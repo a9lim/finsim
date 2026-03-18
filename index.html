@@ -7,6 +7,10 @@
     <title>Trading Simulator</title>
     <meta name="description"
         content="An interactive trading simulator with options pricing, portfolio management, and strategy analysis. Trade stocks, bonds, and options in a realistic market environment.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+Mono:wght@300;400;500;600;700&family=Noto+Serif:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap"
+        rel="stylesheet">
     <script src="/shared-tokens.js"></script>
     <script src="/shared-utils.js"></script>
     <script src="/shared-haptics.js"></script>
@@ -17,10 +21,6 @@
     <script src="/shared-shortcuts.js"></script>
     <link rel="stylesheet" href="/shared-base.css">
     <link rel="stylesheet" href="styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+Mono:wght@300;400;500;600;700&family=Noto+Serif:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap"
-        rel="stylesheet">
 </head>
 
 <body>
@@ -162,7 +162,7 @@
                     </svg>
                 </button>
                 <div class="ctrl-sep"></div>
-                <button class="tool-btn zoom-ctrl-btn" id="zoom-fit-btn" aria-label="Fit to view">
+                <button class="tool-btn zoom-ctrl-btn" id="zoom-reset-btn" aria-label="Fit to view">
                     <svg width="16" height="16" viewBox="0 0 24 24">
                         <path d="M15 3h6v6"></path>
                         <path d="M9 21H3v-6"></path>
@@ -176,9 +176,9 @@
 
     <!-- Time Slider Bar (strategy view) -->
     <div id="time-slider-bar" class="sim-bar glass hidden">
-        <label class="time-slider-label">
+        <label class="time-slider-label" id="time-slider-label">
             <span>Expiry</span>
-            <input type="range" id="strategy-time-slider" min="0" max="100" value="50">
+            <input type="range" id="time-slider" min="0" max="100" value="50">
             <span id="strategy-time-value">50%</span>
         </label>
     </div>
@@ -316,59 +316,59 @@
                         <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn">Advanced Parameters</button>
                         <div id="advanced-section" class="advanced-section hidden">
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-mu">Drift (mu)</label>
-                                <input type="range" id="param-mu" min="-0.20" max="0.20" step="0.01" value="0.08">
-                                <span class="slider-value" id="val-mu">0.08</span>
+                                <label class="stat-label" for="slider-mu">Drift (mu)</label>
+                                <input type="range" id="slider-mu" min="-0.20" max="0.20" step="0.01" value="0.08">
+                                <span class="slider-value" id="slider-mu-val">0.08</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-theta">Vol Mean (theta)</label>
-                                <input type="range" id="param-theta" min="0.01" max="0.50" step="0.01" value="0.04">
-                                <span class="slider-value" id="val-theta">0.04</span>
+                                <label class="stat-label" for="slider-theta">Vol Mean (theta)</label>
+                                <input type="range" id="slider-theta" min="0.01" max="0.50" step="0.01" value="0.04">
+                                <span class="slider-value" id="slider-theta-val">0.04</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-kappa">Mean Rev (kappa)</label>
-                                <input type="range" id="param-kappa" min="0.1" max="5.0" step="0.1" value="3.0">
-                                <span class="slider-value" id="val-kappa">3.0</span>
+                                <label class="stat-label" for="slider-kappa">Mean Rev (kappa)</label>
+                                <input type="range" id="slider-kappa" min="0.1" max="5.0" step="0.1" value="3.0">
+                                <span class="slider-value" id="slider-kappa-val">3.0</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-xi">Vol of Vol (xi)</label>
-                                <input type="range" id="param-xi" min="0.1" max="1.0" step="0.1" value="0.3">
-                                <span class="slider-value" id="val-xi">0.3</span>
+                                <label class="stat-label" for="slider-xi">Vol of Vol (xi)</label>
+                                <input type="range" id="slider-xi" min="0.1" max="1.0" step="0.1" value="0.3">
+                                <span class="slider-value" id="slider-xi-val">0.3</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-rho">Correlation (rho)</label>
-                                <input type="range" id="param-rho" min="-0.95" max="0.00" step="0.05" value="-0.50">
-                                <span class="slider-value" id="val-rho">-0.50</span>
+                                <label class="stat-label" for="slider-rho">Correlation (rho)</label>
+                                <input type="range" id="slider-rho" min="-0.95" max="0.00" step="0.05" value="-0.50">
+                                <span class="slider-value" id="slider-rho-val">-0.50</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-lambda">Jump Rate (lambda)</label>
-                                <input type="range" id="param-lambda" min="0.0" max="10.0" step="0.5" value="0.5">
-                                <span class="slider-value" id="val-lambda">0.5</span>
+                                <label class="stat-label" for="slider-lambda">Jump Rate (lambda)</label>
+                                <input type="range" id="slider-lambda" min="0.0" max="10.0" step="0.5" value="0.5">
+                                <span class="slider-value" id="slider-lambda-val">0.5</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-muJ">Jump Mean (muJ)</label>
-                                <input type="range" id="param-muJ" min="-0.15" max="0.05" step="0.01" value="-0.02">
-                                <span class="slider-value" id="val-muJ">-0.02</span>
+                                <label class="stat-label" for="slider-muJ">Jump Mean (muJ)</label>
+                                <input type="range" id="slider-muJ" min="-0.15" max="0.05" step="0.01" value="-0.02">
+                                <span class="slider-value" id="slider-muJ-val">-0.02</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-sigmaJ">Jump Vol (sigmaJ)</label>
-                                <input type="range" id="param-sigmaJ" min="0.01" max="0.15" step="0.01" value="0.03">
-                                <span class="slider-value" id="val-sigmaJ">0.03</span>
+                                <label class="stat-label" for="slider-sigmaJ">Jump Vol (sigmaJ)</label>
+                                <input type="range" id="slider-sigmaJ" min="0.01" max="0.15" step="0.01" value="0.03">
+                                <span class="slider-value" id="slider-sigmaJ-val">0.03</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-a">Rate Rev (a)</label>
-                                <input type="range" id="param-a" min="0.1" max="1.0" step="0.1" value="0.5">
-                                <span class="slider-value" id="val-a">0.5</span>
+                                <label class="stat-label" for="slider-a">Rate Rev (a)</label>
+                                <input type="range" id="slider-a" min="0.1" max="1.0" step="0.1" value="0.5">
+                                <span class="slider-value" id="slider-a-val">0.5</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-b">Rate Mean (b)</label>
-                                <input type="range" id="param-b" min="0.01" max="0.10" step="0.01" value="0.04">
-                                <span class="slider-value" id="val-b">0.04</span>
+                                <label class="stat-label" for="slider-b">Rate Mean (b)</label>
+                                <input type="range" id="slider-b" min="0.01" max="0.10" step="0.01" value="0.04">
+                                <span class="slider-value" id="slider-b-val">0.04</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="param-sigmaR">Rate Vol (sigmaR)</label>
-                                <input type="range" id="param-sigmaR" min="0.001" max="0.025" step="0.001" value="0.005">
-                                <span class="slider-value" id="val-sigmaR">0.005</span>
+                                <label class="stat-label" for="slider-sigmaR">Rate Vol (sigmaR)</label>
+                                <input type="range" id="slider-sigmaR" min="0.001" max="0.025" step="0.001" value="0.005">
+                                <span class="slider-value" id="slider-sigmaR-val">0.005</span>
                             </div>
                         </div>
                     </div>
