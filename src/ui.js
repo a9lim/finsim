@@ -121,7 +121,17 @@ export function cacheDOMElements($) {
     $.execStrategyBtn  = document.getElementById('exec-strategy-btn');
     $.strategyBuilder  = document.getElementById('strategy-builder');
     $.strategyStrike   = document.getElementById('strategy-strike');
+    $.strategyStrikeVal = document.getElementById('strategy-strike-val');
     $.strategyExpiry   = document.getElementById('strategy-expiry');
+    $.strategyExpiryVal = document.getElementById('strategy-expiry-val');
+    $.tradeQty         = document.getElementById('trade-qty');
+    $.tradeQtyVal      = document.getElementById('trade-qty-val');
+    $.strategyQty      = document.getElementById('strategy-qty');
+    $.strategyQtyVal   = document.getElementById('strategy-qty-val');
+    $.orderTypeToggles = document.getElementById('order-type-toggles');
+    $.triggerPriceGroup = document.getElementById('trigger-price-group');
+    $.triggerPrice     = document.getElementById('trigger-price');
+    $.triggerPriceVal  = document.getElementById('trigger-price-val');
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +232,54 @@ export function bindEvents($, handlers) {
 
     $._onChainCellClick = onChainCellClick;
     $._onTradeSubmit    = onTradeSubmit;
+
+    // Trade tab qty slider
+    if ($.tradeQty) {
+        $.tradeQty.addEventListener('input', () => {
+            $.tradeQtyVal.textContent = $.tradeQty.value;
+        });
+    }
+
+    // Strategy tab qty slider
+    if ($.strategyQty) {
+        $.strategyQty.addEventListener('input', () => {
+            $.strategyQtyVal.textContent = $.strategyQty.value;
+        });
+    }
+
+    // Strategy strike slider
+    if ($.strategyStrike) {
+        $.strategyStrike.addEventListener('input', () => {
+            $.strategyStrikeVal.textContent = '$' + $.strategyStrike.value;
+        });
+    }
+
+    // Strategy expiry slider
+    if ($.strategyExpiry) {
+        $.strategyExpiry.addEventListener('input', () => {
+            $.strategyExpiryVal.textContent = $.strategyExpiry.value + ' DTE';
+        });
+    }
+
+    // Order type toggle (Market / Limit / Stop)
+    if ($.orderTypeToggles) {
+        $.orderTypeToggles.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                $.orderTypeToggles.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const isMarket = btn.dataset.ordertype === 'market';
+                $.triggerPriceGroup.classList.toggle('hidden', isMarket);
+                _haptics.trigger('selection');
+            });
+        });
+    }
+
+    // Trigger price slider
+    if ($.triggerPrice) {
+        $.triggerPrice.addEventListener('input', () => {
+            $.triggerPriceVal.textContent = '$' + parseFloat($.triggerPrice.value).toFixed(2);
+        });
+    }
 
     // Strategy builder buttons: left-click = long, right-click = short
     if ($.addCallBtn && typeof handlers.onAddLeg === 'function') {
@@ -898,52 +956,58 @@ export function updateZoomLevel($, factor) {
 // ---------------------------------------------------------------------------
 
 /**
- * Populate the shared strategy strike and expiry selectors from chain data.
+ * Update the strategy strike and expiry sliders from chain data.
  * Called whenever the chain is rebuilt.
  */
 export function updateStrategySelectors($, chain, spot) {
     if (!$.strategyStrike || !$.strategyExpiry) return;
 
-    // Preserve current selections
-    const prevStrike = $.strategyStrike.value;
-    const prevExpiry = $.strategyExpiry.value;
-
-    // Populate expiry selector
-    $.strategyExpiry.textContent = '';
+    // Update expiry slider range from chain
     if (chain && chain.length > 0) {
-        for (const exp of chain) {
-            const o = document.createElement('option');
-            o.value = exp.day;
-            o.textContent = exp.dte + 'd (D' + exp.day + ')';
-            $.strategyExpiry.appendChild(o);
-        }
-        // Restore previous selection if still valid, otherwise first
-        if (prevExpiry && Array.from($.strategyExpiry.options).some(o => o.value === prevExpiry)) {
-            $.strategyExpiry.value = prevExpiry;
-        }
+        const dtes = chain.map(e => e.dte);
+        const minDte = Math.min(...dtes);
+        const maxDte = Math.max(...dtes);
+        const step = dtes.length > 1 ? dtes[1] - dtes[0] : 21;
+        $.strategyExpiry.min = minDte;
+        $.strategyExpiry.max = maxDte;
+        $.strategyExpiry.step = step > 0 ? step : 21;
+        // Clamp current value into range
+        const curExp = parseInt($.strategyExpiry.value, 10);
+        if (curExp < minDte) $.strategyExpiry.value = minDte;
+        else if (curExp > maxDte) $.strategyExpiry.value = maxDte;
+        $.strategyExpiryVal.textContent = $.strategyExpiry.value + ' DTE';
     }
 
-    // Populate strike selector from first (or selected) expiry
-    const selectedExpiryDay = parseInt($.strategyExpiry.value, 10);
-    const expiryData = chain ? chain.find(e => e.day === selectedExpiryDay) || chain[0] : null;
+    // Update strike slider range from first expiry's options
+    const expiryData = chain && chain.length > 0 ? chain[0] : null;
+    if (expiryData && expiryData.options && expiryData.options.length > 0) {
+        const strikes = expiryData.options.map(o => o.strike);
+        const minStrike = Math.min(...strikes);
+        const maxStrike = Math.max(...strikes);
+        $.strategyStrike.min = minStrike;
+        $.strategyStrike.max = maxStrike;
+        $.strategyStrike.step = 5; // STRIKE_INTERVAL
+        // Clamp current value; default to ATM
+        const atm = spot ? Math.round(spot / 5) * 5 : null;
+        const curStrike = parseInt($.strategyStrike.value, 10);
+        if (curStrike < minStrike || curStrike > maxStrike) {
+            $.strategyStrike.value = atm != null ? Math.max(minStrike, Math.min(maxStrike, atm)) : minStrike;
+        }
+        $.strategyStrikeVal.textContent = '$' + $.strategyStrike.value;
+    }
 
-    $.strategyStrike.textContent = '';
-    const atm = spot ? Math.round(spot / 5) * 5 : null;
-    if (expiryData && expiryData.options) {
-        for (const opt of expiryData.options) {
-            const o = document.createElement('option');
-            o.value = opt.strike;
-            o.textContent = '$' + opt.strike + (opt.strike === atm ? ' (ATM)' : '');
-            $.strategyStrike.appendChild(o);
+    // Update trigger price slider range based on current spot (+-30%)
+    if ($.triggerPrice && spot) {
+        const trigMin = Math.max(1, Math.round(spot * 0.7 * 2) / 2);
+        const trigMax = Math.round(spot * 1.3 * 2) / 2;
+        $.triggerPrice.min = trigMin;
+        $.triggerPrice.max = trigMax;
+        // Clamp current value
+        const curTrig = parseFloat($.triggerPrice.value);
+        if (curTrig < trigMin || curTrig > trigMax) {
+            $.triggerPrice.value = Math.round(spot * 2) / 2;
         }
-        // Restore previous selection if still valid, otherwise ATM
-        if (prevStrike && Array.from($.strategyStrike.options).some(o => o.value === prevStrike)) {
-            $.strategyStrike.value = prevStrike;
-        } else if (atm != null) {
-            // Select ATM strike
-            const atmOpt = Array.from($.strategyStrike.options).find(o => parseInt(o.value) === atm);
-            if (atmOpt) $.strategyStrike.value = atmOpt.value;
-        }
+        $.triggerPriceVal.textContent = '$' + parseFloat($.triggerPrice.value).toFixed(2);
     }
 }
 

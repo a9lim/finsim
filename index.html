@@ -205,6 +205,22 @@
                 <div class="tab-panel active" id="tab-trade" role="tabpanel">
                     <div class="stat-group">
                         <div class="group-label">Quick Trade</div>
+                        <div class="control-group">
+                            <label>Quantity <span class="slider-value" id="trade-qty-val">1</span></label>
+                            <input type="range" id="trade-qty" min="1" max="100" step="1" value="1">
+                        </div>
+                        <div class="control-group">
+                            <label>Order Type</label>
+                            <div class="mode-toggles" id="order-type-toggles">
+                                <button class="mode-btn active" data-ordertype="market">Market</button>
+                                <button class="mode-btn" data-ordertype="limit">Limit</button>
+                                <button class="mode-btn" data-ordertype="stop">Stop</button>
+                            </div>
+                        </div>
+                        <div class="control-group hidden" id="trigger-price-group">
+                            <label>Trigger Price <span class="slider-value" id="trigger-price-val">$100.00</span></label>
+                            <input type="range" id="trigger-price" min="50" max="150" step="0.50" value="100">
+                        </div>
                         <div class="quick-trade-row">
                             <button id="stock-btn" class="ghost-btn trade-btn stock">Stock</button>
                             <button id="bond-btn" class="ghost-btn trade-btn bond">Bond</button>
@@ -293,13 +309,17 @@
                 <div class="tab-panel" id="tab-strategy" role="tabpanel">
                     <div class="stat-group" id="strategy-builder">
                         <div class="group-label">Build Strategy</div>
-                        <div class="ctrl-row">
-                            <label class="stat-label" for="strategy-strike">Strike</label>
-                            <select id="strategy-strike" class="sim-select"></select>
+                        <div class="control-group">
+                            <label>Quantity <span class="slider-value" id="strategy-qty-val">1</span></label>
+                            <input type="range" id="strategy-qty" min="1" max="100" step="1" value="1">
                         </div>
-                        <div class="ctrl-row">
-                            <label class="stat-label" for="strategy-expiry">Expiry</label>
-                            <select id="strategy-expiry" class="sim-select"></select>
+                        <div class="control-group">
+                            <label>Strike <span class="slider-value" id="strategy-strike-val">$100</span></label>
+                            <input type="range" id="strategy-strike" min="50" max="150" step="5" value="100">
+                        </div>
+                        <div class="control-group">
+                            <label>Expiry <span class="slider-value" id="strategy-expiry-val">21 DTE</span></label>
+                            <input type="range" id="strategy-expiry" min="21" max="168" step="21" value="21">
                         </div>
                         <div class="quick-trade-row strategy-add-row">
                             <button id="add-call-btn" class="ghost-btn trade-btn up">Call</button>

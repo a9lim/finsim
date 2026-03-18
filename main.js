@@ -518,62 +518,58 @@ function syncSliderToSim(param, value) {
     dirty = true;
 }
 
-function handleBuyStock() {
+function _getTradeQty() {
+    return parseInt($.tradeQty?.value, 10) || 1;
+}
+
+function _getOrderType() {
+    const active = $.orderTypeToggles?.querySelector('.mode-btn.active');
+    return active ? active.dataset.ordertype : 'market';
+}
+
+function _getTriggerPrice() {
+    return parseFloat($.triggerPrice?.value) || sim.S;
+}
+
+function _executeOrPlace(type, side, qty, strike, expiryDay) {
     const vol = Math.sqrt(Math.max(sim.v, 0));
-    const pos = executeMarketOrder('stock', 'long', 1, sim.S, vol, sim.r, sim.day);
-    if (pos) {
-        if (typeof showToast !== 'undefined') showToast('Bought 1 share at $' + sim.S.toFixed(2));
-        _haptics.trigger('success');
+    const orderType = _getOrderType();
+    if (orderType === 'market') {
+        const pos = executeMarketOrder(type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay);
+        if (pos) {
+            const label = side === 'short' ? 'Shorted' : 'Bought';
+            if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + sim.S.toFixed(2));
+            _haptics.trigger('success');
+        } else {
+            if (typeof showToast !== 'undefined') showToast('Insufficient funds/margin.');
+            _haptics.trigger('error');
+        }
     } else {
-        if (typeof showToast !== 'undefined') showToast('Insufficient cash.');
-        _haptics.trigger('error');
+        const triggerPrice = _getTriggerPrice();
+        placePendingOrder(type, side, qty, orderType, triggerPrice, strike, expiryDay);
+        if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' order placed for ' + qty + ' ' + type + '.');
+        _haptics.trigger('medium');
     }
     updateUI();
     dirty = true;
+}
+
+function handleBuyStock() {
+    _executeOrPlace('stock', 'long', _getTradeQty());
 }
 
 function handleShortStock() {
-    const vol = Math.sqrt(Math.max(sim.v, 0));
-    const pos = executeMarketOrder('stock', 'short', 1, sim.S, vol, sim.r, sim.day);
-    if (pos) {
-        if (typeof showToast !== 'undefined') showToast('Shorted 1 share at $' + sim.S.toFixed(2));
-        _haptics.trigger('success');
-    } else {
-        if (typeof showToast !== 'undefined') showToast('Insufficient margin.');
-        _haptics.trigger('error');
-    }
-    updateUI();
-    dirty = true;
+    _executeOrPlace('stock', 'short', _getTradeQty());
 }
 
 function handleBuyBond() {
-    const vol = Math.sqrt(Math.max(sim.v, 0));
     const expiryDay = chain.length > 0 ? chain[0].day : sim.day + 21;
-    const pos = executeMarketOrder('bond', 'long', 1, sim.S, vol, sim.r, sim.day, null, expiryDay);
-    if (pos) {
-        if (typeof showToast !== 'undefined') showToast('Bought 1 bond, expires day ' + expiryDay);
-        _haptics.trigger('success');
-    } else {
-        if (typeof showToast !== 'undefined') showToast('Insufficient cash.');
-        _haptics.trigger('error');
-    }
-    updateUI();
-    dirty = true;
+    _executeOrPlace('bond', 'long', _getTradeQty(), null, expiryDay);
 }
 
 function handleShortBond() {
-    const vol = Math.sqrt(Math.max(sim.v, 0));
     const expiryDay = chain.length > 0 ? chain[0].day : sim.day + 21;
-    const pos = executeMarketOrder('bond', 'short', 1, sim.S, vol, sim.r, sim.day, null, expiryDay);
-    if (pos) {
-        if (typeof showToast !== 'undefined') showToast('Shorted 1 bond, expires day ' + expiryDay);
-        _haptics.trigger('success');
-    } else {
-        if (typeof showToast !== 'undefined') showToast('Insufficient margin.');
-        _haptics.trigger('error');
-    }
-    updateUI();
-    dirty = true;
+    _executeOrPlace('bond', 'short', _getTradeQty(), null, expiryDay);
 }
 
 function handleChainCellClick(info) {
@@ -624,13 +620,27 @@ function handleLiquidate() {
 // ---------------------------------------------------------------------------
 
 function handleAddLeg(type, side) {
-    const signedQty = side === 'short' ? -1 : 1;
+    const absQty = parseInt($.strategyQty?.value, 10) || 1;
+    const signedQty = side === 'short' ? -absQty : absQty;
     const strike = (type === 'call' || type === 'put')
         ? parseInt($.strategyStrike?.value) || Math.round(sim.S / 5) * 5
         : undefined;
-    const expiryDay = (type === 'call' || type === 'put' || type === 'bond')
-        ? parseInt($.strategyExpiry?.value) || (chain.length > 0 ? chain[0].day : sim.day + 21)
-        : undefined;
+    // Expiry slider gives DTE; find the closest chain expiry day
+    const sliderDte = parseInt($.strategyExpiry?.value, 10) || 21;
+    let expiryDay;
+    if (type === 'call' || type === 'put' || type === 'bond') {
+        // Find chain expiry closest to the slider DTE
+        const targetDay = sim.day + sliderDte;
+        if (chain.length > 0) {
+            let best = chain[0];
+            for (const exp of chain) {
+                if (Math.abs(exp.day - targetDay) < Math.abs(best.day - targetDay)) best = exp;
+            }
+            expiryDay = best.day;
+        } else {
+            expiryDay = sim.day + sliderDte;
+        }
+    }
 
     // Find existing leg of same type/strike/expiry for netting
     const existing = strategyLegs.find(l =>
