@@ -23,7 +23,8 @@ import { priceAmerican, computeGreeks, computeSpread } from './pricing.js';
 export const portfolio = {
     cash:           INITIAL_CAPITAL,
     initialCapital: INITIAL_CAPITAL,
-    positions: [],  // { id, type, side, qty, strike?, expiryDay?, entryPrice, entryDay, strategyName? }
+    positions: [],  // { id, type, qty, strike?, expiryDay?, entryPrice, entryDay, strategyName? }
+                    //   qty > 0 = long, qty < 0 = short
     orders:    [],  // { id, type, side, qty, orderType, triggerPrice, strike?, expiryDay?, strategyName? }
     strategies:[],  // { name, legs: [{ type, side, qty, strike?, expiryDay? }] }
 };
@@ -136,6 +137,10 @@ function _marginForShort(type, qty, fillPrice, currentPrice, currentVol, current
 
 /**
  * Execute a market order immediately at current prices.
+ * Uses signed qty internally: positive = long, negative = short.
+ * If an existing position of the same type (and same strike/expiry for
+ * options) exists, the order nets against it — reducing, flipping, or
+ * closing the position.
  *
  * @param {string}  type         - 'stock'|'bond'|'call'|'put'
  * @param {string}  side         - 'long'|'short'
@@ -147,38 +152,129 @@ function _marginForShort(type, qty, fillPrice, currentPrice, currentVol, current
  * @param {number}  [strike]     - For options/bonds
  * @param {number}  [expiryDay]  - Simulation day of expiry
  * @param {string}  [strategyName]
- * @returns {Object|null} The new position object, or null if insufficient cash.
+ * @returns {Object|null} The position object (new or updated), or null if insufficient cash.
  */
 export function executeMarketOrder(
     type, side, qty,
     currentPrice, currentVol, currentRate, currentDay,
     strike, expiryDay, strategyName
 ) {
+    // Convert to signed qty: long = +qty, short = -qty
+    const signedQty = side === 'long' ? qty : -qty;
+
     const mid  = _fairPrice(type, currentPrice, currentRate, currentDay, strike, expiryDay, currentVol);
     const fill = _fillPrice(type, side, mid, currentPrice, strike, currentVol);
 
-    let cashDelta = 0;  // Net change to portfolio.cash (positive = credit)
+    // Find existing position of same type+strike+expiry for netting
+    const existingIdx = portfolio.positions.findIndex(p =>
+        p.type === type &&
+        (strike == null ? p.strike == null : p.strike === strike) &&
+        (expiryDay == null ? p.expiryDay == null : p.expiryDay === expiryDay)
+    );
+
+    if (existingIdx !== -1) {
+        // --- Netting against existing position ---
+        const existing = portfolio.positions[existingIdx];
+        const oldQty = existing.qty;
+        const newQty = oldQty + signedQty;
+
+        // Compute cash effect based on how the order interacts with the
+        // existing position. Three cases:
+        //   1. Same direction (extending): buy more long or sell more short
+        //   2. Opposite direction, partial/full close: reduces position
+        //   3. Opposite direction, flip: closes then opens on other side
+
+        let cashDelta = 0;
+
+        if (oldQty > 0 && signedQty < 0) {
+            // Selling against a long position
+            const absOrder = Math.abs(signedQty);
+            const closingQty = Math.min(absOrder, oldQty);
+            const openingShortQty = absOrder - closingQty;
+
+            // Credit from closing long portion
+            cashDelta += fill * closingQty;
+
+            // If flipping to short, also handle margin for the new short
+            if (openingShortQty > 0) {
+                const proceeds = fill * openingShortQty;
+                const margin = _marginForShort(
+                    type, openingShortQty, fill, currentPrice, currentVol,
+                    currentRate, currentDay, strike, expiryDay
+                );
+                if (portfolio.cash + cashDelta + proceeds < margin) return null;
+                cashDelta += proceeds - margin;
+            }
+
+        } else if (oldQty < 0 && signedQty > 0) {
+            // Buying against a short position
+            const closingShortQty = Math.min(signedQty, Math.abs(oldQty));
+            const openingLongQty = signedQty - closingShortQty;
+
+            // Return margin for closed short portion
+            const returnedMargin = _marginForShort(
+                type, closingShortQty, existing.entryPrice, currentPrice, currentVol,
+                currentRate, currentDay, strike, expiryDay
+            );
+            // Cost to buy back the short portion
+            const buybackCost = fill * closingShortQty;
+            // Cost of new long portion
+            const longCost = fill * openingLongQty;
+
+            cashDelta = returnedMargin - buybackCost - longCost;
+            if (portfolio.cash + cashDelta < 0) return null;
+
+        } else if (signedQty > 0) {
+            // Extending a long position (oldQty >= 0)
+            const cost = fill * signedQty;
+            if (portfolio.cash < cost) return null;
+            cashDelta = -cost;
+
+        } else {
+            // Extending a short position (oldQty <= 0, signedQty < 0)
+            const absQty = Math.abs(signedQty);
+            const proceeds = fill * absQty;
+            const margin = _marginForShort(
+                type, absQty, fill, currentPrice, currentVol,
+                currentRate, currentDay, strike, expiryDay
+            );
+            if (portfolio.cash + proceeds < margin) return null;
+            cashDelta = proceeds - margin;
+        }
+
+        portfolio.cash += cashDelta;
+
+        if (newQty === 0) {
+            // Position fully closed
+            portfolio.positions.splice(existingIdx, 1);
+            return existing; // Return closed position as confirmation
+        }
+
+        // Update existing position
+        // If qty flipped sign, update entry price to current fill
+        if ((oldQty > 0 && newQty < 0) || (oldQty < 0 && newQty > 0)) {
+            existing.entryPrice = fill;
+            existing.entryDay = currentDay;
+        }
+        existing.qty = newQty;
+        return existing;
+    }
+
+    // --- No existing position: open new ---
+    let cashDelta = 0;
 
     if (side === 'long') {
-        // Cost of buying
         const cost = fill * qty;
-        if (portfolio.cash < cost) return null;  // Insufficient cash
+        if (portfolio.cash < cost) return null;
         cashDelta = -cost;
-
     } else {
-        // Short position: credit premium/proceeds, reserve margin
         const proceeds = fill * qty;
-        const margin   = _marginForShort(
+        const margin = _marginForShort(
             type, qty, fill, currentPrice, currentVol, currentRate,
             currentDay, strike, expiryDay
         );
-        // Margin is reserved from the credited proceeds + existing cash.
-        // Net cash change: +proceeds (credited) - margin (reserved/locked).
-        // We model margin simply: cash increases by proceeds but we check
-        // whether total cash after crediting covers the margin reserve.
-        // If cash + proceeds < margin we can't open the short.
         if (portfolio.cash + proceeds < margin) return null;
-        cashDelta = proceeds - margin;  // margin is locked from cash
+        cashDelta = proceeds - margin;
     }
 
     portfolio.cash += cashDelta;
@@ -186,8 +282,7 @@ export function executeMarketOrder(
     const position = {
         id:          _nextPositionId++,
         type,
-        side,
-        qty,
+        qty:         signedQty,
         entryPrice:  fill,
         entryDay:    currentDay,
         strategyName: strategyName || null,
@@ -301,16 +396,7 @@ export function checkPendingOrders(currentPrice, currentVol, currentRate, curren
 /**
  * Close an existing position at current market prices.
  * Cash is credited/debited accordingly.
- *
- * For short positions the margin reserve is returned to cash when the
- * position is closed.  We approximate the returned margin as the original
- * margin cost (entryPrice * qty for stock, etc.), but since we stored the
- * net cashDelta at open, we compute the close P&L from fair value directly.
- *
- * Simplified approach:
- *   - Long:  credit current fair value * qty to cash
- *   - Short: debit current fair value * qty from cash (cost to close)
- *            then return margin by adding back margin reserve estimate
+ * qty > 0 = long position, qty < 0 = short position.
  *
  * @returns {boolean} true if position was found and closed.
  */
@@ -319,32 +405,30 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
     if (idx === -1) return false;
 
     const pos = portfolio.positions[idx];
+    const absQty = Math.abs(pos.qty);
     const mid = _fairPrice(
         pos.type, currentPrice, currentRate, currentDay,
         pos.strike, pos.expiryDay, currentVol
     );
 
-    if (pos.side === 'long') {
-        // Sell at bid
+    if (pos.qty > 0) {
+        // Long position: sell at bid
         const halfSpread = (pos.type === 'call' || pos.type === 'put')
             ? computeSpread(mid, currentPrice, pos.strike, currentVol) / 2
             : 0;
         const bidPrice = mid - halfSpread;
-        portfolio.cash += bidPrice * pos.qty;
+        portfolio.cash += bidPrice * absQty;
     } else {
-        // Closing a short: buy back at ask to unwind
+        // Short position: buy back at ask to unwind
         const halfSpread = (pos.type === 'call' || pos.type === 'put')
             ? computeSpread(mid, currentPrice, pos.strike, currentVol) / 2
             : 0;
         const askPrice = mid + halfSpread;
-        // Deduct cost to buy back; also return the original margin reserve.
-        // Margin was already deducted from cash at open (stored implicitly).
-        // The margin return = original margin locked - cost to unwind.
         const returnedMargin = _marginForShort(
-            pos.type, pos.qty, pos.entryPrice, currentPrice, currentVol,
+            pos.type, absQty, pos.entryPrice, currentPrice, currentVol,
             currentRate, currentDay, pos.strike, pos.expiryDay
         );
-        portfolio.cash += returnedMargin - askPrice * pos.qty;
+        portfolio.cash += returnedMargin - askPrice * absQty;
     }
 
     portfolio.positions.splice(idx, 1);
@@ -357,7 +441,7 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
 
 /**
  * Manually exercise an option position.
- * Only valid for 'call' or 'put' positions with side === 'long'.
+ * Only valid for 'call' or 'put' positions with qty > 0 (long).
  * (Short options are assigned, not exercised.)
  *
  * Call exercise: pay strike * qty, receive stock position.
@@ -371,19 +455,20 @@ export function exerciseOption(positionId, currentPrice, currentDay) {
 
     const pos = portfolio.positions[idx];
     if (pos.type !== 'call' && pos.type !== 'put') return null;
+    if (pos.qty <= 0) return null; // Can only exercise long options
 
+    const absQty = pos.qty;
     let stockPos = null;
 
     if (pos.type === 'call') {
         // Must pay strike per share; receive a long stock position
-        const cost = pos.strike * pos.qty;
-        if (portfolio.cash < cost) return null; // Can't afford exercise
+        const cost = pos.strike * absQty;
+        if (portfolio.cash < cost) return null;
         portfolio.cash -= cost;
         stockPos = {
             id:          _nextPositionId++,
             type:        'stock',
-            side:        'long',
-            qty:         pos.qty,
+            qty:         absQty,
             entryPrice:  pos.strike,
             entryDay:    currentDay,
             strategyName: pos.strategyName || null,
@@ -391,7 +476,7 @@ export function exerciseOption(positionId, currentPrice, currentDay) {
         portfolio.positions.push(stockPos);
     } else {
         // Put: receive strike per share in cash
-        portfolio.cash += pos.strike * pos.qty;
+        portfolio.cash += pos.strike * absQty;
     }
 
     // Remove the option position
@@ -429,16 +514,16 @@ export function processExpiry(expiryDay, currentPrice, currentDay) {
             ? currentPrice > pos.strike
             : currentPrice < pos.strike;
 
-        if (itm && pos.side === 'long') {
+        if (itm && pos.qty > 0) {
             const result = exerciseOption(pos.id, currentPrice, currentDay);
             exercised.push({ position: pos, result });
         } else {
             // Expire worthless: for short positions, the premium is kept (already in cash);
             // for long positions, the option value goes to zero.
             // Return margin on short options.
-            if (pos.side === 'short') {
+            if (pos.qty < 0) {
                 const returnedMargin = _marginForShort(
-                    pos.type, pos.qty, pos.entryPrice, currentPrice, 0,
+                    pos.type, Math.abs(pos.qty), pos.entryPrice, currentPrice, 0,
                     0, currentDay, pos.strike, pos.expiryDay
                 );
                 portfolio.cash += returnedMargin;
@@ -504,9 +589,7 @@ export function executeStrategy(strategyName, currentPrice, currentVol, currentR
 
 /**
  * Compute total mark-to-market portfolio value (cash + positions).
- *
- * Short stock: value is qty * (2 * entryPrice - currentPrice)
- *   (reflects P&L: if price drops, short gains; if price rises, short loses)
+ * qty > 0 = long, qty < 0 = short.
  *
  * @returns {number} Total portfolio value in dollars.
  */
@@ -514,6 +597,7 @@ export function portfolioValue(currentPrice, currentVol, currentRate, currentDay
     let total = portfolio.cash;
 
     for (const pos of portfolio.positions) {
+        const absQty = Math.abs(pos.qty);
         const dte = pos.expiryDay != null
             ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
             : 0;
@@ -522,22 +606,22 @@ export function portfolioValue(currentPrice, currentVol, currentRate, currentDay
 
         switch (pos.type) {
             case 'stock':
-                posValue = pos.side === 'long'
-                    ? pos.qty * currentPrice
-                    : pos.qty * (2 * pos.entryPrice - currentPrice);
+                posValue = pos.qty > 0
+                    ? absQty * currentPrice
+                    : absQty * (2 * pos.entryPrice - currentPrice);
                 break;
 
             case 'bond':
-                posValue = pos.qty * BOND_FACE_VALUE * Math.exp(-currentRate * dte);
+                posValue = absQty * BOND_FACE_VALUE * Math.exp(-currentRate * dte);
                 break;
 
             case 'call':
             case 'put': {
                 const isPut  = pos.type === 'put';
                 const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut);
-                posValue = pos.side === 'long'
-                    ? pos.qty * optMid
-                    : pos.qty * (pos.entryPrice - optMid); // short: locked-in premium - current value
+                posValue = pos.qty > 0
+                    ? absQty * optMid
+                    : absQty * (pos.entryPrice - optMid);
                 break;
             }
         }
@@ -553,7 +637,7 @@ export function portfolioValue(currentPrice, currentVol, currentRate, currentDay
 // ---------------------------------------------------------------------------
 
 /**
- * Compute total current margin requirement for all short positions.
+ * Compute total current margin requirement for all short positions (qty < 0).
  *
  * For short stock/bonds: Reg-T maintenance margin (25% of current value).
  * For short options:     max(SHORT_OPTION_MARGIN_PCT * underlying, current option value).
@@ -564,21 +648,21 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
     let total = 0;
 
     for (const pos of portfolio.positions) {
-        if (pos.side !== 'short') continue;
+        if (pos.qty >= 0) continue; // Only short positions
 
+        const absQty = Math.abs(pos.qty);
         const dte = pos.expiryDay != null
             ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
             : 0;
 
         switch (pos.type) {
             case 'stock':
-                // Maintenance margin on current market value
-                total += MAINTENANCE_MARGIN * currentPrice * pos.qty;
+                total += MAINTENANCE_MARGIN * currentPrice * absQty;
                 break;
 
             case 'bond': {
                 const bondPrice = BOND_FACE_VALUE * Math.exp(-currentRate * dte);
-                total += MAINTENANCE_MARGIN * bondPrice * pos.qty;
+                total += MAINTENANCE_MARGIN * bondPrice * absQty;
                 break;
             }
 
@@ -586,7 +670,7 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
             case 'put': {
                 const isPut  = pos.type === 'put';
                 const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut);
-                total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * pos.qty, optMid * pos.qty);
+                total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                 break;
             }
         }
@@ -611,22 +695,23 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay) {
     // Total notional of all positions (long + short, measured at current prices)
     let totalPositionValue = 0;
     for (const pos of portfolio.positions) {
+        const absQty = Math.abs(pos.qty);
         const dte = pos.expiryDay != null
             ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
             : 0;
 
         switch (pos.type) {
             case 'stock':
-                totalPositionValue += currentPrice * pos.qty;
+                totalPositionValue += currentPrice * absQty;
                 break;
             case 'bond':
-                totalPositionValue += BOND_FACE_VALUE * Math.exp(-currentRate * dte) * pos.qty;
+                totalPositionValue += BOND_FACE_VALUE * Math.exp(-currentRate * dte) * absQty;
                 break;
             case 'call':
             case 'put': {
                 const isPut  = pos.type === 'put';
                 const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut);
-                totalPositionValue += optMid * pos.qty;
+                totalPositionValue += optMid * absQty;
                 break;
             }
         }
@@ -676,8 +761,8 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
         const isPut  = pos.type === 'put';
         const greeks = computeGreeks(currentPrice, pos.strike, dte, currentRate, currentVol, isPut);
 
-        const sign = pos.side === 'long' ? 1 : -1;
-        const w    = sign * pos.qty;
+        // qty is already signed: positive = long, negative = short
+        const w = pos.qty;
 
         delta += w * greeks.delta;
         gamma += w * greeks.gamma;

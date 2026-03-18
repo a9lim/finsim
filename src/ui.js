@@ -32,8 +32,10 @@ function fmtDte(dte) {
     return dte + 'd';
 }
 
-function posTypeLabel(type, side) {
-    const prefix = side === 'short' ? 'S' : 'L';
+function posTypeLabel(type, sideOrQty) {
+    // Accept either a string side ('long'/'short') or a signed qty number
+    const isShort = typeof sideOrQty === 'number' ? sideOrQty < 0 : sideOrQty === 'short';
+    const prefix = isShort ? 'S' : 'L';
     switch (type) {
         case 'stock': return prefix + ':STK';
         case 'bond':  return prefix + ':BND';
@@ -470,26 +472,27 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
 }
 
 function _posCurrentValue(pos, S, vol, rate, day) {
+    const absQty = Math.abs(pos.qty);
     switch (pos.type) {
         case 'stock':
-            return pos.side === 'long'
-                ? pos.qty * S
-                : pos.qty * (2 * pos.entryPrice - S);
+            return pos.qty > 0
+                ? absQty * S
+                : absQty * (2 * pos.entryPrice - S);
         case 'bond': {
             const dte = pos.expiryDay != null
                 ? Math.max((pos.expiryDay - day) / TRADING_DAYS_PER_YEAR, 0)
                 : 0;
-            return pos.qty * 100 * Math.exp(-rate * dte);
+            return absQty * 100 * Math.exp(-rate * dte);
         }
         default: return 0;
     }
 }
 
 function _computeMarginDisplay(portfolio, currentPrice) {
-    const shortPositions = portfolio.positions.filter(p => p.side === 'short');
+    const shortPositions = portfolio.positions.filter(p => p.qty < 0);
     if (shortPositions.length === 0) return { label: 'OK', cls: '' };
     let shortNotional = 0;
-    for (const pos of shortPositions) shortNotional += pos.qty * currentPrice;
+    for (const pos of shortPositions) shortNotional += Math.abs(pos.qty) * currentPrice;
     const required = 0.25 * shortNotional;
     if (portfolio.cash < required) return { label: 'MARGIN CALL', cls: 'margin-alert' };
     const pct = required > 0 ? Math.min((portfolio.cash / required) * 100, 999) : 999;
@@ -498,14 +501,15 @@ function _computeMarginDisplay(portfolio, currentPrice) {
 }
 
 function _buildPositionRow(pos, currentPrice, vol, rate, day) {
-    const typeLabel  = posTypeLabel(pos.type, pos.side);
+    const absQty     = Math.abs(pos.qty);
+    const typeLabel  = posTypeLabel(pos.type, pos.qty);
     const currentVal = _posCurrentValue(pos, currentPrice, vol, rate, day);
-    const entryTotal = pos.entryPrice * pos.qty;
-    const pnl        = pos.side === 'long' ? currentVal - entryTotal : entryTotal - currentVal;
+    const entryTotal = pos.entryPrice * absQty;
+    const pnl        = pos.qty > 0 ? currentVal - entryTotal : entryTotal - currentVal;
     const isOption   = pos.type === 'call' || pos.type === 'put';
     const strikeStr  = isOption && pos.strike != null ? ' K' + pos.strike : '';
     const expiryStr  = pos.expiryDay != null ? ' ' + fmtDte(pos.expiryDay - day) : '';
-    const labelStr   = typeLabel + strikeStr + expiryStr + ' x' + pos.qty;
+    const labelStr   = typeLabel + strikeStr + expiryStr + ' x' + absQty;
 
     const row = document.createElement('div');
     row.className = 'pos-row stat-row';
@@ -533,7 +537,7 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day) {
     });
     actions.appendChild(closeBtn);
 
-    if (isOption && pos.side === 'long') {
+    if (isOption && pos.qty > 0) {
         const exBtn = document.createElement('button');
         exBtn.className = 'ghost-btn pos-exercise-btn';
         exBtn.textContent = 'Ex';
