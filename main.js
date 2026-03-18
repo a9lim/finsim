@@ -45,6 +45,7 @@ let mouseX = -1, mouseY = -1;
 let strategyLegs = [];
 let greekToggles = { delta: true, gamma: false, theta: false, vega: false, rho: false };
 let sliderDTE = 30;
+let lastSpot = 0; // track spot changes for range reset
 
 // ---------------------------------------------------------------------------
 // Bootstrap
@@ -99,7 +100,20 @@ function init() {
         chart.setCamera(camera);
     }
 
-    // 5. Init swipe dismiss on sidebar for mobile
+    // 5. Bind strategy canvas wheel zoom
+    strategy.bindWheel($.strategyCanvas);
+
+    // 6. Bind click on strategy canvas for legend toggling
+    $.strategyCanvas.addEventListener('click', (e) => {
+        const rect = $.strategyCanvas.getBoundingClientRect();
+        const cssX = e.clientX - rect.left;
+        const cssY = e.clientY - rect.top;
+        if (strategy.handleClick(cssX, cssY, greekToggles)) {
+            dirty = true;
+        }
+    });
+
+    // 7. Init swipe dismiss on sidebar for mobile
     if (typeof initSwipeDismiss !== 'undefined') {
         initSwipeDismiss($.sidebar, {
             onDismiss: () => { $.sidebar.classList.remove('open'); },
@@ -107,7 +121,7 @@ function init() {
         });
     }
 
-    // 6. Init keyboard shortcuts
+    // 8. Init keyboard shortcuts
     if (typeof initShortcuts !== 'undefined') {
         initShortcuts([
             { key: ' ',  label: 'Play / Pause', group: 'Simulation', action: () => togglePlay() },
@@ -124,7 +138,7 @@ function init() {
         ], { helpTitle: 'Shoals Keyboard Shortcuts' });
     }
 
-    // 7. Bind UI events
+    // 9. Bind UI events
     bindEvents($, {
         onTogglePlay:     () => togglePlay(),
         onStep:           () => step(),
@@ -150,7 +164,7 @@ function init() {
         onExecStrategy:   () => handleExecStrategy(),
     });
 
-    // 8. Wire custom events from ui.js position rows
+    // 10. Wire custom events from ui.js position rows
     document.addEventListener('shoals:closePosition', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
@@ -183,7 +197,7 @@ function init() {
         }
     });
 
-    // 9. Wire intro screen
+    // 11. Wire intro screen
     if ($.introStart) {
         $.introStart.onclick = () => {
             if ($.introScreen) $.introScreen.classList.add('hidden');
@@ -197,20 +211,22 @@ function init() {
         };
     }
 
-    // 10. Wire info tips for slider labels
+    // 12. Wire info tips for slider labels
     wireInfoTips($);
 
-    // 11. Generate historical data so chart isn't empty on load
+    // 13. Generate historical data so chart isn't empty on load
     for (let i = 0; i < 60; i++) sim.tick();
 
-    // 12. Build initial chain and update UI
+    // 14. Build initial chain and update UI
     chain = buildChain(sim.S, sim.v, sim.r, sim.day);
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateSpeedBtn($, speed);
+    lastSpot = sim.S;
+    strategy.resetRange(sim.S, strategyLegs);
     updateUI();
 
-    // 13. Position camera so latest candle is visible
+    // 15. Position camera so latest candle is visible
     if (camera) {
         const lastDay = sim.history.length - 1;
         const viewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
@@ -222,7 +238,7 @@ function init() {
         camera.x = (lastDay + 0.5) - (targetScreenX - viewW / 2) / camera.zoom;
     }
 
-    // 15. Wire resize via ResizeObserver on chart container
+    // 16. Wire resize via ResizeObserver on chart container
     // This fires during CSS sidebar transition AND window resize.
     // We must redraw IMMEDIATELY after resize (same call stack) because
     // setting canvas.width clears the buffer — if we wait for the next
@@ -245,7 +261,7 @@ function init() {
         window.addEventListener('resize', handleResize);
     }
 
-    // 16. Wire mousemove/mouseleave on chart canvas for crosshair
+    // 17. Wire mousemove/mouseleave on chart canvas for crosshair
     $.chartCanvas.addEventListener('mousemove', (e) => {
         const rect = $.chartCanvas.getBoundingClientRect();
         mouseX = e.clientX - rect.left;
@@ -258,7 +274,20 @@ function init() {
         dirty = true;
     });
 
-    // 17. Start animation loop
+    // 18. Wire tab switching to strategy mode
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const isStrategy = btn.dataset.tab === 'strategy';
+            if (isStrategy !== strategyMode) {
+                strategyMode = isStrategy;
+                toggleStrategyView($, strategyMode);
+                if (strategyMode) strategy.resize();
+                dirty = true;
+            }
+        });
+    });
+
+    // 19. Start animation loop
     requestAnimationFrame(frame);
 }
 
@@ -290,6 +319,11 @@ function frame(now) {
             tick();
             lastTickTime = now;
         }
+    }
+    // Check if strategy renderer flagged dirty from wheel zoom
+    if (strategy._dirty) {
+        strategy._dirty = false;
+        dirty = true;
     }
     if (dirty) {
         dirty = false;
@@ -332,6 +366,12 @@ function tick() {
         }
     }
 
+    // Reset strategy range if spot has changed significantly
+    if (Math.abs(sim.S - lastSpot) / lastSpot > 0.01) {
+        strategy.resetRange(sim.S, strategyLegs);
+        lastSpot = sim.S;
+    }
+
     updateUI();
     dirty = true;
 }
@@ -346,6 +386,33 @@ function updateUI() {
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
     updateStrategyBuilder();
+    updateTimeSliderRange();
+}
+
+// ---------------------------------------------------------------------------
+// Time slider range management
+// ---------------------------------------------------------------------------
+
+function updateTimeSliderRange() {
+    let maxDTE = 0;
+    for (const leg of strategyLegs) {
+        if (leg.expiryDay != null) {
+            const dte = leg.expiryDay - sim.day;
+            if (dte > maxDTE) maxDTE = dte;
+        }
+    }
+    if (maxDTE > 0) {
+        $.timeSlider.max = maxDTE;
+        $.timeSlider.disabled = false;
+        if (sliderDTE > maxDTE) sliderDTE = maxDTE;
+        $.timeSlider.value = sliderDTE;
+    } else {
+        $.timeSlider.max = 1;
+        $.timeSlider.value = 0;
+        $.timeSlider.disabled = true;
+        sliderDTE = 0;
+    }
+    if ($.timeSliderLabel) $.timeSliderLabel.textContent = sliderDTE + ' DTE';
 }
 
 // ---------------------------------------------------------------------------
@@ -386,6 +453,26 @@ function toggleStrategy() {
     if (strategyMode) {
         // Canvas was hidden (display:none) so clientWidth/Height were 0 — resize now
         strategy.resize();
+        // Also switch to strategy tab in sidebar
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        const stratTab = document.querySelector('[data-tab="strategy"]');
+        const stratPanel = document.getElementById('tab-strategy');
+        if (stratTab) stratTab.classList.add('active');
+        if (stratPanel) stratPanel.classList.add('active');
+        // Open sidebar if closed
+        if (!$.sidebar.classList.contains('open')) {
+            $.sidebar.classList.add('open');
+            $.panelToggle.setAttribute('aria-expanded', 'true');
+        }
+    } else {
+        // Switch back to trade tab when exiting strategy mode
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        const tradeTab = document.querySelector('[data-tab="trade"]');
+        const tradePanel = document.getElementById('tab-trade');
+        if (tradeTab) tradeTab.classList.add('active');
+        if (tradePanel) tradePanel.classList.add('active');
     }
     dirty = true;
     _haptics.trigger('selection');
@@ -398,6 +485,8 @@ function loadPreset(index) {
     for (let i = 0; i < 60; i++) sim.tick();
     chain = buildChain(sim.S, sim.v, sim.r, sim.day);
     playing = false;
+    lastSpot = sim.S;
+    strategy.resetRange(sim.S, strategyLegs);
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateUI();
@@ -413,6 +502,8 @@ function resetSim() {
     for (let i = 0; i < 60; i++) sim.tick();
     chain = buildChain(sim.S, sim.v, sim.r, sim.day);
     playing = false;
+    lastSpot = sim.S;
+    strategy.resetRange(sim.S, strategyLegs);
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateUI();
@@ -551,6 +642,7 @@ function handleAddLeg(type, side) {
     }
 
     strategyLegs.push(leg);
+    strategy.resetRange(sim.S, strategyLegs);
     updateStrategyBuilder();
     dirty = true;
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
@@ -558,6 +650,7 @@ function handleAddLeg(type, side) {
 
 function handleRemoveLeg(index) {
     strategyLegs.splice(index, 1);
+    strategy.resetRange(sim.S, strategyLegs);
     updateStrategyBuilder();
     dirty = true;
 }
@@ -599,6 +692,7 @@ function updateStrategyBuilder() {
         ? strategy.computeSummary(strategyLegs, sim.S, vol, sim.r, sliderDTE)
         : null;
     renderStrategyBuilder($, strategyLegs, summary, handleRemoveLeg, chain, () => {
+        strategy.resetRange(sim.S, strategyLegs);
         updateStrategyBuilder();
         dirty = true;
     });
