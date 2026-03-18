@@ -1,0 +1,529 @@
+/* ===================================================
+   styles.css -- Project-specific layout overrides for
+   the Shoals trading simulator. Colors/fonts injected
+   by colors.js at runtime. Most styling provided by
+   shared-base.css.
+   =================================================== */
+
+/* --- Base --- */
+html, body {
+    overflow: hidden;
+}
+
+body {
+    font-size: 14px;
+    line-height: 1.5;
+    height: 100vh;
+    height: 100dvh;
+}
+
+/* --- Chart Layout --- */
+main {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+}
+
+#chart-container {
+    width: 100%;
+    height: 100%;
+    background: var(--bg-canvas);
+    position: relative;
+    overflow: hidden;
+    transition: background-color 0.5s var(--ease-out);
+}
+
+#chart-canvas,
+#strategy-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+#strategy-canvas.hidden {
+    display: none;
+}
+
+/* --- Zoom Controls --- */
+.zoom-ctrl-btn {
+    height: 30px;
+    color: var(--text-secondary);
+    font-size: 0;
+}
+
+.zoom-ctrl-btn:hover {
+    border-color: transparent;
+}
+
+#zoom-in-btn svg,
+#zoom-out-btn svg,
+#close-panel svg {
+    stroke-width: 2.5;
+}
+
+/* --- Speed Button --- */
+.speed-btn {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    min-width: 34px;
+}
+
+.speed-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+/* --- Strategy Button Active State --- */
+#strategy-btn.active {
+    color: var(--accent);
+    background: var(--accent-subtle);
+    border-color: var(--accent-subtle);
+}
+
+/* --- Play/Pause Button States --- */
+#play-btn.playing {
+    color: var(--accent);
+}
+
+/* --- Quick Trade Buttons --- */
+.quick-trade-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.trade-btn {
+    flex: 1;
+    font-size: 0.72rem;
+    padding: 6px 4px;
+    text-align: center;
+}
+
+.trade-btn.up {
+    color: var(--up);
+    border-color: var(--up);
+}
+
+.trade-btn.up:hover {
+    background: var(--up);
+    color: var(--bg-panel);
+}
+
+.trade-btn.down {
+    color: var(--down);
+    border-color: var(--down);
+}
+
+.trade-btn.down:hover {
+    background: var(--down);
+    color: var(--bg-panel);
+}
+
+.trade-btn.bond {
+    color: var(--bond);
+    border-color: var(--bond);
+}
+
+.trade-btn.bond:hover {
+    background: var(--bond);
+    color: var(--bg-panel);
+}
+
+/* --- Chain Table --- */
+.chain-table {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.chain-placeholder {
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    padding: 12px 0;
+}
+
+.chain-controls {
+    margin-bottom: 8px;
+}
+
+.chain-row {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.chain-row:hover {
+    background: var(--chain-hover);
+}
+
+.chain-row.chain-atm {
+    border-left: 2px solid var(--accent);
+    font-weight: 600;
+}
+
+.chain-row .chain-strike {
+    flex: 0 0 50px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.chain-row .chain-call,
+.chain-row .chain-put {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+}
+
+.chain-row .chain-bid { color: var(--up); }
+.chain-row .chain-ask { color: var(--down); }
+
+.chain-expand-btn {
+    width: 100%;
+    margin-top: 8px;
+    font-size: 0.72rem;
+}
+
+/* --- Chain Overlay --- */
+.chain-overlay-content {
+    max-width: 560px;
+    padding: 1.25rem;
+}
+
+.full-chain {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* --- Trade Dialog --- */
+.trade-dialog-content {
+    max-width: 380px;
+    padding: 1.25rem;
+}
+
+.trade-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.trade-dialog-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.trade-confirm {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.trade-confirm:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+/* --- Margin Call --- */
+.margin-call-content {
+    max-width: 380px;
+    padding: 1.25rem;
+}
+
+.margin-call-title {
+    color: var(--down);
+}
+
+.margin-call-message {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+/* --- Greeks Display --- */
+.greeks-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.greek-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.greek-item:hover {
+    border-color: var(--border-strong);
+}
+
+.greek-value {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 1;
+    margin-bottom: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.greek-label {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+/* 5th Greek spans full width */
+.greeks-grid .greek-item:nth-child(5) {
+    grid-column: 1 / -1;
+}
+
+/* --- Portfolio Positions --- */
+.position-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    margin-bottom: 4px;
+    font-size: 0.78rem;
+    transition: background 0.12s;
+}
+
+.position-row:hover {
+    background: var(--bg-hover);
+}
+
+.position-type {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.position-qty {
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+
+.position-pnl.up { color: var(--up); }
+.position-pnl.down { color: var(--down); }
+
+/* --- Margin Status --- */
+#margin-status.warning {
+    color: var(--down);
+    font-weight: 600;
+}
+
+/* --- Advanced Section --- */
+.advanced-toggle-btn {
+    width: 100%;
+    font-size: 0.78rem;
+}
+
+.advanced-section.hidden {
+    display: none;
+}
+
+.advanced-section {
+    margin-top: 8px;
+}
+
+.advanced-section .ctrl-row {
+    gap: 8px;
+}
+
+.advanced-section .stat-label {
+    font-size: 0.72rem;
+    min-width: 90px;
+}
+
+/* --- Capital Input --- */
+.sim-input {
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.sim-input:focus {
+    border-color: var(--accent);
+}
+
+/* --- Reset Button --- */
+.reset-btn {
+    width: 100%;
+    color: var(--down);
+    border-color: var(--down);
+}
+
+.reset-btn:hover {
+    background: var(--down);
+    color: #fff;
+}
+
+/* --- Time Slider Bar --- */
+#time-slider-bar {
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    padding: 8px 16px;
+    min-width: 300px;
+}
+
+#time-slider-bar.hidden {
+    display: none;
+}
+
+.time-slider-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.time-slider-label input[type="range"] {
+    flex: 1;
+}
+
+#strategy-time-value {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    min-width: 32px;
+    text-align: right;
+}
+
+/* --- Intro Subtitle --- */
+.intro-subtitle {
+    font-size: 0.55em;
+    font-weight: 300;
+    display: block;
+    letter-spacing: 0.04em;
+}
+
+/* --- Tab Panels --- */
+.tab-panels {
+    font-variant-numeric: tabular-nums;
+}
+
+/* ===================================
+   Responsive
+   =================================== */
+
+/* Mobile: sidebar becomes bottom sheet */
+@media (max-width: 900px) {
+    .tool-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .tool-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    #zoom-controls {
+        bottom: 8px;
+        left: 10px;
+    }
+
+    #sidebar {
+        top: auto;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        max-height: 55vh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        transform: translateY(100%);
+        z-index: 110;
+    }
+
+    .app-ready #sidebar {
+        animation: slideInRight 0.5s var(--ease-out) 0.15s both;
+    }
+
+    .app-ready #sidebar.open {
+        transform: translateY(0);
+    }
+
+    .tab-panel {
+        padding: 8px;
+    }
+
+    .stat-group {
+        padding: 0;
+    }
+
+    #time-slider-bar {
+        min-width: 0;
+        left: 10px;
+        right: 10px;
+        transform: none;
+        bottom: 8px;
+    }
+
+    .greeks-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+    }
+}
+
+/* Small phones */
+@media (max-width: 600px) {
+    .tool-btn {
+        width: 34px;
+        height: 34px;
+    }
+
+    .quick-trade-row {
+        flex-direction: column;
+    }
+}
+
+/* Extra small: hide brand */
+@media (max-width: 440px) {
+    .toolbar-brand {
+        display: none;
+    }
+
+    #toolbar {
+        justify-content: center;
+    }
+
+    .toolbar-actions {
+        gap: 1px;
+    }
+}
