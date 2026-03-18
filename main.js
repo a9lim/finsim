@@ -351,6 +351,10 @@ function toggleSidebar() {
 function toggleStrategy() {
     strategyMode = !strategyMode;
     toggleStrategyView($, strategyMode);
+    if (strategyMode) {
+        // Canvas was hidden (display:none) so clientWidth/Height were 0 — resize now
+        strategy.resize();
+    }
     dirty = true;
     _haptics.trigger('selection');
 }
