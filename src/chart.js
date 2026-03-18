@@ -139,11 +139,10 @@ export class ChartRenderer {
 
         const cam = this.camera;
 
-        // Each day occupies SLOT_PX * zoom screen pixels.
-        // The candle body is BODY_RATIO of that slot.
-        const zoom = cam ? cam.zoom : 1;
-        const slotPx = this.SLOT_PX * zoom;
-        const candleWidthRaw = Math.max(2, Math.min(40, slotPx * this.BODY_RATIO));
+        // Camera zoom = pixels per world unit (1 world unit = 1 day).
+        // Candle body is BODY_RATIO of the slot width.
+        const zoom = cam ? cam.zoom : this.SLOT_PX;
+        const candleWidthRaw = Math.max(2, Math.min(40, zoom * this.BODY_RATIO));
 
         // Map between screen X and day index.
         // We place day `d` candle centered at screen X:  plotX + (d * slotPx) + offset
