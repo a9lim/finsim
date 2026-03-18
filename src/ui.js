@@ -79,6 +79,7 @@ export function cacheDOMElements($) {
     $.greekVega       = document.getElementById('greek-vega');
     $.greekRho        = document.getElementById('greek-rho');
     $.presetSelect    = document.getElementById('preset-select');
+    $.rateDisplay     = document.getElementById('rate-display');
     $.advancedToggle  = document.getElementById('advanced-toggle');
     $.advancedSection = document.getElementById('advanced-section');
     $.capitalInput    = document.getElementById('capital-input');
@@ -178,9 +179,8 @@ export function bindEvents($, handlers) {
     }
 
     $.timeSlider.addEventListener('input', () => {
-        const dte = parseInt($.timeSlider.value, 10);
-        if ($.timeSliderLabel) $.timeSliderLabel.textContent = dte + ' DTE';
-        onTimeSlider(dte);
+        const pct = parseInt($.timeSlider.value, 10);
+        onTimeSlider(pct);
     });
 
     // Stock button: left-click = buy, right-click = short
@@ -396,19 +396,32 @@ function _buildChainTable(expiry, compact) {
 
 function _bindChainTableClicks(container, onChainCellClick) {
     container.querySelectorAll('[data-type]').forEach(cell => {
-        const handler = () => {
+        const info = {
+            strike:    parseInt(cell.dataset.strike, 10),
+            expiryDay: parseInt(cell.dataset.expiryDay, 10),
+            type:      cell.dataset.type,
+        };
+        cell.addEventListener('click', () => {
             _haptics.trigger('selection');
             if (typeof onChainCellClick === 'function') {
-                onChainCellClick({
-                    strike:    parseInt(cell.dataset.strike, 10),
-                    expiryDay: parseInt(cell.dataset.expiryDay, 10),
-                    type:      cell.dataset.type,
-                });
+                onChainCellClick({ ...info, side: 'long' });
             }
-        };
-        cell.addEventListener('click', handler);
+        });
+        cell.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            _haptics.trigger('selection');
+            if (typeof onChainCellClick === 'function') {
+                onChainCellClick({ ...info, side: 'short' });
+            }
+        });
         cell.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                _haptics.trigger('selection');
+                if (typeof onChainCellClick === 'function') {
+                    onChainCellClick({ ...info, side: 'long' });
+                }
+            }
         });
     });
 }
@@ -657,6 +670,14 @@ export function updateGreeksDisplay($, greeks) {
     $.greekDelta.classList.toggle('pnl-down', greeks.delta < 0);
     $.greekTheta.classList.toggle('pnl-down', greeks.theta < 0);
     $.greekVega.classList.toggle('pnl-up',    greeks.vega  > 0);
+}
+
+// ---------------------------------------------------------------------------
+// updateRateDisplay
+// ---------------------------------------------------------------------------
+
+export function updateRateDisplay($, rate) {
+    if ($.rateDisplay) $.rateDisplay.textContent = (rate * 100).toFixed(2) + '%';
 }
 
 // ---------------------------------------------------------------------------
@@ -1112,9 +1133,13 @@ function _buildLegRow(leg, index, onRemoveLeg, chain, onLegChange) {
         if (typeof _haptics !== 'undefined') _haptics.trigger('light');
     });
 
+    const actions = document.createElement('div');
+    actions.className = 'pos-actions';
+    actions.appendChild(qtyInput);
+    actions.appendChild(removeBtn);
+
     row.appendChild(label);
-    row.appendChild(qtyInput);
-    row.appendChild(removeBtn);
+    row.appendChild(actions);
 
     return row;
 }

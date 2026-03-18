@@ -19,9 +19,9 @@ import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
 import {
     cacheDOMElements, bindEvents, updateChainDisplay,
-    updatePortfolioDisplay, updateGreeksDisplay, syncSettingsUI,
-    toggleStrategyView, showMarginCall, showChainOverlay,
-    showTradeDialog, updatePlayBtn, updateSpeedBtn,
+    updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay,
+    syncSettingsUI, toggleStrategyView, showMarginCall, showChainOverlay,
+    updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
@@ -44,7 +44,7 @@ let lastTickTime = 0;
 let mouseX = -1, mouseY = -1;
 let strategyLegs = [];
 let greekToggles = { delta: true, gamma: false, theta: false, vega: false, rho: false };
-let sliderDTE = 30;
+let sliderPct = 100;  // percentage of max DTE (100% = full time, 0% = at expiry)
 let lastSpot = 0; // track spot changes for range reset
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ function init() {
         onPresetChange:   (index) => loadPreset(index),
         onReset:          () => resetSim(),
         onSliderChange:   (param, value) => syncSliderToSim(param, value),
-        onTimeSlider:     (dte) => { sliderDTE = dte; dirty = true; },
+        onTimeSlider:     (pct) => { sliderPct = pct; dirty = true; },
         onBuyStock:       () => handleBuyStock(),
         onShortStock:     () => handleShortStock(),
         onBuyBond:        () => handleBuyBond(),
@@ -301,7 +301,7 @@ function renderCurrentView() {
         strategy.draw(
             strategyLegs, sim.S,
             Math.sqrt(Math.max(sim.v, 0)),
-            sim.r, sliderDTE, greekToggles
+            sim.r, _pctToDTE(sliderPct), greekToggles
         );
     } else {
         chart.draw(
@@ -385,6 +385,7 @@ function updateUI() {
     updateChainDisplay($, chain);
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
+    updateRateDisplay($, sim.r);
     updateStrategySelectors($, chain, sim.S);
     updateStrategyBuilder();
     updateTimeSliderRange();
@@ -394,7 +395,7 @@ function updateUI() {
 // Time slider range management
 // ---------------------------------------------------------------------------
 
-function updateTimeSliderRange() {
+function _getMaxDTE() {
     let maxDTE = 0;
     for (const leg of strategyLegs) {
         if (leg.expiryDay != null) {
@@ -402,18 +403,24 @@ function updateTimeSliderRange() {
             if (dte > maxDTE) maxDTE = dte;
         }
     }
+    return maxDTE;
+}
+
+function _pctToDTE(pct) {
+    return Math.round(_getMaxDTE() * pct / 100);
+}
+
+function updateTimeSliderRange() {
+    const maxDTE = _getMaxDTE();
     if (maxDTE > 0) {
-        $.timeSlider.max = maxDTE;
         $.timeSlider.disabled = false;
-        if (sliderDTE > maxDTE) sliderDTE = maxDTE;
-        $.timeSlider.value = sliderDTE;
     } else {
-        $.timeSlider.max = 1;
-        $.timeSlider.value = 0;
         $.timeSlider.disabled = true;
-        sliderDTE = 0;
+        sliderPct = 100;
+        $.timeSlider.value = 100;
     }
-    if ($.timeSliderLabel) $.timeSliderLabel.textContent = sliderDTE + ' DTE';
+    const dte = _pctToDTE(sliderPct);
+    if ($.timeSliderLabel) $.timeSliderLabel.textContent = sliderPct + '% (' + dte + 'd)';
 }
 
 // ---------------------------------------------------------------------------
@@ -573,11 +580,7 @@ function handleShortBond() {
 }
 
 function handleChainCellClick(info) {
-    showTradeDialog($, {
-        type:      info.type,
-        strike:    info.strike,
-        expiryDay: info.expiryDay,
-    });
+    _executeOrPlace(info.type, info.side, _getTradeQty(), info.strike, info.expiryDay);
 }
 
 function handleTradeSubmit(data) {
@@ -659,6 +662,7 @@ function handleAddLeg(type, side) {
 
     strategy.resetRange(sim.S, strategyLegs);
     updateStrategyBuilder();
+    updateTimeSliderRange();
     dirty = true;
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
@@ -667,6 +671,7 @@ function handleRemoveLeg(index) {
     strategyLegs.splice(index, 1);
     strategy.resetRange(sim.S, strategyLegs);
     updateStrategyBuilder();
+    updateTimeSliderRange();
     dirty = true;
 }
 
@@ -712,7 +717,7 @@ function handleExecStrategy() {
 function updateStrategyBuilder() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     const summary = strategyLegs.length > 0
-        ? strategy.computeSummary(strategyLegs, sim.S, vol, sim.r, sliderDTE)
+        ? strategy.computeSummary(strategyLegs, sim.S, vol, sim.r, _pctToDTE(sliderPct))
         : null;
     renderStrategyBuilder($, strategyLegs, summary, handleRemoveLeg, chain, () => {
         strategy.resetRange(sim.S, strategyLegs);

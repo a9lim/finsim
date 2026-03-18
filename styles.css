@@ -140,6 +140,27 @@ main {
     color: var(--accent);
 }
 
+/* --- Stat group spacing (matches physsim) --- */
+.stat-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* --- Control group labels: flex to right-align slider-value --- */
+.control-group > label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+    color: var(--text);
+    font-weight: 400;
+}
+
+/* --- Sub-slider labels match physsim style --- */
+.ctrl-sub { display: flex; flex-direction: column; gap: 4px; }
+.ctrl-sub label { font-size: 0.72rem; color: var(--text-secondary); }
+
 /* --- Quick Trade Buttons --- */
 .quick-trade-row {
     display: flex;
@@ -664,6 +685,22 @@ main {
 
 .leg-row:hover {
     background: var(--bg-hover);
+}
+
+/* --- Leg Row Layout --- */
+.leg-row .pos-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.leg-row .stat-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* --- Leg Inline Qty --- */
