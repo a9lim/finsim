@@ -72,8 +72,6 @@ main {
 /* --- Time Slider (below chart in strategy mode) --- */
 .time-slider-bar {
     padding: 8px 68px 8px 68px;
-    background: var(--bg-panel);
-    border-top: 1px solid var(--border);
     display: flex;
     align-items: center;
 }
@@ -568,6 +566,32 @@ main {
 
 #time-slider-bar.hidden {
     display: none;
+}
+
+#time-slider-bar input[type="range"]::-webkit-slider-thumb {
+    background: var(--accent);
+}
+
+#time-slider-bar input[type="range"]::-moz-range-thumb {
+    background: var(--accent);
+}
+
+#time-slider-bar input[type="range"]::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, var(--accent), var(--accent));
+    height: 4px;
+    border-radius: 2px;
+}
+
+#time-slider-bar input[type="range"]::-moz-range-track {
+    background: var(--slider-track, rgba(168,160,152,0.3));
+    height: 4px;
+    border-radius: 2px;
+}
+
+#time-slider-bar input[type="range"]::-moz-range-progress {
+    background: var(--accent);
+    height: 4px;
+    border-radius: 2px;
 }
 
 .time-slider-label {

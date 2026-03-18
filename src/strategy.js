@@ -2,8 +2,8 @@
  * strategy.js — Strategy View renderer for Shoals trading simulator.
  *
  * Renders a payoff/P&L diagram and optional Greek overlays on a dedicated
- * canvas. Does NOT use shared-camera.js; manages its own fixed X-range
- * centered on the current spot price.
+ * canvas. Does NOT use shared-camera.js; manages its own X-range with
+ * scroll-wheel zoom centered on the current spot price.
  *
  * Exports: StrategyRenderer
  */
@@ -16,7 +16,6 @@ import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
 // ---------------------------------------------------------------------------
 
 const SAMPLE_COUNT   = 200;  // Points across X range
-const X_RANGE_FACTOR = 0.5;  // X spans [spot*(1-f), spot*(1+f)]
 const Y_PADDING_PCT  = 0.15; // 15% vertical padding
 const MARGIN = { top: 24, right: 16, bottom: 48, left: 68 };
 
@@ -55,6 +54,26 @@ function _colors() {
     };
 }
 
+/**
+ * Get theme-aware text colors based on current data-theme attribute.
+ */
+function _themeTextColors() {
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    try {
+        if (typeof _PALETTE !== 'undefined') {
+            const pal = isDark ? _PALETTE.dark : _PALETTE.light;
+            return {
+                text:          pal.text          || (isDark ? '#E8DED4' : '#1A1612'),
+                textSecondary: pal.textSecondary || (isDark ? '#8A8278' : '#78706A'),
+                textMuted:     pal.textMuted     || (isDark ? '#5A544C' : '#A8A098'),
+            };
+        }
+    } catch (_) { /* ignore */ }
+    return isDark
+        ? { text: '#E8DED4', textSecondary: '#8A8278', textMuted: '#5A544C' }
+        : { text: '#1A1612', textSecondary: '#78706A', textMuted: '#A8A098' };
+}
+
 // ---------------------------------------------------------------------------
 // Utility helpers
 // ---------------------------------------------------------------------------
@@ -75,8 +94,17 @@ function _fmt$(v) {
 /**
  * Find zero-crossings in a y-array paired with an x-array.
  * Returns interpolated X values where sign changes occur.
+ * Skips if all values are effectively zero (within epsilon).
  */
 function _zeroCrossings(xs, ys) {
+    // Check if all values are effectively zero
+    const eps = 0.001;
+    let allZero = true;
+    for (let i = 0; i < ys.length; i++) {
+        if (Math.abs(ys[i]) > eps) { allZero = false; break; }
+    }
+    if (allZero) return [];
+
     const result = [];
     for (let i = 0; i < ys.length - 1; i++) {
         if (ys[i] === 0) {
@@ -112,6 +140,17 @@ export class StrategyRenderer {
         this._canvas = canvas;
         this._ctx    = canvas.getContext('2d');
         this._dpr    = window.devicePixelRatio || 1;
+        this._dirty  = false;
+
+        // X-range zoom state (set per draw via resetRange or wheel)
+        this._xCenter = 100;
+        this._xRange  = 30;    // half-width
+        this._xRangeMin = 5;   // will be recomputed per spot
+        this._xRangeMax = 100; // will be recomputed per spot
+
+        // Legend hit areas (populated during draw)
+        this._legendItems = [];
+
         this.resize();
     }
 
@@ -139,6 +178,62 @@ export class StrategyRenderer {
     }
 
     /**
+     * Reset X center and range based on current spot and legs.
+     * Called when spot changes or legs change.
+     */
+    resetRange(spot, legs) {
+        this._xCenter   = spot;
+        this._xRange    = spot * 0.3;
+        this._xRangeMin = spot * 0.05;
+        this._xRangeMax = spot * 1.0;
+
+        // Extend range to cover all strikes with padding
+        if (legs) {
+            for (const leg of legs) {
+                if (leg.strike != null) {
+                    const dist = Math.abs(leg.strike - spot) * 1.1;
+                    if (dist > this._xRange) this._xRange = Math.min(dist, this._xRangeMax);
+                }
+            }
+        }
+    }
+
+    /**
+     * Bind mouse wheel zoom on X axis.
+     * @param {HTMLElement} el
+     */
+    bindWheel(el) {
+        el.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const factor = e.deltaY > 0 ? 1.1 : 1 / 1.1;
+            this._xRange = Math.max(this._xRangeMin, Math.min(this._xRangeMax, this._xRange * factor));
+            this._dirty = true;
+        }, { passive: false });
+    }
+
+    /**
+     * Handle a click on the canvas. Checks legend item bounding boxes
+     * and toggles the corresponding Greek in greekToggles if hit.
+     *
+     * @param {number} cssX - Click X in CSS pixels relative to canvas
+     * @param {number} cssY - Click Y in CSS pixels relative to canvas
+     * @param {Object} greekToggles - Mutable { delta, gamma, theta, vega, rho } booleans
+     * @returns {boolean} true if a legend item was toggled
+     */
+    handleClick(cssX, cssY, greekToggles) {
+        for (const item of this._legendItems) {
+            if (cssX >= item.x && cssX <= item.x + item.w &&
+                cssY >= item.y && cssY <= item.y + item.h) {
+                if (item.key && greekToggles.hasOwnProperty(item.key)) {
+                    greekToggles[item.key] = !greekToggles[item.key];
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Main render entry point.
      *
      * @param {Array<{type:string, side:string, qty:number, strike?:number, expiryDay?:number}>} legs
@@ -153,35 +248,14 @@ export class StrategyRenderer {
         const cssW = this._cssW;
         const cssH = this._cssH;
         const clrs = _colors();
+        const themeClrs = _themeTextColors();
 
         // Clear
         ctx.clearRect(0, 0, cssW, cssH);
 
-        if (!legs || legs.length === 0) {
-            this._drawEmpty(ctx, cssW, cssH);
-            return;
-        }
-
-        const T = _dteToT(dte);
-
-        // --- Build sample arrays ---
-        // Compute X range: at least ±30% from spot, extended to cover all strikes with 10% padding
-        let xMin = spot * 0.7;
-        let xMax = spot * 1.3;
-        for (const leg of legs) {
-            if (leg.strike != null) {
-                xMin = Math.min(xMin, leg.strike * 0.9);
-                xMax = Math.max(xMax, leg.strike * 1.1);
-            }
-        }
-        const xs   = [];
-        const pnls = [];
-
-        for (let i = 0; i < SAMPLE_COUNT; i++) {
-            const S = xMin + (i / (SAMPLE_COUNT - 1)) * (xMax - xMin);
-            xs.push(S);
-            pnls.push(this._totalPnl(legs, S, vol, rate, T, spot));
-        }
+        // --- X range from zoom state ---
+        const xMin = this._xCenter - this._xRange;
+        const xMax = this._xCenter + this._xRange;
 
         // --- Plot area ---
         const plotX = MARGIN.left;
@@ -190,6 +264,35 @@ export class StrategyRenderer {
         const plotH = cssH - MARGIN.top  - MARGIN.bottom;
 
         if (plotW <= 0 || plotH <= 0) return;
+
+        if (!legs || legs.length === 0) {
+            // Draw axes and grid but no curves
+            const xToPixel   = (S) => plotX + ((S   - xMin) / (xMax - xMin)) * plotW;
+            const pnlToPixel = (p) => plotY + ((1 - p) / 2) * plotH; // map -1..1 to plot
+            this._drawBackground(ctx, cssW, cssH);
+            this._drawGrid(ctx, plotX, plotY, plotW, plotH, xMin, xMax, -1, 1, xToPixel, pnlToPixel);
+            this._drawZeroLine(ctx, plotX, plotW, pnlToPixel);
+            this._drawYAxis(ctx, plotX, plotY, plotH, -1, 1, pnlToPixel, themeClrs);
+            this._drawXAxis(ctx, plotX, plotY, plotW, plotH, xMin, xMax, xToPixel, themeClrs);
+            // Draw spot marker if in range
+            if (spot >= xMin && spot <= xMax) {
+                this._drawSpotMarker(ctx, spot, plotY, plotH, xToPixel, clrs.accent);
+            }
+            this._legendItems = [];
+            return;
+        }
+
+        const T = _dteToT(dte);
+
+        // --- Build sample arrays ---
+        const xs   = [];
+        const pnls = [];
+
+        for (let i = 0; i < SAMPLE_COUNT; i++) {
+            const S = xMin + (i / (SAMPLE_COUNT - 1)) * (xMax - xMin);
+            xs.push(S);
+            pnls.push(this._totalPnl(legs, S, vol, rate, T, spot));
+        }
 
         // --- Y scale for P&L ---
         let pnlMin = Math.min(...pnls);
@@ -232,7 +335,9 @@ export class StrategyRenderer {
         this._drawZeroLine(ctx, plotX, plotW, pnlToPixel);
 
         // --- Draw spot marker ---
-        this._drawSpotMarker(ctx, spot, plotY, plotH, xToPixel, clrs.accent);
+        if (spot >= xMin && spot <= xMax) {
+            this._drawSpotMarker(ctx, spot, plotY, plotH, xToPixel, clrs.accent);
+        }
 
         // --- Draw Greek overlays ---
         for (const gKey of activeGreeks) {
@@ -249,13 +354,13 @@ export class StrategyRenderer {
         this._drawBreakevens(ctx, breakevens, pnlToPixel(0), xToPixel, clrs.accent);
 
         // --- Y axis labels ---
-        this._drawYAxis(ctx, plotX, plotY, plotH, yLo, yHi, pnlToPixel);
+        this._drawYAxis(ctx, plotX, plotY, plotH, yLo, yHi, pnlToPixel, themeClrs);
 
         // --- X axis labels ---
-        this._drawXAxis(ctx, plotX, plotY, plotW, plotH, xMin, xMax, xToPixel);
+        this._drawXAxis(ctx, plotX, plotY, plotW, plotH, xMin, xMax, xToPixel, themeClrs);
 
         // --- Legend ---
-        this._drawLegend(ctx, cssW, greekToggles, clrs);
+        this._drawLegend(ctx, cssW, greekToggles, clrs, themeClrs);
     }
 
     /**
@@ -437,16 +542,6 @@ export class StrategyRenderer {
         ctx.clearRect(0, 0, cssW, cssH);
     }
 
-    _drawEmpty(ctx, cssW, cssH) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(168,160,152,0.4)';
-        ctx.font = '14px var(--font-body, sans-serif)';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('Add legs to see the payoff diagram', cssW / 2, cssH / 2);
-        ctx.restore();
-    }
-
     _drawZeroLine(ctx, plotX, plotW, pnlToPixel) {
         const y0 = pnlToPixel(0);
         ctx.save();
@@ -604,9 +699,9 @@ export class StrategyRenderer {
         ctx.restore();
     }
 
-    _drawYAxis(ctx, plotX, plotY, plotH, yLo, yHi, pnlToPixel) {
+    _drawYAxis(ctx, plotX, plotY, plotH, yLo, yHi, pnlToPixel, themeClrs) {
         ctx.save();
-        ctx.fillStyle    = 'rgba(168,160,152,0.8)';
+        ctx.fillStyle    = themeClrs.textSecondary;
         ctx.font         = '11px var(--font-mono, monospace)';
         ctx.textAlign    = 'right';
         ctx.textBaseline = 'middle';
@@ -626,16 +721,17 @@ export class StrategyRenderer {
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
         ctx.font         = '11px var(--font-body, sans-serif)';
+        ctx.fillStyle    = themeClrs.textMuted;
         ctx.fillText('P&L', 0, 0);
         ctx.restore();
 
         ctx.restore();
     }
 
-    _drawXAxis(ctx, plotX, plotY, plotW, plotH, xMin, xMax, xToPixel) {
+    _drawXAxis(ctx, plotX, plotY, plotW, plotH, xMin, xMax, xToPixel, themeClrs) {
         const baseY = plotY + plotH;
         ctx.save();
-        ctx.fillStyle    = 'rgba(168,160,152,0.8)';
+        ctx.fillStyle    = themeClrs.textSecondary;
         ctx.font         = '11px var(--font-mono, monospace)';
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'top';
@@ -651,19 +747,21 @@ export class StrategyRenderer {
         // Axis label
         ctx.textBaseline = 'bottom';
         ctx.font         = '11px var(--font-body, sans-serif)';
+        ctx.fillStyle    = themeClrs.textMuted;
         ctx.fillText('Stock Price', plotX + plotW / 2, baseY + 42);
         ctx.restore();
     }
 
-    _drawLegend(ctx, cssW, greekToggles, clrs) {
+    _drawLegend(ctx, cssW, greekToggles, clrs, themeClrs) {
         const items = [
-            { label: 'P&L',   color: clrs.up,    active: true },
+            { label: 'P&L',   color: clrs.up,    active: true, key: null },
         ];
         for (const [key, meta] of Object.entries(GREEK_META)) {
             items.push({
                 label:  meta.label,
                 color:  clrs[key] || meta.color,
                 active: !!(greekToggles && greekToggles[key]),
+                key:    key,
             });
         }
 
@@ -672,12 +770,15 @@ export class StrategyRenderer {
         const padX  = 10;
         const padY  = 8;
         const legendH = padY * 2 + items.length * lineH;
-        const lx = cssW - MARGIN.right - boxW;
-        const ly = MARGIN.top;
+        // Position in top-LEFT of plot area (inside MARGIN.left)
+        const lx = MARGIN.left + 8;
+        const ly = MARGIN.top + 4;
+
+        const isDark = document.documentElement.dataset.theme === 'dark';
 
         ctx.save();
-        ctx.fillStyle   = 'rgba(12,11,9,0.55)';
-        ctx.strokeStyle = 'rgba(168,160,152,0.3)';
+        ctx.fillStyle   = isDark ? 'rgba(12,11,9,0.55)' : 'rgba(240,235,228,0.75)';
+        ctx.strokeStyle = isDark ? 'rgba(168,160,152,0.3)' : 'rgba(168,160,152,0.4)';
         ctx.lineWidth   = 1;
         _roundRect(ctx, lx, ly, boxW, legendH, 6);
         ctx.fill();
@@ -686,18 +787,30 @@ export class StrategyRenderer {
         ctx.font         = '11px var(--font-body, sans-serif)';
         ctx.textBaseline = 'middle';
 
+        // Reset legend hit areas
+        this._legendItems = [];
+
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             const iy   = ly + padY + i * lineH + lineH / 2;
+
+            // Store bounding box for click detection
+            this._legendItems.push({
+                x: lx,
+                y: ly + padY + i * lineH,
+                w: boxW,
+                h: lineH,
+                key: item.key,
+            });
 
             // Swatch
             ctx.fillStyle   = item.color;
             ctx.globalAlpha = item.active ? 1 : 0.35;
             ctx.fillRect(lx + padX, iy - 4, 12, 8);
 
-            // Label
+            // Label — theme-aware text colors
             ctx.globalAlpha = item.active ? 1 : 0.35;
-            ctx.fillStyle   = item.active ? '#E8DED4' : '#8A8278';
+            ctx.fillStyle   = item.active ? themeClrs.text : themeClrs.textMuted;
             ctx.textAlign   = 'left';
             ctx.fillText(item.label, lx + padX + 18, iy);
         }
