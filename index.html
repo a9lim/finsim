@@ -225,6 +225,23 @@
                         </div>
                         <button id="full-chain-link" class="ghost-btn chain-expand-btn">View Full Chain</button>
                     </div>
+                    <div class="stat-group" id="strategy-builder">
+                        <div class="group-label">Strategy Builder</div>
+                        <div class="quick-trade-row strategy-add-row">
+                            <button id="add-call-btn" class="ghost-btn trade-btn up">+Call</button>
+                            <button id="add-put-btn" class="ghost-btn trade-btn down">+Put</button>
+                            <button id="add-stock-leg-btn" class="ghost-btn trade-btn bond">+Stock</button>
+                            <button id="add-bond-leg-btn" class="ghost-btn trade-btn bond">+Bond</button>
+                        </div>
+                        <div id="strategy-legs-list" class="strategy-legs-list">
+                            <p class="panel-hint">No legs added. Click buttons above to build a strategy.</p>
+                        </div>
+                        <div id="strategy-summary" class="strategy-summary"></div>
+                        <div class="quick-trade-row" style="margin-top:6px">
+                            <button id="save-strategy-btn" class="ghost-btn trade-btn bond" disabled>Save</button>
+                            <button id="exec-strategy-btn" class="ghost-btn trade-btn up" disabled>Execute</button>
+                        </div>
+                    </div>
                 </div>
                 <!-- Portfolio Tab -->
                 <div class="tab-panel" id="tab-portfolio" role="tabpanel">
@@ -440,12 +457,16 @@
         </div>
     </div>
 
-    <!-- Inline intro dismiss (replaced by main.js in Task 9) -->
+    <!-- Inline intro dismiss: lightweight fallback in case ES6 module is slow -->
     <script>
-        document.getElementById('intro-start').addEventListener('click', function() {
-            document.getElementById('intro-screen').classList.add('hidden');
-            document.body.classList.add('app-ready');
-        });
+        (function() {
+            var btn = document.getElementById('intro-start');
+            if (btn) btn.addEventListener('click', function() {
+                var intro = document.getElementById('intro-screen');
+                if (intro) intro.classList.add('hidden');
+                document.body.classList.add('app-ready');
+            });
+        })();
     </script>
     <script src="/shared-tabs.js"></script>
     <script type="module" src="main.js"></script>

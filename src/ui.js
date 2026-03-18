@@ -111,6 +111,15 @@ export function cacheDOMElements($) {
     $.marginCallDismiss   = document.getElementById('margin-call-dismiss');
     $.introScreen = document.getElementById('intro-screen');
     $.introStart  = document.getElementById('intro-start');
+    $.addCallBtn      = document.getElementById('add-call-btn');
+    $.addPutBtn       = document.getElementById('add-put-btn');
+    $.addStockLegBtn  = document.getElementById('add-stock-leg-btn');
+    $.addBondLegBtn   = document.getElementById('add-bond-leg-btn');
+    $.strategyLegsList = document.getElementById('strategy-legs-list');
+    $.strategySummary  = document.getElementById('strategy-summary');
+    $.saveStrategyBtn  = document.getElementById('save-strategy-btn');
+    $.execStrategyBtn  = document.getElementById('exec-strategy-btn');
+    $.strategyBuilder  = document.getElementById('strategy-builder');
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +208,20 @@ export function bindEvents($, handlers) {
 
     $._onChainCellClick = onChainCellClick;
     $._onTradeSubmit    = onTradeSubmit;
+
+    // Strategy builder buttons
+    if ($.addCallBtn && typeof handlers.onAddLeg === 'function') {
+        $.addCallBtn.addEventListener('click',     () => handlers.onAddLeg('call'));
+        $.addPutBtn.addEventListener('click',      () => handlers.onAddLeg('put'));
+        $.addStockLegBtn.addEventListener('click', () => handlers.onAddLeg('stock'));
+        $.addBondLegBtn.addEventListener('click',  () => handlers.onAddLeg('bond'));
+    }
+    if ($.saveStrategyBtn && typeof handlers.onSaveStrategy === 'function') {
+        $.saveStrategyBtn.addEventListener('click', handlers.onSaveStrategy);
+    }
+    if ($.execStrategyBtn && typeof handlers.onExecStrategy === 'function') {
+        $.execStrategyBtn.addEventListener('click', handlers.onExecStrategy);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -719,7 +742,7 @@ export function showTradeDialog($, tradeInfo) {
         const limitPrice   = orderTypeVal !== 'market'
             ? parseFloat(body.querySelector('#trade-limit-price').value)
             : null;
-        if (!qtyVal || qtyVal < 1) { showToast('Enter a valid quantity.'); return; }
+        if (!qtyVal || qtyVal < 1) { if (typeof showToast !== 'undefined') showToast('Enter a valid quantity.'); return; }
         if (typeof $._onTradeSubmit === 'function') {
             $._onTradeSubmit({ type, strike, expiryDay, side: sideVal, qty: qtyVal, orderType: orderTypeVal, limitPrice });
         }
@@ -848,4 +871,158 @@ export function updateSpeedBtn($, speed) {
 
 export function updateZoomLevel($, factor) {
     $.zoomLevel.textContent = Math.round(factor * 100) + '%';
+}
+
+// ---------------------------------------------------------------------------
+// renderStrategyBuilder
+// ---------------------------------------------------------------------------
+
+/**
+ * Render the strategy legs list and summary in the sidebar.
+ *
+ * @param {Object}   $         DOM cache
+ * @param {Object[]} legs      Current strategyLegs array
+ * @param {Object}   summary   { maxProfit, maxLoss, breakevens, netCost } from StrategyRenderer
+ * @param {Function} onRemoveLeg  Callback(index) to remove a leg
+ * @param {Object}   chain     Current chain array for strike/expiry pickers
+ */
+export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain) {
+    if (!$.strategyLegsList) return;
+
+    $.strategyLegsList.textContent = '';
+
+    if (!legs || legs.length === 0) {
+        const hint = document.createElement('p');
+        hint.className = 'panel-hint';
+        hint.textContent = 'No legs added. Click buttons above to build a strategy.';
+        $.strategyLegsList.appendChild(hint);
+    } else {
+        for (let i = 0; i < legs.length; i++) {
+            const leg = legs[i];
+            $.strategyLegsList.appendChild(_buildLegRow(leg, i, onRemoveLeg, chain));
+        }
+    }
+
+    // Update summary
+    if ($.strategySummary) {
+        $.strategySummary.textContent = '';
+        if (summary && legs && legs.length > 0) {
+            const items = [
+                { label: 'Net Cost', value: fmtDollar(summary.netCost), cls: pnlClass(-summary.netCost) },
+                { label: 'Max Profit', value: fmtDollar(summary.maxProfit), cls: 'pnl-up' },
+                { label: 'Max Loss', value: fmtDollar(summary.maxLoss), cls: 'pnl-down' },
+            ];
+            if (summary.breakevens.length > 0) {
+                items.push({
+                    label: 'Breakeven' + (summary.breakevens.length > 1 ? 's' : ''),
+                    value: summary.breakevens.map(b => '$' + b.toFixed(2)).join(', '),
+                    cls: '',
+                });
+            }
+            for (const item of items) {
+                const row = document.createElement('div');
+                row.className = 'stat-row';
+                const lbl = document.createElement('span');
+                lbl.className = 'stat-label';
+                lbl.textContent = item.label;
+                const val = document.createElement('span');
+                val.className = 'stat-value ' + item.cls;
+                val.textContent = item.value;
+                row.appendChild(lbl);
+                row.appendChild(val);
+                $.strategySummary.appendChild(row);
+            }
+        }
+    }
+
+    // Enable/disable save & execute buttons
+    const hasLegs = legs && legs.length > 0;
+    if ($.saveStrategyBtn) $.saveStrategyBtn.disabled = !hasLegs;
+    if ($.execStrategyBtn) $.execStrategyBtn.disabled = !hasLegs;
+}
+
+function _buildLegRow(leg, index, onRemoveLeg, chain) {
+    const row = document.createElement('div');
+    row.className = 'leg-row stat-row';
+
+    const label = document.createElement('span');
+    label.className = 'stat-label';
+    const sideStr = leg.side === 'short' ? 'Short' : 'Long';
+    let desc = sideStr + ' ' + leg.type.toUpperCase();
+    if (leg.strike != null) desc += ' K' + leg.strike;
+    desc += ' x' + (leg.qty || 1);
+    label.textContent = desc;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'ghost-btn pos-close-btn';
+    removeBtn.textContent = 'X';
+    removeBtn.title = 'Remove leg';
+    removeBtn.addEventListener('click', () => {
+        if (typeof onRemoveLeg === 'function') onRemoveLeg(index);
+        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
+    });
+
+    row.appendChild(label);
+    row.appendChild(removeBtn);
+    return row;
+}
+
+// ---------------------------------------------------------------------------
+// wireInfoTips
+// ---------------------------------------------------------------------------
+
+/**
+ * Attach info tip popovers to slider labels and other UI elements.
+ * Must be called after DOM is ready.
+ */
+export function wireInfoTips($) {
+    if (typeof createInfoTip === 'undefined') return;
+
+    const tips = {
+        'slider-mu':     { title: 'Drift (mu)', body: 'Expected annualised return of the underlying asset. Positive = bullish tendency.' },
+        'slider-theta':  { title: 'Vol Mean (theta)', body: 'Long-run variance level the volatility reverts to over time.' },
+        'slider-kappa':  { title: 'Mean Reversion (kappa)', body: 'Speed at which volatility returns to its long-run mean. Higher = faster reversion.' },
+        'slider-xi':     { title: 'Vol of Vol (xi)', body: 'Volatility of the variance process itself. Higher = more erratic vol swings.' },
+        'slider-rho':    { title: 'Correlation (rho)', body: 'Correlation between price and volatility shocks. Negative = leverage effect (drops cause vol spikes).' },
+        'slider-lambda': { title: 'Jump Rate (lambda)', body: 'Expected number of price jumps per year. Higher = more frequent sudden moves.' },
+        'slider-muJ':    { title: 'Jump Mean (muJ)', body: 'Average size of log-price jumps. Negative = jumps tend to be downward.' },
+        'slider-sigmaJ': { title: 'Jump Vol (sigmaJ)', body: 'Standard deviation of jump sizes. Higher = more variable jump magnitudes.' },
+        'slider-a':      { title: 'Rate Reversion (a)', body: 'Speed at which the risk-free rate reverts to its long-run level.' },
+        'slider-b':      { title: 'Rate Mean (b)', body: 'Long-run equilibrium level for the risk-free interest rate.' },
+        'slider-sigmaR': { title: 'Rate Vol (sigmaR)', body: 'Volatility of the interest rate process.' },
+    };
+
+    for (const [sliderId, tipData] of Object.entries(tips)) {
+        const slider = document.getElementById(sliderId);
+        if (!slider) continue;
+        const label = slider.previousElementSibling || slider.closest('.ctrl-row')?.querySelector('.stat-label');
+        if (!label) continue;
+
+        // Check if an info trigger already exists next to this label
+        if (label.parentElement.querySelector('.info-trigger')) continue;
+
+        const triggerBtn = document.createElement('button');
+        triggerBtn.className = 'info-trigger';
+        triggerBtn.type = 'button';
+        triggerBtn.setAttribute('aria-label', 'Info: ' + tipData.title);
+        triggerBtn.textContent = '?';
+        label.parentElement.insertBefore(triggerBtn, label.nextSibling);
+        createInfoTip(triggerBtn, { title: tipData.title, body: tipData.body, maxWidth: 260 });
+    }
+
+    // Margin status info tip
+    const marginLabel = $.marginStatus?.closest('.stat-row')?.querySelector('.stat-label');
+    if (marginLabel && !marginLabel.parentElement.querySelector('.info-trigger')) {
+        const btn = document.createElement('button');
+        btn.className = 'info-trigger';
+        btn.type = 'button';
+        btn.setAttribute('aria-label', 'Info: Margin Status');
+        btn.textContent = '?';
+        marginLabel.parentElement.insertBefore(btn, marginLabel.nextSibling);
+        createInfoTip(btn, {
+            title: 'Margin Status',
+            body: 'Shows your margin health. OK = well-collateralised. Low = approaching maintenance margin. MARGIN CALL = equity below required level; close positions or add cash.',
+            maxWidth: 280,
+        });
+    }
 }
