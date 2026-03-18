@@ -374,12 +374,12 @@ export class StrategyRenderer {
         }
 
         const T    = _dteToT(dte);
-        let xMin = spot * 0.7;
-        let xMax = spot * 1.3;
+        // Extend sampling range to cover near-zero and far-upside
+        let xMin = 0.01;
+        let xMax = spot * 5;
         for (const leg of legs) {
             if (leg.strike != null) {
-                xMin = Math.min(xMin, leg.strike * 0.9);
-                xMax = Math.max(xMax, leg.strike * 1.1);
+                xMax = Math.max(xMax, leg.strike * 5);
             }
         }
         const xs   = [];
@@ -391,8 +391,23 @@ export class StrategyRenderer {
             pnls.push(this._totalPnl(legs, S, vol, rate, T, spot));
         }
 
-        const maxProfit = Math.max(...pnls);
-        const maxLoss   = Math.min(...pnls);
+        let maxProfit = Math.max(...pnls);
+        let maxLoss   = Math.min(...pnls);
+
+        // Check endpoints for unbounded profit/loss
+        const pnlAtLow  = pnls[0];
+        const pnlAtHigh = pnls[pnls.length - 1];
+        const pnlNearHigh = pnls[pnls.length - 2];
+
+        // If P&L is still increasing at the high end, profit is unbounded
+        if (pnlAtHigh > pnlNearHigh + 0.01 && pnlAtHigh === maxProfit) {
+            maxProfit = Infinity;
+        }
+        // If P&L is still decreasing at the high end, loss is unbounded
+        if (pnlAtHigh < pnlNearHigh - 0.01 && pnlAtHigh === maxLoss) {
+            maxLoss = -Infinity;
+        }
+
         const breakevens = _zeroCrossings(xs, pnls);
 
         // Net cost = sum of entry costs (value at spot)
@@ -413,8 +428,9 @@ export class StrategyRenderer {
      * Positive = debit paid, negative = credit received.
      */
     _legEntryCost(leg, spot, vol, rate, T) {
-        const sign = leg.side === 'long' ? 1 : -1;
-        const qty  = leg.qty ?? 1;
+        const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
+                   : (leg.side === 'short') ? -1 : 1;
+        const qty  = Math.abs(leg.qty ?? 1);
 
         switch (leg.type) {
             case 'call':
@@ -447,8 +463,9 @@ export class StrategyRenderer {
      * @param {number} entryS - Original spot (entry price reference)
      */
     _legPnl(leg, S, vol, rate, T, entryS) {
-        const sign  = leg.side === 'long' ? 1 : -1;
-        const qty   = leg.qty ?? 1;
+        const sign  = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
+                    : (leg.side === 'short') ? -1 : 1;
+        const qty   = Math.abs(leg.qty ?? 1);
 
         switch (leg.type) {
             case 'call':
@@ -490,8 +507,9 @@ export class StrategyRenderer {
      * @returns {object} { delta, gamma, theta, vega, rho }
      */
     _legGreeks(leg, S, vol, rate, T) {
-        const sign = leg.side === 'long' ? 1 : -1;
-        const qty  = leg.qty ?? 1;
+        const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
+                   : (leg.side === 'short') ? -1 : 1;
+        const qty  = Math.abs(leg.qty ?? 1);
         const mult = qty * sign;
 
         switch (leg.type) {

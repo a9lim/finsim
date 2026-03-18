@@ -120,6 +120,8 @@ export function cacheDOMElements($) {
     $.saveStrategyBtn  = document.getElementById('save-strategy-btn');
     $.execStrategyBtn  = document.getElementById('exec-strategy-btn');
     $.strategyBuilder  = document.getElementById('strategy-builder');
+    $.strategyStrike   = document.getElementById('strategy-strike');
+    $.strategyExpiry   = document.getElementById('strategy-expiry');
 }
 
 // ---------------------------------------------------------------------------
@@ -892,18 +894,59 @@ export function updateZoomLevel($, factor) {
 }
 
 // ---------------------------------------------------------------------------
-// renderStrategyBuilder
+// Strategy selectors & builder
 // ---------------------------------------------------------------------------
 
 /**
- * Render the strategy legs list and summary in the sidebar.
- *
- * @param {Object}   $         DOM cache
- * @param {Object[]} legs      Current strategyLegs array
- * @param {Object}   summary   { maxProfit, maxLoss, breakevens, netCost } from StrategyRenderer
- * @param {Function} onRemoveLeg  Callback(index) to remove a leg
- * @param {Object}   chain     Current chain array for strike/expiry pickers
+ * Populate the shared strategy strike and expiry selectors from chain data.
+ * Called whenever the chain is rebuilt.
  */
+export function updateStrategySelectors($, chain, spot) {
+    if (!$.strategyStrike || !$.strategyExpiry) return;
+
+    // Preserve current selections
+    const prevStrike = $.strategyStrike.value;
+    const prevExpiry = $.strategyExpiry.value;
+
+    // Populate expiry selector
+    $.strategyExpiry.textContent = '';
+    if (chain && chain.length > 0) {
+        for (const exp of chain) {
+            const o = document.createElement('option');
+            o.value = exp.day;
+            o.textContent = exp.dte + 'd (D' + exp.day + ')';
+            $.strategyExpiry.appendChild(o);
+        }
+        // Restore previous selection if still valid, otherwise first
+        if (prevExpiry && Array.from($.strategyExpiry.options).some(o => o.value === prevExpiry)) {
+            $.strategyExpiry.value = prevExpiry;
+        }
+    }
+
+    // Populate strike selector from first (or selected) expiry
+    const selectedExpiryDay = parseInt($.strategyExpiry.value, 10);
+    const expiryData = chain ? chain.find(e => e.day === selectedExpiryDay) || chain[0] : null;
+
+    $.strategyStrike.textContent = '';
+    const atm = spot ? Math.round(spot / 5) * 5 : null;
+    if (expiryData && expiryData.options) {
+        for (const opt of expiryData.options) {
+            const o = document.createElement('option');
+            o.value = opt.strike;
+            o.textContent = '$' + opt.strike + (opt.strike === atm ? ' (ATM)' : '');
+            $.strategyStrike.appendChild(o);
+        }
+        // Restore previous selection if still valid, otherwise ATM
+        if (prevStrike && Array.from($.strategyStrike.options).some(o => o.value === prevStrike)) {
+            $.strategyStrike.value = prevStrike;
+        } else if (atm != null) {
+            // Select ATM strike
+            const atmOpt = Array.from($.strategyStrike.options).find(o => parseInt(o.value) === atm);
+            if (atmOpt) $.strategyStrike.value = atmOpt.value;
+        }
+    }
+}
+
 export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain, onLegChange) {
     if (!$.strategyLegsList) return;
 
@@ -925,10 +968,15 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain, onLe
     if ($.strategySummary) {
         $.strategySummary.textContent = '';
         if (summary && legs && legs.length > 0) {
+            const fmtVal = (v) => {
+                if (v === Infinity) return '\u221E';
+                if (v === -Infinity) return '-\u221E';
+                return fmtDollar(v);
+            };
             const items = [
-                { label: 'Net Cost', value: fmtDollar(summary.netCost), cls: pnlClass(-summary.netCost) },
-                { label: 'Max Profit', value: fmtDollar(summary.maxProfit), cls: 'pnl-up' },
-                { label: 'Max Loss', value: fmtDollar(summary.maxLoss), cls: 'pnl-down' },
+                { label: 'Net Cost', value: fmtVal(summary.netCost), cls: pnlClass(-summary.netCost) },
+                { label: 'Max Profit', value: fmtVal(summary.maxProfit), cls: 'pnl-up' },
+                { label: 'Max Loss', value: fmtVal(summary.maxLoss), cls: 'pnl-down' },
             ];
             if (summary.breakevens.length > 0) {
                 items.push({
@@ -960,24 +1008,37 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain, onLe
 }
 
 function _buildLegRow(leg, index, onRemoveLeg, chain, onLegChange) {
-    const container = document.createElement('div');
-    container.className = 'leg-row-container';
-
     const row = document.createElement('div');
     row.className = 'leg-row stat-row';
 
+    // Label: "Long CALL K105 12d" or "Short STOCK" etc.
     const label = document.createElement('span');
     label.className = 'stat-label';
-    const sideStr = leg.side === 'short' ? 'Short' : 'Long';
+    const isShort = leg.qty < 0;
+    const sideStr = isShort ? 'Short' : 'Long';
     let desc = sideStr + ' ' + leg.type.toUpperCase();
     if (leg.strike != null) desc += ' K' + leg.strike;
     if (leg.expiryDay != null) {
         const expiry = chain ? chain.find(e => e.day === leg.expiryDay) : null;
         if (expiry) desc += ' ' + expiry.dte + 'd';
     }
-    desc += ' x' + (leg.qty || 1);
     label.textContent = desc;
 
+    // Inline qty input
+    const qtyInput = document.createElement('input');
+    qtyInput.type = 'number';
+    qtyInput.className = 'leg-qty-input';
+    qtyInput.value = Math.abs(leg.qty);
+    qtyInput.min = '1';
+    qtyInput.step = '1';
+    qtyInput.title = 'Quantity';
+    qtyInput.addEventListener('change', () => {
+        const newAbsQty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+        leg.qty = isShort ? -newAbsQty : newAbsQty;
+        if (typeof onLegChange === 'function') onLegChange();
+    });
+
+    // Remove button
     const removeBtn = document.createElement('button');
     removeBtn.className = 'ghost-btn pos-close-btn';
     removeBtn.textContent = 'X';
@@ -988,89 +1049,10 @@ function _buildLegRow(leg, index, onRemoveLeg, chain, onLegChange) {
     });
 
     row.appendChild(label);
+    row.appendChild(qtyInput);
     row.appendChild(removeBtn);
-    container.appendChild(row);
 
-    // For options, show strike/expiry/qty configurator
-    const isOption = leg.type === 'call' || leg.type === 'put';
-    if (isOption && chain && chain.length > 0) {
-        const config = document.createElement('div');
-        config.className = 'leg-config';
-
-        // Strike selector
-        const strikeRow = document.createElement('div');
-        strikeRow.className = 'leg-config-row';
-        const strikeLbl = document.createElement('span');
-        strikeLbl.className = 'leg-config-label';
-        strikeLbl.textContent = 'Strike';
-        const strikeSel = document.createElement('select');
-        strikeSel.className = 'sim-select leg-config-select';
-        // Collect all strikes from first available expiry
-        const expiryData = chain.find(e => e.day === leg.expiryDay) || chain[0];
-        if (expiryData && expiryData.options) {
-            for (const opt of expiryData.options) {
-                const o = document.createElement('option');
-                o.value = opt.strike;
-                o.textContent = '$' + opt.strike;
-                if (opt.strike === leg.strike) o.selected = true;
-                strikeSel.appendChild(o);
-            }
-        }
-        strikeSel.addEventListener('change', () => {
-            leg.strike = parseInt(strikeSel.value, 10);
-            if (typeof onLegChange === 'function') onLegChange();
-        });
-        strikeRow.appendChild(strikeLbl);
-        strikeRow.appendChild(strikeSel);
-        config.appendChild(strikeRow);
-
-        // Expiry selector
-        const expiryRow = document.createElement('div');
-        expiryRow.className = 'leg-config-row';
-        const expiryLbl = document.createElement('span');
-        expiryLbl.className = 'leg-config-label';
-        expiryLbl.textContent = 'Expiry';
-        const expirySel = document.createElement('select');
-        expirySel.className = 'sim-select leg-config-select';
-        for (const exp of chain) {
-            const o = document.createElement('option');
-            o.value = exp.day;
-            o.textContent = exp.dte + 'd (D' + exp.day + ')';
-            if (exp.day === leg.expiryDay) o.selected = true;
-            expirySel.appendChild(o);
-        }
-        expirySel.addEventListener('change', () => {
-            leg.expiryDay = parseInt(expirySel.value, 10);
-            if (typeof onLegChange === 'function') onLegChange();
-        });
-        expiryRow.appendChild(expiryLbl);
-        expiryRow.appendChild(expirySel);
-        config.appendChild(expiryRow);
-
-        // Qty input
-        const qtyRow = document.createElement('div');
-        qtyRow.className = 'leg-config-row';
-        const qtyLbl = document.createElement('span');
-        qtyLbl.className = 'leg-config-label';
-        qtyLbl.textContent = 'Qty';
-        const qtyInput = document.createElement('input');
-        qtyInput.type = 'number';
-        qtyInput.className = 'sim-input leg-config-input';
-        qtyInput.value = leg.qty || 1;
-        qtyInput.min = '1';
-        qtyInput.step = '1';
-        qtyInput.addEventListener('change', () => {
-            leg.qty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
-            if (typeof onLegChange === 'function') onLegChange();
-        });
-        qtyRow.appendChild(qtyLbl);
-        qtyRow.appendChild(qtyInput);
-        config.appendChild(qtyRow);
-
-        container.appendChild(config);
-    }
-
-    return container;
+    return row;
 }
 
 // ---------------------------------------------------------------------------

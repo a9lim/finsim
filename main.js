@@ -22,7 +22,7 @@ import {
     updatePortfolioDisplay, updateGreeksDisplay, syncSettingsUI,
     toggleStrategyView, showMarginCall, showChainOverlay,
     showTradeDialog, updatePlayBtn, updateSpeedBtn,
-    renderStrategyBuilder, wireInfoTips,
+    renderStrategyBuilder, wireInfoTips, updateStrategySelectors,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
 
@@ -385,6 +385,7 @@ function updateUI() {
     updateChainDisplay($, chain);
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
+    updateStrategySelectors($, chain, sim.S);
     updateStrategyBuilder();
     updateTimeSliderRange();
 }
@@ -623,25 +624,29 @@ function handleLiquidate() {
 // ---------------------------------------------------------------------------
 
 function handleAddLeg(type, side) {
-    const vol = Math.sqrt(Math.max(sim.v, 0));
-    const nearestExpiry = chain.length > 0 ? chain[0] : null;
-    const expiryDay = nearestExpiry ? nearestExpiry.day : sim.day + 21;
-    const atm = Math.round(sim.S / 5) * 5;
+    const signedQty = side === 'short' ? -1 : 1;
+    const strike = (type === 'call' || type === 'put')
+        ? parseInt($.strategyStrike?.value) || Math.round(sim.S / 5) * 5
+        : undefined;
+    const expiryDay = (type === 'call' || type === 'put' || type === 'bond')
+        ? parseInt($.strategyExpiry?.value) || (chain.length > 0 ? chain[0].day : sim.day + 21)
+        : undefined;
 
-    const leg = {
-        type,
-        side: side || 'long',
-        qty: 1,
-    };
-    if (type === 'call' || type === 'put') {
-        leg.strike = atm;
-        leg.expiryDay = expiryDay;
-    }
-    if (type === 'bond') {
-        leg.expiryDay = expiryDay;
+    // Find existing leg of same type/strike/expiry for netting
+    const existing = strategyLegs.find(l =>
+        l.type === type && l.strike === strike && l.expiryDay === expiryDay
+    );
+
+    if (existing) {
+        existing.qty += signedQty;
+        if (existing.qty === 0) {
+            strategyLegs.splice(strategyLegs.indexOf(existing), 1);
+        }
+    } else {
+        const leg = { type, qty: signedQty, strike, expiryDay };
+        strategyLegs.push(leg);
     }
 
-    strategyLegs.push(leg);
     strategy.resetRange(sim.S, strategyLegs);
     updateStrategyBuilder();
     dirty = true;
@@ -659,7 +664,13 @@ function handleSaveStrategy() {
     if (strategyLegs.length === 0) return;
     const name = prompt('Strategy name:');
     if (!name || !name.trim()) return;
-    saveStrategy(name.trim(), strategyLegs.map(l => ({ ...l })));
+    // Convert signed qty to side/qty for portfolio storage
+    const legsForSave = strategyLegs.map(l => ({
+        ...l,
+        side: l.qty < 0 ? 'short' : 'long',
+        qty: Math.abs(l.qty),
+    }));
+    saveStrategy(name.trim(), legsForSave);
     if (typeof showToast !== 'undefined') showToast('Strategy "' + name.trim() + '" saved.');
     if (typeof _haptics !== 'undefined') _haptics.trigger('success');
 }
@@ -669,8 +680,10 @@ function handleExecStrategy() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     const results = [];
     for (const leg of strategyLegs) {
+        const side = leg.qty < 0 ? 'short' : 'long';
+        const absQty = Math.abs(leg.qty);
         const pos = executeMarketOrder(
-            leg.type, leg.side, leg.qty, sim.S, vol, sim.r, sim.day,
+            leg.type, side, absQty, sim.S, vol, sim.r, sim.day,
             leg.strike, leg.expiryDay
         );
         if (pos) results.push(pos);

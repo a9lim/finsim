@@ -206,7 +206,7 @@
                     <div class="stat-group">
                         <div class="group-label">Quick Trade</div>
                         <div class="quick-trade-row">
-                            <button id="stock-btn" class="ghost-btn trade-btn up">Stock</button>
+                            <button id="stock-btn" class="ghost-btn trade-btn stock">Stock</button>
                             <button id="bond-btn" class="ghost-btn trade-btn bond">Bond</button>
                         </div>
                         <p class="panel-hint trade-hint">Left-click: buy &middot; Right-click: sell/short</p>
@@ -293,11 +293,19 @@
                 <div class="tab-panel" id="tab-strategy" role="tabpanel">
                     <div class="stat-group" id="strategy-builder">
                         <div class="group-label">Build Strategy</div>
+                        <div class="ctrl-row">
+                            <label class="stat-label" for="strategy-strike">Strike</label>
+                            <select id="strategy-strike" class="sim-select"></select>
+                        </div>
+                        <div class="ctrl-row">
+                            <label class="stat-label" for="strategy-expiry">Expiry</label>
+                            <select id="strategy-expiry" class="sim-select"></select>
+                        </div>
                         <div class="quick-trade-row strategy-add-row">
-                            <button id="add-call-btn" class="ghost-btn trade-btn up">+Call</button>
-                            <button id="add-put-btn" class="ghost-btn trade-btn down">+Put</button>
-                            <button id="add-stock-leg-btn" class="ghost-btn trade-btn bond">+Stock</button>
-                            <button id="add-bond-leg-btn" class="ghost-btn trade-btn bond">+Bond</button>
+                            <button id="add-call-btn" class="ghost-btn trade-btn up">Call</button>
+                            <button id="add-put-btn" class="ghost-btn trade-btn down">Put</button>
+                            <button id="add-stock-leg-btn" class="ghost-btn trade-btn stock">Stock</button>
+                            <button id="add-bond-leg-btn" class="ghost-btn trade-btn bond">Bond</button>
                         </div>
                         <p class="panel-hint trade-hint">Left-click: long &middot; Right-click: short</p>
                         <div id="strategy-legs-list" class="strategy-legs-list">
