@@ -40,6 +40,7 @@ let speed = 1;
 let speedIndex = 0;
 let strategyMode = false;
 let dirty = true;
+let lastTickTime = 0;
 let mouseX = -1, mouseY = -1;
 let strategyLegs = [];
 let greekToggles = { delta: true, gamma: false, theta: false, vega: false, rho: false };
@@ -127,12 +128,13 @@ function init() {
         onBuyStock:       () => handleBuyStock(),
         onShortStock:     () => handleShortStock(),
         onBuyBond:        () => handleBuyBond(),
+        onShortBond:      () => handleShortBond(),
         onChainCellClick: (info) => handleChainCellClick(info),
         onFullChainOpen:  () => showChainOverlay($, chain),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
         onDismissMargin:  () => { /* sim stays paused, overlay hidden by ui.js */ },
-        onAddLeg:         (type) => handleAddLeg(type),
+        onAddLeg:         (type, side) => handleAddLeg(type, side),
         onSaveStrategy:   () => handleSaveStrategy(),
         onExecStrategy:   () => handleExecStrategy(),
     });
@@ -237,9 +239,13 @@ function init() {
 // frame — rAF loop
 // ---------------------------------------------------------------------------
 
-function frame() {
+function frame(now) {
     if (playing) {
-        for (let i = 0; i < speed; i++) tick();
+        const tickInterval = 1000 / speed;
+        if (now - lastTickTime >= tickInterval) {
+            tick();
+            lastTickTime = now;
+        }
     }
     if (dirty) {
         dirty = false;
@@ -281,6 +287,19 @@ function tick() {
         showMarginCall($, margin);
     }
 
+    // Auto-scroll: keep latest candle near right edge when playing
+    if (playing && camera) {
+        const lastDay = sim.history.length - 1;
+        const viewW = $.chartCanvas.clientWidth || 800;
+        // Place latest candle at ~85% from left
+        const targetWorldX = lastDay + 1;
+        const rightEdgeWorld = camera.screenToWorld(viewW * 0.85, 0).x;
+        if (targetWorldX > rightEdgeWorld) {
+            const dx = targetWorldX - rightEdgeWorld;
+            camera.panBy(-dx * camera.zoom, 0);
+        }
+    }
+
     updateUI();
     dirty = true;
 }
@@ -303,6 +322,7 @@ function updateUI() {
 
 function togglePlay() {
     playing = !playing;
+    if (playing) lastTickTime = performance.now();
     updatePlayBtn($, playing);
     _haptics.trigger(playing ? 'medium' : 'light');
 }
@@ -407,6 +427,21 @@ function handleBuyBond() {
     dirty = true;
 }
 
+function handleShortBond() {
+    const vol = Math.sqrt(Math.max(sim.v, 0));
+    const expiryDay = chain.length > 0 ? chain[0].day : sim.day + 21;
+    const pos = executeMarketOrder('bond', 'short', 1, sim.S, vol, sim.r, sim.day, null, expiryDay);
+    if (pos) {
+        if (typeof showToast !== 'undefined') showToast('Shorted 1 bond, expires day ' + expiryDay);
+        _haptics.trigger('success');
+    } else {
+        if (typeof showToast !== 'undefined') showToast('Insufficient margin.');
+        _haptics.trigger('error');
+    }
+    updateUI();
+    dirty = true;
+}
+
 function handleChainCellClick(info) {
     showTradeDialog($, {
         type:      info.type,
@@ -454,7 +489,7 @@ function handleLiquidate() {
 // Strategy builder handlers
 // ---------------------------------------------------------------------------
 
-function handleAddLeg(type) {
+function handleAddLeg(type, side) {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     const nearestExpiry = chain.length > 0 ? chain[0] : null;
     const expiryDay = nearestExpiry ? nearestExpiry.day : sim.day + 21;
@@ -462,7 +497,7 @@ function handleAddLeg(type) {
 
     const leg = {
         type,
-        side: 'long',
+        side: side || 'long',
         qty: 1,
     };
     if (type === 'call' || type === 'put') {
@@ -521,7 +556,10 @@ function updateStrategyBuilder() {
     const summary = strategyLegs.length > 0
         ? strategy.computeSummary(strategyLegs, sim.S, vol, sim.r, sliderDTE)
         : null;
-    renderStrategyBuilder($, strategyLegs, summary, handleRemoveLeg, chain);
+    renderStrategyBuilder($, strategyLegs, summary, handleRemoveLeg, chain, () => {
+        updateStrategyBuilder();
+        dirty = true;
+    });
 }
 
 // ---------------------------------------------------------------------------

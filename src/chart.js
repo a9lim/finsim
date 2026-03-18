@@ -23,6 +23,7 @@ export class ChartRenderer {
 
         // Axis gutter sizes (CSS px)
         this.Y_AXIS_W  = 64;   // right-side Y-axis label area
+        this.Y_LABEL_W = 18;   // left-side rotated Y-axis label
         this.X_AXIS_H  = 32;   // bottom X-axis label area
         this.PADDING_T = 24;   // top padding above chart area
 
@@ -91,13 +92,14 @@ export class ChartRenderer {
         const W   = this.width;
         const H   = this.height;
         const yAW = this.Y_AXIS_W;    // Y-axis gutter on right
+        const yLW = this.Y_LABEL_W;   // Y-axis label on left
         const xAH = this.X_AXIS_H;    // X-axis gutter at bottom
         const pT  = this.PADDING_T;   // top padding
 
         // Chart plot area (in CSS px, within the full canvas)
-        const plotX = 0;
+        const plotX = yLW;
         const plotY = pT;
-        const plotW = W - yAW;
+        const plotW = W - yAW - yLW;
         const plotH = H - pT - xAH;
 
         // Scale context for DPR
@@ -128,10 +130,10 @@ export class ChartRenderer {
         const cam = this.camera;
 
         // Base candle width in world units is 1; in screen pixels it is cam.zoom
-        // We want candles to fit nicely: a base of 8 * zoom px, gap of 2 * zoom px
-        // But clamp min candle body width to 2px and max to 40px.
-        const candleWidthRaw = Math.max(2, Math.min(40, 8 * (cam ? cam.zoom : 1)));
-        const candleGap      = Math.max(0.5, candleWidthRaw * 0.2);
+        // We want candles to fit nicely: a base of 4 * zoom px, gap of at least 1px
+        // But clamp min candle body width to 2px and max to 24px.
+        const candleWidthRaw = Math.max(2, Math.min(24, 4 * (cam ? cam.zoom : 1)));
+        const candleGap      = Math.max(1, candleWidthRaw * 0.25);
         // Each slot (day) occupies candleWidthRaw + candleGap px on screen
         const slotPx = candleWidthRaw + candleGap;
 
@@ -164,7 +166,7 @@ export class ChartRenderer {
 
         const visibleBars = history.slice(firstDay, lastDay + 1);
 
-        // ── 2. Auto-scale Y ──────────────────────────────────────
+        // ── 2. Auto-scale Y (logarithmic) ──────────────────────────
         let minPrice =  Infinity;
         let maxPrice = -Infinity;
 
@@ -173,21 +175,27 @@ export class ChartRenderer {
             if (bar.high > maxPrice) maxPrice = bar.high;
         }
 
-        if (minPrice === maxPrice) {
-            // Flat price — add ±1% padding to avoid zero-height chart
-            minPrice *= 0.99;
-            maxPrice *= 1.01;
-        }
+        // Floor to avoid log(0)
+        if (minPrice <= 0) minPrice = 0.01;
+        if (maxPrice <= minPrice) maxPrice = minPrice * 1.02;
 
-        const priceRange = maxPrice - minPrice;
-        const padFrac    = 0.10;
-        const priceLo    = minPrice - priceRange * padFrac;
-        const priceHi    = maxPrice + priceRange * padFrac;
-        const priceDelta = priceHi - priceLo;
+        const logMin = Math.log(minPrice);
+        const logMax = Math.log(maxPrice);
+        const logRange = logMax - logMin;
+        const padFrac  = 0.10;
+        const logLo    = logMin - logRange * padFrac;
+        const logHi    = logMax + logRange * padFrac;
+        const logDelta = logHi - logLo;
 
-        // Convert price → Y pixel (within the plot area)
-        const priceToY = (price) =>
-            plotY + plotH - ((price - priceLo) / priceDelta) * plotH;
+        // Actual price bounds for labels/grid (exponentiated back)
+        const priceLo = Math.exp(logLo);
+        const priceHi = Math.exp(logHi);
+
+        // Convert price → Y pixel (logarithmic scale)
+        const priceToY = (price) => {
+            const lp = Math.log(Math.max(price, 1e-10));
+            return plotY + plotH - ((lp - logLo) / logDelta) * plotH;
+        };
 
         // ── 3. Draw grid ─────────────────────────────────────────
         ctx.save();
@@ -196,8 +204,9 @@ export class ChartRenderer {
         ctx.rect(plotX, plotY, plotW, plotH);
         ctx.clip();
 
-        // Horizontal grid lines at nice price intervals
-        const priceInterval = _niceInterval(priceDelta, 6);
+        // Horizontal grid lines at nice price intervals (log-aware)
+        const linearRange = Math.exp(logHi) - Math.exp(logLo);
+        const priceInterval = _niceInterval(linearRange, 6);
         const priceStart    = Math.ceil(priceLo / priceInterval) * priceInterval;
 
         const gridColor = isDark
@@ -404,6 +413,17 @@ export class ChartRenderer {
 
         ctx.restore();
 
+        // ── 8b. Y-axis rotated label "Price ($)" ────────────────
+        ctx.save();
+        ctx.fillStyle    = textMuted;
+        ctx.font         = `11px var(--font-body, sans-serif)`;
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.translate(10, plotY + plotH / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Price ($)', 0, 0);
+        ctx.restore();
+
         // ── 9. X-axis labels ──────────────────────────────────────
         ctx.save();
         ctx.font        = `11px var(--font-mono, monospace)`;
@@ -454,8 +474,9 @@ export class ChartRenderer {
 
             ctx.setLineDash([]);
 
-            // Price label on Y-axis
-            const hoverPrice = priceLo + ((plotY + plotH - mouseY) / plotH) * priceDelta;
+            // Price label on Y-axis (log scale: invert priceToY)
+            const hoverLogP = logLo + ((plotY + plotH - mouseY) / plotH) * logDelta;
+            const hoverPrice = Math.exp(hoverLogP);
             const priceLabelW = yAW - 4;
             const priceLabelH = 18;
             const priceLabelX = plotX + plotW;

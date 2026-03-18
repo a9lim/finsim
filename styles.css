@@ -563,6 +563,13 @@ main {
     letter-spacing: 0.04em;
 }
 
+/* --- Trade Hint --- */
+.trade-hint {
+    padding: 2px 0 0;
+    font-size: 0.68rem;
+    text-align: center;
+}
+
 /* --- Strategy Builder --- */
 .strategy-add-row {
     flex-wrap: wrap;
@@ -586,6 +593,52 @@ main {
 
 .leg-row:hover {
     background: var(--bg-hover);
+}
+
+/* --- Leg Configurator --- */
+.leg-row-container {
+    margin-bottom: 3px;
+}
+
+.leg-config {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 8px 6px;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    background: var(--bg-hover);
+}
+
+.leg-config-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 100px;
+}
+
+.leg-config-label {
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.leg-config-select {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.72rem;
+    padding: 2px 4px;
+}
+
+.leg-config-input {
+    width: 48px;
+    font-size: 0.72rem;
+    padding: 2px 4px;
 }
 
 .strategy-summary {

@@ -61,9 +61,8 @@ export function cacheDOMElements($) {
     $.expirySelect  = document.getElementById('expiry-select');
     $.chainTable    = document.getElementById('chain-table');
     $.fullChainLink = document.getElementById('full-chain-link');
-    $.buyStockBtn   = document.getElementById('buy-stock-btn');
-    $.shortStockBtn = document.getElementById('short-stock-btn');
-    $.buyBondBtn    = document.getElementById('buy-bond-btn');
+    $.stockBtn = document.getElementById('stock-btn');
+    $.bondBtn  = document.getElementById('bond-btn');
     $.defaultPositions  = document.getElementById('default-positions');
     $.strategyPositions = document.getElementById('strategy-positions');
     $.pendingOrders     = document.getElementById('pending-orders');
@@ -72,7 +71,6 @@ export function cacheDOMElements($) {
     $.totalPnl          = document.getElementById('total-pnl');
     $.marginStatus      = document.getElementById('margin-status');
     $.greeksAggregate = document.getElementById('greeks-aggregate');
-    $.greeksBreakdown = document.getElementById('greeks-breakdown');
     $.greekDelta      = document.getElementById('greek-delta');
     $.greekGamma      = document.getElementById('greek-gamma');
     $.greekTheta      = document.getElementById('greek-theta');
@@ -130,7 +128,8 @@ export function bindEvents($, handlers) {
     const {
         onTogglePlay, onStep, onSpeedChange, onToggleTheme, onToggleSidebar,
         onToggleStrategy, onPresetChange, onReset, onSliderChange, onTimeSlider,
-        onBuyStock, onShortStock, onBuyBond, onChainCellClick, onFullChainOpen,
+        onBuyStock, onShortStock, onBuyBond, onShortBond,
+        onChainCellClick, onFullChainOpen,
         onTradeSubmit, onLiquidate, onDismissMargin,
     } = handlers;
 
@@ -168,9 +167,18 @@ export function bindEvents($, handlers) {
         onTimeSlider(parseInt($.timeSlider.value, 10));
     });
 
-    $.buyStockBtn.addEventListener('click', onBuyStock);
-    $.shortStockBtn.addEventListener('click', onShortStock);
-    $.buyBondBtn.addEventListener('click', onBuyBond);
+    // Stock button: left-click = buy, right-click = short
+    $.stockBtn.addEventListener('click', onBuyStock);
+    $.stockBtn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        onShortStock();
+    });
+    // Bond button: left-click = buy, right-click = sell/short
+    $.bondBtn.addEventListener('click', onBuyBond);
+    $.bondBtn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (typeof onShortBond === 'function') onShortBond();
+    });
     $.fullChainLink.addEventListener('click', onFullChainOpen);
 
     $.chainOverlayClose.addEventListener('click', () => {
@@ -209,12 +217,16 @@ export function bindEvents($, handlers) {
     $._onChainCellClick = onChainCellClick;
     $._onTradeSubmit    = onTradeSubmit;
 
-    // Strategy builder buttons
+    // Strategy builder buttons: left-click = long, right-click = short
     if ($.addCallBtn && typeof handlers.onAddLeg === 'function') {
-        $.addCallBtn.addEventListener('click',     () => handlers.onAddLeg('call'));
-        $.addPutBtn.addEventListener('click',      () => handlers.onAddLeg('put'));
-        $.addStockLegBtn.addEventListener('click', () => handlers.onAddLeg('stock'));
-        $.addBondLegBtn.addEventListener('click',  () => handlers.onAddLeg('bond'));
+        $.addCallBtn.addEventListener('click',     () => handlers.onAddLeg('call', 'long'));
+        $.addCallBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); handlers.onAddLeg('call', 'short'); });
+        $.addPutBtn.addEventListener('click',      () => handlers.onAddLeg('put', 'long'));
+        $.addPutBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); handlers.onAddLeg('put', 'short'); });
+        $.addStockLegBtn.addEventListener('click', () => handlers.onAddLeg('stock', 'long'));
+        $.addStockLegBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); handlers.onAddLeg('stock', 'short'); });
+        $.addBondLegBtn.addEventListener('click',  () => handlers.onAddLeg('bond', 'long'));
+        $.addBondLegBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); handlers.onAddLeg('bond', 'short'); });
     }
     if ($.saveStrategyBtn && typeof handlers.onSaveStrategy === 'function') {
         $.saveStrategyBtn.addEventListener('click', handlers.onSaveStrategy);
@@ -886,7 +898,7 @@ export function updateZoomLevel($, factor) {
  * @param {Function} onRemoveLeg  Callback(index) to remove a leg
  * @param {Object}   chain     Current chain array for strike/expiry pickers
  */
-export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain) {
+export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain, onLegChange) {
     if (!$.strategyLegsList) return;
 
     $.strategyLegsList.textContent = '';
@@ -899,7 +911,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain) {
     } else {
         for (let i = 0; i < legs.length; i++) {
             const leg = legs[i];
-            $.strategyLegsList.appendChild(_buildLegRow(leg, i, onRemoveLeg, chain));
+            $.strategyLegsList.appendChild(_buildLegRow(leg, i, onRemoveLeg, chain, onLegChange));
         }
     }
 
@@ -941,7 +953,10 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain) {
     if ($.execStrategyBtn) $.execStrategyBtn.disabled = !hasLegs;
 }
 
-function _buildLegRow(leg, index, onRemoveLeg, chain) {
+function _buildLegRow(leg, index, onRemoveLeg, chain, onLegChange) {
+    const container = document.createElement('div');
+    container.className = 'leg-row-container';
+
     const row = document.createElement('div');
     row.className = 'leg-row stat-row';
 
@@ -950,6 +965,10 @@ function _buildLegRow(leg, index, onRemoveLeg, chain) {
     const sideStr = leg.side === 'short' ? 'Short' : 'Long';
     let desc = sideStr + ' ' + leg.type.toUpperCase();
     if (leg.strike != null) desc += ' K' + leg.strike;
+    if (leg.expiryDay != null) {
+        const expiry = chain ? chain.find(e => e.day === leg.expiryDay) : null;
+        if (expiry) desc += ' ' + expiry.dte + 'd';
+    }
     desc += ' x' + (leg.qty || 1);
     label.textContent = desc;
 
@@ -964,7 +983,88 @@ function _buildLegRow(leg, index, onRemoveLeg, chain) {
 
     row.appendChild(label);
     row.appendChild(removeBtn);
-    return row;
+    container.appendChild(row);
+
+    // For options, show strike/expiry/qty configurator
+    const isOption = leg.type === 'call' || leg.type === 'put';
+    if (isOption && chain && chain.length > 0) {
+        const config = document.createElement('div');
+        config.className = 'leg-config';
+
+        // Strike selector
+        const strikeRow = document.createElement('div');
+        strikeRow.className = 'leg-config-row';
+        const strikeLbl = document.createElement('span');
+        strikeLbl.className = 'leg-config-label';
+        strikeLbl.textContent = 'Strike';
+        const strikeSel = document.createElement('select');
+        strikeSel.className = 'sim-select leg-config-select';
+        // Collect all strikes from first available expiry
+        const expiryData = chain.find(e => e.day === leg.expiryDay) || chain[0];
+        if (expiryData && expiryData.options) {
+            for (const opt of expiryData.options) {
+                const o = document.createElement('option');
+                o.value = opt.strike;
+                o.textContent = '$' + opt.strike;
+                if (opt.strike === leg.strike) o.selected = true;
+                strikeSel.appendChild(o);
+            }
+        }
+        strikeSel.addEventListener('change', () => {
+            leg.strike = parseInt(strikeSel.value, 10);
+            if (typeof onLegChange === 'function') onLegChange();
+        });
+        strikeRow.appendChild(strikeLbl);
+        strikeRow.appendChild(strikeSel);
+        config.appendChild(strikeRow);
+
+        // Expiry selector
+        const expiryRow = document.createElement('div');
+        expiryRow.className = 'leg-config-row';
+        const expiryLbl = document.createElement('span');
+        expiryLbl.className = 'leg-config-label';
+        expiryLbl.textContent = 'Expiry';
+        const expirySel = document.createElement('select');
+        expirySel.className = 'sim-select leg-config-select';
+        for (const exp of chain) {
+            const o = document.createElement('option');
+            o.value = exp.day;
+            o.textContent = exp.dte + 'd (D' + exp.day + ')';
+            if (exp.day === leg.expiryDay) o.selected = true;
+            expirySel.appendChild(o);
+        }
+        expirySel.addEventListener('change', () => {
+            leg.expiryDay = parseInt(expirySel.value, 10);
+            if (typeof onLegChange === 'function') onLegChange();
+        });
+        expiryRow.appendChild(expiryLbl);
+        expiryRow.appendChild(expirySel);
+        config.appendChild(expiryRow);
+
+        // Qty input
+        const qtyRow = document.createElement('div');
+        qtyRow.className = 'leg-config-row';
+        const qtyLbl = document.createElement('span');
+        qtyLbl.className = 'leg-config-label';
+        qtyLbl.textContent = 'Qty';
+        const qtyInput = document.createElement('input');
+        qtyInput.type = 'number';
+        qtyInput.className = 'sim-input leg-config-input';
+        qtyInput.value = leg.qty || 1;
+        qtyInput.min = '1';
+        qtyInput.step = '1';
+        qtyInput.addEventListener('change', () => {
+            leg.qty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+            if (typeof onLegChange === 'function') onLegChange();
+        });
+        qtyRow.appendChild(qtyLbl);
+        qtyRow.appendChild(qtyInput);
+        config.appendChild(qtyRow);
+
+        container.appendChild(config);
+    }
+
+    return container;
 }
 
 // ---------------------------------------------------------------------------
