@@ -339,7 +339,7 @@ export class ChartRenderer {
                 }
                 if (cx < plotX - 6 || cx > plotX + plotW + 6) continue;
 
-                const isLong = pos.side === 'long';
+                const isLong = pos.qty > 0;
                 const markerColor = isLong ? palette.up : palette.down;
 
                 if (isLong) {

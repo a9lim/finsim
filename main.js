@@ -200,14 +200,29 @@ function init() {
     // 10. Wire info tips for slider labels
     wireInfoTips($);
 
-    // 11. Build initial chain and update UI
+    // 11. Generate historical data so chart isn't empty on load
+    for (let i = 0; i < 60; i++) sim.tick();
+
+    // 12. Build initial chain and update UI
     chain = buildChain(sim.S, sim.v, sim.r, sim.day);
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateSpeedBtn($, speed);
     updateUI();
 
-    // 12. Wire resize via ResizeObserver on chart container
+    // 13. Position camera so latest candle is visible
+    if (camera) {
+        const lastDay = sim.history.length - 1;
+        const viewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
+        const leftMargin = 80;
+        // Place latest candle at ~85% from left
+        const targetScreenX = viewW * 0.85;
+        // screenX = (worldX - cam.x) * zoom + vpW/2
+        // cam.x = worldX - (targetScreenX - vpW/2) / zoom
+        camera.x = (lastDay + 0.5) - (targetScreenX - viewW / 2) / camera.zoom;
+    }
+
+    // 15. Wire resize via ResizeObserver on chart container
     // This fires during CSS sidebar transition AND window resize.
     // We must redraw IMMEDIATELY after resize (same call stack) because
     // setting canvas.width clears the buffer — if we wait for the next
@@ -230,7 +245,7 @@ function init() {
         window.addEventListener('resize', handleResize);
     }
 
-    // 13. Wire mousemove/mouseleave on chart canvas for crosshair
+    // 16. Wire mousemove/mouseleave on chart canvas for crosshair
     $.chartCanvas.addEventListener('mousemove', (e) => {
         const rect = $.chartCanvas.getBoundingClientRect();
         mouseX = e.clientX - rect.left;
@@ -243,7 +258,7 @@ function init() {
         dirty = true;
     });
 
-    // 14. Start animation loop
+    // 17. Start animation loop
     requestAnimationFrame(frame);
 }
 
@@ -379,11 +394,14 @@ function toggleStrategy() {
 function loadPreset(index) {
     sim.reset(index);
     resetPortfolio();
+    // Generate historical data so chart isn't empty
+    for (let i = 0; i < 60; i++) sim.tick();
     chain = buildChain(sim.S, sim.v, sim.r, sim.day);
     playing = false;
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateUI();
+    _repositionCamera();
     dirty = true;
     _haptics.trigger('medium');
 }
@@ -391,11 +409,14 @@ function loadPreset(index) {
 function resetSim() {
     sim.reset($.presetSelect.selectedIndex);
     resetPortfolio();
+    // Generate historical data so chart isn't empty
+    for (let i = 0; i < 60; i++) sim.tick();
     chain = buildChain(sim.S, sim.v, sim.r, sim.day);
     playing = false;
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateUI();
+    _repositionCamera();
     dirty = true;
     _haptics.trigger('heavy');
 }
@@ -581,6 +602,18 @@ function updateStrategyBuilder() {
         updateStrategyBuilder();
         dirty = true;
     });
+}
+
+// ---------------------------------------------------------------------------
+// Helper: reposition camera so latest candle is near the right edge
+// ---------------------------------------------------------------------------
+
+function _repositionCamera() {
+    if (!camera) return;
+    const lastDay = sim.history.length - 1;
+    const viewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
+    const targetScreenX = viewW * 0.85;
+    camera.x = (lastDay + 0.5) - (targetScreenX - viewW / 2) / camera.zoom;
 }
 
 // ---------------------------------------------------------------------------

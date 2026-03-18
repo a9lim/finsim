@@ -561,13 +561,9 @@ main {
 
 /* --- Time Slider Bar --- */
 #time-slider-bar {
-    position: fixed;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 100;
-    padding: 8px 16px;
-    min-width: 300px;
+    width: 100%;
+    padding: 6px 16px;
+    box-sizing: border-box;
 }
 
 #time-slider-bar.hidden {
@@ -757,11 +753,7 @@ main {
     }
 
     #time-slider-bar {
-        min-width: 0;
-        left: 10px;
-        right: 10px;
-        transform: none;
-        bottom: 8px;
+        padding: 6px 10px;
     }
 
     .greeks-grid {
