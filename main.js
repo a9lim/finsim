@@ -65,15 +65,22 @@ function init() {
 
     // 2. Create camera for horizontal chart pan/zoom
     if (typeof createCamera !== 'undefined') {
-        // Camera zoom units: 1 world unit = 1 day.
-        // At zoom=SLOT_PX (12), each day occupies 12 screen pixels.
-        const SLOT_PX = 12;
+        // Camera zoom = pixels per world unit. 1 world unit = 1 day.
+        // Default zoom=12 → each day = 12 screen px. Range: 12 (100%) to 36 (300%).
+        const DEFAULT_ZOOM = 12;
+        const vpW = $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800;
+        const vpH = $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600;
+        // Position camera so day 0 starts near the left edge of the plot area
+        // screenX = (worldX - cam.x) * zoom + vpW/2
+        // We want worldX=0 at screenX ≈ 80 (left margin): cam.x = (vpW/2 - 80) / zoom
+        const leftMargin = 80;
         camera = createCamera({
-            width:   $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800,
-            height:  $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600,
-            zoom:    SLOT_PX,
-            minZoom: 2,
-            maxZoom: SLOT_PX * 8,
+            width:   vpW,
+            height:  vpH,
+            x:       -(vpW / 2 - leftMargin) / DEFAULT_ZOOM,
+            zoom:    DEFAULT_ZOOM,
+            minZoom: DEFAULT_ZOOM,
+            maxZoom: DEFAULT_ZOOM * 3,
             onUpdate: () => { dirty = true; },
         });
 
@@ -85,6 +92,7 @@ function init() {
             zoomOut: $.zoomOutBtn,
             reset:   $.zoomResetBtn,
             display: $.zoomLevel,
+            formatZoom: (z) => Math.round(z / DEFAULT_ZOOM * 100) + '%',
         });
 
         // 4. Attach camera to chart renderer
@@ -200,7 +208,10 @@ function init() {
     updateUI();
 
     // 12. Wire resize via ResizeObserver on chart container
-    // This fires during CSS sidebar transition AND window resize
+    // This fires during CSS sidebar transition AND window resize.
+    // We must redraw IMMEDIATELY after resize (same call stack) because
+    // setting canvas.width clears the buffer — if we wait for the next
+    // rAF frame, the user sees a blank flash.
     const chartContainer = document.getElementById('chart-container');
     function handleResize() {
         chart.resize();
@@ -209,7 +220,9 @@ function init() {
             $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800,
             $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600
         );
-        dirty = true;
+        // Immediate redraw to avoid blank frame
+        renderCurrentView();
+        dirty = false; // already rendered this frame
     }
     if (typeof ResizeObserver !== 'undefined') {
         new ResizeObserver(handleResize).observe(chartContainer);
@@ -238,6 +251,23 @@ function init() {
 // frame — rAF loop
 // ---------------------------------------------------------------------------
 
+/** Redraw the active canvas view. Called from frame() and handleResize(). */
+function renderCurrentView() {
+    if (strategyMode) {
+        strategy.draw(
+            strategyLegs, sim.S,
+            Math.sqrt(Math.max(sim.v, 0)),
+            sim.r, sliderDTE, greekToggles
+        );
+    } else {
+        chart.draw(
+            sim.history, portfolio.positions,
+            mouseX, mouseY,
+            sim.history[sim.history.length - 1]
+        );
+    }
+}
+
 function frame(now) {
     if (playing) {
         const tickInterval = 1000 / speed;
@@ -248,19 +278,7 @@ function frame(now) {
     }
     if (dirty) {
         dirty = false;
-        if (strategyMode) {
-            strategy.draw(
-                strategyLegs, sim.S,
-                Math.sqrt(Math.max(sim.v, 0)),
-                sim.r, sliderDTE, greekToggles
-            );
-        } else {
-            chart.draw(
-                sim.history, portfolio.positions,
-                mouseX, mouseY,
-                sim.history[sim.history.length - 1]
-            );
-        }
+        renderCurrentView();
     }
     requestAnimationFrame(frame);
 }
