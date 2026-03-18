@@ -160,8 +160,15 @@ export class StrategyRenderer {
         const T = _dteToT(dte);
 
         // --- Build sample arrays ---
-        const xMin = spot * (1 - X_RANGE_FACTOR);
-        const xMax = spot * (1 + X_RANGE_FACTOR);
+        // Compute X range: at least ±30% from spot, extended to cover all strikes with 10% padding
+        let xMin = spot * 0.7;
+        let xMax = spot * 1.3;
+        for (const leg of legs) {
+            if (leg.strike != null) {
+                xMin = Math.min(xMin, leg.strike * 0.9);
+                xMax = Math.max(xMax, leg.strike * 1.1);
+            }
+        }
         const xs   = [];
         const pnls = [];
 
@@ -257,8 +264,14 @@ export class StrategyRenderer {
         }
 
         const T    = _dteToT(dte);
-        const xMin = spot * (1 - X_RANGE_FACTOR);
-        const xMax = spot * (1 + X_RANGE_FACTOR);
+        let xMin = spot * 0.7;
+        let xMax = spot * 1.3;
+        for (const leg of legs) {
+            if (leg.strike != null) {
+                xMin = Math.min(xMin, leg.strike * 0.9);
+                xMax = Math.max(xMax, leg.strike * 1.1);
+            }
+        }
         const xs   = [];
         const pnls = [];
 

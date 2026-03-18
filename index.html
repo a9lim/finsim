@@ -88,7 +88,7 @@
     <header id="toolbar" class="sim-toolbar glass" role="toolbar" aria-label="Trading tools">
         <div class="toolbar-brand">
             <a href="/" class="sim-home" title="a9l.im"><img src="/logo.svg" alt="a9l.im" height="28"></a>
-            <h1 class="sim-brand">Shoals <em>Trading Simulator</em></h1>
+            <h1 class="sim-brand">Shoals</h1>
         </div>
         <div class="toolbar-actions sim-toolbar-actions">
             <button id="strategy-btn" class="tool-btn" aria-label="Strategy view" title="Strategy">
@@ -199,7 +199,7 @@
             <nav class="tab-bar" role="tablist">
                 <button class="tab-btn active" data-tab="trade" role="tab" aria-selected="true">Trade</button>
                 <button class="tab-btn" data-tab="portfolio" role="tab" aria-selected="false">Portfolio</button>
-                <button class="tab-btn" data-tab="greeks" role="tab" aria-selected="false">Greeks</button>
+                <button class="tab-btn" data-tab="strategy" role="tab" aria-selected="false">Strategy</button>
                 <button class="tab-btn" data-tab="settings" role="tab" aria-selected="false">Settings</button>
             </nav>
             <div class="tab-panels scrollbar-thin">
@@ -208,10 +208,10 @@
                     <div class="stat-group">
                         <div class="group-label">Quick Trade</div>
                         <div class="quick-trade-row">
-                            <button id="buy-stock-btn" class="ghost-btn trade-btn up">Buy Stock</button>
-                            <button id="short-stock-btn" class="ghost-btn trade-btn down">Short Stock</button>
-                            <button id="buy-bond-btn" class="ghost-btn trade-btn bond">Buy Bond</button>
+                            <button id="stock-btn" class="ghost-btn trade-btn up">Stock</button>
+                            <button id="bond-btn" class="ghost-btn trade-btn bond">Bond</button>
                         </div>
+                        <p class="panel-hint trade-hint">Left-click: buy &middot; Right-click: sell/short</p>
                     </div>
                     <div class="stat-group">
                         <div class="group-label">Options Chain</div>
@@ -224,23 +224,6 @@
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
                         <button id="full-chain-link" class="ghost-btn chain-expand-btn">View Full Chain</button>
-                    </div>
-                    <div class="stat-group" id="strategy-builder">
-                        <div class="group-label">Strategy Builder</div>
-                        <div class="quick-trade-row strategy-add-row">
-                            <button id="add-call-btn" class="ghost-btn trade-btn up">+Call</button>
-                            <button id="add-put-btn" class="ghost-btn trade-btn down">+Put</button>
-                            <button id="add-stock-leg-btn" class="ghost-btn trade-btn bond">+Stock</button>
-                            <button id="add-bond-leg-btn" class="ghost-btn trade-btn bond">+Bond</button>
-                        </div>
-                        <div id="strategy-legs-list" class="strategy-legs-list">
-                            <p class="panel-hint">No legs added. Click buttons above to build a strategy.</p>
-                        </div>
-                        <div id="strategy-summary" class="strategy-summary"></div>
-                        <div class="quick-trade-row" style="margin-top:6px">
-                            <button id="save-strategy-btn" class="ghost-btn trade-btn bond" disabled>Save</button>
-                            <button id="exec-strategy-btn" class="ghost-btn trade-btn up" disabled>Execute</button>
-                        </div>
                     </div>
                 </div>
                 <!-- Portfolio Tab -->
@@ -282,11 +265,8 @@
                             <p class="panel-hint">No pending orders.</p>
                         </div>
                     </div>
-                </div>
-                <!-- Greeks Tab -->
-                <div class="tab-panel" id="tab-greeks" role="tabpanel">
                     <div class="stat-group">
-                        <div class="group-label">Aggregate Greeks</div>
+                        <div class="group-label">Greeks</div>
                         <div id="greeks-aggregate" class="greeks-grid">
                             <div class="greek-item">
                                 <span class="greek-label">Delta</span>
@@ -310,10 +290,25 @@
                             </div>
                         </div>
                     </div>
-                    <div class="stat-group">
-                        <div class="group-label">Breakdown by Position</div>
-                        <div id="greeks-breakdown">
-                            <p class="panel-hint">Open option positions to see per-position Greeks.</p>
+                </div>
+                <!-- Strategy Tab -->
+                <div class="tab-panel" id="tab-strategy" role="tabpanel">
+                    <div class="stat-group" id="strategy-builder">
+                        <div class="group-label">Build Strategy</div>
+                        <div class="quick-trade-row strategy-add-row">
+                            <button id="add-call-btn" class="ghost-btn trade-btn up">+Call</button>
+                            <button id="add-put-btn" class="ghost-btn trade-btn down">+Put</button>
+                            <button id="add-stock-leg-btn" class="ghost-btn trade-btn bond">+Stock</button>
+                            <button id="add-bond-leg-btn" class="ghost-btn trade-btn bond">+Bond</button>
+                        </div>
+                        <p class="panel-hint trade-hint">Left-click: long &middot; Right-click: short</p>
+                        <div id="strategy-legs-list" class="strategy-legs-list">
+                            <p class="panel-hint">No legs added. Click buttons above to build a strategy.</p>
+                        </div>
+                        <div id="strategy-summary" class="strategy-summary"></div>
+                        <div class="quick-trade-row" style="margin-top:6px">
+                            <button id="save-strategy-btn" class="ghost-btn trade-btn bond" disabled>Save</button>
+                            <button id="exec-strategy-btn" class="ghost-btn trade-btn up" disabled>Execute</button>
                         </div>
                     </div>
                 </div>
