@@ -13,6 +13,7 @@ import {
     checkMargin, aggregateGreeks, portfolioValue,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
+    saveStrategy, executeStrategy,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -21,6 +22,7 @@ import {
     updatePortfolioDisplay, updateGreeksDisplay, syncSettingsUI,
     toggleStrategyView, showMarginCall, showChainOverlay,
     showTradeDialog, updatePlayBtn, updateSpeedBtn,
+    renderStrategyBuilder, wireInfoTips,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
 
@@ -130,13 +132,17 @@ function init() {
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
         onDismissMargin:  () => { /* sim stays paused, overlay hidden by ui.js */ },
+        onAddLeg:         (type) => handleAddLeg(type),
+        onSaveStrategy:   () => handleSaveStrategy(),
+        onExecStrategy:   () => handleExecStrategy(),
     });
 
     // 8. Wire custom events from ui.js position rows
     document.addEventListener('shoals:closePosition', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
-            closePosition(id, sim.S, Math.sqrt(Math.max(sim.v, 0)), sim.r, sim.day);
+            const ok = closePosition(id, sim.S, Math.sqrt(Math.max(sim.v, 0)), sim.r, sim.day);
+            if (ok && typeof showToast !== 'undefined') showToast('Position closed.');
             updateUI();
             dirty = true;
         }
@@ -145,7 +151,10 @@ function init() {
     document.addEventListener('shoals:exerciseOption', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
-            exerciseOption(id, sim.S, sim.day);
+            const result = exerciseOption(id, sim.S, sim.day);
+            if (typeof showToast !== 'undefined') {
+                showToast(result ? 'Option exercised.' : 'Cannot exercise.');
+            }
             updateUI();
             dirty = true;
         }
@@ -155,6 +164,7 @@ function init() {
         const id = e.detail && e.detail.id;
         if (id != null) {
             cancelOrder(id);
+            if (typeof showToast !== 'undefined') showToast('Order cancelled.');
             updateUI();
             dirty = true;
         }
@@ -170,18 +180,21 @@ function init() {
                     $.introScreen.remove();
                 }
             }, 850);
-            _haptics.trigger('medium');
+            if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
         };
     }
 
-    // 10. Build initial chain and update UI
+    // 10. Wire info tips for slider labels
+    wireInfoTips($);
+
+    // 11. Build initial chain and update UI
     chain = buildChain(sim.S, sim.v, sim.r, sim.day);
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateSpeedBtn($, speed);
     updateUI();
 
-    // 11. Wire window resize
+    // 12. Wire window resize
     const onResize = typeof debounce !== 'undefined'
         ? debounce(() => {
             chart.resize();
@@ -203,7 +216,7 @@ function init() {
         };
     window.addEventListener('resize', onResize);
 
-    // 12. Wire mousemove/mouseleave on chart canvas for crosshair
+    // 13. Wire mousemove/mouseleave on chart canvas for crosshair
     $.chartCanvas.addEventListener('mousemove', (e) => {
         const rect = $.chartCanvas.getBoundingClientRect();
         mouseX = e.clientX - rect.left;
@@ -216,7 +229,7 @@ function init() {
         dirty = true;
     });
 
-    // 13. Start animation loop
+    // 14. Start animation loop
     requestAnimationFrame(frame);
 }
 
@@ -281,6 +294,7 @@ function updateUI() {
     updateChainDisplay($, chain);
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
+    updateStrategyBuilder();
 }
 
 // ---------------------------------------------------------------------------
@@ -434,6 +448,80 @@ function handleLiquidate() {
     dirty = true;
     if (typeof showToast !== 'undefined') showToast('All positions liquidated.');
     _haptics.trigger('heavy');
+}
+
+// ---------------------------------------------------------------------------
+// Strategy builder handlers
+// ---------------------------------------------------------------------------
+
+function handleAddLeg(type) {
+    const vol = Math.sqrt(Math.max(sim.v, 0));
+    const nearestExpiry = chain.length > 0 ? chain[0] : null;
+    const expiryDay = nearestExpiry ? nearestExpiry.day : sim.day + 21;
+    const atm = Math.round(sim.S / 5) * 5;
+
+    const leg = {
+        type,
+        side: 'long',
+        qty: 1,
+    };
+    if (type === 'call' || type === 'put') {
+        leg.strike = atm;
+        leg.expiryDay = expiryDay;
+    }
+    if (type === 'bond') {
+        leg.expiryDay = expiryDay;
+    }
+
+    strategyLegs.push(leg);
+    updateStrategyBuilder();
+    dirty = true;
+    if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
+}
+
+function handleRemoveLeg(index) {
+    strategyLegs.splice(index, 1);
+    updateStrategyBuilder();
+    dirty = true;
+}
+
+function handleSaveStrategy() {
+    if (strategyLegs.length === 0) return;
+    const name = prompt('Strategy name:');
+    if (!name || !name.trim()) return;
+    saveStrategy(name.trim(), strategyLegs.map(l => ({ ...l })));
+    if (typeof showToast !== 'undefined') showToast('Strategy "' + name.trim() + '" saved.');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('success');
+}
+
+function handleExecStrategy() {
+    if (strategyLegs.length === 0) return;
+    const vol = Math.sqrt(Math.max(sim.v, 0));
+    const results = [];
+    for (const leg of strategyLegs) {
+        const pos = executeMarketOrder(
+            leg.type, leg.side, leg.qty, sim.S, vol, sim.r, sim.day,
+            leg.strike, leg.expiryDay
+        );
+        if (pos) results.push(pos);
+    }
+    if (results.length > 0) {
+        if (typeof showToast !== 'undefined') showToast('Executed ' + results.length + ' leg(s).');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('success');
+    } else {
+        if (typeof showToast !== 'undefined') showToast('Execution failed -- insufficient funds.');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('error');
+    }
+    updateUI();
+    dirty = true;
+}
+
+function updateStrategyBuilder() {
+    const vol = Math.sqrt(Math.max(sim.v, 0));
+    const summary = strategyLegs.length > 0
+        ? strategy.computeSummary(strategyLegs, sim.S, vol, sim.r, sliderDTE)
+        : null;
+    renderStrategyBuilder($, strategyLegs, summary, handleRemoveLeg, chain);
 }
 
 // ---------------------------------------------------------------------------

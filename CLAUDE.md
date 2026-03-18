@@ -46,11 +46,12 @@ src/
   strategy.js          708 lines  StrategyRenderer: payoff P&L diagram, Greek overlays (Delta/
                                    Gamma/Theta/Vega/Rho), breakeven dots, time slider support,
                                    computeSummary(). Does NOT use shared-camera.js.
-  ui.js                851 lines  cacheDOMElements($), bindEvents(), updateChainDisplay(),
+  ui.js                ~1000 lines cacheDOMElements($), bindEvents(), updateChainDisplay(),
                                    updatePortfolioDisplay(), updateGreeksDisplay(),
                                    syncSettingsUI(), showChainOverlay(), showTradeDialog(),
                                    showMarginCall(), toggleStrategyView(), updatePlayBtn(),
-                                   updateSpeedBtn(). Pure functions — no internal state.
+                                   updateSpeedBtn(), renderStrategyBuilder(), wireInfoTips().
+                                   Pure functions — no internal state.
   theme.js              20 lines  initTheme() (localStorage + prefers-color-scheme),
                                    toggleTheme() (2-state: light/dark)
 ```
