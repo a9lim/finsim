@@ -65,12 +65,15 @@ function init() {
 
     // 2. Create camera for horizontal chart pan/zoom
     if (typeof createCamera !== 'undefined') {
+        // Camera zoom units: 1 world unit = 1 day.
+        // At zoom=SLOT_PX (12), each day occupies 12 screen pixels.
+        const SLOT_PX = 12;
         camera = createCamera({
             width:   $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800,
             height:  $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600,
-            zoom:    1,
-            minZoom: 0.1,
-            maxZoom: 10,
+            zoom:    SLOT_PX,
+            minZoom: 2,
+            maxZoom: SLOT_PX * 8,
             onUpdate: () => { dirty = true; },
         });
 

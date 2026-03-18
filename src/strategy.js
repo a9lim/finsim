@@ -126,8 +126,13 @@ export class StrategyRenderer {
         this._dpr    = dpr;
         const cssW   = canvas.clientWidth  || canvas.width  / dpr;
         const cssH   = canvas.clientHeight || canvas.height / dpr;
-        canvas.width  = Math.round(cssW * dpr);
-        canvas.height = Math.round(cssH * dpr);
+        const newBufW = Math.round(cssW * dpr);
+        const newBufH = Math.round(cssH * dpr);
+        // Only reset buffer if size changed (setting canvas.width clears it)
+        if (canvas.width !== newBufW || canvas.height !== newBufH) {
+            canvas.width  = newBufW;
+            canvas.height = newBufH;
+        }
         this._ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this._cssW = cssW;
         this._cssH = cssH;

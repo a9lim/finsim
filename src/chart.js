@@ -27,6 +27,10 @@ export class ChartRenderer {
         this.X_AXIS_H  = 32;   // bottom X-axis label area
         this.PADDING_T = 24;   // top padding above chart area
 
+        // Candle sizing: each day occupies SLOT_PX screen pixels at zoom=1
+        this.SLOT_PX = 12;     // px per day at zoom=1 (body + gap)
+        this.BODY_RATIO = 0.6; // fraction of slot that is candle body
+
         this._dpr = window.devicePixelRatio || 1;
         this.resize();
     }
@@ -53,11 +57,21 @@ export class ChartRenderer {
         const w = rect.width  || this.canvas.offsetWidth  || 800;
         const h = rect.height || this.canvas.offsetHeight || 600;
 
+        const newBufW = Math.round(w * dpr);
+        const newBufH = Math.round(h * dpr);
+
+        // Only reset canvas buffer if size actually changed
+        // (setting canvas.width clears the canvas, causing flash)
+        if (this.canvas.width !== newBufW || this.canvas.height !== newBufH) {
+            this.canvas.width  = newBufW;
+            this.canvas.height = newBufH;
+        }
+
         this.width  = w;
         this.height = h;
 
-        this.canvas.width  = Math.round(w * dpr);
-        this.canvas.height = Math.round(h * dpr);
+        // Set DPR transform — draw() uses CSS-px coordinates
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
         // Keep camera viewport in sync
         if (this.camera) {
@@ -102,11 +116,7 @@ export class ChartRenderer {
         const plotW = W - yAW - yLW;
         const plotH = H - pT - xAH;
 
-        // Scale context for DPR
-        ctx.save();
-        ctx.scale(dpr, dpr);
-
-        // Clear
+        // Clear (DPR transform already set by resize())
         ctx.clearRect(0, 0, W, H);
 
         if (!history || history.length === 0) {
@@ -129,13 +139,11 @@ export class ChartRenderer {
 
         const cam = this.camera;
 
-        // Base candle width in world units is 1; in screen pixels it is cam.zoom
-        // We want candles to fit nicely: a base of 4 * zoom px, gap of at least 1px
-        // But clamp min candle body width to 2px and max to 24px.
-        const candleWidthRaw = Math.max(2, Math.min(24, 4 * (cam ? cam.zoom : 1)));
-        const candleGap      = Math.max(1, candleWidthRaw * 0.25);
-        // Each slot (day) occupies candleWidthRaw + candleGap px on screen
-        const slotPx = candleWidthRaw + candleGap;
+        // Each day occupies SLOT_PX * zoom screen pixels.
+        // The candle body is BODY_RATIO of that slot.
+        const zoom = cam ? cam.zoom : 1;
+        const slotPx = this.SLOT_PX * zoom;
+        const candleWidthRaw = Math.max(2, Math.min(40, slotPx * this.BODY_RATIO));
 
         // Map between screen X and day index.
         // We place day `d` candle centered at screen X:  plotX + (d * slotPx) + offset
@@ -518,7 +526,6 @@ export class ChartRenderer {
             ctx.restore();
         }
 
-        ctx.restore(); // matches the DPR-scale save
     }
 }
 
