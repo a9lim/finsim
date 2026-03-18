@@ -196,27 +196,23 @@ function init() {
     updateSpeedBtn($, speed);
     updateUI();
 
-    // 12. Wire window resize
-    const onResize = typeof debounce !== 'undefined'
-        ? debounce(() => {
-            chart.resize();
-            strategy.resize();
-            if (camera) camera.setViewport(
-                $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800,
-                $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600
-            );
-            dirty = true;
-        }, 150)
-        : () => {
-            chart.resize();
-            strategy.resize();
-            if (camera) camera.setViewport(
-                $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800,
-                $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600
-            );
-            dirty = true;
-        };
-    window.addEventListener('resize', onResize);
+    // 12. Wire resize via ResizeObserver on chart container
+    // This fires during CSS sidebar transition AND window resize
+    const chartContainer = document.getElementById('chart-container');
+    function handleResize() {
+        chart.resize();
+        if (strategyMode) strategy.resize();
+        if (camera) camera.setViewport(
+            $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800,
+            $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600
+        );
+        dirty = true;
+    }
+    if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(handleResize).observe(chartContainer);
+    } else {
+        window.addEventListener('resize', handleResize);
+    }
 
     // 13. Wire mousemove/mouseleave on chart canvas for crosshair
     $.chartCanvas.addEventListener('mousemove', (e) => {

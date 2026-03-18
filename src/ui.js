@@ -164,7 +164,9 @@ export function bindEvents($, handlers) {
     }
 
     $.timeSlider.addEventListener('input', () => {
-        onTimeSlider(parseInt($.timeSlider.value, 10));
+        const dte = parseInt($.timeSlider.value, 10);
+        if ($.timeSliderLabel) $.timeSliderLabel.textContent = dte + ' DTE';
+        onTimeSlider(dte);
     });
 
     // Stock button: left-click = buy, right-click = short

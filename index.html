@@ -172,16 +172,14 @@
                 </button>
             </div>
         </div>
+        <div id="time-slider-bar" class="time-slider-bar hidden">
+            <label class="time-slider-row">
+                <span class="time-slider-label">Time to Expiry</span>
+                <input type="range" id="time-slider" min="1" max="365" value="30">
+                <span class="slider-value" id="time-slider-label">30 DTE</span>
+            </label>
+        </div>
     </main>
-
-    <!-- Time Slider Bar (strategy view) -->
-    <div id="time-slider-bar" class="sim-bar glass hidden">
-        <label class="time-slider-label" id="time-slider-label">
-            <span>Expiry</span>
-            <input type="range" id="time-slider" min="0" max="100" value="50">
-            <span id="strategy-time-value">50%</span>
-        </label>
-    </div>
 
     <!-- Sidebar Panel -->
     <aside id="sidebar" class="sim-panel glass" role="complementary" aria-label="Trading panel">
