@@ -356,6 +356,38 @@
                             <span class="stat-value" id="rate-display">0.00%</span>
                         </div>
                     </div>
+                    <div id="llm-settings-section" class="stat-group hidden">
+                        <div class="group-label">LLM Settings</div>
+                        <div class="ctrl-row">
+                            <label class="stat-label" for="llm-provider">Provider</label>
+                            <select id="llm-provider" class="sim-select" disabled>
+                                <option value="anthropic">Anthropic</option>
+                            </select>
+                        </div>
+                        <div class="ctrl-row">
+                            <label class="stat-label" for="llm-api-key">API Key</label>
+                            <div class="key-input-wrap">
+                                <input type="password" id="llm-api-key" class="sim-input" placeholder="sk-ant-...">
+                                <button type="button" id="llm-key-toggle" class="tool-btn key-toggle" aria-label="Toggle key visibility">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ctrl-row">
+                            <label class="stat-label" for="llm-model">Model</label>
+                            <select id="llm-model" class="sim-select">
+                                <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
+                                <option value="claude-sonnet-4-20250514">Sonnet 4</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="event-log-section" class="stat-group hidden">
+                        <div class="group-label">Event Log</div>
+                        <div id="event-log" class="event-log"></div>
+                    </div>
                     <div class="stat-group">
                         <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn">Advanced Parameters</button>
                         <div id="advanced-section" class="advanced-section hidden">

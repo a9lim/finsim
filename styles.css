@@ -878,3 +878,73 @@ main {
         gap: 1px;
     }
 }
+
+/* -- Dynamic regime: LLM settings & event log -- */
+#llm-settings-section.hidden,
+#event-log-section.hidden {
+    display: none;
+}
+
+.key-input-wrap {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+.key-input-wrap .sim-input {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+}
+.key-toggle {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.event-log {
+    max-height: 120px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.event-log-entry {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    padding: 3px 0;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    border-bottom: 1px solid var(--border);
+}
+.event-log-entry:last-child {
+    border-bottom: none;
+}
+.event-log-day {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    min-width: 32px;
+}
+.event-log-headline {
+    color: var(--text);
+}
+.event-log-entry[data-magnitude="major"] .event-log-headline {
+    font-weight: 600;
+}
+.event-log-empty {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-style: italic;
+    padding: 4px 0;
+}
+
+/* Major event toast accent (requires showToast extension) */
+.toast-event-positive {
+    border-left: 3px solid var(--up);
+}
+.toast-event-negative {
+    border-left: 3px solid var(--down);
+}
