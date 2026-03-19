@@ -81,7 +81,6 @@ export function cacheDOMElements($) {
     $.rateDisplay     = document.getElementById('rate-display');
     $.advancedToggle  = document.getElementById('advanced-toggle');
     $.advancedSection = document.getElementById('advanced-section');
-    $.capitalInput    = document.getElementById('capital-input');
     $.resetBtn        = document.getElementById('reset-btn');
     $.sliders = {};
     for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR']) {
@@ -111,18 +110,15 @@ export function cacheDOMElements($) {
     $.marginCallDismiss   = document.getElementById('margin-call-dismiss');
     $.introScreen = document.getElementById('intro-screen');
     $.introStart  = document.getElementById('intro-start');
-    $.addCallBtn      = document.getElementById('add-call-btn');
-    $.addPutBtn       = document.getElementById('add-put-btn');
-    $.addStockLegBtn  = document.getElementById('add-stock-leg-btn');
-    $.addBondLegBtn   = document.getElementById('add-bond-leg-btn');
     $.strategyLegsList = document.getElementById('strategy-legs-list');
     $.strategySummary  = document.getElementById('strategy-summary');
     $.saveStrategyBtn  = document.getElementById('save-strategy-btn');
     $.execStrategyBtn  = document.getElementById('exec-strategy-btn');
     $.strategyBuilder  = document.getElementById('strategy-builder');
-    $.strategyStrike   = document.getElementById('strategy-strike');
-    $.strategyStrikeVal = document.getElementById('strategy-strike-val');
     $.strategyExpiry   = document.getElementById('strategy-expiry');
+    $.strategyChainTable = document.getElementById('strategy-chain-table');
+    $.strategyStockCell  = document.getElementById('strategy-stock-cell');
+    $.strategyBondCell   = document.getElementById('strategy-bond-cell');
     $.tradeQty         = document.getElementById('trade-qty');
     $.tradeQtyVal      = document.getElementById('trade-qty-val');
     $.strategyQty      = document.getElementById('strategy-qty');
@@ -282,14 +278,14 @@ export function bindEvents($, handlers) {
         });
     }
 
-    // Strategy strike slider
-    if ($.strategyStrike) {
-        $.strategyStrike.addEventListener('input', () => {
-            $.strategyStrikeVal.textContent = '$' + $.strategyStrike.value;
+    // Strategy expiry dropdown -- rebuild strategy chain on change
+    if ($.strategyExpiry) {
+        $.strategyExpiry.addEventListener('change', () => {
+            if (typeof handlers.onStrategyExpiryChange === 'function') {
+                handlers.onStrategyExpiryChange(parseInt($.strategyExpiry.value, 10));
+            }
         });
     }
-
-    // Strategy expiry dropdown (label updates handled by updateStrategySelectors)
 
     // Order type toggle (Market / Limit / Stop)
     if ($.orderTypeToggles) {
@@ -311,16 +307,12 @@ export function bindEvents($, handlers) {
         });
     }
 
-    // Strategy builder buttons: left-click = long, right-click = short
-    if ($.addCallBtn && typeof handlers.onAddLeg === 'function') {
-        $.addCallBtn.addEventListener('click',     () => handlers.onAddLeg('call', 'long'));
-        $.addCallBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); handlers.onAddLeg('call', 'short'); });
-        $.addPutBtn.addEventListener('click',      () => handlers.onAddLeg('put', 'long'));
-        $.addPutBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); handlers.onAddLeg('put', 'short'); });
-        $.addStockLegBtn.addEventListener('click', () => handlers.onAddLeg('stock', 'long'));
-        $.addStockLegBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); handlers.onAddLeg('stock', 'short'); });
-        $.addBondLegBtn.addEventListener('click',  () => handlers.onAddLeg('bond', 'long'));
-        $.addBondLegBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); handlers.onAddLeg('bond', 'short'); });
+    // Strategy builder: stock/bond cell clicks -> add leg
+    if ($.strategyStockCell && typeof handlers.onAddLeg === 'function') {
+        $.strategyStockCell.addEventListener('click', () => { _haptics.trigger('selection'); handlers.onAddLeg('stock', 'long'); });
+        $.strategyStockCell.addEventListener('contextmenu', (e) => { e.preventDefault(); _haptics.trigger('selection'); handlers.onAddLeg('stock', 'short'); });
+        $.strategyBondCell.addEventListener('click', () => { _haptics.trigger('selection'); handlers.onAddLeg('bond', 'long'); });
+        $.strategyBondCell.addEventListener('contextmenu', (e) => { e.preventDefault(); _haptics.trigger('selection'); handlers.onAddLeg('bond', 'short'); });
     }
     if ($.saveStrategyBtn && typeof handlers.onSaveStrategy === 'function') {
         $.saveStrategyBtn.addEventListener('click', handlers.onSaveStrategy);
@@ -509,54 +501,66 @@ function _bindChainTableClicks(container, onChainCellClick) {
 }
 
 // ---------------------------------------------------------------------------
-// updateChainDisplay
+// Shared chain-into-container renderer
 // ---------------------------------------------------------------------------
 
-export function updateChainDisplay($, chain, selectedExpiryIndex) {
+function _renderChainInto(container, chain, selectedIndex, dropdownEl, onClick) {
     if (!chain || chain.length === 0) {
-        if ($.tradeExpiry) {
-            $.tradeExpiry.textContent = '';
-            const opt = document.createElement('option');
-            opt.textContent = 'No expiries available';
-            $.tradeExpiry.appendChild(opt);
-        }
-        $.chainTable.textContent = '';
+        container.textContent = '';
         const ph = document.createElement('div');
         ph.className = 'chain-placeholder';
         ph.textContent = 'No chain data.';
-        $.chainTable.appendChild(ph);
+        container.appendChild(ph);
+        if (dropdownEl) {
+            dropdownEl.textContent = '';
+            const opt = document.createElement('option');
+            opt.textContent = 'No expiries available';
+            dropdownEl.appendChild(opt);
+        }
         return;
     }
 
-    const raw = selectedExpiryIndex ?? parseInt($.tradeExpiry?.value, 10);
-    const currentSel = (raw != null && !isNaN(raw)) ? raw : chain.length - 1;
-    const clamped = Math.min(Math.max(currentSel, 0), chain.length - 1);
-
     // Rebuild dropdown options
-    if ($.tradeExpiry) {
-        $.tradeExpiry.textContent = '';
+    if (dropdownEl) {
+        const prevVal = dropdownEl.value;
+        dropdownEl.textContent = '';
         chain.forEach((exp, i) => {
             const opt = document.createElement('option');
             opt.value = i;
             opt.textContent = fmtDte(exp.dte) + ' (' + exp.dte + 'd)';
-            $.tradeExpiry.appendChild(opt);
+            dropdownEl.appendChild(opt);
         });
-        $.tradeExpiry.value = clamped;
+        // Preserve previous selection if still valid
+        if (prevVal !== '' && parseInt(prevVal, 10) < chain.length) {
+            dropdownEl.value = prevVal;
+        }
     }
 
+    const raw = selectedIndex ?? parseInt(dropdownEl?.value, 10);
+    const clamped = Math.min(Math.max((raw != null && !isNaN(raw)) ? raw : chain.length - 1, 0), chain.length - 1);
+    if (dropdownEl) dropdownEl.value = clamped;
+
     const expiry = chain[clamped];
-    $.chainTable.textContent = '';
+    container.textContent = '';
 
     if (!expiry || !expiry.options || expiry.options.length === 0) {
         const ph = document.createElement('div');
         ph.className = 'chain-placeholder';
         ph.textContent = 'No options for this expiry.';
-        $.chainTable.appendChild(ph);
+        container.appendChild(ph);
         return;
     }
 
-    $.chainTable.appendChild(_buildChainTable(expiry, true));
-    _bindChainTableClicks($.chainTable, $._onChainCellClick);
+    container.appendChild(_buildChainTable(expiry, true));
+    _bindChainTableClicks(container, onClick);
+}
+
+// ---------------------------------------------------------------------------
+// updateChainDisplay
+// ---------------------------------------------------------------------------
+
+export function updateChainDisplay($, chain, selectedExpiryIndex) {
+    _renderChainInto($.chainTable, chain, selectedExpiryIndex, $.tradeExpiry, $._onChainCellClick);
 }
 
 // ---------------------------------------------------------------------------
@@ -767,12 +771,36 @@ export function updateRateDisplay($, rate) {
 }
 
 // ---------------------------------------------------------------------------
-// updateStockBondPrices
+// updateStockBondPrices -- updates both trade-tab and strategy-tab cells
 // ---------------------------------------------------------------------------
 
-export function updateStockBondPrices($, stockPrice, bondPrice) {
-    if ($.stockPriceCell) $.stockPriceCell.textContent = stockPrice.toFixed(2);
-    if ($.bondPriceCell) $.bondPriceCell.textContent = bondPrice.toFixed(2);
+export function updateStockBondPrices($, spot, rate, chain) {
+    const dash = '\u2014';
+    const stockTxt = spot != null ? spot.toFixed(2) : dash;
+
+    // Trade tab bond: from trade expiry dropdown
+    const tradeIdx = parseInt($.tradeExpiry?.value, 10);
+    const tradeExp = chain && chain.length > 0
+        ? chain[isNaN(tradeIdx) ? chain.length - 1 : Math.min(tradeIdx, chain.length - 1)]
+        : null;
+    const tradeBond = tradeExp && rate != null
+        ? (100 * Math.exp(-rate * tradeExp.dte / 252)).toFixed(2)
+        : dash;
+
+    if ($.stockPriceCell) $.stockPriceCell.textContent = stockTxt;
+    if ($.bondPriceCell) $.bondPriceCell.textContent = tradeBond;
+
+    // Strategy tab bond: from strategy expiry dropdown
+    const stratIdx = parseInt($.strategyExpiry?.value, 10);
+    const stratExp = chain && chain.length > 0
+        ? chain[isNaN(stratIdx) ? chain.length - 1 : Math.min(stratIdx, chain.length - 1)]
+        : null;
+    const stratBond = stratExp && rate != null
+        ? (100 * Math.exp(-rate * stratExp.dte / 252)).toFixed(2)
+        : dash;
+
+    if ($.strategyStockCell) $.strategyStockCell.textContent = stockTxt;
+    if ($.strategyBondCell) $.strategyBondCell.textContent = stratBond;
 }
 
 // ---------------------------------------------------------------------------
@@ -789,7 +817,7 @@ export function syncSettingsUI($, sim) {
         slider.value        = sim.params[p];
         valSpan.textContent = String(sim.params[p]);
     }
-    if (sim.initialCapital != null) $.capitalInput.value = sim.initialCapital;
+
 }
 
 // ---------------------------------------------------------------------------
@@ -1073,54 +1101,19 @@ export function updateZoomLevel($, factor) {
 // ---------------------------------------------------------------------------
 
 /**
- * Update the strategy strike slider and expiry dropdown from chain data.
+ * Update the strategy chain table, stock/bond prices, and trigger price slider.
  * Called whenever the chain is rebuilt.
  */
-export function updateStrategySelectors($, chain, spot) {
-    if (!$.strategyStrike || !$.strategyExpiry) return;
+export function updateStrategySelectors($, chain, spot, onAddLeg) {
+    // Strategy chain table + expiry dropdown (built together by _renderChainInto)
+    updateStrategyChainDisplay($, chain, null, onAddLeg);
 
-    // Update expiry dropdown from chain
-    if (chain && chain.length > 0) {
-        const prevVal = $.strategyExpiry.value;
-        $.strategyExpiry.textContent = '';
-        chain.forEach(exp => {
-            const opt = document.createElement('option');
-            opt.value = exp.dte;
-            opt.textContent = fmtDte(exp.dte) + ' (' + exp.dte + 'd)';
-            $.strategyExpiry.appendChild(opt);
-        });
-        // Preserve previous selection if still valid
-        const validDtes = chain.map(e => String(e.dte));
-        if (validDtes.includes(prevVal)) {
-            $.strategyExpiry.value = prevVal;
-        }
-    }
-
-    // Update strike slider range from first expiry's options
-    const expiryData = chain && chain.length > 0 ? chain[0] : null;
-    if (expiryData && expiryData.options && expiryData.options.length > 0) {
-        const strikes = expiryData.options.map(o => o.strike);
-        const minStrike = Math.min(...strikes);
-        const maxStrike = Math.max(...strikes);
-        $.strategyStrike.min = minStrike;
-        $.strategyStrike.max = maxStrike;
-        $.strategyStrike.step = 5; // STRIKE_INTERVAL
-        // Clamp current value; default to ATM
-        const atm = spot ? Math.round(spot / 5) * 5 : null;
-        const curStrike = parseInt($.strategyStrike.value, 10);
-        if (curStrike < minStrike || curStrike > maxStrike) {
-            $.strategyStrike.value = atm != null ? Math.max(minStrike, Math.min(maxStrike, atm)) : minStrike;
-        }
-        $.strategyStrikeVal.textContent = '$' + $.strategyStrike.value;
-    }
-
-    // Update trigger price slider range based on current spot (+-30%)
+    // Trigger price slider range based on current spot (+-30%)
     if ($.triggerPrice && spot) {
         const trigMin = Math.max(1, Math.round(spot * 0.7 * 2) / 2);
         const trigMax = Math.round(spot * 1.3 * 2) / 2;
         $.triggerPrice.min = trigMin;
         $.triggerPrice.max = trigMax;
-        // Clamp current value
         const curTrig = parseFloat($.triggerPrice.value);
         if (curTrig < trigMin || curTrig > trigMax) {
             $.triggerPrice.value = Math.round(spot * 2) / 2;
@@ -1128,6 +1121,18 @@ export function updateStrategySelectors($, chain, spot) {
         $.triggerPriceVal.textContent = '$' + parseFloat($.triggerPrice.value).toFixed(2);
     }
 }
+
+export function updateStrategyChainDisplay($, chain, selectedIndex, onAddLeg) {
+    if (!$.strategyChainTable) return;
+
+    // Wrap onAddLeg into the { type, side, strike, expiryDay } callback shape
+    const onClick = typeof onAddLeg === 'function'
+        ? (info) => onAddLeg(info.type, info.side, info.strike, info.expiryDay)
+        : null;
+
+    _renderChainInto($.strategyChainTable, chain, selectedIndex, $.strategyExpiry, onClick);
+}
+
 
 export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain, onLegChange) {
     if (!$.strategyLegsList) return;

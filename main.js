@@ -22,7 +22,7 @@ import {
     updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateStockBondPrices,
     syncSettingsUI, toggleStrategyView, showMarginCall, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
-    renderStrategyBuilder, wireInfoTips, updateStrategySelectors,
+    renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay,
     updateDynamicSections, updateEventLog,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
@@ -174,12 +174,13 @@ function init() {
         onBuyBond:        () => handleBuyBond(),
         onShortBond:      () => handleShortBond(),
         onChainCellClick: (info) => handleChainCellClick(info),
-        onExpiryChange:   (idx) => { updateChainDisplay($, chain, idx); dirty = true; },
+        onExpiryChange:   (idx) => { updateChainDisplay($, chain, idx); updateStockBondPrices($, sim.S, sim.r, chain); dirty = true; },
         onFullChainOpen:  () => openFullChain(),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
         onDismissMargin:  () => { /* sim stays paused, overlay hidden by ui.js */ },
-        onAddLeg:         (type, side) => handleAddLeg(type, side),
+        onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
+        onStrategyExpiryChange: (idx) => { updateStrategyChainDisplay($, chain, idx, _addLegFromChain); updateStockBondPrices($, sim.S, sim.r, chain); dirty = true; },
         onSaveStrategy:   () => handleSaveStrategy(),
         onExecStrategy:   () => handleExecStrategy(),
         onLLMKeyChange:   (key) => { if (llmSource) llmSource.setApiKey(key); },
@@ -491,10 +492,8 @@ function updateUI() {
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
     updateRateDisplay($, sim.r);
-    const bondDte = _getTradeExpiryDay() - sim.day;
-    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
-    updateStockBondPrices($, sim.S, bondMid);
-    updateStrategySelectors($, chain, sim.S);
+    updateStockBondPrices($, sim.S, sim.r, chain);
+    updateStrategySelectors($, chain, sim.S, _addLegFromChain);
     updateStrategyBuilder();
     updateTimeSliderRange();
 }
@@ -684,7 +683,7 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
         const pos = executeMarketOrder(type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay);
         if (pos) {
             const label = side === 'short' ? 'Shorted' : 'Bought';
-            if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + pos.entryPrice.toFixed(2));
+            if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + pos.fillPrice.toFixed(2));
             _haptics.trigger('success');
         } else {
             if (typeof showToast !== 'undefined') showToast('Insufficient funds/margin.');
@@ -775,27 +774,22 @@ function handleLiquidate() {
 // Strategy builder handlers
 // ---------------------------------------------------------------------------
 
-function handleAddLeg(type, side) {
+function _addLegFromChain(type, side, strike, expiryDay) {
+    handleAddLeg(type, side, strike, expiryDay);
+}
+
+function handleAddLeg(type, side, strike, expiryDay) {
     const absQty = parseInt($.strategyQty?.value, 10) || 1;
     const signedQty = side === 'short' ? -absQty : absQty;
-    const strike = (type === 'call' || type === 'put')
-        ? parseInt($.strategyStrike?.value) || Math.round(sim.S / 5) * 5
-        : undefined;
-    // Expiry slider gives DTE; find the closest chain expiry day
-    const sliderDte = parseInt($.strategyExpiry?.value, 10) || 21;
-    let expiryDay;
-    if (type === 'call' || type === 'put' || type === 'bond') {
-        // Find chain expiry closest to the slider DTE
-        const targetDay = sim.day + sliderDte;
-        if (chain.length > 0) {
-            let best = chain[0];
-            for (const exp of chain) {
-                if (Math.abs(exp.day - targetDay) < Math.abs(best.day - targetDay)) best = exp;
-            }
-            expiryDay = best.day;
-        } else {
-            expiryDay = sim.day + sliderDte;
-        }
+
+    // For stock/bond clicked from the strategy table (no strike/expiryDay passed)
+    if (strike == null && (type === 'call' || type === 'put')) {
+        strike = Math.round(sim.S / 5) * 5;
+    }
+    if (expiryDay == null && (type === 'call' || type === 'put' || type === 'bond')) {
+        const idx = parseInt($.strategyExpiry?.value, 10);
+        const expiry = chain.length > 0 ? chain[isNaN(idx) ? chain.length - 1 : Math.min(idx, chain.length - 1)] : null;
+        expiryDay = expiry ? expiry.day : sim.day + 21;
     }
 
     // Find existing leg of same type/strike/expiry for netting

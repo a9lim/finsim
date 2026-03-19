@@ -45,9 +45,9 @@ src/
                                    offline event pool (~56 curated events for Palanthropic/PNTH),
                                    PARAM_RANGES canonical clamping. Shared by offline and LLM modes.
   history-buffer.js     86 lines  HistoryBuffer: fixed-capacity (256) ring buffer for OHLC bars
-  llm.js             ~110 lines  LLMEventSource: Anthropic API batch fetcher (browser-direct),
-                                   prompt construction with sim state context, JSON response
-                                   parsing, fallback to offline on failure.
+  llm.js             ~170 lines  LLMEventSource: Anthropic API via structured tool use
+                                   (emit_events tool with JSON schema, forced via tool_choice).
+                                   Full universe lore in system prompt. Fallback to offline on failure.
   simulation.js        208 lines  GBM + Merton jumps + Heston stoch vol + Vasicek rate;
                                    beginDay()/substep()/finalizeDay() sub-step pipeline;
                                    prepopulate() fills buffer and scales to INITIAL_PRICE
@@ -68,6 +68,7 @@ src/
                                    computeSummary(). Per-leg T from evalDay/entryDay.
                                    Does NOT use shared-camera.js.
   ui.js               1270 lines  cacheDOMElements(), bindEvents(), updateChainDisplay(),
+                                   updateStrategyChainDisplay(), _renderChainInto() (shared),
                                    updatePortfolioDisplay(), updateGreeksDisplay(),
                                    showChainOverlay(), showTradeDialog(), showMarginCall(),
                                    toggleStrategyView(), renderStrategyBuilder(),
@@ -218,7 +219,7 @@ Signed qty: `qty > 0` = long, `qty < 0` = short. No `side` field on positions.
 
 ### Netting
 
-`executeMarketOrder()` finds matching `type + strike + expiryDay`. Same direction extends, opposite reduces/closes/flips. Returns position object with `entryPrice` (= fill price including spread).
+`executeMarketOrder()` finds matching `type + strike + expiryDay`. Same direction extends, opposite reduces/closes/flips. Returns position object with `entryPrice` (original entry) and `fillPrice` (this order's actual fill price including spread).
 
 ### Order Types
 
@@ -248,7 +249,7 @@ Margin call at `equity < 25% * totalPositionValue`. Pauses sim, shows overlay.
 
 ### Toolbar
 
-Play/pause, speed (1x-16x), step, theme toggle (hidden <=440px), panel toggle.
+Play/pause, speed (1x-16x), step, reset, theme toggle (hidden <=440px), panel toggle.
 
 ### Sidebar (4 tabs)
 
@@ -256,7 +257,7 @@ Play/pause, speed (1x-16x), step, theme toggle (hidden <=440px), panel toggle.
 - Quantity slider (1-100)
 - Order type toggle: Market | Limit | Stop
 - Trigger price slider (conditional, shown for Limit/Stop)
-- Expiry dropdown (`#trade-expiry`) -- defaults to furthest expiry, determines bond maturity
+- Expiry dropdown (`#trade-expiry`) -- bond price updates when expiry changes
 - Stock/Bond price table -- chain-style, clickable mid-price cells (stock = orange, bond = blue)
 - Compact options chain (Call | Strike | Put, mid prices)
 - "View Full Chain" button (pauses simulation)
@@ -267,11 +268,14 @@ Play/pause, speed (1x-16x), step, theme toggle (hidden <=440px), panel toggle.
 - Positions with close (X) and exercise (Ex) buttons
 - Strategy positions grouped by name
 - Pending orders with cancel buttons
-- Greeks aggregate (Delta, Gamma, Theta, Vega, Rho)
+- Greeks aggregate as stat-rows (Delta, Gamma, Theta, Vega, Rho)
 
 **Strategy tab:**
-- Quantity slider, strike slider, expiry dropdown
-- Call / Put / Stock / Bond buttons (left-click: long, right-click: short)
+- Quantity slider (1-100)
+- Expiry dropdown (`#strategy-expiry`) -- bond price updates when expiry changes
+- Stock/Bond price table (mirrors trade tab layout, stock = orange, bond = blue)
+- Compact options chain (Call | Strike | Put, mirrors trade tab)
+- Left-click: long, right-click: short (on any cell)
 - Legs list with inline qty editing
 - Summary: Net Cost, Max Profit, Max Loss, Breakevens
 - Save / Execute buttons
@@ -279,8 +283,6 @@ Play/pause, speed (1x-16x), step, theme toggle (hidden <=440px), panel toggle.
 **Settings tab:**
 - Market Regime preset dropdown
 - Advanced Parameters (11 sliders)
-- Starting Capital ($10,000 default)
-- Reset Simulation button
 
 ### Candlestick Chart
 
@@ -364,7 +366,7 @@ Events can schedule followup events (Paradox-style Mean Time To Happen). Each fo
 
 ### LLM Integration
 
-Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` header. API key and model stored in localStorage (`shoals_llm_key`, `shoals_llm_model`). Batches pre-fetched to minimize API calls (~1 call per 60-100 trading days). Prompt includes current sim state (with `sqrt(v)` as volatility), last 10 events, and pending followups.
+Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` header. Uses structured tool use: `emit_events` tool with full JSON schema for events array, forced via `tool_choice`. No freeform JSON parsing -- response is read directly from `toolBlock.input.events`. System prompt contains full universe lore (political landscape, PNTH characters, Fed, macro context). API key and model stored in localStorage (`shoals_llm_key`, `shoals_llm_model`). Batches pre-fetched to minimize API calls (~1 call per 60-100 trading days). User message includes current sim state (with `sqrt(v)` as volatility), last 10 events, and pending followups.
 
 ## Keyboard Shortcuts
 
@@ -391,7 +393,9 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Custom event bus**: `shoals:*` events from ui.js to main.js, decouples DOM from portfolio state.
 - **Bond pricing**: `100 * exp(-r * T)`. Volatility-aware spread via `computeBidAsk()`. Strategy view shows theta (interest accrual) and rho.
 - **Auto-scroll**: keeps latest candle at ~85% from left when playing.
-- **Toast fill price**: trade toast shows actual fill price (including bid/ask spread) via `pos.entryPrice`.
+- **Toast fill price**: trade toast shows actual fill price (including bid/ask spread) via `pos.fillPrice`.
+- **Shared chain renderer**: `_renderChainInto()` in ui.js builds both trade-tab and strategy-tab chain tables. Accepts container, chain data, dropdown element, and click callback. Trade tab passes `$._onChainCellClick`, strategy tab wraps `onAddLeg`.
+- **Unified stock/bond prices**: `updateStockBondPrices($, spot, rate, chain)` computes bond price from each tab's selected expiry and updates all four cells (trade + strategy).
 
 ## Gotchas
 

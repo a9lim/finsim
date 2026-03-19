@@ -263,7 +263,8 @@ export function executeMarketOrder(
         if (newQty === 0) {
             // Position fully closed
             portfolio.positions.splice(existingIdx, 1);
-            return existing; // Return closed position as confirmation
+            existing.fillPrice = fill;
+            return existing;
         }
 
         // Update existing position
@@ -273,6 +274,7 @@ export function executeMarketOrder(
             existing.entryDay = currentDay;
         }
         existing.qty = newQty;
+        existing.fillPrice = fill;
         return existing;
     }
 
@@ -300,6 +302,7 @@ export function executeMarketOrder(
         type,
         qty:         signedQty,
         entryPrice:  fill,
+        fillPrice:   fill,
         entryDay:    currentDay,
         strategyName: strategyName || null,
     };

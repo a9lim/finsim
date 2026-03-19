@@ -285,6 +285,8 @@ main {
 
 #stock-price-cell,
 #bond-price-cell,
+#strategy-stock-cell,
+#strategy-bond-cell,
 .stock-overlay-cell,
 .bond-overlay-cell {
     font-family: var(--font-mono);
@@ -304,11 +306,13 @@ main {
     margin-bottom: 10px;
 }
 
-#stock-price-cell {
+#stock-price-cell,
+#strategy-stock-cell {
     color: var(--stock);
 }
 
-#bond-price-cell {
+#bond-price-cell,
+#strategy-bond-cell {
     color: var(--bond);
 }
 
@@ -407,50 +411,6 @@ main {
 }
 
 /* --- Greeks Display --- */
-.greeks-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-}
-
-.greek-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 10px 8px;
-    border-radius: var(--radius-sm);
-    background: var(--bg-hover);
-    border: 1px solid var(--border);
-    transition: background 0.2s, border-color 0.2s;
-}
-
-.greek-item:hover {
-    border-color: var(--border-strong);
-}
-
-.greek-value {
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 400;
-    line-height: 1;
-    margin-bottom: 2px;
-    font-variant-numeric: tabular-nums;
-}
-
-.greek-label {
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-}
-
-/* 5th Greek spans full width */
-.greeks-grid .greek-item:nth-child(5) {
-    grid-column: 1 / -1;
-}
-
 /* --- Portfolio Positions --- */
 .pos-row {
     display: flex;
@@ -609,18 +569,6 @@ main {
     border-color: var(--accent);
 }
 
-/* --- Reset Button --- */
-.reset-btn {
-    width: 100%;
-    color: var(--down);
-    border-color: var(--down);
-}
-
-.reset-btn:hover {
-    background: var(--down);
-    color: #fff;
-}
-
 /* --- Time Slider Bar --- */
 #time-slider-bar {
     width: 100%;
@@ -696,10 +644,6 @@ main {
 }
 
 /* --- Strategy Builder --- */
-.strategy-add-row {
-    flex-wrap: wrap;
-}
-
 .strategy-legs-list {
     margin-top: 6px;
 }
@@ -832,11 +776,6 @@ main {
 
     #time-slider-bar {
         padding: 6px 10px;
-    }
-
-    .greeks-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 6px;
     }
 
     /* Trade dialog and chain overlay fill screen on mobile */
