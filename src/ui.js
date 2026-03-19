@@ -52,7 +52,6 @@ function posTypeLabel(type, sideOrQty) {
 export function cacheDOMElements($) {
     $.chartCanvas    = document.getElementById('chart-canvas');
     $.strategyCanvas = document.getElementById('strategy-canvas');
-    $.strategyBtn = document.getElementById('strategy-btn');
     $.playBtn     = document.getElementById('play-btn');
     $.speedBtn    = document.getElementById('speed-btn');
     $.stepBtn     = document.getElementById('step-btn');
@@ -141,7 +140,7 @@ export function cacheDOMElements($) {
 export function bindEvents($, handlers) {
     const {
         onTogglePlay, onStep, onSpeedChange, onToggleTheme, onToggleSidebar,
-        onToggleStrategy, onPresetChange, onReset, onSliderChange, onTimeSlider,
+        onPresetChange, onReset, onSliderChange, onTimeSlider,
         onBuyStock, onShortStock, onBuyBond, onShortBond,
         onChainCellClick, onFullChainOpen, onExpiryChange,
         onTradeSubmit, onLiquidate, onDismissMargin,
@@ -153,8 +152,6 @@ export function bindEvents($, handlers) {
     $.themeBtn.addEventListener('click', onToggleTheme);
     $.panelToggle.addEventListener('click', onToggleSidebar);
     $.closePanel.addEventListener('click', onToggleSidebar);
-    $.strategyBtn.addEventListener('click', onToggleStrategy);
-
     $.presetSelect.addEventListener('change', () => {
         onPresetChange($.presetSelect.selectedIndex);
     });
@@ -984,14 +981,10 @@ export function toggleStrategyView($, active) {
         $.chartCanvas.classList.add('hidden');
         $.strategyCanvas.classList.remove('hidden');
         $.timeSliderBar.classList.remove('hidden');
-        $.strategyBtn.classList.add('active');
-        $.strategyBtn.setAttribute('aria-pressed', 'true');
     } else {
         $.chartCanvas.classList.remove('hidden');
         $.strategyCanvas.classList.add('hidden');
         $.timeSliderBar.classList.add('hidden');
-        $.strategyBtn.classList.remove('active');
-        $.strategyBtn.setAttribute('aria-pressed', 'false');
     }
     _haptics.trigger('selection');
 }
