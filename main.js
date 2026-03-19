@@ -132,7 +132,14 @@ function init() {
         initShortcuts([
             { key: ' ',  label: 'Play / Pause', group: 'Simulation', action: () => togglePlay() },
             { key: '.', label: 'Step forward',  group: 'Simulation', action: () => step() },
-            { key: 's', label: 'Strategy view',  group: 'View',       action: () => toggleStrategy() },
+            { key: 's', label: 'Strategy view',  group: 'View',       action: () => {
+                if (!$.sidebar.classList.contains('open')) {
+                    $.sidebar.classList.add('open');
+                    $.panelToggle.setAttribute('aria-expanded', 'true');
+                }
+                const tab = document.querySelector('[data-tab="strategy"]');
+                if (tab) tab.click();
+            } },
             { key: 'b', label: 'Buy stock',      group: 'Trade',      action: () => handleBuyStock() },
             { key: 't', label: 'Toggle sidebar',  group: 'View',       action: () => toggleSidebar() },
             { key: 'r', label: 'Reset',           group: 'Simulation', action: () => resetSim() },
@@ -151,7 +158,6 @@ function init() {
         onSpeedChange:    () => cycleSpeed(),
         onToggleTheme:    () => toggleTheme(),
         onToggleSidebar:  () => toggleSidebar(),
-        onToggleStrategy: () => toggleStrategy(),
         onPresetChange:   (index) => loadPreset(index),
         onReset:          () => resetSim(),
         onSliderChange:   (param, value) => syncSliderToSim(param, value),
@@ -562,37 +568,6 @@ function toggleSidebar() {
     _haptics.trigger('light');
 }
 
-function toggleStrategy() {
-    strategyMode = !strategyMode;
-    toggleStrategyView($, strategyMode);
-    if (strategyMode) {
-        // Canvas was hidden (display:none) so clientWidth/Height were 0 — resize now
-        strategy.resize();
-        // Also switch to strategy tab in sidebar
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        const stratTab = document.querySelector('[data-tab="strategy"]');
-        const stratPanel = document.getElementById('tab-strategy');
-        if (stratTab) stratTab.classList.add('active');
-        if (stratPanel) stratPanel.classList.add('active');
-        // Open sidebar if closed
-        if (!$.sidebar.classList.contains('open')) {
-            $.sidebar.classList.add('open');
-            $.panelToggle.setAttribute('aria-expanded', 'true');
-        }
-    } else {
-        // Switch back to trade tab when exiting strategy mode
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        const tradeTab = document.querySelector('[data-tab="trade"]');
-        const tradePanel = document.getElementById('tab-trade');
-        if (tradeTab) tradeTab.classList.add('active');
-        if (tradePanel) tradePanel.classList.add('active');
-    }
-    dirty = true;
-    _haptics.trigger('selection');
-}
-
 function loadPreset(index) {
     sim.reset(index);
     resetPortfolio();
@@ -656,7 +631,7 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
         const pos = executeMarketOrder(type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay);
         if (pos) {
             const label = side === 'short' ? 'Shorted' : 'Bought';
-            if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + sim.S.toFixed(2));
+            if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + pos.entryPrice.toFixed(2));
             _haptics.trigger('success');
         } else {
             if (typeof showToast !== 'undefined') showToast('Insufficient funds/margin.');
