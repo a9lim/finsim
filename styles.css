@@ -6,7 +6,7 @@
    =================================================== */
 
 /* --- Base --- */
-html, body {
+body {
     overflow: hidden;
 }
 
@@ -65,19 +65,7 @@ main {
     display: block;
 }
 
-#strategy-canvas.hidden {
-    display: none;
-}
-
 /* --- Time Slider (below chart in strategy mode) --- */
-.time-slider-bar {
-    padding: 8px 68px 8px 68px;
-    display: flex;
-    align-items: center;
-}
-.time-slider-bar.hidden {
-    display: none;
-}
 .time-slider-row {
     display: flex;
     align-items: center;
@@ -122,19 +110,6 @@ main {
     min-width: 34px;
 }
 
-.speed-label {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    font-weight: 600;
-}
-
-/* --- Strategy Button Active State --- */
-#strategy-btn.active {
-    color: var(--accent);
-    background: var(--accent-subtle);
-    border-color: var(--accent-subtle);
-}
-
 /* --- Play/Pause Button States --- */
 #play-btn.playing {
     color: var(--accent);
@@ -156,10 +131,6 @@ main {
     color: var(--text);
     font-weight: 400;
 }
-
-/* --- Sub-slider labels match physsim style --- */
-.ctrl-sub { display: flex; flex-direction: column; gap: 4px; }
-.ctrl-sub label { font-size: 0.72rem; color: var(--text-secondary); }
 
 /* --- Quick Trade Buttons --- */
 .quick-trade-row {
@@ -341,10 +312,6 @@ main {
     padding: 12px 0;
 }
 
-.chain-controls {
-    margin-bottom: 8px;
-}
-
 /* Legacy chain-row styles kept for backward compatibility */
 
 .chain-expand-btn {
@@ -484,39 +451,6 @@ main {
     white-space: nowrap;
 }
 
-.position-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 8px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    margin-bottom: 4px;
-    font-size: 0.78rem;
-    transition: background 0.12s;
-}
-
-.position-row:hover {
-    background: var(--bg-hover);
-}
-
-.position-type {
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-muted);
-}
-
-.position-qty {
-    font-family: var(--font-mono);
-    font-weight: 600;
-}
-
-.position-pnl.up { color: var(--up); }
-.position-pnl.down { color: var(--down); }
-
 /* --- Margin Status --- */
 #margin-status.margin-alert {
     color: var(--down);
@@ -532,10 +466,6 @@ main {
 .advanced-toggle-btn {
     width: 100%;
     font-size: 0.78rem;
-}
-
-.advanced-section.hidden {
-    display: none;
 }
 
 .advanced-section {
@@ -576,10 +506,6 @@ main {
     box-sizing: border-box;
 }
 
-#time-slider-bar.hidden {
-    display: none;
-}
-
 #time-slider-bar input[type="range"]::-webkit-slider-thumb {
     background: var(--accent);
 }
@@ -589,7 +515,7 @@ main {
 }
 
 #time-slider-bar input[type="range"]::-webkit-slider-runnable-track {
-    background: linear-gradient(to right, var(--accent), var(--accent));
+    background: var(--accent);
     height: 4px;
     border-radius: 2px;
 }
@@ -618,14 +544,6 @@ main {
 
 .time-slider-label input[type="range"] {
     flex: 1;
-}
-
-#strategy-time-value {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    font-weight: 600;
-    min-width: 32px;
-    text-align: right;
 }
 
 /* --- Intro Subtitle --- */
@@ -819,11 +737,6 @@ main {
 }
 
 /* -- Dynamic regime: LLM settings & event log -- */
-#llm-settings-section.hidden,
-#event-log-section.hidden {
-    display: none;
-}
-
 .key-input-wrap {
     display: flex;
     gap: 4px;
@@ -880,10 +793,3 @@ main {
     padding: 4px 0;
 }
 
-/* Major event toast accent (requires showToast extension) */
-.toast-event-positive {
-    border-left: 3px solid var(--up);
-}
-.toast-event-negative {
-    border-left: 3px solid var(--down);
-}
