@@ -619,7 +619,6 @@ export const OFFLINE_EVENTS = [
 
 // -- Event-by-id lookup (built lazily) ----------------------------------
 let _eventById = null;
-_eventById = null; // reset cache after array definition
 function _getEventById(id) {
     if (!_eventById) {
         _eventById = new Map();
@@ -635,7 +634,7 @@ export class EventEngine {
         this._llm = llmSource;          // LLMEventSource instance (or null)
         this.eventLog = [];             // { day, headline, magnitude, params }
         this._queue = [];               // pre-fetched LLM events
-        this._pendingFollowups = [];    // { id, targetDay, weight, depth }
+        this._pendingFollowups = [];    // { event, chainId, targetDay, weight, depth }
         this._poissonRate = 1 / 60;     // ~1 non-fed event per 60 trading days
         this._prefetching = false;
         this._nextFedDay = -1;          // day of next scheduled FOMC meeting
@@ -643,31 +642,31 @@ export class EventEngine {
 
     /**
      * Called each completed trading day. May fire an event.
-     * Returns the event object (for toast) or null.
+     * Returns an array of fired event log entries (may be empty).
      */
     maybeFire(sim, day) {
-        // 1. Check pending followups first
-        const firedFollowup = this._checkFollowups(sim, day);
-        if (firedFollowup) return firedFollowup;
+        // 1. Check pending followups first (returns array)
+        const firedFollowups = this._checkFollowups(sim, day);
+        if (firedFollowups.length > 0) return firedFollowups;
 
-        // 2. Scheduled FOMC meeting (8x/year, regular cadence)
+        // 2. Scheduled FOMC meeting
         if (this._nextFedDay < 0) this._nextFedDay = day + FED_MEETING_INTERVAL;
         if (day >= this._nextFedDay) {
             this._nextFedDay += FED_MEETING_INTERVAL;
             const fedEvent = this._drawFed(sim);
-            if (fedEvent) return this._fireEvent(fedEvent, sim, day, 0);
+            if (fedEvent) return [this._fireEvent(fedEvent, sim, day, 0)];
         }
 
         // 3. Poisson draw for non-fed event
-        if (Math.random() >= this._poissonRate) return null;
+        if (Math.random() >= this._poissonRate) return [];
 
-        // 4. Draw non-fed event from appropriate source
+        // 4. Draw from appropriate source
         const event = this.source === 'llm'
             ? this._drawLLM(sim)
-            : this._drawOffline(sim, /* excludeFed */ true);
+            : this._drawOffline(sim, true);
 
-        if (!event) return null;
-        return this._fireEvent(event, sim, day, 0);
+        if (!event) return [];
+        return [this._fireEvent(event, sim, day, 0)];
     }
 
     /** Kick off initial LLM batch fetch. */
@@ -711,12 +710,14 @@ export class EventEngine {
 
         // Schedule followups (if any and within depth limit)
         if (event.followups && depth < MAX_CHAIN_DEPTH) {
+            const chainId = event.id || ('chain_' + day + '_' + Math.random().toString(36).slice(2, 8));
             for (const fu of event.followups) {
                 const delay = this._poissonSample(fu.mtth);
                 this._pendingFollowups.push({
-                    id: fu.id,
+                    event: fu,
+                    chainId,
                     targetDay: day + Math.max(1, delay),
-                    weight: fu.weight,
+                    weight: fu.weight ?? 1,
                     depth: depth + 1,
                 });
             }
@@ -734,21 +735,34 @@ export class EventEngine {
         }
         this._pendingFollowups = remaining;
 
-        // Process ALL ready followups (multiple can fire on the same day)
-        let lastFired = null;
+        if (ready.length === 0) return [];
+
+        // Group by chainId for mutually exclusive branching
+        const chains = new Map();
         for (const pf of ready) {
-            // Weight roll
-            if (Math.random() > pf.weight) continue;
+            const key = pf.chainId || ('_ungrouped_' + Math.random());
+            if (!chains.has(key)) chains.set(key, []);
+            chains.get(key).push(pf);
+        }
 
-            const event = _getEventById(pf.id);
+        // Pick one from each chain via weighted selection, then fire
+        const fired = [];
+        for (const [, group] of chains) {
+            const totalWeight = group.reduce((sum, pf) => sum + (pf.weight ?? 1), 0);
+            let roll = Math.random() * totalWeight;
+            let picked = group[group.length - 1];
+            for (const pf of group) {
+                roll -= (pf.weight ?? 1);
+                if (roll <= 0) { picked = pf; break; }
+            }
+
+            const event = picked.event ?? _getEventById(picked.id);
             if (!event) continue;
-
-            // Check precondition
             if (event.when && !event.when(sim)) continue;
 
-            lastFired = this._fireEvent(event, sim, day, pf.depth);
+            fired.push(this._fireEvent(event, sim, day, picked.depth));
         }
-        return lastFired;
+        return fired;
     }
 
     _weightedPick(events) {
