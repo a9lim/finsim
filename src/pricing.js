@@ -17,7 +17,6 @@
 // ---------------------------------------------------------------------------
 
 const SQRT_2PI = Math.sqrt(2 * Math.PI);
-const SQRT_2    = Math.sqrt(2);
 
 /**
  * Standard normal PDF at x.
@@ -248,7 +247,6 @@ function _psi(S, T, gamma, H, I2, I1, t1, r, b, sigma) {
     const d4 = -(Math.log(I2 * I2 / (S * H)) + (b + (gamma - 0.5) * v2) * T)  / (sigma * sqrtT);
 
     const lnI1S  = Math.log(I1 / S);
-    const lnI1I2 = Math.log(I1 / I2);  // = ln(I1) - ln(I2) per BS2002 sign convention
 
     // Bivariate CDF terms — arguments are negated because we want the lower tail
     const n2_1 = cbnd(-d3, -d1,  rho);
@@ -423,8 +421,12 @@ export function computeGreeks(S, K, T, r, sigma, isPut) {
         price,
         delta: (pUp - pDn) / (2 * h_S),
         gamma: (pUp - 2 * price + pDn) / (h_S * h_S),
-        theta: (priceAmerican(S, K, Math.max(T - h_T, 1e-10), r, sigma, isPut)
-              - priceAmerican(S, K, T + h_T, r, sigma, isPut)) / (2 * h_T),
+        theta: (() => {
+            const T_lo = Math.max(T - h_T, 1e-10);
+            const T_hi = T + h_T;
+            return (priceAmerican(S, K, T_lo, r, sigma, isPut)
+                  - priceAmerican(S, K, T_hi, r, sigma, isPut)) / (T_hi - T_lo);
+        })(),
         vega:  (priceAmerican(S, K, T, r, sigma + h_sigma, isPut)
               - priceAmerican(S, K, T, r, sigma - h_sigma, isPut)) / (2 * h_sigma),
         rho:   (priceAmerican(S, K, T, r + h_r, sigma, isPut)
