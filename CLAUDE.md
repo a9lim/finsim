@@ -37,9 +37,10 @@ index.html             496 lines  Toolbar, chart canvas, strategy canvas, sideba
 styles.css             810 lines  Project-specific CSS overrides; chain table, position rows,
                                    strategy builder, trade dialog, margin alert, P&L coloring,
                                    Greeks grid, time slider bar, responsive breakpoints
-colors.js               53 lines  Financial color aliases (_PALETTE.up/down/bond/delta/gamma/
-                                   theta/vega/rho), CSS var injection (--up, --down, --bond,
-                                   --delta, --gamma, --theta, --vega, --rho, --chart-grid,
+colors.js               59 lines  Financial color aliases (_PALETTE.up/down/call/put/stock/
+                                   bond/delta/gamma/theta/vega/rho), CSS var injection
+                                   (--up, --down, --call, --put, --stock, --bond, --delta,
+                                   --gamma, --theta, --vega, --rho, --chart-grid,
                                    --chart-crosshair, --chart-axis, --chain-hover, --dialog-bg),
                                    freezes _PALETTE
 src/
@@ -53,15 +54,16 @@ src/
                                    pipeline for animated candles; tick() convenience wrapper;
                                    prepopulate() fills buffer and scales to INITIAL_PRICE;
                                    Box-Muller RNG, inverse-transform Poisson sampler
-  pricing.js           467 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
-                                   normal CDF (Drezner-Wesolowsky 1990) + finite-diff Greeks +
-                                   bid/ask spread model. Pure math -- no imports.
+  pricing.js           441 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
+                                   normal CDF (Drezner-Wesolowsky 1990) + finite-diff Greeks.
+                                   Pure math -- no imports.
   chain.js             170 lines  ExpiryManager (rolling 8-expiry window, 21-day cycle),
                                    generateExpiries() (legacy stateless), generateStrikes()
                                    ($5 intervals, STRIKE_RANGE strikes each side), buildChain()
-  portfolio.js         775 lines  Signed-qty positions, market/limit/stop orders, netting,
+  portfolio.js         800 lines  Signed-qty positions, market/limit/stop orders, netting,
                                    strategy groups, cash/margin, processExpiry(),
-                                   exerciseOption(), aggregateGreeks(), liquidateAll()
+                                   exerciseOption(), aggregateGreeks(), liquidateAll(),
+                                   computeBidAsk(), computeOptionBidAsk()
   chart.js             683 lines  ChartRenderer: logarithmic Y-axis OHLC candles, auto-scale,
                                    grid, crosshair, position entry markers, strike lines;
                                    live candle animation (close lerps between substep values,
@@ -237,11 +239,19 @@ Each Greek requires 2 additional `priceAmerican()` calls (except theta which nee
 
 ### Bid/Ask Spread Model
 
+All instruments use volatility-aware spreads. Two functions in `portfolio.js`:
+
+**`computeOptionBidAsk(mid, S, K, v)`** -- options (includes moneyness term):
 ```
-halfSpread = max(0.05, theoPrice * 0.02 * (1 + sqrt(v)) + 0.10 * |log(S/K)|)
+halfSpread = max(0.025, mid * 0.01 * (1 + sqrt(v)) + 0.05 * |log(S/K)|)
 ```
 
-Bid = theo - halfSpread, Ask = theo + halfSpread. Long positions fill at ask; short positions fill at bid. Widens in high-vol regimes and for deep ITM/OTM strikes. Stock and bond have no spread model -- fill at mid.
+**`computeBidAsk(mid, S, v)`** -- stock/bond (K = S, moneyness = 0):
+```
+halfSpread = max(0.025, mid * 0.01 * (1 + sqrt(v)))
+```
+
+Bid = mid - halfSpread, Ask = mid + halfSpread. Long positions fill at ask; short positions fill at bid. Widens in high-vol regimes. Options additionally widen for deep ITM/OTM strikes. `chain.js` imports `computeOptionBidAsk` from `portfolio.js` for chain construction.
 
 ## Options Chain
 
@@ -353,10 +363,11 @@ Logo + brand "Shoals", then toolbar actions:
 - Quantity slider (`#trade-qty`, 1--100, step 1)
 - Order type segmented toggle (`.mode-toggles`): Market | Limit | Stop
 - Trigger price slider (`#trigger-price`, conditional -- hidden for Market orders, shown for Limit/Stop), range dynamically set to spot +/-30%
-- Stock and Bond buttons (`#stock-btn`, `#bond-btn`): left-click = buy/long, right-click = sell/short
-- "Left-click: buy / Right-click: sell/short" hint
-- Expiry dropdown (`#expiry-select`) + compact chain table (3 columns: Call | Strike | Put)
-- "View Full Chain" button opens chain overlay
+- Expiry dropdown (`#trade-expiry`, `.sim-select`) -- populated from chain expiries, defaults to furthest expiry. Determines bond maturity and which options are shown.
+- Stock/Bond price table (`#stock-bond-table`) -- 2-column chain-style table with clickable price cells (`#stock-price-cell`, `#bond-price-cell`). Shows mid prices. Left-click = buy, right-click = sell/short. Stock cell colored `--stock` (orange), bond cell colored `--bond` (blue).
+- Compact chain table (3 columns: Call | Strike | Put) -- shows mid prices with bid/ask in title tooltip
+- "View Full Chain" button opens chain overlay (pauses simulation)
+- "Left-click: buy / Right-click: sell/short" hint at bottom
 
 **Portfolio tab:**
 - Account summary: Cash, Portfolio Value, Total P&L (color-coded), Margin Status (OK / Low / MARGIN CALL with info tip)
@@ -368,7 +379,7 @@ Logo + brand "Shoals", then toolbar actions:
 **Strategy tab:**
 - Quantity slider (`#strategy-qty`, 1--100, step 1)
 - Strike slider (`#strategy-strike`, range dynamically updated from chain data, step $5)
-- Expiry slider (`#strategy-expiry`, range from chain DTEs, step = chain interval typically 21)
+- Expiry dropdown (`#strategy-expiry`, `.sim-select`) -- populated from chain DTEs
 - Call / Put / Stock / Bond buttons: left-click = long, right-click = short
 - "Left-click: long / Right-click: short" hint
 - Legs list (`#strategy-legs-list`) -- each row shows description, inline qty input (editable), remove button
@@ -378,7 +389,7 @@ Logo + brand "Shoals", then toolbar actions:
 **Settings tab:**
 - Market Regime preset dropdown (`#preset-select`): Calm Bull, Sideways, Volatile, Crisis, Rate Hike
 - Advanced Parameters (expandable `#advanced-section`): 11 range sliders for model params (mu, theta, kappa, xi, rho, lambda, muJ, sigmaJ, a, b, sigmaR) with info tip popovers
-- Starting Capital number input (`#capital-input`)
+- Starting Capital number input (`#capital-input`, default $10,000)
 - Reset Simulation button (red-styled)
 
 ### Candlestick Chart (chart.js)
@@ -402,7 +413,7 @@ Logo + brand "Shoals", then toolbar actions:
 
 ### Strategy View (strategy.js)
 
-`StrategyRenderer.draw(legs, spot, vol, rate, dte, greekToggles)`:
+`StrategyRenderer.draw(legs, spot, vol, rate, dte, greekToggles, evalDay, entryDay)`:
 - X-axis: centered on spot, default range = spot +/-30%, dynamically extended to cover all leg strikes with 10% padding. 200 sample points across range.
 - **Scroll-wheel X zoom**: `_xRange` scales by 1.1x per wheel tick, clamped to `[spot*0.05, spot*1.0]`. Sets `_dirty = true` which main.js detects in frame loop.
 - Y-axis: P&L auto-scaled to min/max of payoff curve + 15% padding
@@ -415,15 +426,15 @@ Logo + brand "Shoals", then toolbar actions:
 - **Clickable legend**: top-left box with color swatches for P&L + all 5 Greeks. Click toggles Greek on/off (hit detection via stored bounding boxes in `_legendItems[]`). Inactive items dimmed to 35% opacity. Theme-aware background and text colors.
 - Empty state: draws axes and grid with no curves when legs array is empty
 
-`computeSummary(legs, spot, vol, rate, dte)` -> `{ maxProfit, maxLoss, breakevens, netCost }`. Samples from `0.01` to `5*spot` (or `5*maxStrike`). Detects unbounded profit/loss by checking if P&L is still monotonically increasing/decreasing at sample boundary.
+`computeSummary(legs, spot, vol, rate, dte, evalDay, entryDay)` -> `{ maxProfit, maxLoss, breakevens, netCost }`. Samples from `0.01` to `5*spot` (or `5*maxStrike`). Detects unbounded profit/loss by checking if P&L is still monotonically increasing/decreasing at sample boundary. Per-leg T computed from `leg.expiryDay - evalDay`; entry T from `leg.expiryDay - entryDay`. Options show theta decay and bonds show interest accrual as the time slider moves.
 
 ### Time-to-Expiry Slider
 
-`#time-slider` (`#time-slider-bar` container) appears only in strategy mode. Range dynamically set to max DTE across strategy legs. Value fed to `StrategyRenderer.draw()` as `dte`; curves morph in real time. Label shows "{n} DTE". Disabled when no legs have expiry days.
+`#time-slider` (`#time-slider-bar` container) appears only in strategy mode. Slider percentage (100% = entry, 0% = first leg expires) maps to `evalDay` via `_sliderElapsed()`. Range clamped to min DTE across legs -- slider stops at the first expiry since the strategy is broken beyond that point. Each leg computes its own T from `leg.expiryDay - evalDay`. Label shows nearest leg's remaining DTE (e.g. "21 DTE"). Disabled when no legs have expiry days.
 
 ### Overlays
 
-**Chain overlay** (`#chain-overlay`, `.sim-overlay`): expiry tabs across top as ghost buttons, full chain table (7 columns: Call Bid, Call Ask, Call Delta, Strike, Put Delta, Put Bid, Put Ask). ATM row highlighted with left accent border. Click any bid/ask price cell opens trade dialog. Max-width 560px, scrollable.
+**Chain overlay** (`#chain-overlay`, `.sim-overlay`): Opening pauses the simulation. Expiry tabs across top as ghost buttons, then a Stock/Bond price table (bid/ask format, clickable like the options cells), then full chain table (5 columns: Call, Call Delta, Strike, Put Delta, Put). Call/Put cells show "bid / ask" combined in a single clickable cell. ATM row highlighted with left accent border. Left-click = buy (fills at ask), right-click = sell/short (fills at bid). Max-width 560px, scrollable.
 
 **Trade dialog** (`#trade-dialog`, `.sim-overlay`): dynamically built DOM -- side dropdown (Long/Short), quantity number input, order type dropdown (Market/Limit/Stop), conditional trigger price input (hidden for Market). Confirm button is `cloneNode()` replaced on each open to avoid stacking listeners. `$._onTradeSubmit` closure reference. Max-width 380px.
 
@@ -448,9 +459,12 @@ Clicking the Strategy tab automatically activates strategy mode (`strategyMode =
 
 | Key | Extended source | Hex | Purpose |
 |-----|----------------|-----|---------|
-| `_PALETTE.up` | `extended.green` | `#509878` | Up candles, profit P&L, long markers, call chain |
-| `_PALETTE.down` | `extended.rose` | `#C46272` | Down candles, loss P&L, short markers, put chain |
-| `_PALETTE.bond` | `extended.blue` | `#5C92A8` | Bond button/position styling |
+| `_PALETTE.up` | `extended.green` | `#509878` | Up candles, profit P&L |
+| `_PALETTE.down` | `extended.rose` | `#C46272` | Down candles, loss P&L, danger/reset |
+| `_PALETTE.call` | `extended.green` | `#509878` | Call option cells, call strike lines |
+| `_PALETTE.put` | `extended.rose` | `#C46272` | Put option cells, put strike lines |
+| `_PALETTE.stock` | `extended.orange` | `#CC8E4E` | Stock price cell, stock trade button |
+| `_PALETTE.bond` | `extended.blue` | `#5C92A8` | Bond price cell, bond trade button |
 | `_PALETTE.delta` | `extended.blue` | `#5C92A8` | Delta Greek overlay + display |
 | `_PALETTE.gamma` | `extended.orange` | `#CC8E4E` | Gamma Greek overlay + display |
 | `_PALETTE.theta` | `extended.cyan` | `#4AACA0` | Theta Greek overlay + display |
@@ -461,7 +475,7 @@ CSS variables injected into `<style id="project-vars">`:
 
 | Variable | Light value | Dark value |
 |----------|-------------|------------|
-| `--up`, `--down`, `--bond`, `--delta`, `--gamma`, `--theta`, `--vega`, `--rho` | same both themes | same both themes |
+| `--up`, `--down`, `--call`, `--put`, `--stock`, `--bond`, `--delta`, `--gamma`, `--theta`, `--vega`, `--rho` | same both themes | same both themes |
 | `--chart-grid` | `_r(light.text, 0.06)` | `_r(dark.text, 0.06)` |
 | `--chart-crosshair` | `_r(light.text, 0.25)` | `_r(dark.text, 0.25)` |
 | `--chart-axis` | `light.textSecondary` | `dark.textSecondary` |
@@ -503,7 +517,7 @@ Registered via `initShortcuts()` from `shared-shortcuts.js`. `?` opens help over
 - **Custom event bus**: position/order action buttons (built in ui.js) dispatch `shoals:*` events to `document`, caught in main.js. Decouples ui.js from portfolio functions and sim state.
 - **`_haptics.trigger()` sites**: play/pause (medium/light), step (light), speed cycle (selection), sidebar toggle (light), strategy toggle (selection), preset load (medium), reset (heavy), trade success (success), trade failure (error), pending order placed (medium), liquidate (heavy), chain cell click (selection), order cancel (light), expiry tab (selection), advanced toggle (selection), overlay open/close (light), margin call (error), strategy leg add (selection), strategy save (success), strategy execute (success/error).
 - **Theme**: two-state only (light/dark). `initTheme()` reads `localStorage('shoals-theme')`, falls back to system `prefers-color-scheme`. `toggleTheme()` toggles + writes to localStorage. `data-theme` on `<html>`.
-- **Bond pricing**: `BOND_FACE_VALUE * exp(-r * T)` where T = DTE/252. No spread model -- fill at mid. Bond Greeks in strategy view: only rho is non-zero (`dB/dr = -T * 100 * exp(-rT)`). Bond P&L in strategy view is always 0 (same T and r for entry and current evaluation).
+- **Bond pricing**: `BOND_FACE_VALUE * exp(-r * T)` where T = DTE/252. Uses same volatility-aware spread as stock via `computeBidAsk()`. Bond Greeks in strategy view: rho (`-T * 100 * exp(-rT)`) and theta (`r * 100 * exp(-rT) / 252`). Bond P&L in strategy view shows interest accrual as time slider moves (entry T differs from current T).
 - **Short position mark-to-market**: stock shorts: `|qty| * (2 * entryPrice - S)`. Option shorts: `|qty| * (entryPrice - currentMid)`.
 - **Auto-scroll**: when `playing` and camera is bound, keeps latest candle at ~85% from left edge by computing world-space offset and calling `camera.panBy()`.
 
@@ -515,7 +529,7 @@ Registered via `initShortcuts()` from `shared-shortcuts.js`. `?` opens help over
 - **Strategy renderer has scroll-wheel zoom but no camera** -- `strategy.js` manages `_xRange`/`_xCenter` directly, NOT via `shared-camera.js`. `bindWheel()` scales `_xRange` and sets `_dirty`. Do not pass a camera to `StrategyRenderer`.
 - **`portfolio` is a mutable exported singleton** -- `resetPortfolio()` modifies it in place. Never replace the object reference (e.g. `portfolio = {}` in another module breaks all imports).
 - **Margin call pauses sim but does not prevent interaction** -- `playing = false` is set in main.js when `checkMargin().triggered`. The user can still call `tick()` via the step button or keyboard shortcut after dismissing the modal.
-- **`_phi` and `_psi` are NOT exported from pricing.js** -- internal helpers for `bs2002Call`. Only `priceAmerican`, `computeGreeks`, and `computeSpread` are exported.
+- **`_phi` and `_psi` are NOT exported from pricing.js** -- internal helpers for `bs2002Call`. Only `priceAmerican` and `computeGreeks` are exported. Bid/ask spread functions (`computeBidAsk`, `computeOptionBidAsk`) are in `portfolio.js`.
 - **Chain table is rebuilt on every `updateChainDisplay()` call** -- do not cache references to table cells. `_bindChainTableClicks()` re-attaches click handlers via `data-*` attribute selectors after each rebuild. Both sidebar chain and overlay chain use the same mechanism.
 - **Trade dialog confirm button is replaced on each open** -- `showTradeDialog()` calls `oldBtn.cloneNode(true)` + `replaceChild()` to avoid stacking event listeners. The `$.tradeConfirmBtn` reference is updated to the new node.
 - **`INTRADAY_STEPS` does not affect option pricing** -- only controls OHLC bar realism (16 sub-steps per day). Options are priced at `T = DTE / 252` years using closing `v` and `r`.

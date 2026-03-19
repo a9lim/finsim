@@ -128,6 +128,14 @@ function _dteToT(dte) {
     return Math.max(dte / TRADING_DAYS_PER_YEAR, 1e-10);
 }
 
+/**
+ * Per-leg time-to-expiry in years. Legs without expiryDay use the fallback.
+ */
+function _legDte(leg, evalDay, fallbackDte) {
+    if (leg.expiryDay != null) return Math.max(leg.expiryDay - evalDay, 0);
+    return fallbackDte;
+}
+
 // ---------------------------------------------------------------------------
 // StrategyRenderer
 // ---------------------------------------------------------------------------
@@ -240,10 +248,12 @@ export class StrategyRenderer {
      * @param {number}  spot         - Current stock price
      * @param {number}  vol          - Current volatility (sqrt(v), annualised)
      * @param {number}  rate         - Risk-free rate (continuously compounded)
-     * @param {number}  dte          - Days to expiry (integer)
+     * @param {number}  dte          - Days to expiry for display (slider value)
      * @param {Object}  greekToggles - { delta, gamma, theta, vega, rho } booleans
+     * @param {number}  [evalDay]    - Evaluation day (sim day number); per-leg T computed from leg.expiryDay
+     * @param {number}  [entryDay]   - Entry day (sim day number); per-leg entryT computed from leg.expiryDay
      */
-    draw(legs, spot, vol, rate, dte, greekToggles) {
+    draw(legs, spot, vol, rate, dte, greekToggles, evalDay, entryDay) {
         const ctx  = this._ctx;
         const cssW = this._cssW;
         const cssH = this._cssH;
@@ -282,7 +292,7 @@ export class StrategyRenderer {
             return;
         }
 
-        const T = _dteToT(dte);
+        const fallbackDte = dte;
 
         // --- Build sample arrays ---
         const xs   = [];
@@ -291,7 +301,7 @@ export class StrategyRenderer {
         for (let i = 0; i < SAMPLE_COUNT; i++) {
             const S = xMin + (i / (SAMPLE_COUNT - 1)) * (xMax - xMin);
             xs.push(S);
-            pnls.push(this._totalPnl(legs, S, vol, rate, T, spot));
+            pnls.push(this._totalPnl(legs, S, vol, rate, evalDay, entryDay, fallbackDte, spot));
         }
 
         // --- Y scale for P&L ---
@@ -310,7 +320,7 @@ export class StrategyRenderer {
         const greekData = {}; // key → { vals, yLo, yHi, toPixel }
 
         for (const gKey of activeGreeks) {
-            const vals = xs.map(S => this._totalGreek(legs, S, vol, rate, T, gKey));
+            const vals = xs.map(S => this._totalGreek(legs, S, vol, rate, evalDay, fallbackDte, gKey));
             let gMin = Math.min(...vals);
             let gMax = Math.max(...vals);
             if (gMin === gMax) { gMin -= 0.01; gMax += 0.01; }
@@ -368,12 +378,12 @@ export class StrategyRenderer {
      *
      * @returns {{ maxProfit: number, maxLoss: number, breakevens: number[], netCost: number }}
      */
-    computeSummary(legs, spot, vol, rate, dte) {
+    computeSummary(legs, spot, vol, rate, dte, evalDay, entryDay) {
         if (!legs || legs.length === 0) {
             return { maxProfit: 0, maxLoss: 0, breakevens: [], netCost: 0 };
         }
 
-        const T    = _dteToT(dte);
+        const fallbackDte = dte;
         // Extend sampling range to cover near-zero and far-upside
         let xMin = 0.01;
         let xMax = spot * 5;
@@ -388,7 +398,7 @@ export class StrategyRenderer {
         for (let i = 0; i < SAMPLE_COUNT; i++) {
             const S = xMin + (i / (SAMPLE_COUNT - 1)) * (xMax - xMin);
             xs.push(S);
-            pnls.push(this._totalPnl(legs, S, vol, rate, T, spot));
+            pnls.push(this._totalPnl(legs, S, vol, rate, evalDay, entryDay, fallbackDte, spot));
         }
 
         let maxProfit = Math.max(...pnls);
@@ -410,10 +420,12 @@ export class StrategyRenderer {
 
         const breakevens = _zeroCrossings(xs, pnls);
 
-        // Net cost = sum of entry costs (value at spot)
+        // Net cost = sum of entry costs (value at entry time)
         let netCost = 0;
         for (const leg of legs) {
-            netCost += this._legEntryCost(leg, spot, vol, rate, T);
+            const legEntryDte = (leg.expiryDay != null && entryDay != null)
+                ? Math.max(leg.expiryDay - entryDay, 0) : fallbackDte;
+            netCost += this._legEntryCost(leg, spot, vol, rate, _dteToT(legEntryDte));
         }
 
         return { maxProfit, maxLoss, breakevens, netCost };
@@ -456,34 +468,40 @@ export class StrategyRenderer {
      * P&L for a single leg at price S (current_value - entry_cost_at_spot).
      *
      * @param {object} leg
-     * @param {number} S      - Hypothetical spot to evaluate at
+     * @param {number} S          - Hypothetical spot to evaluate at
      * @param {number} vol
      * @param {number} rate
-     * @param {number} T      - Time to expiry in years
-     * @param {number} entryS - Original spot (entry price reference)
+     * @param {number} evalDay    - Evaluation day (sim day number)
+     * @param {number} entryDay   - Entry day (sim day number)
+     * @param {number} fallbackDte - Fallback DTE for legs without expiryDay
+     * @param {number} entryS     - Original spot (entry price reference)
      */
-    _legPnl(leg, S, vol, rate, T, entryS) {
+    _legPnl(leg, S, vol, rate, evalDay, entryDay, fallbackDte, entryS) {
         const sign  = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                     : (leg.side === 'short') ? -1 : 1;
         const qty   = Math.abs(leg.qty ?? 1);
+        const curDte   = _legDte(leg, evalDay, fallbackDte);
+        const entryDte = (leg.expiryDay != null && entryDay != null)
+            ? Math.max(leg.expiryDay - entryDay, 0) : fallbackDte;
+        const T      = _dteToT(curDte);
+        const entryT = _dteToT(entryDte);
 
         switch (leg.type) {
             case 'call':
             case 'put': {
                 const isPut    = leg.type === 'put';
                 const K        = leg.strike ?? entryS;
-                const curVal   = priceAmerican(S,      K, T, rate, vol, isPut);
-                const entryVal = priceAmerican(entryS, K, T, rate, vol, isPut);
+                const curVal   = priceAmerican(S,      K, T,      rate, vol, isPut);
+                const entryVal = priceAmerican(entryS, K, entryT, rate, vol, isPut);
                 return (curVal - entryVal) * qty * sign;
             }
             case 'stock': {
-                // P&L = (S - entryS) * qty * sign
                 return (S - entryS) * qty * sign;
             }
             case 'bond': {
-                // Bond value is path-independent; P&L relative to entry = 0
-                // (both evaluated at same T, same rate, same face value)
-                return 0;
+                const curVal   = BOND_FACE_VALUE * Math.exp(-rate * T);
+                const entryVal = BOND_FACE_VALUE * Math.exp(-rate * entryT);
+                return (curVal - entryVal) * qty * sign;
             }
             default:
                 return 0;
@@ -493,10 +511,10 @@ export class StrategyRenderer {
     /**
      * Sum P&L across all legs at price S.
      */
-    _totalPnl(legs, S, vol, rate, T, entryS) {
+    _totalPnl(legs, S, vol, rate, evalDay, entryDay, fallbackDte, entryS) {
         let total = 0;
         for (const leg of legs) {
-            total += this._legPnl(leg, S, vol, rate, T, entryS);
+            total += this._legPnl(leg, S, vol, rate, evalDay, entryDay, fallbackDte, entryS);
         }
         return total;
     }
@@ -506,11 +524,12 @@ export class StrategyRenderer {
      *
      * @returns {object} { delta, gamma, theta, vega, rho }
      */
-    _legGreeks(leg, S, vol, rate, T) {
+    _legGreeks(leg, S, vol, rate, evalDay, fallbackDte) {
         const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                    : (leg.side === 'short') ? -1 : 1;
         const qty  = Math.abs(leg.qty ?? 1);
         const mult = qty * sign;
+        const T = _dteToT(_legDte(leg, evalDay, fallbackDte));
 
         switch (leg.type) {
             case 'call':
@@ -529,10 +548,10 @@ export class StrategyRenderer {
             case 'stock':
                 return { delta: mult, gamma: 0, theta: 0, vega: 0, rho: 0 };
             case 'bond': {
-                // dBond/dr = -T * BOND_FACE_VALUE * exp(-r*T)
-                // Rho for long bond: negative (price falls as rate rises)
-                const bRho = -T * BOND_FACE_VALUE * Math.exp(-rate * T) * mult;
-                return { delta: 0, gamma: 0, theta: 0, vega: 0, rho: bRho };
+                const bv = BOND_FACE_VALUE * Math.exp(-rate * T);
+                const bRho = -T * bv * mult;
+                const bTheta = rate * bv / 252 * mult;
+                return { delta: 0, gamma: 0, theta: bTheta, vega: 0, rho: bRho };
             }
             default:
                 return { delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 };
@@ -542,10 +561,10 @@ export class StrategyRenderer {
     /**
      * Sum a specific Greek key across all legs at price S.
      */
-    _totalGreek(legs, S, vol, rate, T, gKey) {
+    _totalGreek(legs, S, vol, rate, evalDay, fallbackDte, gKey) {
         let total = 0;
         for (const leg of legs) {
-            const g = this._legGreeks(leg, S, vol, rate, T);
+            const g = this._legGreeks(leg, S, vol, rate, evalDay, fallbackDte);
             total += g[gKey] ?? 0;
         }
         return total;

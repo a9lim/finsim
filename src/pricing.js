@@ -3,7 +3,7 @@
  *
  * Pure math module: no imports, no DOM dependencies.
  *
- * Exports: priceAmerican, computeGreeks, computeSpread
+ * Exports: priceAmerican, computeGreeks
  *
  * References:
  *   Bjerksund, P. & Stensland, G. (2002). "Closed Form Valuation of American Options."
@@ -434,30 +434,6 @@ export function computeGreeks(S, K, T, r, sigma, isPut) {
         rho:   (priceAmerican(S, K, T, r + h_r, sigma, isPut)
               - priceAmerican(S, K, T, r - h_r, sigma, isPut)) / (2 * h_r),
     };
-}
-
-// ---------------------------------------------------------------------------
-// Bid/ask spread model
-// ---------------------------------------------------------------------------
-
-/**
- * Compute a model bid/ask spread around a theoretical option price.
- *
- * Spread widens with:
- *   - higher volatility (harder to hedge)
- *   - deeper in/out-of-the-money (wider natural spread)
- *   - minimum $0.05 tick
- *
- * @param {number} theoPrice - Theoretical (mid) option price
- * @param {number} S         - Spot price
- * @param {number} K         - Strike
- * @param {number} v         - Implied volatility (annualised)
- * @returns {number} Half-spread (bid = mid - spread/2, ask = mid + spread/2)
- */
-export function computeSpread(theoPrice, S, K, v) {
-    const moneyness = Math.abs(Math.log(S / K));
-    const sqrtV = Math.sqrt(Math.max(v, 0));
-    return Math.max(0.05, theoPrice * 0.02 * (1 + sqrtV) + 0.10 * moneyness);
 }
 
 // ---------------------------------------------------------------------------

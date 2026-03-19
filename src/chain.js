@@ -8,7 +8,8 @@
  */
 
 import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR } from './config.js';
-import { computeGreeks, computeSpread } from './pricing.js';
+import { computeGreeks } from './pricing.js';
+import { computeOptionBidAsk } from './portfolio.js';
 
 // ---------------------------------------------------------------------------
 // Expiry management — rolling window of expiry dates
@@ -137,8 +138,8 @@ export function buildChain(S, v, r, currentDay, expiries) {
             const callGreeks = computeGreeks(S, K, T, r, v, false);
             const putGreeks  = computeGreeks(S, K, T, r, v, true);
 
-            const callHalfSpread = computeSpread(callGreeks.price, S, K, v);
-            const putHalfSpread  = computeSpread(putGreeks.price,  S, K, v);
+            const callBA = computeOptionBidAsk(callGreeks.price, S, K, v);
+            const putBA  = computeOptionBidAsk(putGreeks.price,  S, K, v);
 
             return {
                 strike: K,
@@ -149,8 +150,8 @@ export function buildChain(S, v, r, currentDay, expiries) {
                     theta: callGreeks.theta,
                     vega:  callGreeks.vega,
                     rho:   callGreeks.rho,
-                    bid:   Math.max(0, callGreeks.price - callHalfSpread),
-                    ask:   callGreeks.price + callHalfSpread,
+                    bid:   Math.max(0, callBA.bid),
+                    ask:   callBA.ask,
                 },
                 put: {
                     price: putGreeks.price,
@@ -159,8 +160,8 @@ export function buildChain(S, v, r, currentDay, expiries) {
                     theta: putGreeks.theta,
                     vega:  putGreeks.vega,
                     rho:   putGreeks.rho,
-                    bid:   Math.max(0, putGreeks.price - putHalfSpread),
-                    ask:   putGreeks.price + putHalfSpread,
+                    bid:   Math.max(0, putBA.bid),
+                    ask:   putBA.ask,
                 },
             };
         });

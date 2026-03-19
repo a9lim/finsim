@@ -6,7 +6,7 @@
 export const TRADING_DAYS_PER_YEAR = 252;
 export const INTRADAY_STEPS = 16;
 export const INITIAL_PRICE = 100;
-export const INITIAL_CAPITAL = 100000;
+export const INITIAL_CAPITAL = 10000;
 export const STRIKE_INTERVAL = 5;
 export const STRIKE_RANGE = 12;
 export const BOND_FACE_VALUE = 100;

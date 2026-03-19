@@ -471,7 +471,7 @@ export class ChartRenderer {
                 const py = Math.round(ys) + 0.5;
 
                 // Color by call/put
-                const lineColor = pos.type === 'call' ? palette.up : palette.down;
+                const lineColor = pos.type === 'call' ? (palette.call || palette.up) : (palette.put || palette.down);
                 ctx.strokeStyle = lineColor + '99'; // semi-transparent
                 ctx.setLineDash(strikeDash);
                 ctx.beginPath();

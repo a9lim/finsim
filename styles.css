@@ -176,32 +176,32 @@ main {
 }
 
 .trade-btn.up {
-    color: var(--up);
-    border-color: var(--up);
+    color: var(--call);
+    border-color: var(--call);
 }
 
 .trade-btn.up:hover {
-    background: var(--up);
+    background: var(--call);
     color: var(--bg-panel);
 }
 
 .trade-btn.down {
-    color: var(--down);
-    border-color: var(--down);
+    color: var(--put);
+    border-color: var(--put);
 }
 
 .trade-btn.down:hover {
-    background: var(--down);
+    background: var(--put);
     color: var(--bg-panel);
 }
 
 .trade-btn.stock {
-    color: var(--ext-orange);
-    border-color: var(--ext-orange);
+    color: var(--stock);
+    border-color: var(--stock);
 }
 
 .trade-btn.stock:hover {
-    background: var(--ext-orange);
+    background: var(--stock);
     color: var(--bg-panel);
 }
 
@@ -254,11 +254,11 @@ main {
 }
 
 .call-cell {
-    color: var(--up);
+    color: var(--call);
 }
 
 .put-cell {
-    color: var(--down);
+    color: var(--put);
 }
 
 .strike-cell {
@@ -277,6 +277,39 @@ main {
 .chain-greek {
     color: var(--text-muted);
     font-size: 0.66rem;
+}
+
+#stock-bond-table {
+    margin-bottom: 8px;
+}
+
+#stock-price-cell,
+#bond-price-cell,
+.stock-overlay-cell,
+.bond-overlay-cell {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.82rem;
+}
+
+.stock-overlay-cell {
+    color: var(--stock);
+}
+
+.bond-overlay-cell {
+    color: var(--bond);
+}
+
+.overlay-stock-bond {
+    margin-bottom: 10px;
+}
+
+#stock-price-cell {
+    color: var(--stock);
+}
+
+#bond-price-cell {
+    color: var(--bond);
 }
 
 .chain-expiry-tabs {

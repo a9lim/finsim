@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE } from './src/config.js';
 import { Simulation } from './src/simulation.js';
 import { buildChain, ExpiryManager } from './src/chain.js';
 import {
@@ -13,13 +13,13 @@ import {
     checkMargin, aggregateGreeks, portfolioValue,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
-    saveStrategy, executeStrategy,
+    saveStrategy, executeStrategy, computeBidAsk,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
 import {
     cacheDOMElements, bindEvents, updateChainDisplay,
-    updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay,
+    updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateStockBondPrices,
     syncSettingsUI, toggleStrategyView, showMarginCall, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors,
@@ -161,7 +161,8 @@ function init() {
         onBuyBond:        () => handleBuyBond(),
         onShortBond:      () => handleShortBond(),
         onChainCellClick: (info) => handleChainCellClick(info),
-        onFullChainOpen:  () => showChainOverlay($, chain),
+        onExpiryChange:   (idx) => { updateChainDisplay($, chain, idx); dirty = true; },
+        onFullChainOpen:  () => openFullChain(),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
         onDismissMargin:  () => { /* sim stays paused, overlay hidden by ui.js */ },
@@ -308,7 +309,8 @@ function renderCurrentView() {
         strategy.draw(
             strategyLegs, sim.S,
             Math.sqrt(Math.max(sim.v, 0)),
-            sim.r, _pctToDTE(sliderPct), greekToggles
+            sim.r, _sliderFallbackDte(), greekToggles,
+            _sliderEvalDay(), sim.day
         );
     } else {
         chart.draw(
@@ -460,6 +462,9 @@ function updateUI() {
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
     updateRateDisplay($, sim.r);
+    const bondDte = _getTradeExpiryDay() - sim.day;
+    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
+    updateStockBondPrices($, sim.S, bondMid);
     updateStrategySelectors($, chain, sim.S);
     updateStrategyBuilder();
     updateTimeSliderRange();
@@ -480,21 +485,44 @@ function _getMaxDTE() {
     return maxDTE;
 }
 
-function _pctToDTE(pct) {
-    return Math.round(_getMaxDTE() * pct / 100);
+function _getMinDTE() {
+    let minDTE = Infinity;
+    for (const leg of strategyLegs) {
+        if (leg.expiryDay != null) {
+            const dte = leg.expiryDay - sim.day;
+            if (dte < minDTE) minDTE = dte;
+        }
+    }
+    return minDTE === Infinity ? 0 : minDTE;
+}
+
+/** Elapsed trading days at the current slider position (0 at 100%, minDTE at 0%). */
+function _sliderElapsed() {
+    return Math.round(_getMinDTE() * (100 - sliderPct) / 100);
+}
+
+/** Evaluation day for strategy diagram at current slider position. */
+function _sliderEvalDay() {
+    return sim.day + _sliderElapsed();
+}
+
+/** Fallback DTE for legs without expiryDay (max leg's remaining DTE at evalDay). */
+function _sliderFallbackDte() {
+    return _getMaxDTE() - _sliderElapsed();
 }
 
 function updateTimeSliderRange() {
-    const maxDTE = _getMaxDTE();
-    if (maxDTE > 0) {
+    const minDTE = _getMinDTE();
+    if (minDTE > 0) {
         $.timeSlider.disabled = false;
     } else {
         $.timeSlider.disabled = true;
         sliderPct = 100;
         $.timeSlider.value = 100;
     }
-    const dte = _pctToDTE(sliderPct);
-    if ($.timeSliderLabel) $.timeSliderLabel.textContent = sliderPct + '% (' + dte + 'd)';
+    const elapsed = _sliderElapsed();
+    const nearestRemaining = minDTE - elapsed;
+    if ($.timeSliderLabel) $.timeSliderLabel.textContent = nearestRemaining + ' DTE';
 }
 
 // ---------------------------------------------------------------------------
@@ -652,18 +680,32 @@ function handleShortStock() {
     _executeOrPlace('stock', 'short', _getTradeQty());
 }
 
+function _getTradeExpiryDay() {
+    const idx = parseInt($.tradeExpiry?.value, 10) || 0;
+    return chain.length > idx ? chain[idx].day : sim.day + 21;
+}
+
 function handleBuyBond() {
-    const expiryDay = chain.length > 0 ? chain[0].day : sim.day + 21;
-    _executeOrPlace('bond', 'long', _getTradeQty(), null, expiryDay);
+    _executeOrPlace('bond', 'long', _getTradeQty(), null, _getTradeExpiryDay());
 }
 
 function handleShortBond() {
-    const expiryDay = chain.length > 0 ? chain[0].day : sim.day + 21;
-    _executeOrPlace('bond', 'short', _getTradeQty(), null, expiryDay);
+    _executeOrPlace('bond', 'short', _getTradeQty(), null, _getTradeExpiryDay());
 }
 
 function handleChainCellClick(info) {
-    _executeOrPlace(info.type, info.side, _getTradeQty(), info.strike, info.expiryDay);
+    const expiryDay = info.expiryDay ?? (info.type === 'bond' ? _getTradeExpiryDay() : undefined);
+    _executeOrPlace(info.type, info.side, _getTradeQty(), info.strike ?? undefined, expiryDay);
+}
+
+function openFullChain() {
+    if (playing) togglePlay();
+    const vol = Math.sqrt(Math.max(sim.v, 0));
+    const bondDte = _getTradeExpiryDay() - sim.day;
+    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
+    const stockBA = computeBidAsk(sim.S, sim.S, vol);
+    const bondBA = computeBidAsk(bondMid, sim.S, vol);
+    showChainOverlay($, chain, stockBA, bondBA);
 }
 
 function handleTradeSubmit(data) {
@@ -800,7 +842,8 @@ function handleExecStrategy() {
 function updateStrategyBuilder() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     const summary = strategyLegs.length > 0
-        ? strategy.computeSummary(strategyLegs, sim.S, vol, sim.r, _pctToDTE(sliderPct))
+        ? strategy.computeSummary(strategyLegs, sim.S, vol, sim.r, _sliderFallbackDte(),
+            _sliderEvalDay(), sim.day)
         : null;
     renderStrategyBuilder($, strategyLegs, summary, handleRemoveLeg, chain, () => {
         strategy.resetRange(sim.S, strategyLegs);

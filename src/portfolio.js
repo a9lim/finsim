@@ -14,7 +14,7 @@ import {
     TRADING_DAYS_PER_YEAR,
 } from './config.js';
 
-import { priceAmerican, computeGreeks, computeSpread } from './pricing.js';
+import { priceAmerican, computeGreeks } from './pricing.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -94,13 +94,29 @@ function _fairPrice(type, currentPrice, currentRate, currentDay, strike, expiryD
  * @returns {number} Fill price per unit
  */
 function _fillPrice(type, side, mid, currentPrice, strike, currentVol) {
-    if (type === 'call' || type === 'put') {
-        const halfSpread = computeSpread(mid, currentPrice, strike, currentVol) / 2;
-        // Long positions pay the ask; short positions receive the bid.
-        return side === 'long' ? mid + halfSpread : mid - halfSpread;
-    }
-    // Stock and bond: no spread model — trade at mid.
-    return mid;
+    const ba = (type === 'call' || type === 'put')
+        ? computeOptionBidAsk(mid, currentPrice, strike, currentVol)
+        : computeBidAsk(mid, currentPrice, currentVol);
+    return side === 'long' ? ba.ask : ba.bid;
+}
+
+/**
+ * Bid/ask for stock or bond (K = currentPrice, moneyness = 0).
+ */
+export function computeBidAsk(mid, currentPrice, currentVol) {
+    const sqrtV = Math.sqrt(Math.max(currentVol, 0));
+    const halfSpread = Math.max(0.025, mid * 0.01 * (1 + sqrtV));
+    return { bid: mid - halfSpread, ask: mid + halfSpread };
+}
+
+/**
+ * Bid/ask for an option (volatility + moneyness aware spread).
+ */
+export function computeOptionBidAsk(mid, currentPrice, strike, currentVol) {
+    const moneyness = Math.abs(Math.log(currentPrice / strike));
+    const sqrtV = Math.sqrt(Math.max(currentVol, 0));
+    const halfSpread = Math.max(0.025, mid * 0.01 * (1 + sqrtV) + 0.05 * moneyness);
+    return { bid: mid - halfSpread, ask: mid + halfSpread };
 }
 
 /**
@@ -413,17 +429,16 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
 
     if (pos.qty > 0) {
         // Long position: sell at bid
-        const halfSpread = (pos.type === 'call' || pos.type === 'put')
-            ? computeSpread(mid, currentPrice, pos.strike, currentVol) / 2
-            : 0;
-        const bidPrice = mid - halfSpread;
-        portfolio.cash += bidPrice * absQty;
+        const ba = (pos.type === 'call' || pos.type === 'put')
+            ? computeOptionBidAsk(mid, currentPrice, pos.strike, currentVol)
+            : computeBidAsk(mid, currentPrice, currentVol);
+        portfolio.cash += ba.bid * absQty;
     } else {
         // Short position: buy back at ask to unwind
-        const halfSpread = (pos.type === 'call' || pos.type === 'put')
-            ? computeSpread(mid, currentPrice, pos.strike, currentVol) / 2
-            : 0;
-        const askPrice = mid + halfSpread;
+        const ba = (pos.type === 'call' || pos.type === 'put')
+            ? computeOptionBidAsk(mid, currentPrice, pos.strike, currentVol)
+            : computeBidAsk(mid, currentPrice, currentVol);
+        const askPrice = ba.ask;
         const returnedMargin = _marginForShort(
             pos.type, absQty, pos.entryPrice, currentPrice, currentVol,
             currentRate, currentDay, pos.strike, pos.expiryDay

@@ -7,6 +7,9 @@
 // --- Financial Color Aliases ---
 _PALETTE.up    = _PALETTE.extended.green;
 _PALETTE.down  = _PALETTE.extended.rose;
+_PALETTE.call  = _PALETTE.extended.green;
+_PALETTE.put   = _PALETTE.extended.rose;
+_PALETTE.stock = _PALETTE.extended.orange;
 _PALETTE.bond  = _PALETTE.extended.blue;
 _PALETTE.delta = _PALETTE.extended.blue;
 _PALETTE.gamma = _PALETTE.extended.orange;
@@ -29,6 +32,9 @@ Object.freeze(_PALETTE);
   style.textContent = `:root {
   --up: ${P.up};
   --down: ${P.down};
+  --call: ${P.call};
+  --put: ${P.put};
+  --stock: ${P.stock};
   --bond: ${P.bond};
   --delta: ${P.delta};
   --gamma: ${P.gamma};
