@@ -416,14 +416,18 @@ function _onDayComplete() {
 
     // Fire dynamic events
     if (eventEngine) {
-        const event = eventEngine.maybeFire(sim, sim.day);
-        if (event) {
+        const events = eventEngine.maybeFire(sim, sim.day);
+        if (events.length > 0) {
+            sim.recomputeK();
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog);
             if (typeof showToast !== 'undefined') {
-                const duration = event.magnitude === 'major' ? 8000
-                    : event.magnitude === 'moderate' ? 5000 : 3000;
-                showToast(event.headline, duration);
+                for (let i = 0; i < events.length; i++) {
+                    const ev = events[i];
+                    const duration = ev.magnitude === 'major' ? 8000
+                        : ev.magnitude === 'moderate' ? 5000 : 3000;
+                    setTimeout(function() { showToast(ev.headline, duration); }, i * 1500);
+                }
             }
         }
     }
