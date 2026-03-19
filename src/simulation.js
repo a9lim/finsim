@@ -49,67 +49,111 @@ export class Simulation {
     }
 
     /* -----------------------------------------------
-       tick()
-       Advance one trading day using INTRADAY_STEPS
-       sub-steps. Returns and appends the OHLC bar.
+       beginDay()
+       Start a new trading day. Pushes a partial bar
+       into history immediately so the chart can see
+       the live candle forming.
     ----------------------------------------------- */
-    tick() {
-        const dt = 1 / (TRADING_DAYS_PER_YEAR * INTRADAY_STEPS);
+    beginDay() {
+        this._dt = 1 / (TRADING_DAYS_PER_YEAR * INTRADAY_STEPS);
+        this._k  = Math.exp(this.muJ + 0.5 * this.sigmaJ * this.sigmaJ) - 1;
+        this._substepIndex = 0;
 
-        // Jump compensator: k = E[e^J] - 1
-        const k = Math.exp(this.muJ + 0.5 * this.sigmaJ * this.sigmaJ) - 1;
-
-        let open = null, high = -Infinity, low = Infinity;
-
-        for (let i = 0; i < INTRADAY_STEPS; i++) {
-            // 1. Correlated Brownian increments
-            const z1 = this._randn();
-            const z2 = this.rho * z1 + Math.sqrt(1 - this.rho * this.rho) * this._randn();
-            const z3 = this._randn(); // independent, for Vasicek
-
-            // 2. Heston stochastic volatility (full truncation scheme)
-            const sqrtV = Math.sqrt(Math.max(this.v, 0));
-            this.v = this.v
-                + this.kappa * (this.theta - this.v) * dt
-                + this.xi * sqrtV * Math.sqrt(dt) * z2;
-            this.v = Math.max(this.v, 0);
-
-            // 3. Merton jumps
-            const nJumps = this._poisson(this.lambda * dt);
-            let jumpSum = 0;
-            for (let j = 0; j < nJumps; j++) {
-                jumpSum += this.muJ + this.sigmaJ * this._randn();
-            }
-
-            // 4. GBM with jumps (log-price update)
-            const drift     = (this.mu - this.lambda * k) * dt;
-            const diffusion = sqrtV * Math.sqrt(dt) * z1;
-            this.S = this.S * Math.exp(drift + diffusion + jumpSum);
-
-            // 5. Vasicek short rate
-            this.r = this.r
-                + this.a * (this.b - this.r) * dt
-                + this.sigmaR * Math.sqrt(dt) * z3;
-
-            // OHLC tracking
-            if (i === 0) open = this.S;
-            if (this.S > high) high = this.S;
-            if (this.S < low)  low  = this.S;
-        }
-
-        const bar = {
+        this._partial = {
             day:   this.day,
-            open,
-            high,
-            low,
+            open:  this.S,
+            high:  this.S,
+            low:   this.S,
             close: this.S,
             v:     this.v,
             r:     this.r,
         };
 
-        this.history.push(bar);
+        this.history.push(this._partial);
+    }
+
+    /* -----------------------------------------------
+       substep()
+       Run one intraday sub-step. Updates the partial
+       bar in-place (already in history buffer).
+       Returns the partial bar reference.
+    ----------------------------------------------- */
+    substep() {
+        if (!this._partial || this._substepIndex >= INTRADAY_STEPS) return this._partial;
+
+        const dt = this._dt;
+        const k  = this._k;
+
+        // 1. Correlated Brownian increments
+        const z1 = this._randn();
+        const z2 = this.rho * z1 + Math.sqrt(1 - this.rho * this.rho) * this._randn();
+        const z3 = this._randn();
+
+        // 2. Heston stochastic volatility (full truncation scheme)
+        const sqrtV = Math.sqrt(Math.max(this.v, 0));
+        this.v = this.v
+            + this.kappa * (this.theta - this.v) * dt
+            + this.xi * sqrtV * Math.sqrt(dt) * z2;
+        this.v = Math.max(this.v, 0);
+
+        // 3. Merton jumps
+        const nJumps = this._poisson(this.lambda * dt);
+        let jumpSum = 0;
+        for (let j = 0; j < nJumps; j++) {
+            jumpSum += this.muJ + this.sigmaJ * this._randn();
+        }
+
+        // 4. GBM with jumps (log-price update)
+        const drift     = (this.mu - this.lambda * k) * dt;
+        const diffusion = sqrtV * Math.sqrt(dt) * z1;
+        this.S = this.S * Math.exp(drift + diffusion + jumpSum);
+
+        // 5. Vasicek short rate
+        this.r = this.r
+            + this.a * (this.b - this.r) * dt
+            + this.sigmaR * Math.sqrt(dt) * z3;
+
+        // Update partial bar in-place
+        const p = this._partial;
+        if (this.S > p.high) p.high = this.S;
+        if (this.S < p.low)  p.low  = this.S;
+        p.close = this.S;
+        p.v     = this.v;
+        p.r     = this.r;
+
+        this._substepIndex++;
+        return p;
+    }
+
+    /* -----------------------------------------------
+       finalizeDay()
+       Complete the current trading day. The partial
+       bar is already in the history buffer; just
+       advance the day counter and clear partial state.
+    ----------------------------------------------- */
+    finalizeDay() {
+        this._partial = null;
+        this._substepIndex = 0;
         this.day++;
-        return bar;
+    }
+
+    /** Number of sub-steps completed so far this day. */
+    get substepsDone() { return this._substepIndex || 0; }
+
+    /** True when all sub-steps for the current day are done. */
+    get dayComplete() { return this._substepIndex >= INTRADAY_STEPS; }
+
+    /* -----------------------------------------------
+       tick()
+       Advance one full trading day at once (all
+       sub-steps). Used for step button, prepopulation,
+       and high-speed catch-up.
+    ----------------------------------------------- */
+    tick() {
+        this.beginDay();
+        for (let i = 0; i < INTRADAY_STEPS; i++) this.substep();
+        this.finalizeDay();
+        return this.history.last();
     }
 
     /* -----------------------------------------------

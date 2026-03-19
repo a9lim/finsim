@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS } from './src/config.js';
 import { Simulation } from './src/simulation.js';
 import { buildChain, ExpiryManager } from './src/chain.js';
 import {
@@ -42,6 +42,7 @@ let speedIndex = 0;
 let strategyMode = false;
 let dirty = true;
 let lastTickTime = 0;
+let dayInProgress = false; // true between beginDay() and finalizeDay()
 let mouseX = -1, mouseY = -1;
 let strategyLegs = [];
 let greekToggles = { delta: true, gamma: false, theta: false, vega: false, rho: false };
@@ -321,11 +322,55 @@ function renderCurrentView() {
 function frame(now) {
     if (playing) {
         const tickInterval = 1000 / speed;
-        if (now - lastTickTime >= tickInterval) {
-            tick();
-            lastTickTime = now;
+        const substepInterval = tickInterval / INTRADAY_STEPS;
+
+        if (!dayInProgress) {
+            // Start a new day if enough time has passed since last tick
+            if (now - lastTickTime >= tickInterval) {
+                sim.beginDay();
+                dayInProgress = true;
+                // Advance by tickInterval (not now) to avoid drift; clamp
+                // to prevent burst catch-up after tab was backgrounded
+                lastTickTime = Math.max(lastTickTime + tickInterval, now - tickInterval);
+                chart.setLiveCandle(sim._partial);
+                dirty = true;
+            }
+        }
+
+        if (dayInProgress) {
+            const elapsed = now - lastTickTime;
+            // How many sub-steps should be done by now
+            const targetSteps = Math.min(
+                INTRADAY_STEPS,
+                Math.floor(elapsed / substepInterval) + 1
+            );
+            // Run any pending sub-steps
+            while (sim.substepsDone < targetSteps) {
+                sim.substep();
+                chart.setLiveCandle(sim._partial);
+                dirty = true;
+            }
+            // All sub-steps done — finalize the day
+            if (sim.dayComplete) {
+                sim.finalizeDay();
+                dayInProgress = false;
+                _onDayComplete();
+            }
         }
     }
+
+    // Lerp animation runs every frame (even when paused, for settling)
+    chart.update(now);
+    // Lerp always causes a redraw while targets differ from display
+    const L = chart._lerp;
+    if (L.day >= 0 && (
+        Math.abs(L.close - L._targetClose) > 0.001 ||
+        Math.abs(L.high  - L._targetHigh)  > 0.001 ||
+        Math.abs(L.low   - L._targetLow)   > 0.001
+    )) {
+        dirty = true;
+    }
+
     // Check if strategy renderer flagged dirty from wheel zoom
     if (strategy._dirty) {
         strategy._dirty = false;
@@ -338,12 +383,8 @@ function frame(now) {
     requestAnimationFrame(frame);
 }
 
-// ---------------------------------------------------------------------------
-// tick — advance one trading day
-// ---------------------------------------------------------------------------
-
-function tick() {
-    sim.tick();
+/** Called after all 16 sub-steps complete — runs portfolio/chain/margin checks. */
+function _onDayComplete() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
 
     checkPendingOrders(sim.S, vol, sim.r, sim.day);
@@ -363,7 +404,6 @@ function tick() {
     if (playing && camera) {
         const lastDay = sim.history.maxDay;
         const viewW = $.chartCanvas.clientWidth || 800;
-        // Place latest candle at ~85% from left
         const targetWorldX = lastDay + 1;
         const rightEdgeWorld = camera.screenToWorld(viewW * 0.85, 0).x;
         if (targetWorldX > rightEdgeWorld) {
@@ -380,6 +420,34 @@ function tick() {
 
     updateUI();
     dirty = true;
+}
+
+// ---------------------------------------------------------------------------
+// tick — advance one trading day
+// ---------------------------------------------------------------------------
+
+/** Instant full-day tick (used by step button). */
+function tick() {
+    if (dayInProgress) {
+        // Finish remaining sub-steps instantly
+        while (!sim.dayComplete) sim.substep();
+        sim.finalizeDay();
+        dayInProgress = false;
+    } else {
+        sim.tick();
+    }
+    // Snap the lerp to the final state (no animation for step)
+    const last = sim.history.last();
+    if (last) {
+        chart._lerp.day = last.day;
+        chart._lerp.close = last.close;
+        chart._lerp.high  = last.high;
+        chart._lerp.low   = last.low;
+        chart._lerp._targetClose = last.close;
+        chart._lerp._targetHigh  = last.high;
+        chart._lerp._targetLow   = last.low;
+    }
+    _onDayComplete();
 }
 
 // ---------------------------------------------------------------------------
@@ -435,7 +503,12 @@ function updateTimeSliderRange() {
 
 function togglePlay() {
     playing = !playing;
-    if (playing) lastTickTime = performance.now();
+    if (playing) {
+        lastTickTime = performance.now();
+        // If no day in progress, the first tick will start immediately
+        // (lastTickTime - now >= tickInterval is false, but we want immediate start)
+        if (!dayInProgress) lastTickTime -= 2000; // force immediate beginDay
+    }
     updatePlayBtn($, playing);
     _haptics.trigger(playing ? 'medium' : 'light');
 }
@@ -496,6 +569,8 @@ function loadPreset(index) {
     sim.reset(index);
     resetPortfolio();
     sim.prepopulate();
+    dayInProgress = false;
+    chart._lerp.day = -1;
     expiryMgr.init(sim.day);
     chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
     playing = false;
@@ -513,6 +588,8 @@ function resetSim() {
     sim.reset($.presetSelect.selectedIndex);
     resetPortfolio();
     sim.prepopulate();
+    dayInProgress = false;
+    chart._lerp.day = -1;
     expiryMgr.init(sim.day);
     chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
     playing = false;

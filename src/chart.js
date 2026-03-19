@@ -21,6 +21,14 @@ export class ChartRenderer {
         this.width  = 0;
         this.height = 0;
 
+        // Live candle lerp state
+        this._lerp = {
+            day: -1, close: 0, high: 0, low: 0,
+            _targetClose: 0, _targetHigh: 0, _targetLow: 0,
+        };
+        this._lerpSpeed = 15;   // higher = snappier response
+        this._lastFrameTime = 0;
+
         // Axis gutter sizes (CSS px)
         this.Y_AXIS_W  = 64;   // right-side Y-axis label area
         this.Y_LABEL_W = 18;   // left-side rotated Y-axis label
@@ -77,6 +85,49 @@ export class ChartRenderer {
         if (this.camera) {
             this.camera.setViewport(w, h);
         }
+    }
+
+    /* -----------------------------------------------
+       update(now)
+       Advance lerp state toward the live candle's
+       actual values. Call once per frame before draw().
+       @param {number} now  performance.now() timestamp
+    ----------------------------------------------- */
+    update(now) {
+        const dt = this._lastFrameTime > 0
+            ? Math.min((now - this._lastFrameTime) / 1000, 0.1) // cap at 100ms
+            : 0;
+        this._lastFrameTime = now;
+
+        const L = this._lerp;
+        if (L.day < 0) return; // no live candle yet
+
+        const alpha = 1 - Math.exp(-this._lerpSpeed * dt);
+        L.close += (L._targetClose - L.close) * alpha;
+        // High/low snap immediately (no lerp)
+        L.high = L._targetHigh;
+        L.low  = L._targetLow;
+    }
+
+    /* -----------------------------------------------
+       setLiveCandle(bar)
+       Update the lerp targets from the current partial
+       bar. If the day changed, snap instead of lerp.
+       @param {Object} bar  The partial/live bar
+    ----------------------------------------------- */
+    setLiveCandle(bar) {
+        if (!bar) return;
+        const L = this._lerp;
+        if (L.day !== bar.day) {
+            // New day — snap to open price
+            L.day   = bar.day;
+            L.close = bar.open;
+            L.high  = bar.open;
+            L.low   = bar.open;
+        }
+        L._targetClose = bar.close;
+        L._targetHigh  = bar.high;
+        L._targetLow   = bar.low;
     }
 
     /* -----------------------------------------------
@@ -263,11 +314,25 @@ export class ChartRenderer {
         ctx.rect(plotX, plotY, plotW, plotH);
         ctx.clip();
 
+        const liveDay = this._lerp.day;
+
         for (let i = firstDay; i <= lastDay; i++) {
             const bar = _get(i);
             if (!bar) continue;
 
-            const isUp = bar.close >= bar.open;
+            // Use lerped values for the live candle
+            let bHigh, bLow, bClose;
+            if (i === liveDay && liveDay >= 0) {
+                bHigh  = this._lerp.high;
+                bLow   = this._lerp.low;
+                bClose = this._lerp.close;
+            } else {
+                bHigh  = bar.high;
+                bLow   = bar.low;
+                bClose = bar.close;
+            }
+
+            const isUp = bClose >= bar.open;
             const color = isUp ? palette.up : palette.down;
 
             // Screen X center of this candle
@@ -275,20 +340,18 @@ export class ChartRenderer {
             if (cam) {
                 cx = cam.worldToScreen(i + 0.5, 0).x;
             } else {
-                // Fallback: evenly spread candles
                 cx = plotX + ((i + 0.5) / history.length) * plotW;
             }
 
             const bodyLeft  = cx - candleWidthRaw / 2;
-            const bodyRight = cx + candleWidthRaw / 2;
 
-            const yHigh  = priceToY(bar.high);
-            const yLow   = priceToY(bar.low);
+            const yHigh  = priceToY(bHigh);
+            const yLow   = priceToY(bLow);
             const yOpen  = priceToY(bar.open);
-            const yClose = priceToY(bar.close);
+            const yClose = priceToY(bClose);
             const yTop   = Math.min(yOpen, yClose);
             const yBot   = Math.max(yOpen, yClose);
-            const bodyH  = Math.max(1, yBot - yTop); // at least 1px
+            const bodyH  = Math.max(1, yBot - yTop);
 
             // Wick (high–low line)
             ctx.beginPath();
@@ -309,7 +372,11 @@ export class ChartRenderer {
         const lastBar = latestBar
             || (typeof history.last === 'function' ? history.last() : history[history.length - 1]);
         if (lastBar) {
-            const yLast = priceToY(lastBar.close);
+            // Use lerped close for the live candle's price line
+            const priceLineClose = (liveDay >= 0 && lastBar.day === liveDay)
+                ? this._lerp.close
+                : lastBar.close;
+            const yLast = priceToY(priceLineClose);
             if (yLast >= plotY && yLast <= plotY + plotH) {
                 ctx.save();
                 ctx.strokeStyle = palette.accent;
