@@ -1,7 +1,8 @@
 /* ===================================================
    llm.js -- Anthropic API client for dynamic event
    generation in Shoals. Generates batches of narrative
-   market events with parameter deltas.
+   market events with parameter deltas via structured
+   tool use.
    =================================================== */
 
 import { PARAM_RANGES } from './events.js';
@@ -11,9 +12,113 @@ const LS_KEY_MODEL = 'shoals_llm_model';
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 const API_URL = 'https://api.anthropic.com/v1/messages';
 
-const SYSTEM_PROMPT = 'You are a financial event generator for a trading simulator. The simulated company is Palanthropic (ticker: PNTH), a tech company with government defense contracts. PNTH has close ties to the Vice President but frequently clashes with the government over ethical use of its surveillance technology.\n\nGenerate realistic market events that shift simulation parameters. Each event must be a JSON object with:\n- "headline": string (1-2 sentence news headline)\n- "params": object mapping parameter names to DELTA values (additive changes, not absolute). Valid keys and ranges:\n'
-    + Object.entries(PARAM_RANGES).map(([k, r]) => '  ' + k + ': [' + r.min + ', ' + r.max + '] (delta should be a fraction of this range)').join('\n')
-    + '\n- "magnitude": "minor" | "moderate" | "major"\n- "followups": optional array of {id, mtth, weight} for chain events. id is a short snake_case identifier. mtth is mean trading days until followup. weight is probability (0-1) it fires.\n\nRules:\n- Return a JSON array of 3-5 events\n- Build a coherent narrative across events\n- Events should reference current market conditions and past events\n- Parameter deltas should be realistic: minor events touch 1-2 params with small deltas, major events touch 3-5 params with large deltas\n- Mix company-specific (PNTH) events with macro/market events\n- Do NOT include any text outside the JSON array';
+const PARAM_PROPERTIES = {};
+for (const [k, r] of Object.entries(PARAM_RANGES)) {
+    PARAM_PROPERTIES[k] = {
+        type: 'number',
+        description: 'Additive delta. Full range: [' + r.min + ', ' + r.max + ']. Delta should be a fraction of this range.',
+    };
+}
+
+const TOOL_DEF = {
+    name: 'emit_events',
+    description: 'Emit 3-5 narrative market events that shift simulation parameters for Palanthropic (PNTH).',
+    input_schema: {
+        type: 'object',
+        properties: {
+            events: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        headline: {
+                            type: 'string',
+                            description: '1-2 sentence news headline.',
+                        },
+                        params: {
+                            type: 'object',
+                            description: 'Parameter name to additive delta value. Minor events: 1-2 params with small deltas. Major events: 3-5 params with large deltas.',
+                            properties: PARAM_PROPERTIES,
+                            additionalProperties: false,
+                        },
+                        magnitude: {
+                            type: 'string',
+                            enum: ['minor', 'moderate', 'major'],
+                        },
+                        followups: {
+                            type: 'array',
+                            description: 'Optional chain events.',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    id: {
+                                        type: 'string',
+                                        description: 'Short snake_case identifier.',
+                                    },
+                                    mtth: {
+                                        type: 'number',
+                                        description: 'Mean trading days until followup fires.',
+                                    },
+                                    weight: {
+                                        type: 'number',
+                                        description: 'Probability (0-1) the followup fires.',
+                                    },
+                                },
+                                required: ['id', 'mtth', 'weight'],
+                                additionalProperties: false,
+                            },
+                        },
+                    },
+                    required: ['headline', 'params', 'magnitude'],
+                    additionalProperties: false,
+                },
+                minItems: 3,
+                maxItems: 5,
+            },
+        },
+        required: ['events'],
+        additionalProperties: false,
+    },
+};
+
+const SYSTEM_PROMPT = `You are a financial event generator for "Shoals", an options trading simulator. Use the emit_events tool to return your events.
+
+## Universe
+
+The player trades stock and options in Palanthropic (ticker: PNTH), an up-and-coming AI giant with deep government ties.
+
+### Political landscape
+- **President John Barron** (Federalist Party) won an upset against incumbent Robin Clay (Farmer-Labor Party).
+- Military hawk — renamed the Department of Defense to "Department of War." Launches airstrikes in the Middle East and "stabilization operations" in South America using PNTH AI targeting systems.
+- Pressures Fed Chair Hayden Hartley to cut rates; Hartley publicly rebuffs him, reaffirming Fed independence.
+
+### Palanthropic (PNTH)
+- **Chairwoman Andrea Dirks**: close to Vice President Jay Bowman, supports military contracts. Wields board majority.
+- **CEO Eugene Gottlieb**: opposes military use of PNTH AI on ethical grounds. Has publicly threatened to resign over offensive military deployments. Frequently clashes with Dirks.
+- **VP Jay Bowman**: lobbied Pentagon on PNTH's behalf before taking office. Senate investigation into his PNTH ties is ongoing.
+- Key tension: Dirks pushes defense revenue (Pentagon contracts, DHS border analytics), Gottlieb pushes commercial growth (Atlas AI platform, cloud partnerships). The board is split 7-3 in Dirks' favor.
+- Ongoing threads: DOJ antitrust suit, ACLU lawsuit over battlefield surveillance, whistleblower complaint about NSA data sharing, ethics board resignations, activist hedge fund demanding sale of commercial division, patent litigation from a rival.
+
+### Fed / Monetary
+- **Fed Chair Hayden Hartley** runs FOMC meetings roughly every 32 trading days (~8x/year).
+- Hartley is data-driven and independent; resists political pressure from Barron.
+- The Fed can hold, hike, or cut rates; announce QE or taper; issue hawkish or dovish minutes.
+
+### Macro / Geopolitical
+- Barron imposes tariffs, sanctions oil exporters, signs trade frameworks. Trading partners retaliate.
+- Risks: recession, inflation surprises, OPEC supply cuts, sovereign debt crises, ceasefire agreements, military escalation.
+- Congress is gridlocked between Federalists and Farmer-Labor holdouts.
+
+### Market Structure
+- Flash crashes, short squeezes, repo market seizures, triple witching vol spikes, market maker malfunctions, VIX spikes/collapses, margin call cascades.
+
+## Event Design Rules
+- Build a coherent narrative that continues from recent events and pending followups.
+- Reference current market conditions (price level, volatility, rates) when relevant.
+- Parameter deltas should be realistic: minor events touch 1-2 params with small deltas, major events touch 3-5 params with large deltas.
+- Mix PNTH-specific events with macro, Fed, geopolitical, sector, and market structure events.
+- Include plenty of neutral/flavor events (quiet trading days, mixed data, no-news days) to avoid constant directional drift.
+- Followup chains should create multi-step narratives (e.g., ethics dispute → board meeting → resignation threat → resolution).`;
 
 export class LLMEventSource {
     constructor() {
@@ -77,6 +182,8 @@ export class LLMEventSource {
                 model: this.model,
                 max_tokens: 1024,
                 system: SYSTEM_PROMPT,
+                tools: [TOOL_DEF],
+                tool_choice: { type: 'tool', name: 'emit_events' },
                 messages: [{ role: 'user', content: userMsg }],
             }),
         });
@@ -87,23 +194,17 @@ export class LLMEventSource {
         }
 
         const data = await resp.json();
-        const text = data.content && data.content[0] && data.content[0].text || '';
+        const toolBlock = data.content && data.content.find(b => b.type === 'tool_use');
+        if (!toolBlock) throw new Error('No tool_use block in response');
 
-        // Parse JSON from response (may be wrapped in markdown code fences)
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) throw new Error('No JSON array in response');
+        const events = toolBlock.input.events;
+        if (!Array.isArray(events) || events.length === 0) throw new Error('Empty events array');
 
-        const events = JSON.parse(jsonMatch[0]);
-        if (!Array.isArray(events)) throw new Error('Response is not an array');
-
-        // Validate and sanitize
-        return events
-            .filter(ev => ev && typeof ev.headline === 'string' && ev.params && typeof ev.params === 'object')
-            .map(ev => ({
-                headline: ev.headline,
-                params: ev.params,
-                magnitude: ['minor', 'moderate', 'major'].includes(ev.magnitude) ? ev.magnitude : 'moderate',
-                followups: Array.isArray(ev.followups) ? ev.followups : undefined,
-            }));
+        return events.map(ev => ({
+            headline: ev.headline,
+            params: ev.params,
+            magnitude: ev.magnitude,
+            followups: Array.isArray(ev.followups) ? ev.followups : undefined,
+        }));
     }
 }
