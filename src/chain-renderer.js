@@ -114,14 +114,14 @@ export function buildChainTable(expiry, compact) {
 
 function bindCellTrade(cell, type, onChainCellClick) {
     cell.addEventListener('click', () => {
-        _haptics.trigger('selection');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
         if (typeof onChainCellClick === 'function') {
             onChainCellClick({ type, side: 'long', strike: null, expiryDay: null });
         }
     });
     cell.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        _haptics.trigger('selection');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
         if (typeof onChainCellClick === 'function') {
             onChainCellClick({ type, side: 'short', strike: null, expiryDay: null });
         }
@@ -136,14 +136,14 @@ export function bindChainTableClicks(container, onChainCellClick) {
             type:      cell.dataset.type,
         };
         cell.addEventListener('click', () => {
-            _haptics.trigger('selection');
+            if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
             if (typeof onChainCellClick === 'function') {
                 onChainCellClick({ ...info, side: 'long' });
             }
         });
         cell.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            _haptics.trigger('selection');
+            if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
             if (typeof onChainCellClick === 'function') {
                 onChainCellClick({ ...info, side: 'short' });
             }
@@ -151,7 +151,7 @@ export function bindChainTableClicks(container, onChainCellClick) {
         cell.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                _haptics.trigger('selection');
+                if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
                 if (typeof onChainCellClick === 'function') {
                     onChainCellClick({ ...info, side: 'long' });
                 }

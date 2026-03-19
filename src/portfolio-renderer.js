@@ -91,7 +91,7 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day) {
     closeBtn.title = 'Close position';
     closeBtn.addEventListener('click', () => {
         closeBtn.dispatchEvent(new CustomEvent('shoals:closePosition', { detail: { id: pos.id }, bubbles: true }));
-        _haptics.trigger('medium');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
     });
     actions.appendChild(closeBtn);
 
@@ -102,7 +102,7 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day) {
         exBtn.title = 'Exercise option';
         exBtn.addEventListener('click', () => {
             exBtn.dispatchEvent(new CustomEvent('shoals:exerciseOption', { detail: { id: pos.id }, bubbles: true }));
-            _haptics.trigger('medium');
+            if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
         });
         actions.appendChild(exBtn);
     }
@@ -136,7 +136,7 @@ function _buildOrderRow(order) {
     cancelBtn.title = 'Cancel order';
     cancelBtn.addEventListener('click', () => {
         cancelBtn.dispatchEvent(new CustomEvent('shoals:cancelOrder', { detail: { id: order.id }, bubbles: true }));
-        _haptics.trigger('light');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
     });
 
     row.appendChild(labelEl);
@@ -239,16 +239,10 @@ function _diffOrderRows(container, orders) {
 export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, day, marginInfo) {
     $.cashDisplay.textContent = fmtDollar(portfolio.cash);
 
-    // Compute total portfolio value from positions + cash
-    let totalValue = portfolio.cash;
-    for (const pos of portfolio.positions) {
-        const pnl = computePositionPnl(pos, currentPrice, vol, rate, day);
-        const absQty = Math.abs(pos.qty);
-        const entryTotal = pos.entryPrice * absQty;
-        // Reconstruct value: for longs, value = entryTotal + pnl; for shorts, proceeds already in cash
-        // Simpler: use marginInfo.equity if available (it's portfolioValue which includes cash)
-        totalValue += pnl;
-    }
+    // Use marginInfo.equity when available -- it's the canonical portfolio value computed
+    // by the margin system (cash + all position mark-to-market values). Fall back to cash
+    // only when marginInfo is not provided (e.g. called before first margin check).
+    const totalValue = (marginInfo && marginInfo.equity != null) ? marginInfo.equity : portfolio.cash;
     $.portfolioValue.textContent = fmtDollar(totalValue);
 
     const pnl = totalValue - portfolio.initialCapital;

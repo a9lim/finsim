@@ -714,7 +714,7 @@ export class EventEngine {
             for (const fu of event.followups) {
                 const delay = this._poissonSample(fu.mtth);
                 this._pendingFollowups.push({
-                    event: fu,
+                    event: _getEventById(fu.id) || fu,
                     chainId,
                     targetDay: day + Math.max(1, delay),
                     weight: fu.weight ?? 1,
