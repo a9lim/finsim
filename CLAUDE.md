@@ -41,6 +41,12 @@ colors.js               59 lines  Financial color aliases (_PALETTE.up/down/call
                                    freezes _PALETTE
 src/
   config.js             26 lines  Named constants and PRESETS array (5 market regimes)
+  position-value.js    ~40 lines  Unified position valuation: computePositionValue(),
+                                   computePositionPnl(). Imports pricing, config.
+  chain-renderer.js   ~230 lines  Chain table DOM building: renderChainInto(),
+                                   buildStockBondTable(). Extracted from ui.js.
+  portfolio-renderer.js ~200 lines Portfolio display with DOM diffing:
+                                   updatePortfolioDisplay(). Extracted from ui.js.
   events.js          ~500 lines  EventEngine: Poisson scheduler, MTTH followup chains,
                                    offline event pool (~56 curated events for Palanthropic/PNTH),
                                    PARAM_RANGES canonical clamping. Shared by offline and LLM modes.
@@ -67,12 +73,12 @@ src/
                                    breakeven dots, scroll-wheel X zoom, clickable legend,
                                    computeSummary(). Per-leg T from evalDay/entryDay.
                                    Does NOT use shared-camera.js.
-  ui.js               1270 lines  cacheDOMElements(), bindEvents(), updateChainDisplay(),
-                                   updateStrategyChainDisplay(), _renderChainInto() (shared),
-                                   updatePortfolioDisplay(), updateGreeksDisplay(),
+  ui.js                966 lines  cacheDOMElements(), bindEvents(), updateChainDisplay(),
+                                   updateStrategyChainDisplay(), updateGreeksDisplay(),
                                    showChainOverlay(), showTradeDialog(), showMarginCall(),
                                    toggleStrategyView(), renderStrategyBuilder(),
-                                   updateStockBondPrices(), updateStrategySelectors()
+                                   updateStockBondPrices(), updateStrategySelectors();
+                                   delegates to chain-renderer.js and portfolio-renderer.js
   theme.js              20 lines  initTheme(), toggleTheme() (2-state: light/dark)
 ```
 
@@ -92,7 +98,11 @@ main.js
   |- src/llm.js         (LLMEventSource -- imports events.js)
   |- src/chart.js         (ChartRenderer -- no ES6 imports; reads _PALETTE, _r globals)
   |- src/strategy.js      (StrategyRenderer -- imports pricing, config)
-  |- src/ui.js            (cacheDOMElements, bindEvents, display updaters -- imports config;
+  |- src/position-value.js  (imports pricing, config)
+  |- src/chain-renderer.js  (imports config; reads _PALETTE, _haptics globals)
+  |- src/portfolio-renderer.js (imports position-value, config)
+  |- src/ui.js            (cacheDOMElements, bindEvents, display updaters -- imports config,
+  |                         chain-renderer, portfolio-renderer;
   |                         reads _haptics, showToast, createInfoTip globals)
   +- src/theme.js         (initTheme, toggleTheme -- no imports)
 ```
@@ -205,7 +215,7 @@ ATM = `round(S / 5) * 5`. 12 strikes each side, filtered positive, sorted ascend
 [{ day, dte, options: [{ strike, call: {price,delta,gamma,theta,vega,rho,bid,ask}, put: {...} }] }]
 ```
 
-**Known issue**: `v` (variance) is passed where `sqrt(v)` (volatility) is expected. Chain Greeks use variance instead of volatility.
+`buildChain()` converts `v` to `sigma = sqrt(max(v, 0))` before passing to `computeGreeks()`.
 
 ## Portfolio System
 
@@ -412,13 +422,13 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **`portfolio` singleton** -- `resetPortfolio()` mutates in place. Never replace the reference.
 - **Chain table rebuilt every call** -- do not cache cell references. Clicks re-bound after each rebuild.
 - **Trade dialog confirm button cloned** on each open to avoid stacking listeners.
-- **Variance vs volatility bug** -- `buildChain()` passes `v` (variance) where `computeGreeks()` expects `sqrt(v)` (volatility).
 - **`ExpiryManager` is stateful** -- lives in main.js, `.init()` on reset, `.update()` each tick.
 - **Vasicek rate can go negative** -- BS2002 uses `rEff = max(r, 1e-7)` for beta only.
 - **`_phi`/`_psi` not exported** from pricing.js. Only `priceAmerican` and `computeGreeks` exported.
 - **Opening full chain pauses sim** -- `playing` set to false before showing overlay.
 - **Time slider clamped to min DTE** -- stops at first leg expiry; per-leg T computed individually.
-- **`eventEngine` is null in non-Dynamic presets** -- always check `if (eventEngine)` before calling methods.
+- **`eventEngine` is null in non-Dynamic presets** -- always check `if (eventEngine)` before calling methods. `maybeFire()` returns an array of fired events (may be empty), not a single event/null.
+- **`_reservedMargin` field on short positions** stores actual margin reserved at open time. Use `?? _marginForShort(...)` fallback when reading.
 - **Event deltas are additive and clamped** to `PARAM_RANGES` -- never set absolute values via events.
 - **LLM followup events don't enter `_eventById` lookup** -- only offline pool events are indexed. LLM-generated followup IDs reference nothing.
 - **`_pendingFollowups` cleared on reset** -- switching presets mid-chain drops all scheduled followups.
