@@ -41,7 +41,13 @@ colors.js               59 lines  Financial color aliases (_PALETTE.up/down/call
                                    freezes _PALETTE
 src/
   config.js             26 lines  Named constants and PRESETS array (5 market regimes)
+  events.js          ~500 lines  EventEngine: Poisson scheduler, MTTH followup chains,
+                                   offline event pool (~56 curated events for Palanthropic/PNTH),
+                                   PARAM_RANGES canonical clamping. Shared by offline and LLM modes.
   history-buffer.js     86 lines  HistoryBuffer: fixed-capacity (256) ring buffer for OHLC bars
+  llm.js             ~110 lines  LLMEventSource: Anthropic API batch fetcher (browser-direct),
+                                   prompt construction with sim state context, JSON response
+                                   parsing, fallback to offline on failure.
   simulation.js        208 lines  GBM + Merton jumps + Heston stoch vol + Vasicek rate;
                                    beginDay()/substep()/finalizeDay() sub-step pipeline;
                                    prepopulate() fills buffer and scales to INITIAL_PRICE
@@ -81,6 +87,8 @@ main.js
   |                         checkPendingOrders, processExpiry, checkMargin, aggregateGreeks,
   |                         closePosition, exerciseOption, liquidateAll, placePendingOrder,
   |                         cancelOrder, saveStrategy, executeStrategy -- imports pricing, config)
+  |- src/events.js      (EventEngine, OFFLINE_EVENTS, PARAM_RANGES -- no imports)
+  |- src/llm.js         (LLMEventSource -- imports events.js)
   |- src/chart.js         (ChartRenderer -- no ES6 imports; reads _PALETTE, _r globals)
   |- src/strategy.js      (StrategyRenderer -- imports pricing, config)
   |- src/ui.js            (cacheDOMElements, bindEvents, display updaters -- imports config;
@@ -324,6 +332,30 @@ Clicking Strategy tab sets `strategyMode = true`, shows strategy canvas + time s
 
 CSS vars injected: `--up`, `--down`, `--call`, `--put`, `--stock`, `--bond`, `--delta`, `--gamma`, `--theta`, `--vega`, `--rho` (same both themes). Themed vars: `--chart-grid`, `--chart-crosshair`, `--chart-axis`, `--chain-hover`, `--dialog-bg`.
 
+## Dynamic Regime
+
+Two dynamic market regime modes use a shared event engine (`src/events.js`):
+
+### Event Engine
+
+`EventEngine` fires narrative events on a Poisson schedule (~1 event per 20 trading days). Events apply additive parameter deltas to the simulation, clamped to `PARAM_RANGES`. Called from `_onDayComplete()` in main.js.
+
+Two event sources:
+- **Offline** (preset index 5): draws from `OFFLINE_EVENTS` pool (~56 curated events across Fed/monetary, macro/geopolitical, sector/tech, PNTH company, and market structure categories)
+- **LLM** (preset index 6): generates batches of 3-5 events via Anthropic Claude API (Haiku 4.5 default), with offline fallback on failure
+
+### MTTH Chains
+
+Events can schedule followup events (Paradox-style Mean Time To Happen). Each followup has an `mtth` (mean delay in trading days, Poisson-sampled) and a `weight` (probability of firing). Followups can chain recursively (max depth 5). `_pendingFollowups[]` checked each day before the regular Poisson draw.
+
+### Palanthropic (PNTH)
+
+The simulated company. Tech sector, government defense contracts, ties to the Vice President. Ethical conflicts with government over surveillance product use. ~18 company-specific events in the offline pool with multi-step narrative chains.
+
+### LLM Integration
+
+Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` header. API key and model stored in localStorage (`shoals_llm_key`, `shoals_llm_model`). Batches pre-fetched to minimize API calls (~1 call per 60-100 trading days). Prompt includes current sim state (with `sqrt(v)` as volatility), last 10 events, and pending followups.
+
 ## Keyboard Shortcuts
 
 | Key | Action | Group |
@@ -335,6 +367,8 @@ CSS vars injected: `--up`, `--down`, `--call`, `--put`, `--stock`, `--bond`, `--
 | `t` | Toggle sidebar | View |
 | `b` | Buy stock | Trade |
 | `1`-`5` | Load preset | Presets |
+| `6` | Dynamic (Offline) | Presets |
+| `7` | Dynamic (LLM) | Presets |
 
 ## Key Patterns
 
@@ -370,3 +404,8 @@ CSS vars injected: `--up`, `--down`, `--call`, `--put`, `--stock`, `--bond`, `--
 - **`_phi`/`_psi` not exported** from pricing.js. Only `priceAmerican` and `computeGreeks` exported.
 - **Opening full chain pauses sim** -- `playing` set to false before showing overlay.
 - **Time slider clamped to min DTE** -- stops at first leg expiry; per-leg T computed individually.
+- **`eventEngine` is null in non-Dynamic presets** -- always check `if (eventEngine)` before calling methods.
+- **Event deltas are additive and clamped** to `PARAM_RANGES` -- never set absolute values via events.
+- **LLM followup events don't enter `_eventById` lookup** -- only offline pool events are indexed. LLM-generated followup IDs reference nothing.
+- **`_pendingFollowups` cleared on reset** -- switching presets mid-chain drops all scheduled followups.
+- **Slider ranges expanded globally** -- all 11 parameter sliders have wider min/max than the original presets use. Events can push params to extremes.
