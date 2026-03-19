@@ -405,7 +405,13 @@ function frame(now) {
 function _onDayComplete() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
 
-    checkPendingOrders(sim.S, vol, sim.r, sim.day);
+    const filledOrders = checkPendingOrders(sim.S, vol, sim.r, sim.day);
+    for (const pos of filledOrders) {
+        if (typeof showToast !== 'undefined') {
+            const side = pos.qty > 0 ? 'Bought' : 'Sold';
+            showToast(side + ' ' + Math.abs(pos.qty) + ' ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
+        }
+    }
     processExpiry(sim.day, sim.S, sim.day);
 
     // Fire dynamic events
@@ -763,7 +769,6 @@ function handleTradeSubmit(data) {
 function handleLiquidate() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     liquidateAll(sim.S, vol, sim.r, sim.day);
-    resetPortfolio(portfolio.cash);
     updateUI();
     dirty = true;
     if (typeof showToast !== 'undefined') showToast('All positions liquidated.');
