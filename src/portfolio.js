@@ -105,9 +105,8 @@ function _fillPrice(type, side, mid, currentPrice, strike, currentVol) {
  * Bid/ask for stock or bond (K = currentPrice, moneyness = 0).
  */
 export function computeBidAsk(mid, currentPrice, currentVol) {
-    const sqrtV = Math.sqrt(Math.max(currentVol, 0));
-    const halfSpread = Math.max(0.025, mid * 0.01 * (1 + sqrtV));
-    return { bid: mid - halfSpread, ask: mid + halfSpread };
+    const halfSpread = Math.max(0.025, mid * 0.01 * (1 + currentVol));
+    return { bid: Math.max(0, mid - halfSpread), ask: mid + halfSpread };
 }
 
 /**
@@ -115,9 +114,8 @@ export function computeBidAsk(mid, currentPrice, currentVol) {
  */
 export function computeOptionBidAsk(mid, currentPrice, strike, currentVol) {
     const moneyness = Math.abs(Math.log(currentPrice / strike));
-    const sqrtV = Math.sqrt(Math.max(currentVol, 0));
-    const halfSpread = Math.max(0.025, mid * 0.01 * (1 + sqrtV) + 0.05 * moneyness);
-    return { bid: mid - halfSpread, ask: mid + halfSpread };
+    const halfSpread = Math.max(0.025, mid * 0.01 * (1 + currentVol) + 0.05 * moneyness);
+    return { bid: Math.max(0, mid - halfSpread), ask: mid + halfSpread };
 }
 
 /**
@@ -449,22 +447,15 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
     );
 
     if (pos.qty > 0) {
-        // Long position: sell at bid
-        const ba = (pos.type === 'call' || pos.type === 'put')
-            ? computeOptionBidAsk(mid, currentPrice, pos.strike, currentVol)
-            : computeBidAsk(mid, currentPrice, currentVol);
-        portfolio.cash += ba.bid * absQty;
+        const fill = _fillPrice(pos.type, 'short', mid, currentPrice, pos.strike, currentVol);
+        portfolio.cash += fill * absQty;
     } else {
-        // Short position: buy back at ask to unwind
-        const ba = (pos.type === 'call' || pos.type === 'put')
-            ? computeOptionBidAsk(mid, currentPrice, pos.strike, currentVol)
-            : computeBidAsk(mid, currentPrice, currentVol);
-        const askPrice = ba.ask;
+        const fill = _fillPrice(pos.type, 'long', mid, currentPrice, pos.strike, currentVol);
         const returnedMargin = pos._reservedMargin ?? _marginForShort(
             pos.type, absQty, pos.entryPrice, currentPrice, currentVol,
             currentRate, currentDay, pos.strike, pos.expiryDay
         );
-        portfolio.cash += returnedMargin - askPrice * absQty;
+        portfolio.cash += returnedMargin - fill * absQty;
     }
 
     portfolio.positions.splice(idx, 1);
@@ -544,6 +535,23 @@ export function processExpiry(expiryDay, currentPrice, currentDay) {
     const expiring = portfolio.positions.filter(p => p.expiryDay === expiryDay);
 
     for (const pos of expiring) {
+        if (pos.type === 'bond') {
+            // Bond maturity: settle at face value
+            if (pos.qty > 0) {
+                portfolio.cash += BOND_FACE_VALUE * Math.abs(pos.qty);
+            } else {
+                // Short bond: return margin, debit face value
+                const returnedMargin = pos._reservedMargin ?? _marginForShort(
+                    pos.type, Math.abs(pos.qty), pos.entryPrice, 0, 0,
+                    0, currentDay, pos.strike, pos.expiryDay
+                );
+                portfolio.cash += returnedMargin - BOND_FACE_VALUE * Math.abs(pos.qty);
+            }
+            const idx = portfolio.positions.findIndex(p => p.id === pos.id);
+            if (idx !== -1) portfolio.positions.splice(idx, 1);
+            expired.push(pos);
+            continue;
+        }
         if (pos.type !== 'call' && pos.type !== 'put') continue;
 
         const itm = pos.type === 'call'
@@ -696,34 +704,7 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
 export function checkMargin(currentPrice, currentVol, currentRate, currentDay) {
     const equity   = portfolioValue(currentPrice, currentVol, currentRate, currentDay);
     const required = marginRequirement(currentPrice, currentVol, currentRate, currentDay);
-
-    // Total notional of all positions (long + short, measured at current prices)
-    let totalPositionValue = 0;
-    for (const pos of portfolio.positions) {
-        const absQty = Math.abs(pos.qty);
-        const dte = pos.expiryDay != null
-            ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
-            : 0;
-
-        switch (pos.type) {
-            case 'stock':
-                totalPositionValue += currentPrice * absQty;
-                break;
-            case 'bond':
-                totalPositionValue += BOND_FACE_VALUE * Math.exp(-currentRate * dte) * absQty;
-                break;
-            case 'call':
-            case 'put': {
-                const isPut  = pos.type === 'put';
-                const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut);
-                totalPositionValue += optMid * absQty;
-                break;
-            }
-        }
-    }
-
-    const triggered = equity < MAINTENANCE_MARGIN * totalPositionValue;
-
+    const triggered = required > 0 && equity < required;
     return { triggered, equity, required };
 }
 
