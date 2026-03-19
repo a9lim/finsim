@@ -131,6 +131,13 @@ export function cacheDOMElements($) {
     $.triggerPriceGroup = document.getElementById('trigger-price-group');
     $.triggerPrice     = document.getElementById('trigger-price');
     $.triggerPriceVal  = document.getElementById('trigger-price-val');
+    $.llmSettingsSection = document.getElementById('llm-settings-section');
+    $.eventLogSection    = document.getElementById('event-log-section');
+    $.eventLog           = document.getElementById('event-log');
+    $.llmApiKey          = document.getElementById('llm-api-key');
+    $.llmKeyToggle       = document.getElementById('llm-key-toggle');
+    $.llmModel           = document.getElementById('llm-model');
+    $.llmProvider        = document.getElementById('llm-provider');
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +151,7 @@ export function bindEvents($, handlers) {
         onBuyStock, onShortStock, onBuyBond, onShortBond,
         onChainCellClick, onFullChainOpen, onExpiryChange,
         onTradeSubmit, onLiquidate, onDismissMargin,
+        onLLMKeyChange, onLLMModelChange,
     } = handlers;
 
     $.playBtn.addEventListener('click', onTogglePlay);
@@ -155,6 +163,30 @@ export function bindEvents($, handlers) {
     $.presetSelect.addEventListener('change', () => {
         onPresetChange($.presetSelect.selectedIndex);
     });
+
+    // LLM key show/hide toggle
+    if ($.llmKeyToggle) {
+        $.llmKeyToggle.addEventListener('click', () => {
+            const isPassword = $.llmApiKey.type === 'password';
+            $.llmApiKey.type = isPassword ? 'text' : 'password';
+        });
+    }
+
+    // LLM API key persistence
+    if ($.llmApiKey) {
+        $.llmApiKey.value = localStorage.getItem('shoals_llm_key') || '';
+        $.llmApiKey.addEventListener('change', () => {
+            if (onLLMKeyChange) onLLMKeyChange($.llmApiKey.value);
+        });
+    }
+
+    // LLM model persistence
+    if ($.llmModel) {
+        $.llmModel.value = localStorage.getItem('shoals_llm_model') || 'claude-haiku-4-5-20251001';
+        $.llmModel.addEventListener('change', () => {
+            if (onLLMModelChange) onLLMModelChange($.llmModel.value);
+        });
+    }
 
     $.resetBtn.addEventListener('click', onReset);
 
@@ -1266,5 +1298,58 @@ export function wireInfoTips($) {
             body: 'Shows your margin health. OK = well-collateralised. Low = approaching maintenance margin. MARGIN CALL = equity below required level; close positions or add cash.',
             maxWidth: 280,
         });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// updateDynamicSections
+// ---------------------------------------------------------------------------
+
+export function updateDynamicSections($, presetIndex) {
+    const isLLM = presetIndex >= 6;
+    const isOffline = presetIndex === 5;
+    const isDynamic = isLLM || isOffline;
+
+    if ($.llmSettingsSection) {
+        $.llmSettingsSection.classList.toggle('hidden', !isLLM);
+    }
+    if ($.eventLogSection) {
+        $.eventLogSection.classList.toggle('hidden', !isDynamic);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// updateEventLog
+// ---------------------------------------------------------------------------
+
+export function updateEventLog($, eventLog) {
+    if (!$.eventLog) return;
+    if (!eventLog || eventLog.length === 0) {
+        $.eventLog.textContent = '';
+        const empty = document.createElement('div');
+        empty.className = 'event-log-empty';
+        empty.textContent = 'No events yet.';
+        $.eventLog.appendChild(empty);
+        return;
+    }
+    // Show last 5, newest first
+    $.eventLog.textContent = '';
+    const recent = eventLog.slice(-5).reverse();
+    for (const e of recent) {
+        const row = document.createElement('div');
+        row.className = 'event-log-entry';
+        row.dataset.magnitude = e.magnitude;
+
+        const daySpan = document.createElement('span');
+        daySpan.className = 'event-log-day';
+        daySpan.textContent = 'D' + e.day;
+
+        const headlineSpan = document.createElement('span');
+        headlineSpan.className = 'event-log-headline';
+        headlineSpan.textContent = e.headline;
+
+        row.appendChild(daySpan);
+        row.appendChild(headlineSpan);
+        $.eventLog.appendChild(row);
     }
 }
