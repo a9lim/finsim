@@ -338,19 +338,29 @@ Two dynamic market regime modes use a shared event engine (`src/events.js`):
 
 ### Event Engine
 
-`EventEngine` fires narrative events on a Poisson schedule (~1 event per 20 trading days). Events apply additive parameter deltas to the simulation, clamped to `PARAM_RANGES`. Called from `_onDayComplete()` in main.js.
+`EventEngine` fires narrative events via two mechanisms: scheduled FOMC meetings (every 32 trading days, ~8x/year) and Poisson-drawn non-Fed events (~1 per 60 trading days). Events apply additive parameter deltas to the simulation, clamped to `PARAM_RANGES`. Called from `_onDayComplete()` in main.js. Events have `likelihood` weights for weighted random selection (`_weightedPick`); high-likelihood neutral/flavor events dilute directional bias so the stock doesn't drift to zero or infinity.
 
 Two event sources:
-- **Offline** (preset index 5): draws from `OFFLINE_EVENTS` pool (~56 curated events across Fed/monetary, macro/geopolitical, sector/tech, PNTH company, and market structure categories)
+- **Offline** (preset index 5): draws from `OFFLINE_EVENTS` pool (88 curated events across Fed/monetary, macro/geopolitical, sector/tech, PNTH company, market structure, and neutral/flavor categories)
 - **LLM** (preset index 6): generates batches of 3-5 events via Anthropic Claude API (Haiku 4.5 default), with offline fallback on failure
+
+### Event Scheduling
+
+- **Fed events** (`category: 'fed'`): fire on a fixed schedule every 32 trading days (~8x/year, like real FOMC). One eligible Fed event drawn via weighted random. Fed events excluded from the Poisson pool.
+- **Non-Fed events**: Poisson rate 1/60 (~1 event per 60 trading days). Drawn from all non-fed events via weighted random.
+- **Followup chain events**: fire on their scheduled `targetDay`, independent of both the Fed schedule and Poisson rate.
 
 ### MTTH Chains
 
 Events can schedule followup events (Paradox-style Mean Time To Happen). Each followup has an `mtth` (mean delay in trading days, Poisson-sampled) and a `weight` (probability of firing). Followups can chain recursively (max depth 5). `_pendingFollowups[]` checked each day before the regular Poisson draw.
 
-### Palanthropic (PNTH)
+### Universe / Lore
 
-The simulated company. Tech sector, government defense contracts, ties to the Vice President. Ethical conflicts with government over surveillance product use. ~18 company-specific events in the offline pool with multi-step narrative chains.
+**Political context:** President John Barron (Federalist Party) won an upset against incumbent Robin Clay (Farmer-Labor Party). Military hawk -- renamed DoD to "Department of War", launches strikes in Middle East and South America using PNTH AI. Pressures Fed Chair Hayden Hartley to cut rates.
+
+**Palanthropic (PNTH):** Up-and-coming AI giant. Chairwoman Andrea Dirks (close to VP Jay Bowman, supports military contracts) vs CEO Eugene Gottlieb (opposes military use on ethical grounds). ~25 company-specific events with multi-step narrative chains (ethics disputes, board crises, defense contracts, Senate investigations into Bowman ties).
+
+**Event balance:** Weighted average mu and b deltas are approximately zero across the full pool. High-likelihood neutral/flavor events (likelihood 2-5) heavily dilute directional bias from rarer major events.
 
 ### LLM Integration
 
