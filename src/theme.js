@@ -2,9 +2,13 @@
 
 export function initTheme() {
     const saved = localStorage.getItem('shoals-theme');
-    document.documentElement.dataset.theme = saved || 'light';
+    if (saved) {
+        document.documentElement.dataset.theme = saved;
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.dataset.theme = 'dark';
+    }
+    // else: HTML default 'light' already set
 
-    // Follow system preference when user hasn't made an explicit choice.
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
         if (!localStorage.getItem('shoals-theme')) {
             document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
