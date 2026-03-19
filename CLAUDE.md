@@ -62,7 +62,7 @@ src/
   portfolio.js         775 lines  Signed-qty positions, market/limit/stop orders, netting,
                                    strategy groups, cash/margin, processExpiry(),
                                    exerciseOption(), aggregateGreeks(), liquidateAll()
-  chart.js             676 lines  ChartRenderer: logarithmic Y-axis OHLC candles, auto-scale,
+  chart.js             683 lines  ChartRenderer: logarithmic Y-axis OHLC candles, auto-scale,
                                    grid, crosshair, position entry markers, strike lines;
                                    live candle animation (close lerps between substep values,
                                    high/low are water marks of the lerped close path);
@@ -533,3 +533,4 @@ Registered via `initShortcuts()` from `shared-shortcuts.js`. `?` opens help over
 - **`dayInProgress` flag in main.js** -- tracks whether a streamed day is active (between `beginDay()` and `finalizeDay()`). Must be reset to `false` on preset load and sim reset. Pausing does NOT finalize the day — the partial bar stays frozen mid-formation until the user resumes or steps.
 - **Step button finishes partial days** -- if `dayInProgress` is true when step is pressed, remaining sub-steps are completed instantly (no new `beginDay()`). Lerp state is snapped to final values.
 - **`chart._lerp.day = -1` means no live candle** -- set on reset/preset load to disable lerp rendering. `setLiveCandle()` sets it to the bar's day on first call.
+- **`setLiveCandle()` finalizes the previous day** -- when called with a new day's bar, it first snaps close to the previous day's final `_targetClose` and updates water marks before transitioning to the new open. This ensures the lerp reaches both the open (start) and close (end) of every day.

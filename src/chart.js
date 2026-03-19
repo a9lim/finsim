@@ -119,6 +119,13 @@ export class ChartRenderer {
         if (!bar) return;
         const L = this._lerp;
         if (L.day !== bar.day) {
+            // Finish previous day: snap close to its final target
+            // so the last substep value is actually reached
+            if (L.day >= 0) {
+                L.close = L._targetClose;
+                if (L.close > L.high) L.high = L.close;
+                if (L.close < L.low)  L.low  = L.close;
+            }
             // New day — snap to open price
             L.day   = bar.day;
             L.close = bar.open;
