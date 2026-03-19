@@ -796,7 +796,7 @@ export class EventEngine {
 
         // Queue empty -- trigger fetch, return offline fallback
         if (!this._prefetching) this._fetchBatch(sim);
-        return this._drawOffline(sim);
+        return this._drawOffline(sim, true);
     }
 
     async _fetchBatch(sim) {
