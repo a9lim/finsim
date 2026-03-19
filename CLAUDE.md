@@ -62,9 +62,10 @@ src/
   portfolio.js         775 lines  Signed-qty positions, market/limit/stop orders, netting,
                                    strategy groups, cash/margin, processExpiry(),
                                    exerciseOption(), aggregateGreeks(), liquidateAll()
-  chart.js             672 lines  ChartRenderer: logarithmic Y-axis OHLC candles, auto-scale,
+  chart.js             676 lines  ChartRenderer: logarithmic Y-axis OHLC candles, auto-scale,
                                    grid, crosshair, position entry markers, strike lines;
-                                   live candle lerp animation (close lerps, high/low snap);
+                                   live candle animation (close lerps between substep values,
+                                   high/low are water marks of the lerped close path);
                                    uses shared-camera.js for horizontal pan/zoom.
                                    Accesses history via .get(day)/.last() (HistoryBuffer API).
   strategy.js          857 lines  StrategyRenderer: payoff P&L diagram, Greek overlays (Delta/
@@ -123,7 +124,7 @@ When `playing = true`, each trading day is streamed across the tick interval:
 
 1. `frame()` calls `sim.beginDay()` — pushes a partial bar (open = close = high = low = current S) into `sim.history` by reference
 2. Sub-steps are paced across the tick interval (`tickInterval / INTRADAY_STEPS`). Each frame, `sim.substep()` runs any due sub-steps, mutating the partial bar in-place (high/low/close updated)
-3. After each sub-step, `chart.setLiveCandle(bar)` updates lerp targets. The close price lerps smoothly toward the target each frame (`lerpSpeed = 15`, frame-rate-independent exponential). High/low snap immediately (no lerp).
+3. After each sub-step, `chart.setLiveCandle(bar)` snaps close to the previous sub-step's value (ensuring every intermediate price is visited), then sets the new target. Between sub-steps, the close lerps smoothly toward the target (`lerpSpeed = 15`, frame-rate-independent exponential). High/low are water marks of the lerped close path — they expand when close reaches new extremes but never retract, matching the simulation's actual high/low by day end.
 4. When all 16 sub-steps are done, `sim.finalizeDay()` increments the day counter. Then `_onDayComplete()` runs portfolio/chain/margin checks (same as the old `tick()` flow):
    - `checkPendingOrders()`, `processExpiry()`, `buildChain()`, `checkMargin()`
    - Auto-scroll, strategy range reset, UI update
@@ -494,7 +495,7 @@ Registered via `initShortcuts()` from `shared-shortcuts.js`. `?` opens help over
 - **`$` DOM cache**: plain object `{}`, populated by `cacheDOMElements($)` (135 element references), passed to all ui.js functions. Avoids repeated `getElementById` calls. Also stores closures: `$._onChainCellClick`, `$._onTradeSubmit`.
 - **Dirty flag**: `dirty = true` set on any state change; rAF loop skips canvas render when false. `strategy._dirty` also checked (set by wheel zoom). Prevents needless repaints when sim is paused and user is not interacting.
 - **Sub-step streaming**: `frame()` distributes 16 intraday sub-steps across the tick interval (`1000 / speed` ms). `dayInProgress` flag tracks whether a day is being streamed. `lastTickTime` advances by `tickInterval` (not `now`) to prevent drift; clamped to avoid burst catch-up after tab backgrounding.
-- **Live candle lerp**: `ChartRenderer` has `_lerp` state with `update(now)` (frame-rate-independent exponential lerp, speed=15) and `setLiveCandle(bar)` (sets targets, snaps on day boundary). Close price lerps smoothly; high/low snap immediately. Only the latest candle uses lerped values; historical candles draw raw.
+- **Live candle lerp**: `ChartRenderer` has `_lerp` state with `update(now)` (frame-rate-independent exponential lerp, speed=15) and `setLiveCandle(bar)` (snaps close to previous target on each new substep, sets new target, snaps on day boundary). Close lerps between substep values; high/low are water marks of the lerped close path (expand when close reaches new extremes, never retract). Only the latest candle uses lerped values; historical candles draw raw.
 - **Camera integration (chart only)**: `createCamera()` from `shared-camera.js` attached to `#chart-canvas`. World X = day index (day 0 at X=0, each day is 1 world unit wide). `worldToScreen(d + 0.5)` gives candle center pixel. Default zoom 12px/day (100%), max 36px/day (300%). Strategy canvas manages its own X-range.
 - **`renderCurrentView()`**: single function that draws either chart or strategy based on `strategyMode` flag. Called from rAF frame loop and from `handleResize()` (immediate, to avoid blank flash on resize).
 - **Pure module separation**: `simulation.js` and `portfolio.js` are pure state -- no DOM. `ui.js` is pure DOM -- no sim state. `chart.js` and `strategy.js` are pure renderers -- no state mutation. `main.js` orchestrates.

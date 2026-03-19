@@ -104,9 +104,9 @@ export class ChartRenderer {
 
         const alpha = 1 - Math.exp(-this._lerpSpeed * dt);
         L.close += (L._targetClose - L.close) * alpha;
-        // High/low snap immediately (no lerp)
-        L.high = L._targetHigh;
-        L.low  = L._targetLow;
+        // High/low are water marks of the lerped close path
+        if (L.close > L.high) L.high = L.close;
+        if (L.close < L.low)  L.low  = L.close;
     }
 
     /* -----------------------------------------------
@@ -124,10 +124,14 @@ export class ChartRenderer {
             L.close = bar.open;
             L.high  = bar.open;
             L.low   = bar.open;
+        } else {
+            // New substep — snap close to previous target so every
+            // substep value is visited, then water-mark high/low
+            L.close = L._targetClose;
+            if (L.close > L.high) L.high = L.close;
+            if (L.close < L.low)  L.low  = L.close;
         }
         L._targetClose = bar.close;
-        L._targetHigh  = bar.high;
-        L._targetLow   = bar.low;
     }
 
     /* -----------------------------------------------
