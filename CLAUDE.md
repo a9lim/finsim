@@ -23,9 +23,10 @@ Serve from `a9lim.github.io/` -- shared files load via absolute paths (`/shared-
 ## File Map
 
 ```
-main.js                758 lines  Entry point: DOM cache $, rAF loop, tick(), timer-based speed,
+main.js                765 lines  Entry point: DOM cache $, rAF loop, tick(), timer-based speed,
                                    camera setup, shortcut registration, custom event wiring,
-                                   strategy builder handlers, auto-scroll, resize handling
+                                   strategy builder handlers, auto-scroll, resize handling,
+                                   ExpiryManager wiring
 index.html             496 lines  Toolbar, chart canvas, strategy canvas, sidebar (4 tabs:
                                    Trade/Portfolio/Strategy/Settings), chain overlay, trade dialog,
                                    margin call overlay, intro screen
@@ -38,23 +39,28 @@ colors.js               53 lines  Financial color aliases (_PALETTE.up/down/bond
                                    --chart-crosshair, --chart-axis, --chain-hover, --dialog-bg),
                                    freezes _PALETTE
 src/
-  config.js             25 lines  Named constants (STRIKE_INTERVAL, STRIKE_RANGE, BOND_FACE_VALUE,
-                                   MAINTENANCE_MARGIN, REG_T_MARGIN, etc.) and PRESETS array
-                                   (5 market regimes)
-  simulation.js        140 lines  Simulation class: GBM + Merton jumps + Heston stoch vol +
+  history-buffer.js     86 lines  HistoryBuffer: fixed-capacity (256) ring buffer for OHLC bars.
+                                   push(), get(day), last(), scaleAll(). Overwrites oldest when full.
+  config.js             26 lines  Named constants (STRIKE_INTERVAL, STRIKE_RANGE, BOND_FACE_VALUE,
+                                   MAINTENANCE_MARGIN, REG_T_MARGIN, HISTORY_CAPACITY, etc.) and
+                                   PRESETS array (5 market regimes)
+  simulation.js        164 lines  Simulation class: GBM + Merton jumps + Heston stoch vol +
                                    Vasicek rate; tick() produces OHLC bars via INTRADAY_STEPS;
+                                   prepopulate() fills buffer and scales to INITIAL_PRICE;
                                    Box-Muller RNG, inverse-transform Poisson sampler
   pricing.js           467 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
                                    normal CDF (Drezner-Wesolowsky 1990) + finite-diff Greeks +
                                    bid/ask spread model. Pure math -- no imports.
-  chain.js             134 lines  generateExpiries() (21-day cycles), generateStrikes()
+  chain.js             170 lines  ExpiryManager (rolling 8-expiry window, 21-day cycle),
+                                   generateExpiries() (legacy stateless), generateStrikes()
                                    ($5 intervals, STRIKE_RANGE strikes each side), buildChain()
   portfolio.js         775 lines  Signed-qty positions, market/limit/stop orders, netting,
                                    strategy groups, cash/margin, processExpiry(),
                                    exerciseOption(), aggregateGreeks(), liquidateAll()
-  chart.js             598 lines  ChartRenderer: logarithmic Y-axis OHLC candles, auto-scale,
+  chart.js             605 lines  ChartRenderer: logarithmic Y-axis OHLC candles, auto-scale,
                                    grid, crosshair, position entry markers, strike lines;
-                                   uses shared-camera.js for horizontal pan/zoom
+                                   uses shared-camera.js for horizontal pan/zoom.
+                                   Accesses history via .get(day)/.last() (HistoryBuffer API).
   strategy.js          857 lines  StrategyRenderer: payoff P&L diagram, Greek overlays (Delta/
                                    Gamma/Theta/Vega/Rho), breakeven dots, scroll-wheel X zoom,
                                    clickable legend, computeSummary(). Own X-range management,
@@ -74,8 +80,9 @@ src/
 ```
 main.js
   |- src/config.js        (SPEED_OPTIONS, PRESETS)
-  |- src/simulation.js    (Simulation -- imports config)
-  |- src/chain.js         (buildChain -- imports pricing, config)
+  |- src/simulation.js    (Simulation -- imports config, history-buffer)
+  |- src/history-buffer.js (HistoryBuffer -- no imports)
+  |- src/chain.js         (buildChain, ExpiryManager -- imports pricing, config)
   |- src/portfolio.js     (portfolio, resetPortfolio, checkPendingOrders, processExpiry,
   |                         checkMargin, aggregateGreeks, portfolioValue, executeMarketOrder,
   |                         closePosition, exerciseOption, liquidateAll, placePendingOrder,
@@ -105,16 +112,16 @@ Loaded at end of <body>:
 ## Data Flow
 
 Each tick:
-1. `simulation.js` `tick()` runs `INTRADAY_STEPS = 16` sub-steps, produces `{ day, open, high, low, close, v, r }` appended to `sim.history`
+1. `simulation.js` `tick()` runs `INTRADAY_STEPS = 16` sub-steps, produces `{ day, open, high, low, close, v, r }` pushed into `sim.history` (HistoryBuffer ring buffer, capacity 256; oldest bars overwritten when full)
 2. `portfolio.js` `checkPendingOrders()` evaluates limit/stop orders against new `S`, fills triggered orders; `processExpiry()` auto-exercises ITM longs, expires worthless OTMs, returns short margin
-3. `chain.js` `buildChain()` reads `S, v, r` -> generates strikes + expiries -> calls `pricing.js` `computeGreeks()` + `computeSpread()` for every option
+3. `chain.js` `buildChain()` reads `S, v, r` + expiries from `ExpiryManager.update()` -> generates strikes -> calls `pricing.js` `computeGreeks()` + `computeSpread()` for every option
 4. `portfolio.js` `checkMargin()` -> if `equity < 25% * totalPositionValue`, sets `playing = false` and shows margin call modal
 5. Auto-scroll: if playing, camera pans right to keep latest candle at ~85% screen width
 6. Strategy range reset if spot moved >1% since last check
 7. `ui.js` updates sidebar (chain display, portfolio positions, Greeks aggregate, strategy selectors)
 8. `dirty = true` -> `renderCurrentView()` in next rAF frame draws either `chart.js` or `strategy.js`
 
-Bootstrap: on init, 60 ticks are pre-run to populate the chart with historical data before user interaction.
+Bootstrap: on init, `sim.prepopulate()` runs 256 ticks (filling the entire HistoryBuffer), then scales all OHLC prices so the final close = $100 (INITIAL_PRICE). This creates realistic-looking historical data that ends at the starting price. The `ExpiryManager` is initialised after prepopulation.
 
 ## Simulation Engine
 
@@ -159,7 +166,7 @@ Box-Muller transform for standard normals (discards second variate). Inverse-tra
 | Crisis | -0.10 | 0.25 | 0.5 | 0.8 | -0.85 | 8.0 | -0.08 | 0.10 | 0.2 | 0.02 | 0.020 |
 | Rate Hike | 0.04 | 0.08 | 2.0 | 0.5 | -0.6 | 1.5 | -0.02 | 0.05 | 0.8 | 0.08 | 0.015 |
 
-On `sim.reset(presetIndex)`, state initializes at `S = 100` (INITIAL_PRICE), `v = theta` (long-run variance), and `r = b` (long-run rate). History is cleared. 60 ticks are then pre-run to populate chart.
+On `sim.reset(presetIndex)`, state initializes at `S = 100` (INITIAL_PRICE), `v = theta` (long-run variance), and `r = b` (long-run rate). History buffer is cleared. `sim.prepopulate()` then fills the entire 256-bar buffer with scaled historical data ending at $100.
 
 ## Options Pricing
 
@@ -206,13 +213,15 @@ Bid = theo - halfSpread, Ask = theo + halfSpread. Long positions fill at ask; sh
 
 ATM strike = `round(S / STRIKE_INTERVAL) * STRIKE_INTERVAL` (STRIKE_INTERVAL = 5). `STRIKE_RANGE = 12` strikes above and below ATM, filtered for positive values, sorted ascending -> up to 25 strikes total.
 
-### Expiry Generation
+### Expiry Management
 
-21-trading-day cycle (approximate monthly). First expiry = next 21-day boundary strictly above `currentDay` (`floor(currentDay/21)*21 + 21`). 8 expiries generated by default. Each identified by `{ day, dte }` where `dte = day - currentDay`.
+`ExpiryManager` (in `chain.js`) maintains a persistent rolling window of 8 expiry dates on a 21-trading-day cycle. On each tick, `expiryMgr.update(currentDay)` drops any expired dates and appends new ones at the far end to maintain exactly 8 active expiries. This ensures the chain never shrinks over time.
+
+`init(currentDay)` seeds the list from the next 21-day boundary. `update(currentDay)` returns `[{ day, dte }]`. A legacy stateless `generateExpiries()` function is retained for one-off use.
 
 ### Chain Data Structure
 
-`buildChain(S, v, r, currentDay)` returns:
+`buildChain(S, v, r, currentDay, expiries?)` returns (`expiries` from `ExpiryManager.update()`, falls back to `generateExpiries()` if omitted):
 ```
 [{
   day:     number,        // simulation day of expiry
@@ -477,6 +486,9 @@ Registered via `initShortcuts()` from `shared-shortcuts.js`. `?` opens help over
 - **`shared-tabs.js` loaded at end of `<body>`** -- tab switching works before ES6 module loads, in case of slow network. Do not move it to `<head>`.
 - **`strategy.js` GREEK_META uses hardcoded hex colors** -- `_paletteColor()` resolves from `_PALETTE` at draw time with literal fallbacks in `GREEK_META` and `_colors()`. If adding a new Greek, update both.
 - **`buildChain()` receives `v` (variance) as its second argument** -- but passes it directly to `computeGreeks()` which expects volatility (sigma). The `main.js` tick function passes `sim.v` (variance) to `buildChain()` and `Math.sqrt(sim.v)` (volatility) to portfolio functions. This means chain Greeks use variance where they should use volatility.
-- **60 pre-run ticks on init and reset** -- the chart is pre-populated with 60 historical bars so it is not empty on load. Camera is repositioned after to show latest candle at ~85% from left.
+- **256-bar prepopulation on init and reset** -- `sim.prepopulate()` fills the entire `HistoryBuffer` (capacity 256) then scales all OHLC prices by `INITIAL_PRICE / finalClose` so the last bar closes at exactly $100. After scaling, `S`, `v`, and `r` are reset to their starting values. Camera is repositioned after to show latest candle at ~85% from left.
 - **Strategy legs live in main.js, not portfolio.js** -- the `strategyLegs[]` array is local state in `main.js`. `portfolio.js` has `saveStrategy()`/`executeStrategy()` but the builder UI works against the main.js array directly.
 - **Inline qty editing in leg rows** -- leg rows in the strategy builder have an `<input type="number">` that directly mutates the leg object's `qty` field and triggers `onLegChange()` callback (which resets range and redraws). This bypasses netting logic.
+- **`sim.history` is a `HistoryBuffer`, not an array** -- access bars via `.get(day)`, not `history[day]`. Use `.last()` for the most recent bar, `.minDay`/`.maxDay` for bounds, `.length` for total days produced (same semantics as old array length). Direct bracket indexing will NOT work. Capacity is `HISTORY_CAPACITY = 256`; oldest bars are silently overwritten when full.
+- **`ExpiryManager` is stateful and lives in main.js** -- the `expiryMgr` instance persists between ticks. It must be `.init(currentDay)` on reset/preset load, and `.update(currentDay)` each tick. The returned expiries array is passed to `buildChain()`. Do not call `generateExpiries()` directly in the tick loop.
+- **Position entry markers for very old positions may not render** -- if a position's `entryDay` has been evicted from the ring buffer (older than 256 days), `history.get(entryDay)` returns `undefined` and the marker is skipped. The position itself still works correctly.

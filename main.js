@@ -7,7 +7,7 @@
 
 import { SPEED_OPTIONS, PRESETS } from './src/config.js';
 import { Simulation } from './src/simulation.js';
-import { buildChain } from './src/chain.js';
+import { buildChain, ExpiryManager } from './src/chain.js';
 import {
     portfolio, resetPortfolio, checkPendingOrders, processExpiry,
     checkMargin, aggregateGreeks, portfolioValue,
@@ -32,6 +32,7 @@ import { initTheme, toggleTheme } from './src/theme.js';
 
 const $ = {};
 const sim = new Simulation();
+const expiryMgr = new ExpiryManager();
 let chart, strategy;
 let camera;
 let chain = [];
@@ -214,11 +215,12 @@ function init() {
     // 12. Wire info tips for slider labels
     wireInfoTips($);
 
-    // 13. Generate historical data so chart isn't empty on load
-    for (let i = 0; i < 60; i++) sim.tick();
+    // 13. Pre-populate full history buffer (prices scaled so final close = $100)
+    sim.prepopulate();
 
     // 14. Build initial chain and update UI
-    chain = buildChain(sim.S, sim.v, sim.r, sim.day);
+    expiryMgr.init(sim.day);
+    chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateSpeedBtn($, speed);
@@ -228,7 +230,7 @@ function init() {
 
     // 15. Position camera so latest candle is visible
     if (camera) {
-        const lastDay = sim.history.length - 1;
+        const lastDay = sim.history.maxDay;
         const viewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
         const leftMargin = 80;
         // Place latest candle at ~85% from left
@@ -307,7 +309,7 @@ function renderCurrentView() {
         chart.draw(
             sim.history, portfolio.positions,
             mouseX, mouseY,
-            sim.history[sim.history.length - 1]
+            sim.history.last()
         );
     }
 }
@@ -343,7 +345,7 @@ function tick() {
     checkPendingOrders(sim.S, vol, sim.r, sim.day);
     processExpiry(sim.day, sim.S, sim.day);
 
-    chain = buildChain(sim.S, sim.v, sim.r, sim.day);
+    chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
 
     // Check margin
     const margin = checkMargin(sim.S, vol, sim.r, sim.day);
@@ -355,7 +357,7 @@ function tick() {
 
     // Auto-scroll: keep latest candle near right edge when playing
     if (playing && camera) {
-        const lastDay = sim.history.length - 1;
+        const lastDay = sim.history.maxDay;
         const viewW = $.chartCanvas.clientWidth || 800;
         // Place latest candle at ~85% from left
         const targetWorldX = lastDay + 1;
@@ -489,9 +491,9 @@ function toggleStrategy() {
 function loadPreset(index) {
     sim.reset(index);
     resetPortfolio();
-    // Generate historical data so chart isn't empty
-    for (let i = 0; i < 60; i++) sim.tick();
-    chain = buildChain(sim.S, sim.v, sim.r, sim.day);
+    sim.prepopulate();
+    expiryMgr.init(sim.day);
+    chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
     playing = false;
     lastSpot = sim.S;
     strategy.resetRange(sim.S, strategyLegs);
@@ -506,9 +508,9 @@ function loadPreset(index) {
 function resetSim() {
     sim.reset($.presetSelect.selectedIndex);
     resetPortfolio();
-    // Generate historical data so chart isn't empty
-    for (let i = 0; i < 60; i++) sim.tick();
-    chain = buildChain(sim.S, sim.v, sim.r, sim.day);
+    sim.prepopulate();
+    expiryMgr.init(sim.day);
+    chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
     playing = false;
     lastSpot = sim.S;
     strategy.resetRange(sim.S, strategyLegs);
@@ -732,7 +734,7 @@ function updateStrategyBuilder() {
 
 function _repositionCamera() {
     if (!camera) return;
-    const lastDay = sim.history.length - 1;
+    const lastDay = sim.history.maxDay;
     const viewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
     const targetScreenX = viewW * 0.85;
     camera.x = (lastDay + 0.5) - (targetScreenX - viewW / 2) / camera.zoom;

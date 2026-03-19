@@ -119,14 +119,12 @@ export class ChartRenderer {
         // Clear (DPR transform already set by resize())
         ctx.clearRect(0, 0, W, H);
 
-        if (!history || history.length === 0) {
-            // Show placeholder text
+        if (!history || history.length === 0 || history.size === 0) {
             ctx.fillStyle = textMuted;
             ctx.font      = `13px var(--font-body, sans-serif)`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('Awaiting market data…', W / 2, H / 2);
-            ctx.restore();
+            ctx.fillText('Awaiting market data\u2026', W / 2, H / 2);
             return;
         }
 
@@ -152,26 +150,34 @@ export class ChartRenderer {
         // But camera was sized to the full canvas (W x H). The plot area
         // starts at plotX=0 so screen coords are directly usable in plotX range.
 
+        // Buffer bounds (works for both HistoryBuffer and plain array)
+        const hMinDay = history.minDay != null ? history.minDay : 0;
+        const hMaxDay = history.maxDay != null ? history.maxDay : history.length - 1;
+
         let firstDay, lastDay;
 
         if (cam) {
-            // Find the world x at the left edge of the plot area
             const worldLeft  = cam.screenToWorld(plotX, 0).x;
             const worldRight = cam.screenToWorld(plotX + plotW, 0).x;
-            firstDay = Math.max(0, Math.floor(worldLeft)   - 1);
-            lastDay  = Math.min(history.length - 1, Math.ceil(worldRight));
+            firstDay = Math.max(hMinDay, Math.floor(worldLeft)   - 1);
+            lastDay  = Math.min(hMaxDay, Math.ceil(worldRight));
         } else {
-            firstDay = 0;
-            lastDay  = history.length - 1;
+            firstDay = hMinDay;
+            lastDay  = hMaxDay;
         }
 
-        // Guard: nothing to draw
-        if (firstDay > lastDay) {
-            ctx.restore();
-            return;
-        }
+        if (firstDay > lastDay) return;
 
-        const visibleBars = history.slice(firstDay, lastDay + 1);
+        // Collect visible bars via .get() (ring buffer) or direct index (array)
+        const _get = typeof history.get === 'function'
+            ? (d) => history.get(d)
+            : (d) => history[d];
+
+        const visibleBars = [];
+        for (let d = firstDay; d <= lastDay; d++) {
+            const bar = _get(d);
+            if (bar) visibleBars.push(bar);
+        }
 
         // ── 2. Auto-scale Y (logarithmic) ──────────────────────────
         let minPrice =  Infinity;
@@ -258,7 +264,7 @@ export class ChartRenderer {
         ctx.clip();
 
         for (let i = firstDay; i <= lastDay; i++) {
-            const bar = history[i];
+            const bar = _get(i);
             if (!bar) continue;
 
             const isUp = bar.close >= bar.open;
@@ -300,7 +306,8 @@ export class ChartRenderer {
         ctx.restore();
 
         // ── 5. Current price line ─────────────────────────────────
-        const lastBar = latestBar || history[history.length - 1];
+        const lastBar = latestBar
+            || (typeof history.last === 'function' ? history.last() : history[history.length - 1]);
         if (lastBar) {
             const yLast = priceToY(lastBar.close);
             if (yLast >= plotY && yLast <= plotY + plotH) {
@@ -327,8 +334,8 @@ export class ChartRenderer {
 
             for (const pos of positions) {
                 const d = pos.entryDay;
-                if (d < 0 || d >= history.length) continue;
-                const bar = history[d];
+                if (d < hMinDay || d > hMaxDay) continue;
+                const bar = _get(d);
                 if (!bar) continue;
 
                 let cx;
@@ -507,7 +514,7 @@ export class ChartRenderer {
                 hoverDay = Math.floor(cam.screenToWorld(mouseX, 0).x);
             }
 
-            if (hoverDay >= 0 && hoverDay < history.length) {
+            if (hoverDay >= hMinDay && hoverDay <= hMaxDay) {
                 const dayLabelW = 36;
                 const dayLabelH = 18;
                 const dayLabelX = Math.round(mouseX) - dayLabelW / 2;

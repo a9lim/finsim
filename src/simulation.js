@@ -11,7 +11,9 @@ import {
     INITIAL_PRICE,
     PRESETS,
     DEFAULT_PRESET,
+    HISTORY_CAPACITY,
 } from './config.js';
+import { HistoryBuffer } from './history-buffer.js';
 
 export class Simulation {
     constructor() {
@@ -43,7 +45,7 @@ export class Simulation {
         this.S       = INITIAL_PRICE;
         this.v       = p.theta;  // start at long-run variance
         this.r       = p.b;      // start at long-run rate
-        this.history = [];
+        this.history = new HistoryBuffer(HISTORY_CAPACITY);
     }
 
     /* -----------------------------------------------
@@ -108,6 +110,28 @@ export class Simulation {
         this.history.push(bar);
         this.day++;
         return bar;
+    }
+
+    /* -----------------------------------------------
+       prepopulate()
+       Fill the history buffer with dummy data that
+       ends at INITIAL_PRICE. Runs the sim forward,
+       then scales all OHLC prices so the final close
+       lands exactly at the starting price.
+    ----------------------------------------------- */
+    prepopulate() {
+        const count = HISTORY_CAPACITY;
+        for (let i = 0; i < count; i++) this.tick();
+
+        // Scale so that final close = INITIAL_PRICE
+        const finalClose = this.S;
+        const factor = INITIAL_PRICE / finalClose;
+        this.history.scaleAll(factor);
+
+        // Reset live state to the target starting point
+        this.S = INITIAL_PRICE;
+        this.v = this.theta;
+        this.r = this.b;
     }
 
     /* -----------------------------------------------

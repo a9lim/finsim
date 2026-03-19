@@ -13,6 +13,7 @@ export const BOND_FACE_VALUE = 100;
 export const MAINTENANCE_MARGIN = 0.25;
 export const REG_T_MARGIN = 0.50;
 export const SHORT_OPTION_MARGIN_PCT = 0.20;
+export const HISTORY_CAPACITY = 256;
 export const SPEED_OPTIONS = [1, 2, 4, 8, 16];
 
 export const PRESETS = [

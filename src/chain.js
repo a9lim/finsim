@@ -11,31 +11,67 @@ import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR } from './config.j
 import { computeGreeks, computeSpread } from './pricing.js';
 
 // ---------------------------------------------------------------------------
-// Expiry generation
+// Expiry management — rolling window of expiry dates
 // ---------------------------------------------------------------------------
 
+const EXPIRY_CYCLE = 21; // trading days per month (approximate)
+const EXPIRY_COUNT = 8;  // number of active expiries to maintain
+
 /**
- * Generate monthly expiry dates using a 21-trading-day interval scheme.
+ * Persistent rolling manager for option/bond expiry dates.
  *
- * The first expiry is the next 21-day boundary strictly above currentDay.
- * Subsequent expiries follow every 21 trading days.
- *
- * @param {number} currentDay - Current simulation day (integer)
- * @param {number} [count=8]  - Number of expiries to generate
- * @returns {{ day: number, dte: number }[]} Expiry objects where dte > 0
+ * Maintains a fixed-count list of future expiry dates. When the nearest
+ * expiry passes, it is dropped and a new one is appended at the far end
+ * so the list never shrinks.
+ */
+export class ExpiryManager {
+    constructor() {
+        this._expiries = []; // sorted ascending day numbers
+    }
+
+    /**
+     * (Re)initialise the expiry list from a given simulation day.
+     * @param {number} currentDay
+     */
+    init(currentDay) {
+        this._expiries = [];
+        const first = Math.floor(currentDay / EXPIRY_CYCLE) * EXPIRY_CYCLE + EXPIRY_CYCLE;
+        for (let i = 0; i < EXPIRY_COUNT; i++) {
+            this._expiries.push(first + i * EXPIRY_CYCLE);
+        }
+    }
+
+    /**
+     * Advance the rolling window: drop expired dates, replenish at the far end.
+     * @param {number} currentDay
+     * @returns {{ day: number, dte: number }[]}
+     */
+    update(currentDay) {
+        // Drop any expiries that have passed
+        while (this._expiries.length > 0 && this._expiries[0] <= currentDay) {
+            this._expiries.shift();
+        }
+        // Replenish to maintain EXPIRY_COUNT
+        while (this._expiries.length < EXPIRY_COUNT) {
+            const last = this._expiries.length > 0
+                ? this._expiries[this._expiries.length - 1]
+                : Math.floor(currentDay / EXPIRY_CYCLE) * EXPIRY_CYCLE + EXPIRY_CYCLE;
+            this._expiries.push(last + EXPIRY_CYCLE);
+        }
+        return this._expiries.map(day => ({ day, dte: day - currentDay }));
+    }
+}
+
+/**
+ * Legacy helper — generate expiries statelessly (used by tests or one-off calls).
  */
 export function generateExpiries(currentDay, count = 8) {
-    const CYCLE = 21; // trading days per month (approximate)
-    // First boundary strictly above currentDay
-    const firstExpiry = Math.floor(currentDay / CYCLE) * CYCLE + CYCLE;
-
+    const firstExpiry = Math.floor(currentDay / EXPIRY_CYCLE) * EXPIRY_CYCLE + EXPIRY_CYCLE;
     const expiries = [];
     for (let i = 0; i < count; i++) {
-        const day = firstExpiry + i * CYCLE;
+        const day = firstExpiry + i * EXPIRY_CYCLE;
         const dte = day - currentDay;
-        if (dte > 0) {
-            expiries.push({ day, dte });
-        }
+        if (dte > 0) expiries.push({ day, dte });
     }
     return expiries;
 }
@@ -90,9 +126,9 @@ export function generateStrikes(currentPrice) {
  *   }>
  * }>}
  */
-export function buildChain(S, v, r, currentDay) {
-    const expiries = generateExpiries(currentDay);
-    const strikes  = generateStrikes(S);
+export function buildChain(S, v, r, currentDay, expiries) {
+    if (!expiries) expiries = generateExpiries(currentDay);
+    const strikes = generateStrikes(S);
 
     return expiries.map(({ day, dte }) => {
         const T = dte / TRADING_DAYS_PER_YEAR; // convert trading days to years
