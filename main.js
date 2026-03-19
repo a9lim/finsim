@@ -95,6 +95,10 @@ function init() {
             reset:   $.zoomResetBtn,
             display: $.zoomLevel,
             formatZoom: (z) => Math.round(z / DEFAULT_ZOOM * 100) + '%',
+            onReset: () => {
+                camera.zoom = DEFAULT_ZOOM;
+                _repositionCamera();
+            },
         });
 
         // 4. Attach camera to chart renderer
