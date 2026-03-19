@@ -15,6 +15,7 @@ import {
 } from './config.js';
 
 import { priceAmerican, computeGreeks } from './pricing.js';
+import { computePositionValue } from './position-value.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -613,40 +614,9 @@ export function executeStrategy(strategyName, currentPrice, currentVol, currentR
  */
 export function portfolioValue(currentPrice, currentVol, currentRate, currentDay) {
     let total = portfolio.cash;
-
     for (const pos of portfolio.positions) {
-        const absQty = Math.abs(pos.qty);
-        const dte = pos.expiryDay != null
-            ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
-            : 0;
-
-        let posValue = 0;
-
-        switch (pos.type) {
-            case 'stock':
-                posValue = pos.qty > 0
-                    ? absQty * currentPrice
-                    : absQty * (2 * pos.entryPrice - currentPrice);
-                break;
-
-            case 'bond':
-                posValue = absQty * BOND_FACE_VALUE * Math.exp(-currentRate * dte);
-                break;
-
-            case 'call':
-            case 'put': {
-                const isPut  = pos.type === 'put';
-                const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut);
-                posValue = pos.qty > 0
-                    ? absQty * optMid
-                    : absQty * (pos.entryPrice - optMid);
-                break;
-            }
-        }
-
-        total += posValue;
+        total += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay);
     }
-
     return total;
 }
 
