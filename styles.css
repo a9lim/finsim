@@ -8,6 +8,10 @@
 /* --- Base --- */
 body {
     overflow: hidden;
+    font-size: 14px;
+    line-height: 1.5;
+    height: 100vh;
+    height: 100dvh;
 }
 
 /* --- P&L Colour Classes --- */
@@ -20,13 +24,6 @@ body {
     font-size: 0.78rem;
     padding: 8px 0;
     margin: 0;
-}
-
-body {
-    font-size: 14px;
-    line-height: 1.5;
-    height: 100vh;
-    height: 100dvh;
 }
 
 /* --- Chart Layout --- */
@@ -312,8 +309,6 @@ main {
     padding: 12px 0;
 }
 
-/* Legacy chain-row styles kept for backward compatibility */
-
 .chain-expand-btn {
     width: 100%;
     margin-top: 8px;
@@ -357,7 +352,7 @@ main {
 
 .trade-confirm:hover {
     background: var(--accent);
-    color: #fff;
+    color: var(--bg-panel);
 }
 
 /* --- Margin Call --- */
@@ -515,7 +510,9 @@ main {
 }
 
 #time-slider-bar input[type="range"]::-webkit-slider-runnable-track {
-    background: var(--accent);
+    background: linear-gradient(var(--accent), var(--accent)) no-repeat,
+                var(--slider-track, rgba(168,160,152,0.3));
+    background-size: var(--slider-fill, 50%) 100%, 100% 100%;
     height: 4px;
     border-radius: 2px;
 }

@@ -169,6 +169,7 @@ export function bindEvents($, handlers) {
 
     $.timeSlider.addEventListener('input', () => {
         const pct = parseInt($.timeSlider.value, 10);
+        $.timeSlider.style.setProperty('--slider-fill', pct + '%');
         onTimeSlider(pct);
     });
 
