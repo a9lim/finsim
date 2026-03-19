@@ -23,8 +23,11 @@ import {
     syncSettingsUI, toggleStrategyView, showMarginCall, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors,
+    updateDynamicSections, updateEventLog,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
+import { EventEngine } from './src/events.js';
+import { LLMEventSource } from './src/llm.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -48,6 +51,8 @@ let strategyLegs = [];
 let greekToggles = { delta: true, gamma: false, theta: false, vega: false, rho: false };
 let sliderPct = 100;  // percentage of max DTE (100% = full time, 0% = at expiry)
 let lastSpot = 0; // track spot changes for range reset
+let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
+let llmSource = null;     // LLMEventSource singleton
 
 // ---------------------------------------------------------------------------
 // Bootstrap
@@ -148,6 +153,8 @@ function init() {
             { key: '3', label: PRESETS[2].name,   group: 'Presets',    action: () => loadPreset(2) },
             { key: '4', label: PRESETS[3].name,   group: 'Presets',    action: () => loadPreset(3) },
             { key: '5', label: PRESETS[4].name,   group: 'Presets',    action: () => loadPreset(4) },
+            { key: '6', label: PRESETS[5].name,   group: 'Presets',    action: () => loadPreset(5) },
+            { key: '7', label: PRESETS[6].name,   group: 'Presets',    action: () => loadPreset(6) },
         ], { helpTitle: 'Shoals Keyboard Shortcuts' });
     }
 
@@ -175,6 +182,8 @@ function init() {
         onAddLeg:         (type, side) => handleAddLeg(type, side),
         onSaveStrategy:   () => handleSaveStrategy(),
         onExecStrategy:   () => handleExecStrategy(),
+        onLLMKeyChange:   (key) => { if (llmSource) llmSource.setApiKey(key); },
+        onLLMModelChange: (model) => { if (llmSource) llmSource.setModel(model); },
     });
 
     // 10. Wire custom events from ui.js position rows
@@ -398,6 +407,20 @@ function _onDayComplete() {
     checkPendingOrders(sim.S, vol, sim.r, sim.day);
     processExpiry(sim.day, sim.S, sim.day);
 
+    // Fire dynamic events
+    if (eventEngine) {
+        const event = eventEngine.maybeFire(sim, sim.day);
+        if (event) {
+            syncSettingsUI($, _simSettingsObj());
+            updateEventLog($, eventEngine.eventLog);
+            if (typeof showToast !== 'undefined') {
+                const duration = event.magnitude === 'major' ? 8000
+                    : event.magnitude === 'moderate' ? 5000 : 3000;
+                showToast(event.headline, duration);
+            }
+        }
+    }
+
     chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
 
     // Check margin
@@ -569,6 +592,9 @@ function toggleSidebar() {
 }
 
 function loadPreset(index) {
+    // Sync dropdown when called from keyboard shortcut (keys 6/7)
+    $.presetSelect.selectedIndex = index;
+
     sim.reset(index);
     resetPortfolio();
     sim.prepopulate();
@@ -581,6 +607,22 @@ function loadPreset(index) {
     strategy.resetRange(sim.S, strategyLegs);
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
+    updateDynamicSections($, index);
+
+    // Event engine lifecycle
+    if (_isDynamicPreset(index)) {
+        if (_isLLMPreset(index)) {
+            if (!llmSource) llmSource = new LLMEventSource();
+            eventEngine = new EventEngine('llm', llmSource);
+            eventEngine.prefetch(sim);
+        } else {
+            eventEngine = new EventEngine('offline');
+        }
+    } else {
+        eventEngine = null;
+    }
+    updateEventLog($, eventEngine ? eventEngine.eventLog : []);
+
     updateUI();
     _repositionCamera();
     dirty = true;
@@ -588,7 +630,8 @@ function loadPreset(index) {
 }
 
 function resetSim() {
-    sim.reset($.presetSelect.selectedIndex);
+    const index = $.presetSelect.selectedIndex;
+    sim.reset(index);
     resetPortfolio();
     sim.prepopulate();
     dayInProgress = false;
@@ -600,11 +643,21 @@ function resetSim() {
     strategy.resetRange(sim.S, strategyLegs);
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
+    updateDynamicSections($, index);
+
+    // Reset event engine if in dynamic mode
+    if (eventEngine) eventEngine.reset();
+    if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
+    updateEventLog($, eventEngine ? eventEngine.eventLog : []);
+
     updateUI();
     _repositionCamera();
     dirty = true;
     _haptics.trigger('heavy');
 }
+
+function _isDynamicPreset(index) { return index >= 5; }
+function _isLLMPreset(index) { return index >= 6; }
 
 function syncSliderToSim(param, value) {
     sim[param] = value;
