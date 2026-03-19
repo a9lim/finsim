@@ -498,8 +498,9 @@ function tick() {
 
 function updateUI() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
+    const margin = checkMargin(sim.S, vol, sim.r, sim.day);
     updateChainDisplay($, chain);
-    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day);
+    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
     updateRateDisplay($, sim.r);
     updateStockBondPrices($, sim.S, sim.r, chain);
