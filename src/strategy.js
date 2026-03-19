@@ -279,7 +279,6 @@ export class StrategyRenderer {
             // Draw axes and grid but no curves
             const xToPixel   = (S) => plotX + ((S   - xMin) / (xMax - xMin)) * plotW;
             const pnlToPixel = (p) => plotY + ((1 - p) / 2) * plotH; // map -1..1 to plot
-            this._drawBackground(ctx, cssW, cssH);
             this._drawGrid(ctx, plotX, plotY, plotW, plotH, xMin, xMax, -1, 1, xToPixel, pnlToPixel);
             this._drawZeroLine(ctx, plotX, plotW, pnlToPixel);
             this._drawYAxis(ctx, plotX, plotY, plotH, -1, 1, pnlToPixel, themeClrs);
@@ -317,26 +316,33 @@ export class StrategyRenderer {
 
         // --- Greek data (only for enabled toggles) ---
         const activeGreeks = Object.keys(greekToggles || {}).filter(k => greekToggles[k]);
-        const greekData = {}; // key → { vals, yLo, yHi, toPixel }
+        const greekData = {};
 
-        for (const gKey of activeGreeks) {
-            const vals = xs.map(S => this._totalGreek(legs, S, vol, rate, evalDay, fallbackDte, gKey));
-            let gMin = Infinity, gMax = -Infinity;
-            for (const v of vals) { if (v < gMin) gMin = v; if (v > gMax) gMax = v; }
-            if (gMin === gMax) { gMin -= 0.01; gMax += 0.01; }
-            const gPad  = (gMax - gMin) * Y_PADDING_PCT;
-            const gLo   = gMin - gPad;
-            const gHi   = gMax + gPad;
-            greekData[gKey] = {
-                vals,
-                yLo: gLo,
-                yHi: gHi,
-                toPixel: (v) => plotY + ((gHi - v) / (gHi - gLo)) * plotH,
-            };
+        if (activeGreeks.length > 0) {
+            const greekArrays = {};
+            for (const gKey of activeGreeks) greekArrays[gKey] = new Array(SAMPLE_COUNT);
+
+            for (let i = 0; i < SAMPLE_COUNT; i++) {
+                const allGreeks = this._totalGreeksAll(legs, xs[i], vol, rate, evalDay, fallbackDte);
+                for (const gKey of activeGreeks) {
+                    greekArrays[gKey][i] = allGreeks[gKey] ?? 0;
+                }
+            }
+
+            for (const gKey of activeGreeks) {
+                const vals = greekArrays[gKey];
+                let gMin = Infinity, gMax = -Infinity;
+                for (const v of vals) { if (v < gMin) gMin = v; if (v > gMax) gMax = v; }
+                if (gMin === gMax) { gMin -= 0.01; gMax += 0.01; }
+                const gPad = (gMax - gMin) * Y_PADDING_PCT;
+                const gLo = gMin - gPad;
+                const gHi = gMax + gPad;
+                greekData[gKey] = {
+                    vals, yLo: gLo, yHi: gHi,
+                    toPixel: (v) => plotY + ((gHi - v) / (gHi - gLo)) * plotH,
+                };
+            }
         }
-
-        // --- Draw background ---
-        this._drawBackground(ctx, cssW, cssH);
 
         // --- Draw grid / axes ---
         this._drawGrid(ctx, plotX, plotY, plotW, plotH, xMin, xMax, yLo, yHi, xToPixel, pnlToPixel);
@@ -570,13 +576,26 @@ export class StrategyRenderer {
         return total;
     }
 
+    /**
+     * Sum ALL Greeks across all legs at price S in a single pass.
+     * Computes computeGreeks() once per option leg instead of once per Greek key.
+     */
+    _totalGreeksAll(legs, S, vol, rate, evalDay, fallbackDte) {
+        let delta = 0, gamma = 0, theta = 0, vega = 0, rho = 0;
+        for (const leg of legs) {
+            const g = this._legGreeks(leg, S, vol, rate, evalDay, fallbackDte);
+            delta += g.delta;
+            gamma += g.gamma;
+            theta += g.theta;
+            vega  += g.vega;
+            rho   += g.rho;
+        }
+        return { delta, gamma, theta, vega, rho };
+    }
+
     // -----------------------------------------------------------------------
     // Drawing helpers
     // -----------------------------------------------------------------------
-
-    _drawBackground(ctx, cssW, cssH) {
-        // Canvas cleared at top of draw()
-    }
 
     _drawZeroLine(ctx, plotX, plotW, pnlToPixel) {
         const y0 = pnlToPixel(0);
