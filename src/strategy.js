@@ -19,13 +19,13 @@ const SAMPLE_COUNT   = 200;  // Points across X range
 const Y_PADDING_PCT  = 0.15; // 15% vertical padding
 const MARGIN = { top: 24, right: 16, bottom: 48, left: 68 };
 
-// Greek display metadata: key → { label, color }
+// Greek display metadata: key → { label }
 const GREEK_META = {
-    delta: { label: 'Delta', color: '#5C92A8' },
-    gamma: { label: 'Gamma', color: '#CC8E4E' },
-    theta: { label: 'Theta', color: '#4AACA0' },
-    vega:  { label: 'Vega',  color: '#9C7EB0' },
-    rho:   { label: 'Rho',   color: '#8A7E72' },
+    delta: { label: 'Delta' },
+    gamma: { label: 'Gamma' },
+    theta: { label: 'Theta' },
+    vega:  { label: 'Vega' },
+    rho:   { label: 'Rho' },
 };
 
 // Attempt to resolve colours from the frozen _PALETTE global at call time,
@@ -305,8 +305,8 @@ export class StrategyRenderer {
         }
 
         // --- Y scale for P&L ---
-        let pnlMin = Math.min(...pnls);
-        let pnlMax = Math.max(...pnls);
+        let pnlMin = Infinity, pnlMax = -Infinity;
+        for (const p of pnls) { if (p < pnlMin) pnlMin = p; if (p > pnlMax) pnlMax = p; }
         if (pnlMin === pnlMax) { pnlMin -= 1; pnlMax += 1; }
         const pnlPad = (pnlMax - pnlMin) * Y_PADDING_PCT;
         const yLo = pnlMin - pnlPad;
@@ -321,8 +321,8 @@ export class StrategyRenderer {
 
         for (const gKey of activeGreeks) {
             const vals = xs.map(S => this._totalGreek(legs, S, vol, rate, evalDay, fallbackDte, gKey));
-            let gMin = Math.min(...vals);
-            let gMax = Math.max(...vals);
+            let gMin = Infinity, gMax = -Infinity;
+            for (const v of vals) { if (v < gMin) gMin = v; if (v > gMax) gMax = v; }
             if (gMin === gMax) { gMin -= 0.01; gMax += 0.01; }
             const gPad  = (gMax - gMin) * Y_PADDING_PCT;
             const gLo   = gMin - gPad;
@@ -352,7 +352,7 @@ export class StrategyRenderer {
         // --- Draw Greek overlays ---
         for (const gKey of activeGreeks) {
             const gd  = greekData[gKey];
-            const col = clrs[gKey] || GREEK_META[gKey]?.color || '#888';
+            const col = clrs[gKey] || '#888';
             this._drawLine(ctx, xs, gd.vals, gd.toPixel, xToPixel, col, 0.5, 1.5);
         }
 
@@ -401,8 +401,8 @@ export class StrategyRenderer {
             pnls.push(this._totalPnl(legs, S, vol, rate, evalDay, entryDay, fallbackDte, spot));
         }
 
-        let maxProfit = Math.max(...pnls);
-        let maxLoss   = Math.min(...pnls);
+        let maxProfit = -Infinity, maxLoss = Infinity;
+        for (const p of pnls) { if (p > maxProfit) maxProfit = p; if (p < maxLoss) maxLoss = p; }
 
         // Check endpoints for unbounded profit/loss
         const pnlAtLow  = pnls[0];
@@ -575,14 +575,13 @@ export class StrategyRenderer {
     // -----------------------------------------------------------------------
 
     _drawBackground(ctx, cssW, cssH) {
-        // Transparent — let the canvas background CSS handle it
-        ctx.clearRect(0, 0, cssW, cssH);
+        // Canvas cleared at top of draw()
     }
 
     _drawZeroLine(ctx, plotX, plotW, pnlToPixel) {
         const y0 = pnlToPixel(0);
         ctx.save();
-        ctx.strokeStyle = 'rgba(168,160,152,0.6)';
+        ctx.strokeStyle = '#A8A09899';
         ctx.lineWidth   = 1.5;
         ctx.beginPath();
         ctx.moveTo(plotX, y0);
@@ -710,7 +709,7 @@ export class StrategyRenderer {
 
     _drawGrid(ctx, plotX, plotY, plotW, plotH, xMin, xMax, yLo, yHi, xToPixel, pnlToPixel) {
         ctx.save();
-        ctx.strokeStyle = 'rgba(168,160,152,0.15)';
+        ctx.strokeStyle = '#A8A09826';
         ctx.lineWidth   = 1;
 
         // Horizontal grid lines (5 divisions)
@@ -796,7 +795,7 @@ export class StrategyRenderer {
         for (const [key, meta] of Object.entries(GREEK_META)) {
             items.push({
                 label:  meta.label,
-                color:  clrs[key] || meta.color,
+                color:  clrs[key] || '#888',
                 active: !!(greekToggles && greekToggles[key]),
                 key:    key,
             });
