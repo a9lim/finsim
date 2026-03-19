@@ -114,7 +114,7 @@ export function generateStrikes(currentPrice) {
  * (price, delta, gamma, theta, vega, rho) and model bid/ask spreads.
  *
  * @param {number} S          - Spot price
- * @param {number} v          - Implied volatility (annualised)
+ * @param {number} v          - Heston variance (converted to volatility internally)
  * @param {number} r          - Risk-free rate (continuously compounded)
  * @param {number} currentDay - Current simulation day (integer)
  * @returns {Array<{
@@ -130,16 +130,17 @@ export function generateStrikes(currentPrice) {
 export function buildChain(S, v, r, currentDay, expiries) {
     if (!expiries) expiries = generateExpiries(currentDay);
     const strikes = generateStrikes(S);
+    const sigma = Math.sqrt(Math.max(v, 0));
 
     return expiries.map(({ day, dte }) => {
         const T = dte / TRADING_DAYS_PER_YEAR; // convert trading days to years
 
         const options = strikes.map(K => {
-            const callGreeks = computeGreeks(S, K, T, r, v, false);
-            const putGreeks  = computeGreeks(S, K, T, r, v, true);
+            const callGreeks = computeGreeks(S, K, T, r, sigma, false);
+            const putGreeks  = computeGreeks(S, K, T, r, sigma, true);
 
-            const callBA = computeOptionBidAsk(callGreeks.price, S, K, v);
-            const putBA  = computeOptionBidAsk(putGreeks.price,  S, K, v);
+            const callBA = computeOptionBidAsk(callGreeks.price, S, K, sigma);
+            const putBA  = computeOptionBidAsk(putGreeks.price,  S, K, sigma);
 
             return {
                 strike: K,
