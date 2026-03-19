@@ -51,20 +51,19 @@ const TOOL_DEF = {
                             items: {
                                 type: 'object',
                                 properties: {
-                                    id: {
-                                        type: 'string',
-                                        description: 'Short snake_case identifier.',
+                                    id: { type: 'string', description: 'Short snake_case identifier.' },
+                                    headline: { type: 'string', description: '1-2 sentence followup news headline.' },
+                                    params: {
+                                        type: 'object',
+                                        description: 'Parameter deltas for the followup event.',
+                                        properties: PARAM_PROPERTIES,
+                                        additionalProperties: false,
                                     },
-                                    mtth: {
-                                        type: 'number',
-                                        description: 'Mean trading days until followup fires.',
-                                    },
-                                    weight: {
-                                        type: 'number',
-                                        description: 'Probability (0-1) the followup fires.',
-                                    },
+                                    magnitude: { type: 'string', enum: ['minor', 'moderate', 'major'] },
+                                    mtth: { type: 'number', description: 'Mean trading days until followup fires.' },
+                                    weight: { type: 'number', description: 'Probability (0-1) the followup fires.' },
                                 },
-                                required: ['id', 'mtth', 'weight'],
+                                required: ['id', 'headline', 'params', 'magnitude', 'mtth', 'weight'],
                                 additionalProperties: false,
                             },
                         },
@@ -162,7 +161,7 @@ export class LLMEventSource {
             : '(none yet)';
 
         const pendingLines = pendingFollowups.length > 0
-            ? pendingFollowups.map(f => '"' + f.id + '" scheduled for day ' + f.targetDay).join('\n')
+            ? pendingFollowups.map(f => '"' + (f.event?.id || f.chainId || 'unknown') + '" scheduled for day ' + f.targetDay).join('\n')
             : '(none)';
 
         const userMsg = stateLines.join('\n') +
