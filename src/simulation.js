@@ -65,6 +65,8 @@ export class Simulation {
     ----------------------------------------------- */
     beginDay() {
         this._dt = 1 / (TRADING_DAYS_PER_YEAR * INTRADAY_STEPS);
+        this._sqrtDt = Math.sqrt(this._dt);
+        this._sqrtOneMinusRhoSq = Math.sqrt(1 - this.rho * this.rho);
         this._substepIndex = 0;
 
         this._partial = {
@@ -94,14 +96,15 @@ export class Simulation {
 
         // 1. Correlated Brownian increments
         const z1 = this._randn();
-        const z2 = this.rho * z1 + Math.sqrt(1 - this.rho * this.rho) * this._randn();
+        const z2 = this.rho * z1 + this._sqrtOneMinusRhoSq * this._randn();
         const z3 = this._randn();
 
         // 2. Heston stochastic volatility (full truncation scheme)
-        const sqrtV = Math.sqrt(Math.max(this.v, 0));
+        const vPrev = Math.max(this.v, 0);
+        const sqrtV = Math.sqrt(vPrev);
         this.v = this.v
             + this.kappa * (this.theta - this.v) * dt
-            + this.xi * sqrtV * Math.sqrt(dt) * z2;
+            + this.xi * sqrtV * this._sqrtDt * z2;
         this.v = Math.max(this.v, 0);
 
         // 3. Merton jumps
@@ -111,15 +114,15 @@ export class Simulation {
             jumpSum += this.muJ + this.sigmaJ * this._randn();
         }
 
-        // 4. GBM with jumps (log-price update)
-        const drift     = (this.mu - this.lambda * k) * dt;
-        const diffusion = sqrtV * Math.sqrt(dt) * z1;
+        // 4. GBM with jumps (log-price update, Ito correction: -0.5*vPrev*dt)
+        const drift     = (this.mu - this.lambda * k - 0.5 * vPrev) * dt;
+        const diffusion = sqrtV * this._sqrtDt * z1;
         this.S = this.S * Math.exp(drift + diffusion + jumpSum);
 
         // 5. Vasicek short rate
         this.r = this.r
             + this.a * (this.b - this.r) * dt
-            + this.sigmaR * Math.sqrt(dt) * z3;
+            + this.sigmaR * this._sqrtDt * z3;
 
         // Update partial bar in-place
         const p = this._partial;
@@ -184,6 +187,7 @@ export class Simulation {
         this.S = INITIAL_PRICE;
         this.v = this.theta;
         this.r = this.b;
+        this._spareValid = false;
     }
 
     /* -----------------------------------------------
