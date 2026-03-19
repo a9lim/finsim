@@ -6,19 +6,7 @@
    handlers, no internal state.
    ===================================================== */
 
-import { TRADING_DAYS_PER_YEAR } from './config.js';
-
-// ---------------------------------------------------------------------------
-// Formatting helpers
-// ---------------------------------------------------------------------------
-
-function fmtDte(dte) {
-    if (dte >= TRADING_DAYS_PER_YEAR) return (dte / TRADING_DAYS_PER_YEAR).toFixed(1) + 'y';
-    if (dte >= 21) return Math.round(dte / 21) + 'mo';
-    return dte + 'd';
-}
-
-function fmtNum(v, dp = 4) { return Number(v).toFixed(dp); }
+import { fmtDte, fmtNum } from './format-helpers.js';
 
 // ---------------------------------------------------------------------------
 // Internal chain table builders (DOM methods -- no text interpolation)
