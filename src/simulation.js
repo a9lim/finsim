@@ -46,6 +46,15 @@ export class Simulation {
         this.v       = p.theta;  // start at long-run variance
         this.r       = p.b;      // start at long-run rate
         this.history = new HistoryBuffer(HISTORY_CAPACITY);
+
+        this.recomputeK();
+        this._spareValid = false;
+        this._spare = 0;
+    }
+
+    /** Recompute jump compensation. Call after muJ or sigmaJ change. */
+    recomputeK() {
+        this._k = Math.exp(this.muJ + 0.5 * this.sigmaJ * this.sigmaJ) - 1;
     }
 
     /* -----------------------------------------------
@@ -56,7 +65,6 @@ export class Simulation {
     ----------------------------------------------- */
     beginDay() {
         this._dt = 1 / (TRADING_DAYS_PER_YEAR * INTRADAY_STEPS);
-        this._k  = Math.exp(this.muJ + 0.5 * this.sigmaJ * this.sigmaJ) - 1;
         this._substepIndex = 0;
 
         this._partial = {
@@ -183,10 +191,16 @@ export class Simulation {
        Box-Muller standard normal sample.
     ----------------------------------------------- */
     _randn() {
-        // Box-Muller transform; discard second variate for simplicity
-        const u1 = 1 - Math.random(); // exclude 0 to avoid log(0)
+        if (this._spareValid) {
+            this._spareValid = false;
+            return this._spare;
+        }
+        const u1 = 1 - Math.random();
         const u2 = Math.random();
-        return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        const mag = Math.sqrt(-2 * Math.log(u1));
+        this._spare = mag * Math.sin(2 * Math.PI * u2);
+        this._spareValid = true;
+        return mag * Math.cos(2 * Math.PI * u2);
     }
 
     /* -----------------------------------------------
