@@ -6,6 +6,10 @@ Part of the **a9l.im** portfolio. See parent `site-meta/CLAUDE.md` for the share
 
 Never use the phrase "retarded potential(s)" in code, comments, or user-facing text. Use "signal delay" or "finite-speed force propagation" instead.
 
+## Testing
+
+Do not manually test via browser automation. The user will test changes themselves and provide feedback.
+
 ## Overview
 
 Shoals -- interactive options trading simulator. Models a stock as geometric Brownian motion with Merton jumps and Heston stochastic volatility; the risk-free rate follows a Vasicek process. Users buy and sell combinations of the underlying stock, zero-coupon bonds, and American options (calls/puts) at various strikes and expiries. Options priced via Bjerksund-Stensland 2002 analytical approximation. Includes a strategy builder with payoff diagrams and Greek overlays, a full interactive options chain, and a portfolio/margin system.
@@ -23,10 +27,10 @@ Serve from `a9lim.github.io/` -- shared files load via absolute paths (`/shared-
 ## File Map
 
 ```
-main.js                765 lines  Entry point: DOM cache $, rAF loop, tick(), timer-based speed,
-                                   camera setup, shortcut registration, custom event wiring,
-                                   strategy builder handlers, auto-scroll, resize handling,
-                                   ExpiryManager wiring
+main.js                846 lines  Entry point: DOM cache $, rAF loop, sub-step streaming,
+                                   live candle animation, camera setup, shortcut registration,
+                                   custom event wiring, strategy builder handlers, auto-scroll,
+                                   resize handling, ExpiryManager wiring
 index.html             496 lines  Toolbar, chart canvas, strategy canvas, sidebar (4 tabs:
                                    Trade/Portfolio/Strategy/Settings), chain overlay, trade dialog,
                                    margin call overlay, intro screen
@@ -44,8 +48,9 @@ src/
   config.js             26 lines  Named constants (STRIKE_INTERVAL, STRIKE_RANGE, BOND_FACE_VALUE,
                                    MAINTENANCE_MARGIN, REG_T_MARGIN, HISTORY_CAPACITY, etc.) and
                                    PRESETS array (5 market regimes)
-  simulation.js        164 lines  Simulation class: GBM + Merton jumps + Heston stoch vol +
-                                   Vasicek rate; tick() produces OHLC bars via INTRADAY_STEPS;
+  simulation.js        208 lines  Simulation class: GBM + Merton jumps + Heston stoch vol +
+                                   Vasicek rate; beginDay()/substep()/finalizeDay() sub-step
+                                   pipeline for animated candles; tick() convenience wrapper;
                                    prepopulate() fills buffer and scales to INITIAL_PRICE;
                                    Box-Muller RNG, inverse-transform Poisson sampler
   pricing.js           467 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
@@ -57,8 +62,9 @@ src/
   portfolio.js         775 lines  Signed-qty positions, market/limit/stop orders, netting,
                                    strategy groups, cash/margin, processExpiry(),
                                    exerciseOption(), aggregateGreeks(), liquidateAll()
-  chart.js             605 lines  ChartRenderer: logarithmic Y-axis OHLC candles, auto-scale,
+  chart.js             672 lines  ChartRenderer: logarithmic Y-axis OHLC candles, auto-scale,
                                    grid, crosshair, position entry markers, strike lines;
+                                   live candle lerp animation (close lerps, high/low snap);
                                    uses shared-camera.js for horizontal pan/zoom.
                                    Accesses history via .get(day)/.last() (HistoryBuffer API).
   strategy.js          857 lines  StrategyRenderer: payoff P&L diagram, Greek overlays (Delta/
@@ -79,7 +85,7 @@ src/
 
 ```
 main.js
-  |- src/config.js        (SPEED_OPTIONS, PRESETS)
+  |- src/config.js        (SPEED_OPTIONS, PRESETS, INTRADAY_STEPS)
   |- src/simulation.js    (Simulation -- imports config, history-buffer)
   |- src/history-buffer.js (HistoryBuffer -- no imports)
   |- src/chain.js         (buildChain, ExpiryManager -- imports pricing, config)
@@ -111,15 +117,34 @@ Loaded at end of <body>:
 
 ## Data Flow
 
-Each tick:
-1. `simulation.js` `tick()` runs `INTRADAY_STEPS = 16` sub-steps, produces `{ day, open, high, low, close, v, r }` pushed into `sim.history` (HistoryBuffer ring buffer, capacity 256; oldest bars overwritten when full)
-2. `portfolio.js` `checkPendingOrders()` evaluates limit/stop orders against new `S`, fills triggered orders; `processExpiry()` auto-exercises ITM longs, expires worthless OTMs, returns short margin
-3. `chain.js` `buildChain()` reads `S, v, r` + expiries from `ExpiryManager.update()` -> generates strikes -> calls `pricing.js` `computeGreeks()` + `computeSpread()` for every option
-4. `portfolio.js` `checkMargin()` -> if `equity < 25% * totalPositionValue`, sets `playing = false` and shows margin call modal
-5. Auto-scroll: if playing, camera pans right to keep latest candle at ~85% screen width
-6. Strategy range reset if spot moved >1% since last check
-7. `ui.js` updates sidebar (chain display, portfolio positions, Greeks aggregate, strategy selectors)
-8. `dirty = true` -> `renderCurrentView()` in next rAF frame draws either `chart.js` or `strategy.js`
+### Animated Sub-Step Streaming (playing)
+
+When `playing = true`, each trading day is streamed across the tick interval:
+
+1. `frame()` calls `sim.beginDay()` — pushes a partial bar (open = close = high = low = current S) into `sim.history` by reference
+2. Sub-steps are paced across the tick interval (`tickInterval / INTRADAY_STEPS`). Each frame, `sim.substep()` runs any due sub-steps, mutating the partial bar in-place (high/low/close updated)
+3. After each sub-step, `chart.setLiveCandle(bar)` updates lerp targets. The close price lerps smoothly toward the target each frame (`lerpSpeed = 15`, frame-rate-independent exponential). High/low snap immediately (no lerp).
+4. When all 16 sub-steps are done, `sim.finalizeDay()` increments the day counter. Then `_onDayComplete()` runs portfolio/chain/margin checks (same as the old `tick()` flow):
+   - `checkPendingOrders()`, `processExpiry()`, `buildChain()`, `checkMargin()`
+   - Auto-scroll, strategy range reset, UI update
+5. At high speeds (16x → 62.5ms per tick, ~3.9ms per sub-step), multiple sub-steps batch per frame. Lerp still smooths between frames.
+
+### Instant Tick (step button, prepopulation)
+
+`sim.tick()` is a convenience wrapper: `beginDay()` + 16 `substep()` + `finalizeDay()`. Used by the step button and `prepopulate()`. Lerp state is snapped (no animation).
+
+### Pause Behavior
+
+Pausing mid-day leaves the partial bar frozen in its current state (`dayInProgress` remains `true`). Resuming continues sub-steps from where they left off. The partial bar is already in the history buffer and renders normally.
+
+### Each completed day:
+1. `portfolio.js` `checkPendingOrders()` evaluates limit/stop orders against new `S`, fills triggered orders; `processExpiry()` auto-exercises ITM longs, expires worthless OTMs, returns short margin
+2. `chain.js` `buildChain()` reads `S, v, r` + expiries from `ExpiryManager.update()` -> generates strikes -> calls `pricing.js` `computeGreeks()` + `computeSpread()` for every option
+3. `portfolio.js` `checkMargin()` -> if `equity < 25% * totalPositionValue`, sets `playing = false` and shows margin call modal
+4. Auto-scroll: if playing, camera pans right to keep latest candle at ~85% screen width
+5. Strategy range reset if spot moved >1% since last check
+6. `ui.js` updates sidebar (chain display, portfolio positions, Greeks aggregate, strategy selectors)
+7. `dirty = true` -> `renderCurrentView()` in next rAF frame draws either `chart.js` or `strategy.js`
 
 Bootstrap: on init, `sim.prepopulate()` runs 256 ticks (filling the entire HistoryBuffer), then scales all OHLC prices so the final close = $100 (INITIAL_PRICE). This creates realistic-looking historical data that ends at the starting price. The `ExpiryManager` is initialised after prepopulation.
 
@@ -148,9 +173,19 @@ dr = a(b - r)dt + sigmaR * dW3      (dW3 independent of dW1, dW2)
 
 Parameters: `a` (mean-reversion speed), `b` (long-run rate target), `sigmaR` (rate vol). Rate `r` is unconstrained (can go negative).
 
-### OHLC Construction
+### OHLC Construction & Sub-Step Pipeline
 
-Each trading day runs `INTRADAY_STEPS = 16` sub-steps at `dt = 1/(252 * 16)`. Open = first sub-step price, Close = last, High/Low = max/min across all 16 sub-steps. Only Close is carried forward as `S` for the next day. Each bar stores `{ day, open, high, low, close, v, r }`.
+Each trading day runs `INTRADAY_STEPS = 16` sub-steps at `dt = 1/(252 * 16)`. The simulation exposes a 3-phase pipeline for animated candle rendering:
+
+1. **`beginDay()`** — initializes `_partial` bar (`open = close = high = low = S`), pushes it to `history` by reference, resets `_substepIndex = 0`
+2. **`substep()`** — runs one sub-step of the stochastic model, updates `_partial` in-place (high/low/close/v/r). Returns the partial bar. Guard: no-ops if `_substepIndex >= INTRADAY_STEPS`.
+3. **`finalizeDay()`** — clears `_partial`, increments `day`. The bar remains in history.
+
+**`tick()`** is a convenience wrapper: `beginDay()` + 16 `substep()` + `finalizeDay()`. Used for step-forward, prepopulation, and backward compatibility.
+
+Properties: `substepsDone` (getter, 0–16), `dayComplete` (getter, true when all 16 done), `_partial` (the live bar reference, or null).
+
+Open = price at `beginDay()`, Close = price after last sub-step, High/Low = running max/min across all sub-steps. Only Close is carried forward as `S` for the next day. Each bar stores `{ day, open, high, low, close, v, r }`.
 
 ### Random Number Generation
 
@@ -458,7 +493,8 @@ Registered via `initShortcuts()` from `shared-shortcuts.js`. `?` opens help over
 
 - **`$` DOM cache**: plain object `{}`, populated by `cacheDOMElements($)` (135 element references), passed to all ui.js functions. Avoids repeated `getElementById` calls. Also stores closures: `$._onChainCellClick`, `$._onTradeSubmit`.
 - **Dirty flag**: `dirty = true` set on any state change; rAF loop skips canvas render when false. `strategy._dirty` also checked (set by wheel zoom). Prevents needless repaints when sim is paused and user is not interacting.
-- **Timer-based speed**: `frame()` checks `now - lastTickTime >= 1000 / speed`. At speed 1, one tick per second. At speed 16, one tick every 62.5ms. Not a loop -- exactly one tick per interval.
+- **Sub-step streaming**: `frame()` distributes 16 intraday sub-steps across the tick interval (`1000 / speed` ms). `dayInProgress` flag tracks whether a day is being streamed. `lastTickTime` advances by `tickInterval` (not `now`) to prevent drift; clamped to avoid burst catch-up after tab backgrounding.
+- **Live candle lerp**: `ChartRenderer` has `_lerp` state with `update(now)` (frame-rate-independent exponential lerp, speed=15) and `setLiveCandle(bar)` (sets targets, snaps on day boundary). Close price lerps smoothly; high/low snap immediately. Only the latest candle uses lerped values; historical candles draw raw.
 - **Camera integration (chart only)**: `createCamera()` from `shared-camera.js` attached to `#chart-canvas`. World X = day index (day 0 at X=0, each day is 1 world unit wide). `worldToScreen(d + 0.5)` gives candle center pixel. Default zoom 12px/day (100%), max 36px/day (300%). Strategy canvas manages its own X-range.
 - **`renderCurrentView()`**: single function that draws either chart or strategy based on `strategyMode` flag. Called from rAF frame loop and from `handleResize()` (immediate, to avoid blank flash on resize).
 - **Pure module separation**: `simulation.js` and `portfolio.js` are pure state -- no DOM. `ui.js` is pure DOM -- no sim state. `chart.js` and `strategy.js` are pure renderers -- no state mutation. `main.js` orchestrates.
@@ -492,3 +528,7 @@ Registered via `initShortcuts()` from `shared-shortcuts.js`. `?` opens help over
 - **`sim.history` is a `HistoryBuffer`, not an array** -- access bars via `.get(day)`, not `history[day]`. Use `.last()` for the most recent bar, `.minDay`/`.maxDay` for bounds, `.length` for total days produced (same semantics as old array length). Direct bracket indexing will NOT work. Capacity is `HISTORY_CAPACITY = 256`; oldest bars are silently overwritten when full.
 - **`ExpiryManager` is stateful and lives in main.js** -- the `expiryMgr` instance persists between ticks. It must be `.init(currentDay)` on reset/preset load, and `.update(currentDay)` each tick. The returned expiries array is passed to `buildChain()`. Do not call `generateExpiries()` directly in the tick loop.
 - **Position entry markers for very old positions may not render** -- if a position's `entryDay` has been evicted from the ring buffer (older than 256 days), `history.get(entryDay)` returns `undefined` and the marker is skipped. The position itself still works correctly.
+- **`sim._partial` is pushed to history by reference** -- `beginDay()` creates a bar object and pushes it to `HistoryBuffer`. `substep()` mutates this same object in-place. The ring buffer stores the reference, so `history.last()` and `history.get(day)` return the live, mutating bar. Do not clone or replace `_partial` mid-day.
+- **`dayInProgress` flag in main.js** -- tracks whether a streamed day is active (between `beginDay()` and `finalizeDay()`). Must be reset to `false` on preset load and sim reset. Pausing does NOT finalize the day — the partial bar stays frozen mid-formation until the user resumes or steps.
+- **Step button finishes partial days** -- if `dayInProgress` is true when step is pressed, remaining sub-steps are completed instantly (no new `beginDay()`). Lerp state is snapped to final values.
+- **`chart._lerp.day = -1` means no live candle** -- set on reset/preset load to disable lerp rendering. `setLiveCandle()` sets it to the bar's day on first call.
