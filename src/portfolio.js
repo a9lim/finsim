@@ -228,11 +228,15 @@ export function executeMarketOrder(
             const closingShortQty = Math.min(signedQty, Math.abs(oldQty));
             const openingLongQty = signedQty - closingShortQty;
 
-            // Return margin for closed short portion
-            const returnedMargin = _marginForShort(
-                type, closingShortQty, existing.entryPrice, currentPrice, currentVol,
+            // Return margin for closed short portion (prorated from reserved, or recomputed)
+            const totalReserved = existing._reservedMargin ?? _marginForShort(
+                type, Math.abs(oldQty), existing.entryPrice, currentPrice, currentVol,
                 currentRate, currentDay, strike, expiryDay
             );
+            const returnedMargin = totalReserved * (closingShortQty / Math.abs(oldQty));
+            if (existing._reservedMargin != null) {
+                existing._reservedMargin -= returnedMargin;
+            }
             // Cost to buy back the short portion
             const buybackCost = fill * closingShortQty;
             // Cost of new long portion
@@ -257,6 +261,7 @@ export function executeMarketOrder(
             );
             if (portfolio.cash + proceeds < margin) return null;
             cashDelta = proceeds - margin;
+            existing._reservedMargin = (existing._reservedMargin || 0) + margin;
         }
 
         portfolio.cash += cashDelta;
@@ -276,6 +281,12 @@ export function executeMarketOrder(
         }
         existing.qty = newQty;
         existing.fillPrice = fill;
+        if (oldQty > 0 && newQty < 0) {
+            existing._reservedMargin = _marginForShort(
+                type, Math.abs(newQty), fill, currentPrice, currentVol,
+                currentRate, currentDay, strike, expiryDay
+            );
+        }
         return existing;
     }
 
@@ -312,6 +323,12 @@ export function executeMarketOrder(
     if (expiryDay  != null) position.expiryDay = expiryDay;
 
     portfolio.positions.push(position);
+    if (side === 'short') {
+        position._reservedMargin = _marginForShort(
+            type, qty, fill, currentPrice, currentVol, currentRate,
+            currentDay, strike, expiryDay
+        );
+    }
     return position;
 }
 
@@ -443,7 +460,7 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
             ? computeOptionBidAsk(mid, currentPrice, pos.strike, currentVol)
             : computeBidAsk(mid, currentPrice, currentVol);
         const askPrice = ba.ask;
-        const returnedMargin = _marginForShort(
+        const returnedMargin = pos._reservedMargin ?? _marginForShort(
             pos.type, absQty, pos.entryPrice, currentPrice, currentVol,
             currentRate, currentDay, pos.strike, pos.expiryDay
         );
@@ -541,7 +558,7 @@ export function processExpiry(expiryDay, currentPrice, currentDay) {
             // for long positions, the option value goes to zero.
             // Return margin on short options.
             if (pos.qty < 0) {
-                const returnedMargin = _marginForShort(
+                const returnedMargin = pos._reservedMargin ?? _marginForShort(
                     pos.type, Math.abs(pos.qty), pos.entryPrice, currentPrice, 0,
                     0, currentDay, pos.strike, pos.expiryDay
                 );
