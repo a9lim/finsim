@@ -403,7 +403,7 @@ function priceAmerican(S, K, T, r, sigma, isPut) {
  *
  * All bump sizes chosen to balance truncation vs. floating-point errors:
  *   h_S     = 1% of spot (central difference for delta, gamma)
- *   h_T     = 1 trading day = 1/252 years (forward difference for theta)
+ *   h_T     = 1 trading day = 1/252 years (central difference for theta)
  *   h_sigma = 0.1 vol point (central difference for vega)
  *   h_r     = 1 basis point (central difference for rho)
  *
@@ -423,7 +423,8 @@ export function computeGreeks(S, K, T, r, sigma, isPut) {
         price,
         delta: (pUp - pDn) / (2 * h_S),
         gamma: (pUp - 2 * price + pDn) / (h_S * h_S),
-        theta: (priceAmerican(S, K, Math.max(T - h_T, 1e-10), r, sigma, isPut) - price) / h_T,
+        theta: (priceAmerican(S, K, Math.max(T - h_T, 1e-10), r, sigma, isPut)
+              - priceAmerican(S, K, T + h_T, r, sigma, isPut)) / (2 * h_T),
         vega:  (priceAmerican(S, K, T, r, sigma + h_sigma, isPut)
               - priceAmerican(S, K, T, r, sigma - h_sigma, isPut)) / (2 * h_sigma),
         rho:   (priceAmerican(S, K, T, r + h_r, sigma, isPut)
