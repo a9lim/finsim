@@ -348,6 +348,8 @@
                             <option value="2">Volatile</option>
                             <option value="3">Crisis</option>
                             <option value="4">Rate Hike</option>
+                            <option value="5">Dynamic (Offline)</option>
+                            <option value="6">Dynamic (LLM)</option>
                         </select>
                         <div class="stat-row">
                             <span class="stat-label">Risk-Free Rate</span>
@@ -359,57 +361,57 @@
                         <div id="advanced-section" class="advanced-section hidden">
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-mu">Drift (mu)</label>
-                                <input type="range" id="slider-mu" min="-0.20" max="0.20" step="0.01" value="0.08">
+                                <input type="range" id="slider-mu" min="-0.50" max="0.50" step="0.02" value="0.08">
                                 <span class="slider-value" id="slider-mu-val">0.08</span>
                             </div>
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-theta">Vol Mean (theta)</label>
-                                <input type="range" id="slider-theta" min="0.01" max="0.50" step="0.01" value="0.04">
+                                <input type="range" id="slider-theta" min="0.005" max="1.00" step="0.005" value="0.04">
                                 <span class="slider-value" id="slider-theta-val">0.04</span>
                             </div>
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-kappa">Mean Rev (kappa)</label>
-                                <input type="range" id="slider-kappa" min="0.1" max="5.0" step="0.1" value="3.0">
+                                <input type="range" id="slider-kappa" min="0.05" max="10.0" step="0.05" value="3.0">
                                 <span class="slider-value" id="slider-kappa-val">3.0</span>
                             </div>
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-xi">Vol of Vol (xi)</label>
-                                <input type="range" id="slider-xi" min="0.1" max="1.0" step="0.1" value="0.3">
+                                <input type="range" id="slider-xi" min="0.05" max="1.50" step="0.05" value="0.3">
                                 <span class="slider-value" id="slider-xi-val">0.3</span>
                             </div>
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-rho">Correlation (rho)</label>
-                                <input type="range" id="slider-rho" min="-0.95" max="0.00" step="0.05" value="-0.50">
+                                <input type="range" id="slider-rho" min="-0.99" max="0.50" step="0.01" value="-0.50">
                                 <span class="slider-value" id="slider-rho-val">-0.50</span>
                             </div>
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-lambda">Jump Rate (lambda)</label>
-                                <input type="range" id="slider-lambda" min="0.0" max="10.0" step="0.5" value="0.5">
+                                <input type="range" id="slider-lambda" min="0.0" max="15.0" step="0.5" value="0.5">
                                 <span class="slider-value" id="slider-lambda-val">0.5</span>
                             </div>
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-muJ">Jump Mean (muJ)</label>
-                                <input type="range" id="slider-muJ" min="-0.15" max="0.05" step="0.01" value="-0.02">
+                                <input type="range" id="slider-muJ" min="-0.25" max="0.15" step="0.01" value="-0.02">
                                 <span class="slider-value" id="slider-muJ-val">-0.02</span>
                             </div>
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-sigmaJ">Jump Vol (sigmaJ)</label>
-                                <input type="range" id="slider-sigmaJ" min="0.01" max="0.15" step="0.01" value="0.03">
+                                <input type="range" id="slider-sigmaJ" min="0.005" max="0.25" step="0.005" value="0.03">
                                 <span class="slider-value" id="slider-sigmaJ-val">0.03</span>
                             </div>
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-a">Rate Rev (a)</label>
-                                <input type="range" id="slider-a" min="0.1" max="1.0" step="0.1" value="0.5">
+                                <input type="range" id="slider-a" min="0.01" max="2.0" step="0.01" value="0.5">
                                 <span class="slider-value" id="slider-a-val">0.5</span>
                             </div>
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-b">Rate Mean (b)</label>
-                                <input type="range" id="slider-b" min="0.01" max="0.10" step="0.01" value="0.04">
+                                <input type="range" id="slider-b" min="-0.05" max="0.20" step="0.01" value="0.04">
                                 <span class="slider-value" id="slider-b-val">0.04</span>
                             </div>
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-sigmaR">Rate Vol (sigmaR)</label>
-                                <input type="range" id="slider-sigmaR" min="0.001" max="0.025" step="0.001" value="0.005">
+                                <input type="range" id="slider-sigmaR" min="0.001" max="0.050" step="0.001" value="0.005">
                                 <span class="slider-value" id="slider-sigmaR-val">0.005</span>
                             </div>
                         </div>
