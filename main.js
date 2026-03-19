@@ -44,6 +44,7 @@ let speed = 1;
 let speedIndex = 0;
 let strategyMode = false;
 let dirty = true;
+let chainDirty = true;
 let lastTickTime = 0;
 let dayInProgress = false; // true between beginDay() and finalizeDay()
 let mouseX = -1, mouseY = -1;
@@ -433,6 +434,7 @@ function _onDayComplete() {
     }
 
     chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
+    chainDirty = true;
 
     // Check margin
     const margin = checkMargin(sim.S, vol, sim.r, sim.day);
@@ -499,12 +501,15 @@ function tick() {
 function updateUI() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     const margin = checkMargin(sim.S, vol, sim.r, sim.day);
-    updateChainDisplay($, chain);
+    if (chainDirty) {
+        updateChainDisplay($, chain);
+        updateStockBondPrices($, sim.S, sim.r, chain);
+        updateStrategySelectors($, chain, sim.S, _addLegFromChain);
+        chainDirty = false;
+    }
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
     updateRateDisplay($, sim.r);
-    updateStockBondPrices($, sim.S, sim.r, chain);
-    updateStrategySelectors($, chain, sim.S, _addLegFromChain);
     updateStrategyBuilder();
     updateTimeSliderRange();
 }
@@ -612,6 +617,7 @@ function loadPreset(index) {
     chart._lerp.day = -1;
     expiryMgr.init(sim.day);
     chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
+    chainDirty = true;
     playing = false;
     lastSpot = sim.S;
     strategy.resetRange(sim.S, strategyLegs);
@@ -648,6 +654,7 @@ function resetSim() {
     chart._lerp.day = -1;
     expiryMgr.init(sim.day);
     chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
+    chainDirty = true;
     playing = false;
     lastSpot = sim.S;
     strategy.resetRange(sim.S, strategyLegs);
