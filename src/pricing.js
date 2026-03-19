@@ -50,23 +50,11 @@ function cnd(x) {
 /**
  * Bivariate standard normal CDF: P(X <= a, Y <= b) with correlation rho.
  *
- * Uses the Drezner & Wesolowsky (1990) 5-point Gauss-Legendre quadrature
- * on the integral representation. This is the standard implementation used
- * in practice (also appears in Haug's "The Complete Guide to Option Pricing
- * Formulas").
- *
- * Nodes and weights for 5-point GL on [0,1]:
+ * Uses 20-point Gauss-Legendre quadrature on the integral representation,
+ * based on the Drezner & Wesolowsky (1990) approach (also appears in Haug's
+ * "The Complete Guide to Option Pricing Formulas"). The 20-point rule gives
+ * higher precision than the original 5-point version.
  */
-const DW_X = [0.24840615, 0.39233107, 0.21141819, 0.03324666, 0.00082485334];
-const DW_W = [0.10024215, 0.11276679, 0.07940958, 0.02943759, 0.00114723606];
-// Full symmetric 10-point rule (reflect about 0.5 as used in DW1990):
-const DW_X_FULL = [
-    0.04691008, 0.23076534, 0.5, 0.76923466, 0.95308992,
-];
-const DW_W_FULL = [
-    0.11846345, 0.23931434, 0.28444444, 0.23931434, 0.11846345,
-];
-
 /**
  * cbnd(a, b, rho) — bivariate normal CDF using the Drezner-Wesolowsky
  * approach as implemented in Haug (2007), pp. 468-469.
@@ -115,37 +103,46 @@ function cbnd(a, b, rho) {
 
 /**
  * Core quadrature for cbnd when a <= 0, b <= 0, rho <= 0.
- * Uses 5-point Gauss-Legendre on [0, asin(rho)].
+ * Uses 20-point Gauss-Legendre on [0, rho] for higher precision.
  */
 function _cbndCore(a, b, rho) {
-    // 5-point Gauss-Legendre quadrature nodes and weights on [-1, 1]
-    // mapped to [0, rho] via substitution r = rho*(1+t)/2
-    const NODES = [
-        -0.9061798459, -0.5384693101, 0.0,
-         0.5384693101,  0.9061798459,
+    const X = [
+        -0.9931285991850949, -0.9639719272779138,
+        -0.9122344282513259, -0.8391169718222188,
+        -0.7463319064601508, -0.6360536807265150,
+        -0.5108670019508271, -0.3737060887154195,
+        -0.2277858511416451, -0.0765265211334973,
+         0.0765265211334973,  0.2277858511416451,
+         0.3737060887154195,  0.5108670019508271,
+         0.6360536807265150,  0.7463319064601508,
+         0.8391169718222188,  0.9122344282513259,
+         0.9639719272779138,  0.9931285991850949,
     ];
-    const WEIGHTS = [
-        0.2369268851, 0.4786286705, 0.5688888889,
-        0.4786286705, 0.2369268851,
+    const W = [
+        0.0176140071391521, 0.0406014298003869,
+        0.0626720483341091, 0.0832767415767048,
+        0.1019301198172404, 0.1181945319615184,
+        0.1316886384491766, 0.1420961093183820,
+        0.1491729864726037, 0.1527533871307258,
+        0.1527533871307258, 0.1491729864726037,
+        0.1420961093183820, 0.1316886384491766,
+        0.1181945319615184, 0.1019301198172404,
+        0.0832767415767048, 0.0626720483341091,
+        0.0406014298003869, 0.0176140071391521,
     ];
 
     const aS = a * a;
     const bS = b * b;
-    const ab  = a * b;
-
+    const limit = rho;
     let sum = 0;
-    const rho2 = rho * rho;
-    const limit = rho; // integrate over [0, rho]
 
-    for (let i = 0; i < NODES.length; i++) {
-        // Map GL node from [-1,1] to [0, rho]
-        const r = limit * (1 + NODES[i]) / 2;
+    for (let i = 0; i < 20; i++) {
+        const r = limit * (1 + X[i]) / 2;
         const r2 = r * r;
         const denom = Math.sqrt(Math.max(1 - r2, 1e-15));
-        const exponent = (2 * r * ab - aS - bS) / (2 * (1 - r2));
-        sum += WEIGHTS[i] * Math.exp(exponent) / denom;
+        const exponent = (2 * r * a * b - aS - bS) / (2 * (1 - r2));
+        sum += W[i] * Math.exp(exponent) / denom;
     }
-    // Scale: limit/2 * (1/(2*pi)) * sum
     return Math.max(0, (limit / 2) * sum / (2 * Math.PI) + cnd(a) * cnd(b));
 }
 
@@ -266,11 +263,9 @@ function _psi(S, T, gamma, H, I2, I1, t1, r, b, sigma) {
     const term1 =  n2_1;
     const term2 = -Math.pow(I2 / S, kappa) * n2_2;
     const term3 = -Math.pow(I1 / S, kappa) * n2_3;
-    const term4 =  Math.pow(I1 / I2, kappa) * n2_4;  // (I1/S)^k / (I2/S)^k = (I1/I2)^k is wrong; see note below
-
-    // Correction: BS2002 eq A.3 term 4 coefficient is (I1/S)^kappa * (I2/I1)^kappa
-    // = (I2/S)^kappa which doesn't simplify nicely. Per the original paper and
-    // Haug's implementation, the coefficient is (I1/I2)^kappa — keeping as is.
+    // BS2002 eq. A.3, term 4: coefficient is (I1/I2)^kappa.
+    // Derivation: (I1/S)^kappa * (I2/S)^{-kappa} = (I1/I2)^kappa. Matches Haug (2007) p. 89.
+    const term4 =  Math.pow(I1 / I2, kappa) * n2_4;
 
     return Math.exp(lambda) * Math.pow(S, gamma) * (term1 + term2 + term3 + term4);
 }
