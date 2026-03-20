@@ -36,6 +36,7 @@ export function cacheDOMElements($) {
     $.portfolioValue    = document.getElementById('portfolio-value');
     $.totalPnl          = document.getElementById('total-pnl');
     $.marginStatus      = document.getElementById('margin-status');
+    $.marginStatusLabel = document.getElementById('margin-status-label');
     $.borrowCostDisplay = document.getElementById('borrow-cost');
     $.greeksAggregate = document.getElementById('greeks-aggregate');
     $.greekDelta      = document.getElementById('greek-delta');

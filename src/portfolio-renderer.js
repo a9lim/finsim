@@ -204,6 +204,7 @@ function _diffOrderRows(container, orders) {
 
 export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, day, marginInfo) {
     $.cashDisplay.textContent = fmtDollar(portfolio.cash);
+    $.cashDisplay.className = 'stat-value ' + (portfolio.cash < 0 ? 'pnl-down' : '');
 
     // Use marginInfo.equity when available -- it's the canonical portfolio value computed
     // by the margin system (cash + all position mark-to-market values). Fall back to cash
@@ -222,12 +223,18 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     $.marginStatus.textContent = marginDisplay.label;
     $.marginStatus.className   = 'stat-value ' + marginDisplay.cls;
 
+    // Color the margin status label to match
+    if ($.marginStatusLabel) {
+        $.marginStatusLabel.className = 'stat-label ' + marginDisplay.cls;
+    }
+
     // Cumulative borrow cost across all positions (including closed -- tracked on portfolio)
     let totalBorrowCost = 0;
     for (const pos of portfolio.positions) {
         if (pos.borrowCost) totalBorrowCost += pos.borrowCost;
     }
     totalBorrowCost += portfolio.closedBorrowCost || 0;
+    totalBorrowCost += portfolio.marginDebitCost || 0;
     if ($.borrowCostDisplay) {
         $.borrowCostDisplay.textContent = fmtDollar(-totalBorrowCost);
         $.borrowCostDisplay.className = 'stat-value ' + (totalBorrowCost > 0 ? pnlClass(-totalBorrowCost) : '');

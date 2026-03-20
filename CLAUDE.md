@@ -252,8 +252,11 @@ Signed qty: `qty > 0` = long, `qty < 0` = short. No `side` field on positions.
 | Short stock | 50% of notional | 25% |
 | Short bond | 50% of fill | 25% |
 | Short option | max(20% * S * qty, premium * qty) | same, marked to market |
+| Long on margin (negative cash) | equity >= 50% of debit | 25% of debit balance |
 
-Margin call at `equity < marginRequirement` (considers only short positions). Pauses sim, shows overlay.
+Long positions can be bought on margin -- cash goes negative when insufficient, up to a limit. `_checkInitialMarginDebit()` enforces Reg-T: post-trade equity must be >= `REG_T_MARGIN (50%) * |newCash|`. This prevents buying into a margin call. Negative cash incurs the same volatility-weighted borrow cost as short positions: `dailyCost = |cash| * (max(r,0) + borrowSpread * sigma) / 252`. Tracked in `portfolio.marginDebitCost`.
+
+Margin call at `equity < marginRequirement` (considers short positions + margin debit). Pauses sim, shows overlay. Cash display turns red when negative; margin status label and value both color-match (OK/Low/MARGIN CALL).
 
 ### Short Borrow Interest
 
@@ -267,6 +270,7 @@ dailyCost = |qty| * notional * (max(r, 0) + borrowSpread * sigma) / 252
 - Stock shorts: notional = `|qty| * S`. Bond shorts: notional = `|qty| * 100 * exp(-r * T)`
 - Deducted from `portfolio.cash` daily. Cumulative cost tracked per-position (`pos.borrowCost`) and for closed positions (`portfolio.closedBorrowCost`)
 - Does NOT apply to short options (writing doesn't require borrowing)
+- Also charges on negative cash (margin debit): `dailyCost = |cash| * dailyRate`. Tracked in `portfolio.marginDebitCost`
 - Called in `_onDayComplete()` before `processExpiry()`
 
 ### Option Expiry
@@ -457,6 +461,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **`_pendingFollowups` cleared on reset** -- switching presets mid-chain drops all scheduled followups.
 - **Slider ranges expanded globally** -- all 12 parameter sliders have wider min/max than the original presets use. Events can push params to extremes.
 - **`borrowCost` on positions** -- cumulative borrow interest charged to short stock/bond positions. Preserved in `portfolio.closedBorrowCost` when positions close/flip/expire.
+- **`portfolio.marginDebitCost`** -- cumulative interest charged on negative cash (buying on margin). Included in borrow cost display. Reset on `resetPortfolio()`.
 - **`_haptics` must always be guarded** -- use `if (typeof _haptics !== 'undefined') _haptics.trigger(...)`. The global loads from `/shared-haptics.js`; ES6 modules may execute before it's defined.
 - **`generateStrikes` is not exported** from chain.js -- internal helper only.
 - **Strategy execution rolls back on partial failure** -- `handleExecStrategy()` snapshots portfolio state before executing legs; if any leg fails, it restores the snapshot.
