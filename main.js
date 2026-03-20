@@ -29,6 +29,8 @@ import {
 import { initTheme, toggleTheme } from './src/theme.js';
 import { EventEngine } from './src/events.js';
 import { LLMEventSource } from './src/llm.js';
+import { generateEpilogue } from './src/epilogue.js';
+import { computePositionValue } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 
 // ---------------------------------------------------------------------------
@@ -492,6 +494,19 @@ function _onSubstep() {
         chainDirty = true;
     }
 
+    // Track peak equity and drawdown for epilogue scorecard
+    if (eventEngine) {
+        let equity = portfolio.cash;
+        for (const pos of portfolio.positions) {
+            equity += computePositionValue(pos, sim.S, Math.sqrt(Math.max(sim.v, 0)), sim.r, sim.day, sim.q);
+        }
+        if (equity > portfolio.peakValue) portfolio.peakValue = equity;
+        if (portfolio.peakValue > 0) {
+            const dd = 1 - equity / portfolio.peakValue;
+            if (dd > portfolio.maxDrawdown) portfolio.maxDrawdown = dd;
+        }
+    }
+
     // Lightweight UI update: reprice visible expiry, update portfolio, rate
     updateSubstepUI();
 }
@@ -515,6 +530,15 @@ function _onDayComplete() {
     }
 
     processExpiry(sim.day, sim.S, sim.day);
+
+    // Epilogue check (before regular events)
+    if (eventEngine && eventEngine.isEpilogueReady(sim.day)) {
+        playing = false;
+        updatePlayBtn($, playing);
+        eventEngine.computeElectionOutcome(sim);
+        _showEpilogue();
+        return;
+    }
 
     // Fire dynamic events
     if (eventEngine) {
@@ -540,6 +564,7 @@ function _onDayComplete() {
     // Check margin
     const margin = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
     if (margin.triggered) {
+        portfolio.marginCallCount++;
         playing = false;
         updatePlayBtn($, playing);
         showMarginCall($, margin);
@@ -765,6 +790,7 @@ function toggleSidebar() {
 }
 
 function _resetCore(index) {
+    document.getElementById('epilogue-overlay')?.classList.add('hidden');
     sim.reset(index);
     resetPortfolio();
     sim.prepopulate();
@@ -1067,6 +1093,58 @@ function updateStrategyBuilder() {
         updateStrategyBuilder();
         dirty = true;
     });
+}
+
+// ---------------------------------------------------------------------------
+// Epilogue overlay controller
+// ---------------------------------------------------------------------------
+
+function _showEpilogue() {
+    const pages = generateEpilogue(eventEngine.world, sim, portfolio, eventEngine.eventLog);
+    let currentPage = 0;
+
+    const overlay = document.getElementById('epilogue-overlay');
+    const title = overlay.querySelector('.epilogue-title');
+    const body = overlay.querySelector('.epilogue-body');
+    const dots = overlay.querySelectorAll('.epilogue-dot');
+    const backBtn = overlay.querySelector('#epilogue-back');
+    const nextBtn = overlay.querySelector('#epilogue-next');
+    const restartBtn = overlay.querySelector('#epilogue-restart');
+    const keepBtn = overlay.querySelector('#epilogue-keep');
+
+    function render() {
+        const page = pages[currentPage];
+        body.style.opacity = '0';
+        setTimeout(() => {
+            title.textContent = page.title;
+            // SECURITY: page.body is generated entirely by generateEpilogue()
+            // from trusted world state -- no user input or external data
+            body.innerHTML = page.body;  // eslint-disable-line no-unsanitized/property
+            body.scrollTop = 0;
+            body.style.opacity = '1';
+            dots.forEach((d, i) => d.classList.toggle('active', i === currentPage));
+            backBtn.classList.toggle('hidden', currentPage === 0);
+            nextBtn.classList.toggle('hidden', currentPage === pages.length - 1);
+            restartBtn.classList.toggle('hidden', currentPage !== pages.length - 1);
+            keepBtn.classList.toggle('hidden', currentPage !== pages.length - 1);
+        }, 200);
+    }
+
+    backBtn.onclick = () => { if (currentPage > 0) { currentPage--; render(); } };
+    nextBtn.onclick = () => { if (currentPage < pages.length - 1) { currentPage++; render(); } };
+    restartBtn.onclick = () => {
+        overlay.classList.add('hidden');
+        // Find the Dynamic (Offline) preset index
+        const offlineIdx = PRESETS.findIndex(p => p.name.includes('Offline'));
+        if (offlineIdx >= 0) _resetCore(offlineIdx);
+    };
+    keepBtn.onclick = () => {
+        overlay.classList.add('hidden');
+        if (typeof showToast !== 'undefined') showToast('Event storyline complete. Market simulation continues.');
+    };
+
+    overlay.classList.remove('hidden');
+    render();
 }
 
 // ---------------------------------------------------------------------------
