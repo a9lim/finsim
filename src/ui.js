@@ -479,57 +479,12 @@ export function toggleStrategyView($, active) {
 // updatePlayBtn
 // ---------------------------------------------------------------------------
 
-let _playSvg = null;
-let _pauseSvg = null;
-
-function _getPlaySvg() {
-    if (_playSvg) return _playSvg;
-    const NS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('width', '18'); svg.setAttribute('height', '18');
-    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'none');
-    svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '2');
-    svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round');
-    const poly = document.createElementNS(NS, 'polygon');
-    poly.setAttribute('points', '5 3 19 12 5 21 5 3');
-    svg.appendChild(poly);
-    _playSvg = svg;
-    return svg;
-}
-
-function _getPauseSvg() {
-    if (_pauseSvg) return _pauseSvg;
-    const NS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('width', '18'); svg.setAttribute('height', '18');
-    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'none');
-    svg.setAttribute('stroke', 'currentColor'); svg.setAttribute('stroke-width', '2');
-    svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round');
-    for (const [x, y, w, h] of [[6,4,4,16],[14,4,4,16]]) {
-        const rect = document.createElementNS(NS, 'rect');
-        rect.setAttribute('x', x); rect.setAttribute('y', y);
-        rect.setAttribute('width', w); rect.setAttribute('height', h);
-        svg.appendChild(rect);
-    }
-    _pauseSvg = svg;
-    return svg;
-}
-
 export function updatePlayBtn($, playing) {
-    $.playBtn.setAttribute('aria-label', playing ? 'Pause simulation' : 'Play simulation');
-    $.playBtn.title = playing ? 'Pause' : 'Play';
-    $.playBtn.textContent = '';
-    $.playBtn.appendChild((playing ? _getPauseSvg() : _getPlaySvg()).cloneNode(true));
+    _playback.updatePlayBtn($.playBtn, playing);
 }
-
-// ---------------------------------------------------------------------------
-// updateSpeedBtn
-// ---------------------------------------------------------------------------
 
 export function updateSpeedBtn($, speed) {
-    const label = $.speedBtn.querySelector('.speed-label');
-    if (label) label.textContent = speed + 'x';
-    $.speedBtn.title = 'Speed: ' + speed + 'x';
+    _playback.updateSpeedBtn($.speedBtn, speed);
 }
 
 // ---------------------------------------------------------------------------

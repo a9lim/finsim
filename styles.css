@@ -106,18 +106,7 @@ main {
     stroke-width: 2.5;
 }
 
-/* --- Speed Button --- */
-.speed-btn {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    font-weight: 600;
-    min-width: 34px;
-}
-
-/* --- Play/Pause Button States --- */
-#play-btn.playing {
-    color: var(--accent);
-}
+/* Speed button and play/pause states now in shared-base.css */
 
 /* --- Stat group spacing (matches physsim) --- */
 .stat-group {
