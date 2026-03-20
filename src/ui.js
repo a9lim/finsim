@@ -153,7 +153,7 @@ export function bindEvents($, handlers) {
 
     $.advancedToggle.addEventListener('click', () => {
         $.advancedSection.classList.toggle('hidden');
-        _haptics.trigger('selection');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
     });
 
     for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR']) {
@@ -189,7 +189,7 @@ export function bindEvents($, handlers) {
 
     $.chainOverlayClose.addEventListener('click', () => {
         $.chainOverlay.classList.add('hidden');
-        _haptics.trigger('light');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
     });
     $.chainOverlay.addEventListener('click', (e) => {
         if (e.target === $.chainOverlay) $.chainOverlay.classList.add('hidden');
@@ -197,7 +197,7 @@ export function bindEvents($, handlers) {
 
     const closeTrade = () => {
         $.tradeDialog.classList.add('hidden');
-        _haptics.trigger('light');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
     };
     $.tradeDialogClose.addEventListener('click', closeTrade);
     $.tradeCancelBtn.addEventListener('click', closeTrade);
@@ -209,12 +209,12 @@ export function bindEvents($, handlers) {
     $.marginCallDismiss.addEventListener('click', () => {
         $.marginCallOverlay.classList.add('hidden');
         if (typeof onDismissMargin === 'function') onDismissMargin();
-        _haptics.trigger('light');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
     });
     $.marginCallLiquidate.addEventListener('click', () => {
         $.marginCallOverlay.classList.add('hidden');
         if (typeof onLiquidate === 'function') onLiquidate();
-        _haptics.trigger('heavy');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
     });
     $.marginCallOverlay.addEventListener('click', (e) => {
         if (e.target === $.marginCallOverlay) $.marginCallOverlay.classList.add('hidden');
@@ -261,7 +261,7 @@ export function bindEvents($, handlers) {
                 btn.classList.add('active');
                 const isMarket = btn.dataset.ordertype === 'market';
                 $.triggerPriceGroup.classList.toggle('hidden', isMarket);
-                _haptics.trigger('selection');
+                if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
             });
         });
     }
@@ -275,10 +275,10 @@ export function bindEvents($, handlers) {
 
     // Strategy builder: stock/bond cell clicks -> add leg
     if ($.strategyStockCell && typeof handlers.onAddLeg === 'function') {
-        $.strategyStockCell.addEventListener('click', () => { _haptics.trigger('selection'); handlers.onAddLeg('stock', 'long'); });
-        $.strategyStockCell.addEventListener('contextmenu', (e) => { e.preventDefault(); _haptics.trigger('selection'); handlers.onAddLeg('stock', 'short'); });
-        $.strategyBondCell.addEventListener('click', () => { _haptics.trigger('selection'); handlers.onAddLeg('bond', 'long'); });
-        $.strategyBondCell.addEventListener('contextmenu', (e) => { e.preventDefault(); _haptics.trigger('selection'); handlers.onAddLeg('bond', 'short'); });
+        $.strategyStockCell.addEventListener('click', () => { if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('stock', 'long'); });
+        $.strategyStockCell.addEventListener('contextmenu', (e) => { e.preventDefault(); if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('stock', 'short'); });
+        $.strategyBondCell.addEventListener('click', () => { if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('bond', 'long'); });
+        $.strategyBondCell.addEventListener('contextmenu', (e) => { e.preventDefault(); if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('bond', 'short'); });
     }
     if ($.saveStrategyBtn && typeof handlers.onSaveStrategy === 'function') {
         $.saveStrategyBtn.addEventListener('click', handlers.onSaveStrategy);
@@ -401,7 +401,7 @@ export function showChainOverlay($, chain, stockBA, bondBA) {
             btn.textContent = fmtDte(exp.dte);
             btn.addEventListener('click', () => {
                 selectedExpiry = i;
-                _haptics.trigger('selection');
+                if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
                 renderOverlay();
             });
             tabBar.appendChild(btn);
@@ -420,7 +420,7 @@ export function showChainOverlay($, chain, stockBA, bondBA) {
 
     renderOverlay();
     $.chainOverlay.classList.remove('hidden');
-    _haptics.trigger('light');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('light');
 }
 
 // ---------------------------------------------------------------------------
@@ -449,7 +449,7 @@ export function showMarginCall($, marginInfo) {
     frag.appendChild(document.createTextNode('. Liquidate positions or dismiss and manage risk manually.'));
     msg.appendChild(frag);
     $.marginCallOverlay.classList.remove('hidden');
-    _haptics.trigger('error');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('error');
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +466,7 @@ export function toggleStrategyView($, active) {
         $.strategyCanvas.classList.add('hidden');
         $.timeSliderBar.classList.add('hidden');
     }
-    _haptics.trigger('selection');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
 
 // ---------------------------------------------------------------------------
