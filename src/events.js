@@ -5,6 +5,8 @@
    event sources, with MTTH-style followup chains.
    =================================================== */
 
+import { MAX_EVENT_LOG, MAX_FOLLOWUP_DEPTH, FED_MEETING_INTERVAL } from './config.js';
+
 // -- Canonical parameter clamping ranges --------------------------------
 export const PARAM_RANGES = {
     mu:     { min: -0.50, max: 0.50 },
@@ -19,11 +21,11 @@ export const PARAM_RANGES = {
     b:      { min: -0.05, max: 0.20 },
     sigmaR:       { min: 0.001, max: 0.050 },
     borrowSpread: { min: 0.0,   max: 5.0 },
+    q:            { min: 0.0,   max: 0.10 },
 };
 
-const MAX_LOG = 20;
-const MAX_CHAIN_DEPTH = 5;
-const FED_MEETING_INTERVAL = 32;  // ~252/8 = 31.5 → 32 trading days between FOMC meetings
+const MAX_LOG = MAX_EVENT_LOG;
+const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 
 // -- Offline event pool -------------------------------------------------
 export const OFFLINE_EVENTS = [

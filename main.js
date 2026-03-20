@@ -5,12 +5,12 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_AUTOSCROLL_PCT } from './src/config.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
 import {
     portfolio, resetPortfolio, checkPendingOrders, processExpiry,
-    chargeBorrowInterest, checkMargin, aggregateGreeks,
+    chargeBorrowInterest, processDividends, checkMargin, aggregateGreeks,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
     saveStrategy, executeStrategy, computeBidAsk,
@@ -112,13 +112,13 @@ function _strategyExpiryIdx() {
 /** Price one skeleton expiry on demand (price-only, no greeks). */
 function _priceExpiry(idx) {
     if (idx < 0 || idx >= chainSkeleton.length) return null;
-    return priceChainExpiry(sim.S, sim.v, sim.r, chainSkeleton[idx]);
+    return priceChainExpiry(sim.S, sim.v, sim.r, chainSkeleton[idx], false, sim.q);
 }
 
 /** Price one skeleton expiry with full greeks (for overlay). */
 function _priceExpiryGreeks(idx) {
     if (idx < 0 || idx >= chainSkeleton.length) return null;
-    return priceChainExpiry(sim.S, sim.v, sim.r, chainSkeleton[idx], true);
+    return priceChainExpiry(sim.S, sim.v, sim.r, chainSkeleton[idx], true, sim.q);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,18 +141,13 @@ function init() {
     // 2. Create camera for horizontal chart pan/zoom
     if (typeof createCamera !== 'undefined') {
         // Camera zoom = pixels per world unit. 1 world unit = 1 day.
-        // Default zoom=12 → each day = 12 screen px. Range: 12 (100%) to 36 (300%).
-        const DEFAULT_ZOOM = 12;
+        const DEFAULT_ZOOM = CHART_SLOT_PX;
         const vpW = $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800;
         const vpH = $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600;
-        // Position camera so day 0 starts near the left edge of the plot area
-        // screenX = (worldX - cam.x) * zoom + vpW/2
-        // We want worldX=0 at screenX ≈ 80 (left margin): cam.x = (vpW/2 - 80) / zoom
-        const leftMargin = 80;
         camera = createCamera({
             width:   vpW,
             height:  vpH,
-            x:       -(vpW / 2 - leftMargin) / DEFAULT_ZOOM,
+            x:       -(vpW / 2 - CHART_LEFT_MARGIN) / DEFAULT_ZOOM,
             zoom:    DEFAULT_ZOOM,
             minZoom: DEFAULT_ZOOM,
             maxZoom: DEFAULT_ZOOM * 3,
@@ -259,7 +254,7 @@ function init() {
     document.addEventListener('shoals:closePosition', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
-            const ok = closePosition(id, sim.S, Math.sqrt(Math.max(sim.v, 0)), sim.r, sim.day);
+            const ok = closePosition(id, sim.S, Math.sqrt(Math.max(sim.v, 0)), sim.r, sim.day, sim.q);
             if (ok && typeof showToast !== 'undefined') showToast('Position closed.');
             chainDirty = true;
             updateUI();
@@ -270,7 +265,7 @@ function init() {
     document.addEventListener('shoals:exerciseOption', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
-            const result = exerciseOption(id, sim.S, sim.day, Math.sqrt(Math.max(sim.v, 0)), sim.r);
+            const result = exerciseOption(id, sim.S, sim.day, Math.sqrt(Math.max(sim.v, 0)), sim.r, sim.q);
             if (typeof showToast !== 'undefined') {
                 showToast(result ? 'Option exercised.' : 'Cannot exercise.');
             }
@@ -327,11 +322,7 @@ function init() {
     if (camera) {
         const lastDay = sim.history.maxDay;
         const viewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
-        const leftMargin = 80;
-        // Place latest candle at ~85% from left
-        const targetScreenX = viewW * 0.85;
-        // screenX = (worldX - cam.x) * zoom + vpW/2
-        // cam.x = worldX - (targetScreenX - vpW/2) / zoom
+        const targetScreenX = viewW * CHART_AUTOSCROLL_PCT;
         camera.x = (lastDay + 0.5) - (targetScreenX - viewW / 2) / camera.zoom;
     }
 
@@ -413,7 +404,7 @@ function renderCurrentView() {
             strategyLegs, sim.S,
             Math.sqrt(Math.max(sim.v, 0)),
             sim.r, _sliderFallbackDte(), greekToggles,
-            _sliderEvalDay(), sim.day
+            _sliderEvalDay(), sim.day, sim.q
         );
     } else {
         chart.draw(
@@ -492,7 +483,7 @@ function _onSubstep() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
 
     // Check pending orders at intraday price
-    const filledOrders = checkPendingOrders(sim.S, vol, sim.r, sim.day);
+    const filledOrders = checkPendingOrders(sim.S, vol, sim.r, sim.day, sim.q);
     for (const pos of filledOrders) {
         if (typeof showToast !== 'undefined') {
             const side = pos.qty > 0 ? 'Bought' : 'Sold';
@@ -513,6 +504,16 @@ function _onDayComplete() {
     if (rateHistory) pushSparkSample(rateHistory, sim.r);
 
     chargeBorrowInterest(sim.S, vol, sim.r, sim.borrowSpread, sim.day);
+
+    // Quarterly dividend payments (every 63 trading days, aligned with expiry cycle)
+    if (sim.q > 0 && sim.day > 0 && sim.day % QUARTERLY_CYCLE === 0) {
+        const divNet = processDividends(sim.S, sim.q);
+        if (divNet !== 0 && typeof showToast !== 'undefined') {
+            const label = divNet > 0 ? 'Dividend received' : 'Dividend charged';
+            showToast(label + ': $' + Math.abs(divNet).toFixed(2));
+        }
+    }
+
     processExpiry(sim.day, sim.S, sim.day);
 
     // Fire dynamic events
@@ -537,7 +538,7 @@ function _onDayComplete() {
     chainDirty = true;
 
     // Check margin
-    const margin = checkMargin(sim.S, vol, sim.r, sim.day);
+    const margin = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
     if (margin.triggered) {
         playing = false;
         updatePlayBtn($, playing);
@@ -550,8 +551,8 @@ function _onDayComplete() {
         const viewW = $.chartCanvas.clientWidth || 800;
         const targetWorldX = lastDay + 1;
         const rightEdgeWorld = camera.screenToWorldX
-            ? camera.screenToWorldX(viewW * 0.85)
-            : camera.screenToWorld(viewW * 0.85, 0).x;
+            ? camera.screenToWorldX(viewW * CHART_AUTOSCROLL_PCT)
+            : camera.screenToWorld(viewW * CHART_AUTOSCROLL_PCT, 0).x;
         if (targetWorldX > rightEdgeWorld) {
             const dx = targetWorldX - rightEdgeWorld;
             camera.panBy(-dx * camera.zoom, 0);
@@ -604,7 +605,7 @@ function tick() {
 
 function updateUI(precomputedMargin) {
     const vol = Math.sqrt(Math.max(sim.v, 0));
-    const margin = precomputedMargin || checkMargin(sim.S, vol, sim.r, sim.day);
+    const margin = precomputedMargin || checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
     const pMap = _buildPosMap();
     const sMap = strategyMode ? _buildStrategyPosMap() : null;
     if (chainDirty) {
@@ -619,9 +620,9 @@ function updateUI(precomputedMargin) {
         }
         chainDirty = false;
     }
-    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin);
+    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q);
     if (activeTab === 'portfolio') {
-        updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
+        updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     }
     updateRateDisplay($, sim.r, rateHistory);
     if (strategyMode && strategyLegs.length > 0) {
@@ -646,9 +647,9 @@ function updateSubstepUI() {
     }
 
     // Portfolio mark-to-market
-    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day);
+    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, undefined, sim.q);
     if (activeTab === 'portfolio') {
-        updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
+        updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     }
     updateRateDisplay($, sim.r, rateHistory);
 
@@ -847,7 +848,7 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     const orderType = _getOrderType();
     if (orderType === 'market') {
-        const pos = executeMarketOrder(type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay);
+        const pos = executeMarketOrder(type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q);
         if (pos) {
             const label = side === 'short' ? 'Shorted' : 'Bought';
             if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + pos.fillPrice.toFixed(2));
@@ -909,7 +910,7 @@ function handleTradeSubmit(data) {
 
     if (orderType === 'market') {
         const pos = executeMarketOrder(
-            type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay
+            type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q
         );
         if (pos) {
             if (typeof showToast !== 'undefined') showToast('Order filled: ' + type + ' x' + qty);
@@ -931,7 +932,7 @@ function handleTradeSubmit(data) {
 
 function handleLiquidate() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
-    liquidateAll(sim.S, vol, sim.r, sim.day);
+    liquidateAll(sim.S, vol, sim.r, sim.day, sim.q);
     chainDirty = true;
     updateUI();
     dirty = true;
@@ -1017,6 +1018,7 @@ function handleExecStrategy() {
     const savedPositions = portfolio.positions.map(p => ({ ...p }));
     const savedClosedBorrowCost = portfolio.closedBorrowCost;
     const savedMarginDebitCost = portfolio.marginDebitCost;
+    const savedTotalDividends = portfolio.totalDividends;
 
     const results = [];
     let failed = false;
@@ -1025,7 +1027,7 @@ function handleExecStrategy() {
         const absQty = Math.abs(leg.qty);
         const pos = executeMarketOrder(
             leg.type, side, absQty, sim.S, vol, sim.r, sim.day,
-            leg.strike, leg.expiryDay
+            leg.strike, leg.expiryDay, undefined, sim.q
         );
         if (pos) {
             results.push(pos);
@@ -1040,6 +1042,7 @@ function handleExecStrategy() {
         portfolio.cash = savedCash;
         portfolio.closedBorrowCost = savedClosedBorrowCost;
         portfolio.marginDebitCost = savedMarginDebitCost;
+        portfolio.totalDividends = savedTotalDividends;
         portfolio.positions.length = 0;
         for (const p of savedPositions) portfolio.positions.push(p);
         if (typeof showToast !== 'undefined') showToast('Strategy failed (leg ' + (results.length + 1) + ' rejected) — all legs unwound.');
@@ -1057,7 +1060,7 @@ function updateStrategyBuilder() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     const summary = strategyLegs.length > 0
         ? strategy.computeSummary(strategyLegs, sim.S, vol, sim.r, _sliderFallbackDte(),
-            _sliderEvalDay(), sim.day)
+            _sliderEvalDay(), sim.day, sim.q)
         : null;
     renderStrategyBuilder($, strategyLegs, summary, handleRemoveLeg, chainSkeleton, () => {
         strategy.resetRange(sim.S, strategyLegs);
@@ -1074,7 +1077,7 @@ function _repositionCamera() {
     if (!camera) return;
     const lastDay = sim.history.maxDay;
     const viewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
-    const targetScreenX = viewW * 0.85;
+    const targetScreenX = viewW * CHART_AUTOSCROLL_PCT;
     camera.x = (lastDay + 0.5) - (targetScreenX - viewW / 2) / camera.zoom;
 }
 
@@ -1098,6 +1101,7 @@ function _simSettingsObj() {
             b:      sim.b,
             sigmaR: sim.sigmaR,
             borrowSpread: sim.borrowSpread,
+            q: sim.q,
         },
         initialCapital: portfolio.initialCapital,
     };

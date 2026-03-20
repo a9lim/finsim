@@ -19,9 +19,10 @@ import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
  * @param {number} day        - Current simulation day
  * @param {number} [strike]   - Strike price (options only)
  * @param {number} [expiryDay] - Simulation day of expiry (options/bonds)
+ * @param {number} [q=0]      - Continuous dividend yield
  * @returns {number} Mid-market price per unit
  */
-export function unitPrice(type, S, vol, rate, day, strike, expiryDay) {
+export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
     const dte = expiryDay != null
         ? Math.max((expiryDay - day) / TRADING_DAYS_PER_YEAR, 0)
         : 0;
@@ -31,7 +32,7 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay) {
         case 'call':
         case 'put':
             return dte > 0
-                ? priceAmerican(S, strike, dte, rate, vol, type === 'put')
+                ? priceAmerican(S, strike, dte, rate, vol, type === 'put', q)
                 : Math.max(0, type === 'call' ? S - strike : strike - S);
         default: return 0;
     }
@@ -49,10 +50,11 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay) {
  * @param {number} vol  - Current implied volatility (annualized)
  * @param {number} rate - Current risk-free rate
  * @param {number} day  - Current simulation day
+ * @param {number} [q=0] - Continuous dividend yield
  * @returns {number} Signed market value
  */
-export function computePositionValue(pos, S, vol, rate, day) {
-    return pos.qty * unitPrice(pos.type, S, vol, rate, day, pos.strike, pos.expiryDay);
+export function computePositionValue(pos, S, vol, rate, day, q) {
+    return pos.qty * unitPrice(pos.type, S, vol, rate, day, pos.strike, pos.expiryDay, q);
 }
 
 /**
@@ -60,8 +62,8 @@ export function computePositionValue(pos, S, vol, rate, day) {
  *
  * @returns {number} Profit (positive) or loss (negative)
  */
-export function computePositionPnl(pos, S, vol, rate, day) {
-    const currentValue = computePositionValue(pos, S, vol, rate, day);
+export function computePositionPnl(pos, S, vol, rate, day, q) {
+    const currentValue = computePositionValue(pos, S, vol, rate, day, q);
     const absQty = Math.abs(pos.qty);
     const entryTotal = pos.entryPrice * absQty;
 

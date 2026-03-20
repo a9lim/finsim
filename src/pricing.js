@@ -434,12 +434,10 @@ function bs2002Call(S, K, T, r, q, sigma) {
 /**
  * Price an American option.
  *
- * Put-call symmetry for American options (Bjerksund & Stensland 1993):
+ * Put-call symmetry (McDonald & Schroder 1998, Bjerksund & Stensland 1993):
  *   P_am(S, K, T, r, q, σ) = C_am(K, S, T, q, r, σ)
- *
- * With q = 0 for puts (the simulator carries no dividend on the underlying
- * in the put direction), this simplifies to:
- *   P_am(S, K, T, r, 0, σ) = C_am(K, S, T, 0, r, σ)
+ * The roles of r and q swap: q becomes the risk-free rate and r becomes
+ * the dividend yield in the transformed call.
  *
  * @param {number}  S      - Spot price
  * @param {number}  K      - Strike
@@ -447,18 +445,15 @@ function bs2002Call(S, K, T, r, q, sigma) {
  * @param {number}  r      - Risk-free rate
  * @param {number}  sigma  - Volatility
  * @param {boolean} isPut  - true = put, false = call
+ * @param {number}  [q=0]  - Continuous dividend yield
  */
-function priceAmerican(S, K, T, r, sigma, isPut) {
+function priceAmerican(S, K, T, r, sigma, isPut, q) {
+    q = q || 0;
     if (isPut) {
-        // Put-call symmetry (McDonald & Schroder 1998, Bjerksund & Stensland 1993):
-        //   P_am(S, K, T, r, q, σ) = C_am(K, S, T, q, r, σ)
-        // With q=0 (no dividend on underlying in put direction):
-        //   P_am(S, K, T, r, 0, σ) = C_am(K, S, T, q_new=0, r_new=r, σ)
-        // The "transformed call" has: r_new=q_original=0, q_new=r_original=r
-        // so we call bs2002Call(K, S, T, r_new=0, q_new=r, sigma).
-        return bs2002Call(K, S, T, 0, r, sigma);
+        // Put-call symmetry: P(S,K,T,r,q,σ) = C(K,S,T,q,r,σ)
+        return bs2002Call(K, S, T, q, r, sigma);
     }
-    return bs2002Call(S, K, T, r, 0, sigma);
+    return bs2002Call(S, K, T, r, q, sigma);
 }
 
 // ---------------------------------------------------------------------------
@@ -476,15 +471,15 @@ function priceAmerican(S, K, T, r, sigma, isPut) {
  *
  * @returns {{ price, delta, gamma, theta, vega, rho }}
  */
-export function computeGreeks(S, K, T, r, sigma, isPut) {
+export function computeGreeks(S, K, T, r, sigma, isPut, q) {
     const h_S     = S * 0.01;
     const h_T     = 1 / 252;
     const h_sigma = 0.001;
     const h_r     = 0.0001;
 
-    const price = priceAmerican(S, K, T, r, sigma, isPut);
-    const pUp   = priceAmerican(S + h_S, K, T, r, sigma, isPut);
-    const pDn   = priceAmerican(S - h_S, K, T, r, sigma, isPut);
+    const price = priceAmerican(S, K, T, r, sigma, isPut, q);
+    const pUp   = priceAmerican(S + h_S, K, T, r, sigma, isPut, q);
+    const pDn   = priceAmerican(S - h_S, K, T, r, sigma, isPut, q);
 
     return {
         price,
@@ -493,13 +488,13 @@ export function computeGreeks(S, K, T, r, sigma, isPut) {
         theta: (() => {
             const T_lo = Math.max(T - h_T, 1e-10);
             const T_hi = T + h_T;
-            return (priceAmerican(S, K, T_lo, r, sigma, isPut)
-                  - priceAmerican(S, K, T_hi, r, sigma, isPut)) / (T_hi - T_lo);
+            return (priceAmerican(S, K, T_lo, r, sigma, isPut, q)
+                  - priceAmerican(S, K, T_hi, r, sigma, isPut, q)) / (T_hi - T_lo);
         })(),
-        vega:  (priceAmerican(S, K, T, r, sigma + h_sigma, isPut)
-              - priceAmerican(S, K, T, r, sigma - h_sigma, isPut)) / (2 * h_sigma),
-        rho:   (priceAmerican(S, K, T, r + h_r, sigma, isPut)
-              - priceAmerican(S, K, T, r - h_r, sigma, isPut)) / (2 * h_r),
+        vega:  (priceAmerican(S, K, T, r, sigma + h_sigma, isPut, q)
+              - priceAmerican(S, K, T, r, sigma - h_sigma, isPut, q)) / (2 * h_sigma),
+        rho:   (priceAmerican(S, K, T, r + h_r, sigma, isPut, q)
+              - priceAmerican(S, K, T, r - h_r, sigma, isPut, q)) / (2 * h_r),
     };
 }
 

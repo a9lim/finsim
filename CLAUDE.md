@@ -40,7 +40,8 @@ colors.js               59 lines  Financial color aliases (_PALETTE.up/down/call
                                    bond/delta/gamma/theta/vega/rho), CSS var injection,
                                    freezes _PALETTE
 src/
-  config.js             26 lines  Named constants and PRESETS array (5 static + 2 dynamic regimes)
+  config.js             64 lines  All tunable constants (timing, instruments, margin, spreads,
+                                   event engine, chart/strategy rendering) and PRESETS (5 static + 2 dynamic)
   format-helpers.js     48 lines  Shared formatting: fmtDollar(), fmtNum(), pnlClass(),
                                    fmtDte(), fmtRelDay(), posTypeLabel(). Single source for UI modules.
   position-value.js    ~40 lines  Unified position valuation: computePositionValue(),
@@ -65,7 +66,7 @@ src/
   pricing.js           435 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
                                    normal CDF (Drezner-Wesolowsky 1990) + finite-diff Greeks.
                                    Exports: priceAmerican, computeGreeks
-  chain.js             170 lines  ExpiryManager (rolling 8-expiry window, 63-day cycle),
+  chain.js             170 lines  ExpiryManager (rolling EXPIRY_COUNT window, QUARTERLY_CYCLE cycle),
                                    generateStrikes(), buildChainSkeleton(),
                                    priceChainExpiry() (lazy per-expiry pricing)
   portfolio.js         770 lines  Signed-qty positions, market/limit/stop orders, netting,
@@ -104,7 +105,8 @@ main.js
   |- src/chain.js         (buildChainSkeleton, priceChainExpiry, generateStrikes,
   |                         ExpiryManager -- imports pricing, portfolio, config)
   |- src/portfolio.js     (portfolio, resetPortfolio, executeMarketOrder, computeBidAsk,
-  |                         checkPendingOrders, chargeBorrowInterest, processExpiry,
+  |                         checkPendingOrders, chargeBorrowInterest, processDividends,
+  |                         processExpiry,
   |                         checkMargin, aggregateGreeks, closePosition, exerciseOption,
   |                         liquidateAll, placePendingOrder, cancelOrder, saveStrategy,
   |                         executeStrategy -- imports pricing, config, position-value)
@@ -150,10 +152,10 @@ Pausing mid-day leaves the partial bar frozen. Resuming continues from where it 
 
 ### Stock Price Model
 
-GBM with Merton jumps and Heston stochastic volatility (Euler-Maruyama, full truncation):
+GBM with Merton jumps, Heston stochastic volatility, and continuous dividend yield (Euler-Maruyama, full truncation):
 
 ```
-dS/S = (mu - lambda*k - 0.5*v)dt + sqrt(v) * dW1 + J * dN(lambda)
+dS/S = (mu - q - lambda*k - 0.5*v)dt + sqrt(v) * dW1 + J * dN(lambda)
 dv   = kappa(theta - v)dt + xi*sqrt(v) * dW2      (dW1*dW2 = rho*dt)
 ```
 
@@ -172,13 +174,13 @@ Vasicek: `dr = a(b - r)dt + sigmaR * dW3` (independent of dW1, dW2). Rate uncons
 
 ### Market Regime Presets
 
-| Preset | mu | theta | kappa | xi | rho | lambda | muJ | sigmaJ | a | b | sigmaR | borrowSpread |
-|--------|-----|-------|-------|----|------|--------|------|--------|-----|------|--------|--------------|
-| Calm Bull | 0.08 | 0.04 | 3.0 | 0.3 | -0.5 | 0.5 | -0.02 | 0.03 | 0.5 | 0.04 | 0.005 | 0.5 |
-| Sideways | 0.02 | 0.06 | 2.0 | 0.4 | -0.6 | 1.0 | -0.01 | 0.04 | 0.5 | 0.03 | 0.008 | 0.5 |
-| Volatile | 0.05 | 0.12 | 1.5 | 0.6 | -0.7 | 3.0 | -0.03 | 0.06 | 0.3 | 0.05 | 0.012 | 0.5 |
-| Crisis | -0.10 | 0.25 | 0.5 | 0.8 | -0.85 | 8.0 | -0.08 | 0.10 | 0.2 | 0.02 | 0.020 | 0.5 |
-| Rate Hike | 0.04 | 0.08 | 2.0 | 0.5 | -0.6 | 1.5 | -0.02 | 0.05 | 0.8 | 0.08 | 0.015 | 0.5 |
+| Preset | mu | theta | kappa | xi | rho | lambda | muJ | sigmaJ | a | b | sigmaR | borrowSpread | q |
+|--------|-----|-------|-------|----|------|--------|------|--------|-----|------|--------|--------------|------|
+| Calm Bull | 0.08 | 0.04 | 3.0 | 0.3 | -0.5 | 0.5 | -0.02 | 0.03 | 0.5 | 0.04 | 0.005 | 0.5 | 0.02 |
+| Sideways | 0.02 | 0.06 | 2.0 | 0.4 | -0.6 | 1.0 | -0.01 | 0.04 | 0.5 | 0.03 | 0.008 | 0.5 | 0.02 |
+| Volatile | 0.05 | 0.12 | 1.5 | 0.6 | -0.7 | 3.0 | -0.03 | 0.06 | 0.3 | 0.05 | 0.012 | 0.5 | 0.01 |
+| Crisis | -0.10 | 0.25 | 0.5 | 0.8 | -0.85 | 8.0 | -0.08 | 0.10 | 0.2 | 0.02 | 0.020 | 0.5 | 0.00 |
+| Rate Hike | 0.04 | 0.08 | 2.0 | 0.5 | -0.6 | 1.5 | -0.02 | 0.05 | 0.8 | 0.08 | 0.015 | 0.5 | 0.02 |
 
 On reset: `S = 100`, `v = theta`, `r = b`. History cleared, prepopulated, camera repositioned.
 
@@ -186,7 +188,7 @@ On reset: `S = 100`, `v = theta`, `r = b`. History cleared, prepopulated, camera
 
 ### Bjerksund-Stensland 2002
 
-Analytical approximation for American options. Computes perpetual exercise boundary, splits time at golden ratio, uses `_phi()` and `_psi()` helper functions. Falls back to European BS when early exercise is never optimal. Put pricing via put-call symmetry. Small floor `rEff = max(r, 1e-7)` prevents degenerate case. Bivariate normal CDF via Drezner-Wesolowsky 5-point Gauss-Legendre.
+Analytical approximation for American options with continuous dividend yield `q`. Cost of carry `b = r - q`. Computes perpetual exercise boundary, splits time at golden ratio, uses `_phi()` and `_psi()` helper functions. Falls back to European BS when `b >= r` (i.e., `q <= 0`). Put pricing via put-call symmetry: `P(S,K,T,r,q,σ) = C(K,S,T,q,r,σ)`. Small floor `rEff = max(r, 1e-7)` prevents degenerate case. Bivariate normal CDF via Drezner-Wesolowsky 20-point Gauss-Legendre.
 
 ### Finite-Difference Greeks
 
@@ -202,17 +204,17 @@ Analytical approximation for American options. Computes perpetual exercise bound
 
 ### Bid/Ask Spread Model
 
-All instruments use volatility-aware spreads. Two functions in `portfolio.js`. Callers pass `sigma = sqrt(v)` (not variance). Bids floored at 0.
+All instruments use volatility-aware spreads. Two functions in `portfolio.js`. Callers pass `sigma = sqrt(v)` (not variance). Bids floored at 0. Spread constants (`MIN_HALF_SPREAD`, `SPREAD_PCT`, `MONEYNESS_SPREAD_WEIGHT`) defined in config.js.
 
 **`computeOptionBidAsk(mid, S, K, sigma)`** -- options (includes moneyness):
 ```
-halfSpread = max(0.025, mid * 0.01 * (1 + sigma) + 0.05 * |log(S/K)|)
+halfSpread = max(MIN_HALF_SPREAD, mid * SPREAD_PCT * (1 + sigma) + MONEYNESS_SPREAD_WEIGHT * |log(S/K)|)
 bid = max(0, mid - halfSpread), ask = mid + halfSpread
 ```
 
 **`computeBidAsk(mid, S, sigma)`** -- stock/bond (moneyness = 0):
 ```
-halfSpread = max(0.025, mid * 0.01 * (1 + sigma))
+halfSpread = max(MIN_HALF_SPREAD, mid * SPREAD_PCT * (1 + sigma))
 bid = max(0, mid - halfSpread), ask = mid + halfSpread
 ```
 
@@ -226,7 +228,7 @@ ATM = `round(S / 5) * 5`. 12 strikes each side, filtered positive, sorted ascend
 
 ### Expiry Management
 
-`ExpiryManager` maintains 8 rolling expiry dates on a 63-day cycle (~quarterly). `update(currentDay)` drops expired, appends new. Returns `[{ day, dte }]`.
+`ExpiryManager` maintains `EXPIRY_COUNT` (8) rolling expiry dates on a `QUARTERLY_CYCLE` (63-day) cycle. `update(currentDay)` drops expired, appends new. Returns `[{ day, dte }]`.
 
 ### Lazy Chain Architecture
 
@@ -291,6 +293,18 @@ dailyCost = |qty| * notional * (max(r, 0) + borrowSpread * sigma) / 252
 - Also charges on negative cash (margin debit): `dailyCost = |cash| * dailyRate`. Tracked in `portfolio.marginDebitCost`
 - Called in `_onDayComplete()` before `processExpiry()`
 
+### Dividend System
+
+Continuous dividend yield `q` affects pricing (cost of carry `b = r - q`) and stock drift (`mu - q`). Discrete cash payments every `QUARTERLY_CYCLE` (63) trading days (aligned with expiry cycle):
+
+- `dividendPerShare = S * q / 4` (quarterly)
+- Long stock: receive `qty * dividendPerShare` as cash
+- Short stock: pay `|qty| * dividendPerShare` from cash
+- `processDividends(S, q)` in portfolio.js. Net tracked in `portfolio.totalDividends`
+- Toast notification on dividend day
+- No ex-dividend price drop — continuous yield in the drift already reflects the drain
+- Slider range: 0% to 10%, step 0.5%, default 2% (Crisis preset: 0%)
+
 ### Option Expiry
 
 `processExpiry()`: Bonds settle at face value ($100) on maturity. ITM option longs auto-exercised, OTM longs expire worthless, shorts removed with margin returned. Short ITM options are NOT assigned (simplified model).
@@ -336,7 +350,7 @@ Play/pause, speed (0.25x-4x, left-click faster / right-click slower), step, rese
 
 **Settings tab:**
 - Market Regime preset dropdown
-- Advanced Parameters (12 sliders)
+- Advanced Parameters (13 sliders)
 
 ### Candlestick Chart
 
@@ -396,7 +410,7 @@ Two dynamic market regime modes use a shared event engine (`src/events.js`):
 
 ### Event Engine
 
-`EventEngine` fires narrative events via two mechanisms: scheduled FOMC meetings (every 32 trading days, ~8x/year) and Poisson-drawn non-Fed events (~1 per 60 trading days). Events apply additive parameter deltas to the simulation, clamped to `PARAM_RANGES`. Called from `_onDayComplete()` in main.js. Events have `likelihood` weights for weighted random selection (`_weightedPick`); high-likelihood neutral/flavor events dilute directional bias so the stock doesn't drift to zero or infinity.
+`EventEngine` fires narrative events via two mechanisms: scheduled FOMC meetings (every `FED_MEETING_INTERVAL` (32) trading days, ~8x/year) and Poisson-drawn non-Fed events (~1 per 60 trading days). Events apply additive parameter deltas to the simulation, clamped to `PARAM_RANGES`. Called from `_onDayComplete()` in main.js. Events have `likelihood` weights for weighted random selection (`_weightedPick`); high-likelihood neutral/flavor events dilute directional bias so the stock doesn't drift to zero or infinity.
 
 Two event sources:
 - **Offline** (preset index 5): draws from `OFFLINE_EVENTS` pool (88 curated events across Fed/monetary, macro/geopolitical, sector/tech, PNTH company, market structure, and neutral/flavor categories)
@@ -404,7 +418,7 @@ Two event sources:
 
 ### Event Scheduling
 
-- **Fed events** (`category: 'fed'`): fire on a fixed schedule every 32 trading days (~8x/year, like real FOMC). One eligible Fed event drawn via weighted random. Fed events excluded from the Poisson pool.
+- **Fed events** (`category: 'fed'`): fire on a fixed schedule every `FED_MEETING_INTERVAL` (32) trading days (~8x/year, like real FOMC). One eligible Fed event drawn via weighted random. Fed events excluded from the Poisson pool.
 - **Non-Fed events**: Poisson rate 1/60 (~1 event per 60 trading days). Drawn from all non-fed events via weighted random.
 - **Followup chain events**: fire on their scheduled `targetDay`, independent of both the Fed schedule and Poisson rate.
 
@@ -482,7 +496,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Event deltas are additive and clamped** to `PARAM_RANGES` -- never set absolute values via events.
 - **LLM followup events** now include `headline`, `params`, `magnitude` in the tool schema. Offline followups still resolved via `_getEventById`; LLM followups carry their own data.
 - **`_pendingFollowups` cleared on reset** -- switching presets mid-chain drops all scheduled followups.
-- **Slider ranges expanded globally** -- all 12 parameter sliders have wider min/max than the original presets use. Events can push params to extremes.
+- **Slider ranges expanded globally** -- all 13 parameter sliders have wider min/max than the original presets use. Events can push params to extremes.
 - **`borrowCost` on positions** -- cumulative borrow interest charged to short stock/bond positions. Preserved in `portfolio.closedBorrowCost` when positions close/flip/expire.
 - **`portfolio.marginDebitCost`** -- cumulative interest charged on negative cash (buying on margin). Included in borrow cost display. Reset on `resetPortfolio()`.
 - **`_haptics` must always be guarded** -- use `if (typeof _haptics !== 'undefined') _haptics.trigger(...)`. The global loads from `/shared-haptics.js`; ES6 modules may execute before it's defined.
@@ -495,4 +509,6 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Lazy chain: skeleton vs priced expiry** -- `chainSkeleton` (in main.js) holds expiry metadata + strikes with no pricing. `_priceExpiry(idx)` / `_priceExpiryGreeks(idx)` compute prices on demand for one expiry. Only the currently visible expiry is priced each substep (50 calls). Full Greeks only computed for the chain overlay.
 - **Substep UI updates** -- `_onSubstep()` fires after each substep batch during playback. It checks pending orders at intraday prices, reprices the visible expiry, and updates the sidebar (portfolio, rate, chain table). Dropdown rebuild happens only on day-complete via `chainDirty`.
 - **Strategy tab pauses sim** -- switching to the strategy tab sets `playing = false`. The user must manually resume after leaving the tab.
+- **`q` (dividend yield) threads through all pricing** -- `priceAmerican(S, K, T, r, sigma, isPut, q)` and `computeGreeks(S, K, T, r, sigma, isPut, q)` accept `q` as the last optional param (default 0). All call sites in chain.js, portfolio.js, position-value.js, strategy.js pass it explicitly.
+- **Dividends fire every `QUARTERLY_CYCLE` trading days** -- aligned with expiry cycle. `sim.day % QUARTERLY_CYCLE === 0` in `_onDayComplete()`. No payment if `q === 0` or no stock positions.
 - **No hardcoded colors in JS** -- chart.js and strategy.js use `_PALETTE` and `_r()` for all colors. CSS slider-track fallbacks in styles.css are the only remaining hardcoded rgba values (defensive fallback for when shared-tokens.js hasn't loaded).
