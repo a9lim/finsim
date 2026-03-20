@@ -28,6 +28,7 @@ import {
 import { initTheme, toggleTheme } from './src/theme.js';
 import { EventEngine } from './src/events.js';
 import { LLMEventSource } from './src/llm.js';
+import { posKey } from './src/chain-renderer.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -54,6 +55,28 @@ let sliderPct = 100;  // percentage of max DTE (100% = full time, 0% = at expiry
 let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let llmSource = null;     // LLMEventSource singleton
+
+// ---------------------------------------------------------------------------
+// Position map builders (for chain pill indicators)
+// ---------------------------------------------------------------------------
+
+function _buildPosMap() {
+    const map = {};
+    for (const pos of portfolio.positions) {
+        const key = posKey(pos.type, pos.strike, pos.expiryDay);
+        map[key] = (map[key] || 0) + pos.qty;
+    }
+    return map;
+}
+
+function _buildStrategyPosMap() {
+    const map = {};
+    for (const leg of strategyLegs) {
+        const key = posKey(leg.type, leg.strike, leg.expiryDay);
+        map[key] = (map[key] || 0) + leg.qty;
+    }
+    return map;
+}
 
 // ---------------------------------------------------------------------------
 // Bootstrap
@@ -176,13 +199,13 @@ function init() {
         onBuyBond:        () => handleBuyBond(),
         onShortBond:      () => handleShortBond(),
         onChainCellClick: (info) => handleChainCellClick(info),
-        onExpiryChange:   (idx) => { updateChainDisplay($, chain, idx); updateStockBondPrices($, sim.S, sim.r, chain); dirty = true; },
+        onExpiryChange:   (idx) => { updateChainDisplay($, chain, idx, _buildPosMap()); updateStockBondPrices($, sim.S, sim.r, chain, _buildPosMap(), strategyMode ? _buildStrategyPosMap() : null); dirty = true; },
         onFullChainOpen:  () => openFullChain(),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
         onDismissMargin:  () => { /* sim stays paused, overlay hidden by ui.js */ },
         onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
-        onStrategyExpiryChange: (idx) => { updateStrategyChainDisplay($, chain, idx, handleAddLeg); updateStockBondPrices($, sim.S, sim.r, chain); dirty = true; },
+        onStrategyExpiryChange: (idx) => { updateStrategyChainDisplay($, chain, idx, handleAddLeg, _buildStrategyPosMap()); updateStockBondPrices($, sim.S, sim.r, chain, _buildPosMap(), _buildStrategyPosMap()); dirty = true; },
         onSaveStrategy:   () => handleSaveStrategy(),
         onExecStrategy:   () => handleExecStrategy(),
         onLLMKeyChange:   (key) => { if (llmSource) llmSource.setApiKey(key); },
@@ -195,6 +218,7 @@ function init() {
         if (id != null) {
             const ok = closePosition(id, sim.S, Math.sqrt(Math.max(sim.v, 0)), sim.r, sim.day);
             if (ok && typeof showToast !== 'undefined') showToast('Position closed.');
+            chainDirty = true;
             updateUI();
             dirty = true;
         }
@@ -207,6 +231,7 @@ function init() {
             if (typeof showToast !== 'undefined') {
                 showToast(result ? 'Option exercised.' : 'Cannot exercise.');
             }
+            chainDirty = true;
             updateUI();
             dirty = true;
         }
@@ -313,8 +338,8 @@ function init() {
                 dirty = true;
             }
             if (isStrategy) {
-                updateStrategySelectors($, chain, sim.S, handleAddLeg);
-                updateStockBondPrices($, sim.S, sim.r, chain);
+                updateStrategySelectors($, chain, sim.S, handleAddLeg, _buildStrategyPosMap());
+                updateStockBondPrices($, sim.S, sim.r, chain, _buildPosMap(), _buildStrategyPosMap());
             }
         });
     });
@@ -506,11 +531,13 @@ function tick() {
 function updateUI(precomputedMargin) {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     const margin = precomputedMargin || checkMargin(sim.S, vol, sim.r, sim.day);
+    const pMap = _buildPosMap();
+    const sMap = strategyMode ? _buildStrategyPosMap() : null;
     if (chainDirty) {
-        updateChainDisplay($, chain);
-        updateStockBondPrices($, sim.S, sim.r, chain);
+        updateChainDisplay($, chain, undefined, pMap);
+        updateStockBondPrices($, sim.S, sim.r, chain, pMap, sMap);
         if (strategyMode) {
-            updateStrategySelectors($, chain, sim.S, handleAddLeg);
+            updateStrategySelectors($, chain, sim.S, handleAddLeg, sMap);
         }
         chainDirty = false;
     }
@@ -725,6 +752,7 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
         if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' order placed for ' + qty + ' ' + type + '.');
         if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
     }
+    chainDirty = true;
     updateUI();
     dirty = true;
 }
@@ -762,7 +790,7 @@ function openFullChain() {
     const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
     const stockBA = computeBidAsk(sim.S, sim.S, vol);
     const bondBA = computeBidAsk(bondMid, sim.S, vol);
-    showChainOverlay($, chain, stockBA, bondBA);
+    showChainOverlay($, chain, stockBA, bondBA, _buildPosMap());
 }
 
 function handleTradeSubmit(data) {
@@ -786,6 +814,7 @@ function handleTradeSubmit(data) {
         if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
     }
 
+    chainDirty = true;
     updateUI();
     dirty = true;
 }
@@ -793,6 +822,7 @@ function handleTradeSubmit(data) {
 function handleLiquidate() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     liquidateAll(sim.S, vol, sim.r, sim.day);
+    chainDirty = true;
     updateUI();
     dirty = true;
     if (typeof showToast !== 'undefined') showToast('All positions liquidated.');
@@ -833,6 +863,8 @@ function handleAddLeg(type, side, strike, expiryDay) {
     }
 
     strategy.resetRange(sim.S, strategyLegs);
+    updateStrategyChainDisplay($, chain, null, handleAddLeg, _buildStrategyPosMap());
+    updateStockBondPrices($, sim.S, sim.r, chain, _buildPosMap(), _buildStrategyPosMap());
     updateStrategyBuilder();
     updateTimeSliderRange();
     dirty = true;
@@ -842,6 +874,8 @@ function handleAddLeg(type, side, strike, expiryDay) {
 function handleRemoveLeg(index) {
     strategyLegs.splice(index, 1);
     strategy.resetRange(sim.S, strategyLegs);
+    updateStrategyChainDisplay($, chain, null, handleAddLeg, _buildStrategyPosMap());
+    updateStockBondPrices($, sim.S, sim.r, chain, _buildPosMap(), _buildStrategyPosMap());
     updateStrategyBuilder();
     updateTimeSliderRange();
     dirty = true;
@@ -902,6 +936,7 @@ function handleExecStrategy() {
         if (typeof showToast !== 'undefined') showToast('Executed ' + results.length + ' leg(s).');
         if (typeof _haptics !== 'undefined') _haptics.trigger('success');
     }
+    chainDirty = true;
     updateUI();
     dirty = true;
 }

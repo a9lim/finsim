@@ -7,7 +7,7 @@
    ===================================================== */
 
 import { fmtDollar, fmtNum, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
-import { renderChainInto, buildStockBondTable, buildChainTable, bindChainTableClicks } from './chain-renderer.js';
+import { renderChainInto, buildStockBondTable, buildChainTable, bindChainTableClicks, posKey } from './chain-renderer.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
 // ---------------------------------------------------------------------------
@@ -295,8 +295,8 @@ export function bindEvents($, handlers) {
 // updateChainDisplay
 // ---------------------------------------------------------------------------
 
-export function updateChainDisplay($, chain, selectedExpiryIndex) {
-    renderChainInto($.chainTable, chain, selectedExpiryIndex, $.tradeExpiry, $._onChainCellClick);
+export function updateChainDisplay($, chain, selectedExpiryIndex, posMap) {
+    renderChainInto($.chainTable, chain, selectedExpiryIndex, $.tradeExpiry, $._onChainCellClick, posMap);
 }
 
 
@@ -329,7 +329,13 @@ export function updateRateDisplay($, rate) {
 // updateStockBondPrices -- updates both trade-tab and strategy-tab cells
 // ---------------------------------------------------------------------------
 
-export function updateStockBondPrices($, spot, rate, chain) {
+function _applyPill(el, text, qty) {
+    el.textContent = text;
+    el.classList.remove('pos-long', 'pos-short');
+    if (qty) el.classList.add(qty > 0 ? 'pos-long' : 'pos-short');
+}
+
+export function updateStockBondPrices($, spot, rate, chain, posMap, stratPosMap) {
     const dash = '\u2014';
     const stockTxt = spot != null ? spot.toFixed(2) : dash;
 
@@ -342,8 +348,13 @@ export function updateStockBondPrices($, spot, rate, chain) {
         ? (100 * Math.exp(-rate * tradeExp.dte / 252)).toFixed(2)
         : dash;
 
-    if ($.stockPriceCell) $.stockPriceCell.textContent = stockTxt;
-    if ($.bondPriceCell) $.bondPriceCell.textContent = tradeBond;
+    if ($.stockPriceCell) _applyPill($.stockPriceCell, stockTxt, posMap && posMap['stock']);
+    if ($.bondPriceCell) {
+        const bondQty = posMap && tradeExp
+            ? posMap[posKey('bond', null, tradeExp.day)]
+            : null;
+        _applyPill($.bondPriceCell, tradeBond, bondQty);
+    }
 
     // Strategy tab bond: from strategy expiry dropdown
     const stratIdx = parseInt($.strategyExpiry?.value, 10);
@@ -354,8 +365,14 @@ export function updateStockBondPrices($, spot, rate, chain) {
         ? (100 * Math.exp(-rate * stratExp.dte / 252)).toFixed(2)
         : dash;
 
-    if ($.strategyStockCell) $.strategyStockCell.textContent = stockTxt;
-    if ($.strategyBondCell) $.strategyBondCell.textContent = stratBond;
+    const sMap = stratPosMap || posMap;
+    if ($.strategyStockCell) _applyPill($.strategyStockCell, stockTxt, sMap && sMap['stock']);
+    if ($.strategyBondCell) {
+        const bondQty = sMap && stratExp
+            ? sMap[posKey('bond', null, stratExp.day)]
+            : null;
+        _applyPill($.strategyBondCell, stratBond, bondQty);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +396,7 @@ export function syncSettingsUI($, sim) {
 // showChainOverlay
 // ---------------------------------------------------------------------------
 
-export function showChainOverlay($, chain, stockBA, bondBA) {
+export function showChainOverlay($, chain, stockBA, bondBA, posMap) {
     $.chainOverlayTable.textContent = '';
 
     if (!chain || chain.length === 0) {
@@ -413,11 +430,11 @@ export function showChainOverlay($, chain, stockBA, bondBA) {
 
         // Stock / Bond price table
         $.chainOverlayTable.appendChild(
-            buildStockBondTable(stockBA, bondBA, $._onChainCellClick)
+            buildStockBondTable(stockBA, bondBA, $._onChainCellClick, posMap)
         );
 
         const expiry = chain[selectedExpiry];
-        $.chainOverlayTable.appendChild(buildChainTable(expiry, false));
+        $.chainOverlayTable.appendChild(buildChainTable(expiry, false, posMap));
         if (!$.chainOverlayTable._chainClicksBound) {
             bindChainTableClicks($.chainOverlayTable, $._onChainCellClick);
             $.chainOverlayTable._chainClicksBound = true;
@@ -495,9 +512,9 @@ export function updateSpeedBtn($, speed) {
  * Update the strategy chain table, stock/bond prices, and trigger price slider.
  * Called whenever the chain is rebuilt.
  */
-export function updateStrategySelectors($, chain, spot, onAddLeg) {
+export function updateStrategySelectors($, chain, spot, onAddLeg, posMap) {
     // Strategy chain table + expiry dropdown (built together by renderChainInto)
-    updateStrategyChainDisplay($, chain, null, onAddLeg);
+    updateStrategyChainDisplay($, chain, null, onAddLeg, posMap);
 
     // Trigger price slider range based on current spot (+-30%)
     if ($.triggerPrice && spot) {
@@ -513,7 +530,7 @@ export function updateStrategySelectors($, chain, spot, onAddLeg) {
     }
 }
 
-export function updateStrategyChainDisplay($, chain, selectedIndex, onAddLeg) {
+export function updateStrategyChainDisplay($, chain, selectedIndex, onAddLeg, posMap) {
     if (!$.strategyChainTable) return;
 
     // Wrap onAddLeg into the { type, side, strike, expiryDay } callback shape
@@ -521,7 +538,7 @@ export function updateStrategyChainDisplay($, chain, selectedIndex, onAddLeg) {
         ? (info) => onAddLeg(info.type, info.side, info.strike, info.expiryDay)
         : null;
 
-    renderChainInto($.strategyChainTable, chain, selectedIndex, $.strategyExpiry, onClick);
+    renderChainInto($.strategyChainTable, chain, selectedIndex, $.strategyExpiry, onClick, posMap);
 }
 
 

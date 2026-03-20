@@ -12,7 +12,20 @@ import { fmtDte, fmtNum } from './format-helpers.js';
 // Internal chain table builders (DOM methods -- no text interpolation)
 // ---------------------------------------------------------------------------
 
-function buildChainRow(row, expiry, isAtm, compact) {
+export function posKey(type, strike, expiryDay) {
+    if (type === 'stock') return 'stock';
+    if (type === 'bond') return 'bond:' + expiryDay;
+    return type + ':' + strike + ':' + expiryDay;
+}
+
+function _wrapPrice(td, text, posMap, type, strike, expiryDay) {
+    td.textContent = text;
+    const key = posKey(type, strike, expiryDay);
+    const qty = posMap && posMap[key];
+    if (qty) td.classList.add(qty > 0 ? 'pos-long' : 'pos-short');
+}
+
+function buildChainRow(row, expiry, isAtm, compact, posMap) {
     const tr = document.createElement('tr');
     tr.className = 'chain-row' + (isAtm ? ' atm-row' : '');
 
@@ -22,13 +35,13 @@ function buildChainRow(row, expiry, isAtm, compact) {
 
         const callTd = document.createElement('td');
         callTd.className = 'chain-cell call-cell';
-        callTd.textContent = callMid;
         callTd.title = 'Bid ' + row.call.bid.toFixed(2) + ' / Ask ' + row.call.ask.toFixed(2);
         callTd.setAttribute('tabindex', '0');
         callTd.setAttribute('role', 'button');
         callTd.dataset.strike    = row.strike;
         callTd.dataset.expiryDay = expiry.day;
         callTd.dataset.type      = 'call';
+        _wrapPrice(callTd, callMid, posMap, 'call', row.strike, expiry.day);
 
         const strikeTd = document.createElement('td');
         strikeTd.className = 'chain-cell strike-cell' + (isAtm ? ' atm-strike' : '');
@@ -36,13 +49,13 @@ function buildChainRow(row, expiry, isAtm, compact) {
 
         const putTd = document.createElement('td');
         putTd.className = 'chain-cell put-cell';
-        putTd.textContent = putMid;
         putTd.title = 'Bid ' + row.put.bid.toFixed(2) + ' / Ask ' + row.put.ask.toFixed(2);
         putTd.setAttribute('tabindex', '0');
         putTd.setAttribute('role', 'button');
         putTd.dataset.strike    = row.strike;
         putTd.dataset.expiryDay = expiry.day;
         putTd.dataset.type      = 'put';
+        _wrapPrice(putTd, putMid, posMap, 'put', row.strike, expiry.day);
 
         tr.appendChild(callTd);
         tr.appendChild(strikeTd);
@@ -58,13 +71,15 @@ function buildChainRow(row, expiry, isAtm, compact) {
         for (const c of cellDefs) {
             const td = document.createElement('td');
             td.className = 'chain-cell ' + c.cls;
-            td.textContent = c.text;
             if (c.type) {
                 td.setAttribute('tabindex', '0');
                 td.setAttribute('role', 'button');
                 td.dataset.strike    = row.strike;
                 td.dataset.expiryDay = expiry.day;
                 td.dataset.type      = c.type;
+                _wrapPrice(td, c.text, posMap, c.type, row.strike, expiry.day);
+            } else {
+                td.textContent = c.text;
             }
             tr.appendChild(td);
         }
@@ -72,7 +87,7 @@ function buildChainRow(row, expiry, isAtm, compact) {
     return tr;
 }
 
-export function buildChainTable(expiry, compact) {
+export function buildChainTable(expiry, compact, posMap) {
     const table = document.createElement('table');
     table.className = 'chain-tbl' + (compact ? '' : ' full-chain-tbl');
     table.setAttribute('role', 'grid');
@@ -94,7 +109,7 @@ export function buildChainTable(expiry, compact) {
     const tbody = document.createElement('tbody');
     const midStrike = expiry.options[Math.floor(expiry.options.length / 2)]?.strike;
     for (const row of expiry.options) {
-        tbody.appendChild(buildChainRow(row, expiry, row.strike === midStrike, compact));
+        tbody.appendChild(buildChainRow(row, expiry, row.strike === midStrike, compact, posMap));
     }
     table.appendChild(tbody);
     return table;
@@ -147,7 +162,7 @@ export function bindChainTableClicks(container, onChainCellClick) {
 // Exported: render chain into container
 // ---------------------------------------------------------------------------
 
-export function renderChainInto(container, chain, selectedIndex, dropdownEl, onClick) {
+export function renderChainInto(container, chain, selectedIndex, dropdownEl, onClick, posMap) {
     if (!chain || chain.length === 0) {
         container.textContent = '';
         const ph = document.createElement('div');
@@ -194,7 +209,7 @@ export function renderChainInto(container, chain, selectedIndex, dropdownEl, onC
         return;
     }
 
-    container.appendChild(buildChainTable(expiry, true));
+    container.appendChild(buildChainTable(expiry, true, posMap));
     // Bind click delegation only once per container
     if (!container._chainClicksBound) {
         bindChainTableClicks(container, onClick);
@@ -206,7 +221,7 @@ export function renderChainInto(container, chain, selectedIndex, dropdownEl, onC
 // Exported: build stock/bond price table (used by chain overlay)
 // ---------------------------------------------------------------------------
 
-export function buildStockBondTable(stockBA, bondBA, onChainCellClick) {
+export function buildStockBondTable(stockBA, bondBA, onChainCellClick, posMap) {
     const table = document.createElement('table');
     table.className = 'chain-tbl overlay-stock-bond';
     const thead = document.createElement('thead');
@@ -226,6 +241,8 @@ export function buildStockBondTable(stockBA, bondBA, onChainCellClick) {
     const stockTd = document.createElement('td');
     stockTd.className = 'chain-cell stock-overlay-cell';
     stockTd.textContent = stockBA ? stockBA.bid.toFixed(2) + ' / ' + stockBA.ask.toFixed(2) : '\u2014';
+    const stockQty = posMap && posMap['stock'];
+    if (stockQty) stockTd.classList.add(stockQty > 0 ? 'pos-long' : 'pos-short');
     stockTd.setAttribute('tabindex', '0');
     stockTd.setAttribute('role', 'button');
     bindCellTrade(stockTd, 'stock', onChainCellClick);
@@ -233,6 +250,8 @@ export function buildStockBondTable(stockBA, bondBA, onChainCellClick) {
     const bondTd = document.createElement('td');
     bondTd.className = 'chain-cell bond-overlay-cell';
     bondTd.textContent = bondBA ? bondBA.bid.toFixed(2) + ' / ' + bondBA.ask.toFixed(2) : '\u2014';
+    const bondQty = posMap && Object.keys(posMap).filter(k => k.startsWith('bond:')).reduce((acc, k) => acc + posMap[k], 0);
+    if (bondQty) bondTd.classList.add(bondQty > 0 ? 'pos-long' : 'pos-short');
     bondTd.setAttribute('tabindex', '0');
     bondTd.setAttribute('role', 'button');
     bindCellTrade(bondTd, 'bond', onChainCellClick);

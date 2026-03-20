@@ -45,8 +45,10 @@ src/
                                    fmtDte(), posTypeLabel(). Single source for UI modules.
   position-value.js    ~40 lines  Unified position valuation: computePositionValue(),
                                    computePositionPnl(). Imports pricing, config.
-  chain-renderer.js   ~200 lines  Chain table DOM building with event delegation:
-                                   renderChainInto(), buildStockBondTable(). Extracted from ui.js.
+  chain-renderer.js   ~220 lines  Chain table DOM building with event delegation:
+                                   renderChainInto(), buildStockBondTable(), posKey().
+                                   Position indicators: accepts posMap param, applies
+                                   .pos-long/.pos-short CSS classes to cells with positions.
   portfolio-renderer.js ~190 lines Portfolio display with DOM diffing:
                                    updatePortfolioDisplay(). Extracted from ui.js.
   events.js          ~500 lines  EventEngine: Poisson scheduler, MTTH followup chains,
@@ -108,7 +110,8 @@ main.js
   |- src/strategy.js      (StrategyRenderer -- imports pricing, config)
   |- src/format-helpers.js  (fmtDollar, fmtNum, pnlClass, fmtDte, posTypeLabel -- imports config)
   |- src/position-value.js  (imports pricing, config)
-  |- src/chain-renderer.js  (imports format-helpers; reads _haptics globals)
+  |- src/chain-renderer.js  (posKey, renderChainInto, buildStockBondTable, buildChainTable,
+  |                         bindChainTableClicks -- imports format-helpers; reads _haptics globals)
   |- src/portfolio-renderer.js (imports position-value, format-helpers)
   |- src/ui.js            (cacheDOMElements, bindEvents, display updaters -- imports
   |                         format-helpers, chain-renderer, portfolio-renderer;
@@ -437,7 +440,8 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Toast fill price**: trade toast shows actual fill price (including bid/ask spread) via `pos.fillPrice`.
 - **Shared chain renderer**: `renderChainInto()` in chain-renderer.js builds both trade-tab and strategy-tab chain tables. Uses event delegation (3 listeners on container, not per-cell). Trade tab passes `$._onChainCellClick`, strategy tab wraps `onAddLeg`.
 - **`_resetCore` helper**: shared reset logic for `loadPreset()` and `resetSim()` in main.js.
-- **Unified stock/bond prices**: `updateStockBondPrices($, spot, rate, chain)` computes bond price from each tab's selected expiry and updates all four cells (trade + strategy).
+- **Unified stock/bond prices**: `updateStockBondPrices($, spot, rate, chain, posMap, stratPosMap)` computes bond price from each tab's selected expiry and updates all four cells (trade + strategy). Applies position indicator classes via posMap.
+- **Position indicators on chain cells**: Chain cells show **bold** text for long positions, **bold italic** for short. `posKey(type, strike, expiryDay)` generates map keys. `_buildPosMap()` (portfolio) and `_buildStrategyPosMap()` (strategy legs) in main.js build maps passed to all chain rendering functions. Trade tab uses portfolio positions; strategy tab uses strategy legs. `chainDirty = true` set after every trade action for immediate update.
 
 ## Gotchas
 

@@ -264,6 +264,15 @@ main {
     color: var(--bond);
 }
 
+/* --- Position indicators on chain cells --- */
+.pos-long {
+    font-weight: 700;
+}
+.pos-short {
+    font-weight: 700;
+    font-style: italic;
+}
+
 .overlay-stock-bond {
     margin-bottom: 10px;
 }
