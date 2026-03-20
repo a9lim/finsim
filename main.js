@@ -869,6 +869,8 @@ function handleExecStrategy() {
     // Snapshot portfolio state for rollback
     const savedCash = portfolio.cash;
     const savedPositions = portfolio.positions.map(p => ({ ...p }));
+    const savedClosedBorrowCost = portfolio.closedBorrowCost;
+    const savedMarginDebitCost = portfolio.marginDebitCost;
 
     const results = [];
     let failed = false;
@@ -890,6 +892,8 @@ function handleExecStrategy() {
     if (failed) {
         // Rollback: restore portfolio to pre-execution state
         portfolio.cash = savedCash;
+        portfolio.closedBorrowCost = savedClosedBorrowCost;
+        portfolio.marginDebitCost = savedMarginDebitCost;
         portfolio.positions.length = 0;
         for (const p of savedPositions) portfolio.positions.push(p);
         if (typeof showToast !== 'undefined') showToast('Strategy failed (leg ' + (results.length + 1) + ' rejected) — all legs unwound.');
