@@ -290,7 +290,396 @@ const FED_EVENTS = [
         magnitude: 'minor',
     },
 ];
-const MACRO_EVENTS = [];
+const MACRO_EVENTS = [
+    // =====================================================================
+    //  ARC 3: TRADE WAR ESCALATION LADDER
+    // =====================================================================
+    {
+        id: 'tariffs_announced',
+        category: 'macro',
+        likelihood: 0.7,
+        headline: 'Barron signs executive order imposing 25% tariffs on $200B of imports; "America will no longer be ripped off," he declares at signing ceremony',
+        params: { mu: -0.05, theta: 0.02, lambda: 1.0, muJ: -0.02 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.tradeWarStage === 0,
+        effects: (world) => {
+            world.geopolitical.tradeWarStage = 1;
+            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+        followups: [
+            { id: 'trade_retaliation', mtth: 15, weight: 0.8 },
+            { id: 'tariff_selloff', mtth: 3, weight: 0.6 },
+        ],
+    },
+    {
+        id: 'tariff_selloff',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Markets reel from tariff shock: industrials down 4%, transports down 6%, retailers scramble to quantify supply chain cost impact',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'trade_retaliation',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Beijing retaliates with matching tariffs on U.S. agriculture and energy; Liang Wei\'s Zhaowei announces "strategic decoupling plan"',
+        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.tradeWarStage === 1,
+        effects: (world) => {
+            world.geopolitical.tradeWarStage = 2;
+            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
+        },
+        followups: [
+            { id: 'zhaowei_ban', mtth: 30, weight: 0.6 },
+            { id: 'tariff_exemptions', mtth: 20, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'zhaowei_ban',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Barron bans Zhaowei from U.S. markets and imposes chip export controls: "They steal our technology and weaponize it." Full tech decoupling underway',
+        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.03, sigmaR: 0.005 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.tradeWarStage === 2,
+        effects: (world) => {
+            world.geopolitical.tradeWarStage = 3;
+            world.geopolitical.chinaRelations = -3;
+        },
+        followups: [
+            { id: 'rare_earth_crisis', mtth: 25, weight: 0.7 },
+        ],
+    },
+    {
+        id: 'rare_earth_crisis',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Beijing restricts rare earth exports to U.S. in retaliation; chip manufacturers warn of 6-month supply shortage. Defense stocks crater',
+        params: { mu: -0.08, theta: 0.04, lambda: 2.0, muJ: -0.05, sigmaR: 0.008 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.tradeWarStage >= 3 && world.geopolitical.chinaRelations <= -2,
+    },
+    {
+        id: 'tariff_exemptions',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'White House quietly grants tariff exemptions to 40 product categories after corporate lobbying blitz; partial de-escalation calms markets',
+        params: { mu: 0.03, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.tradeWarStage >= 1 && world.geopolitical.tradeWarStage <= 3,
+        effects: (world) => {
+            world.geopolitical.chinaRelations = Math.min(3, world.geopolitical.chinaRelations + 1);
+        },
+    },
+    {
+        id: 'trade_deal_framework',
+        category: 'macro',
+        likelihood: (sim, world) => {
+            let base = 0.5;
+            if (world.election.barronApproval < 40) base += 0.4;
+            if (sim.day > 750) base += 0.3;
+            return base;
+        },
+        headline: 'Barron and Beijing announce "Phase One" trade deal framework; tariffs to be rolled back over 18 months. Barron: "The biggest deal in history, maybe ever"',
+        params: { mu: 0.05, theta: -0.02, lambda: -0.8, muJ: 0.01 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.tradeWarStage >= 2 && world.geopolitical.tradeWarStage < 4,
+        effects: (world) => {
+            world.geopolitical.tradeWarStage = 4;
+            world.geopolitical.chinaRelations = Math.min(3, world.geopolitical.chinaRelations + 2);
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
+        },
+    },
+
+    // =====================================================================
+    //  ARC 4: MIDDLE EAST QUAGMIRE
+    // =====================================================================
+    {
+        id: 'mideast_strikes',
+        category: 'macro',
+        likelihood: 0.6,
+        headline: 'U.S. launches precision strikes using PNTH Atlas AI targeting; Department of War calls it "surgical, zero collateral." Barron: "Mission accomplished"',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.mideastEscalation === 0,
+        effects: (world) => {
+            world.geopolitical.mideastEscalation = 1;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+        },
+        followups: [
+            { id: 'mideast_civilian_casualties', mtth: 15, weight: 0.7 },
+            { id: 'mideast_oil_spike', mtth: 5, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'mideast_civilian_casualties',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Al Jazeera footage contradicts DoW "zero collateral" claims; 47 civilian casualties confirmed. Gottlieb calls it "a betrayal of everything Atlas was built for"',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.mideastEscalation >= 1,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 4);
+        },
+        followups: [
+            { id: 'mideast_ground_deployment', mtth: 30, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'mideast_oil_spike',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Oil prices surge 12% as strikes threaten Strait shipping lanes; energy stocks rally but consumer discretionary tanks',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.004 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'mideast_ground_deployment',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Barron deploys 15,000 troops for "stability operations"; largest ground deployment in 20 years. Defense stocks surge, but consumer confidence plummets',
+        params: { mu: -0.04, theta: 0.025, lambda: 1.2, muJ: -0.03, sigmaR: 0.005 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.mideastEscalation === 1,
+        effects: (world) => {
+            world.geopolitical.mideastEscalation = 2;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 6);
+        },
+        followups: [
+            { id: 'mideast_quagmire', mtth: 40, weight: 0.6 },
+        ],
+    },
+    {
+        id: 'mideast_quagmire',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Pentagon briefing leaked: 200+ casualties, $2B/month burn rate, no exit strategy. Okafor: "This is Vietnam with drones." Barron approval craters',
+        params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.mideastEscalation === 2,
+        effects: (world) => {
+            world.geopolitical.mideastEscalation = 3;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
+        },
+        followups: [
+            { id: 'mideast_ceasefire', mtth: 50, weight: 0.5 },
+            { id: 'mideast_withdrawal', mtth: 40, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'mideast_ceasefire',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Ceasefire brokered by Turkey and UAE; Barron takes credit despite opposition from his own DoW advisors. Markets rally on de-escalation hopes',
+        params: { mu: 0.04, theta: -0.02, lambda: -0.8, sigmaR: -0.003 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.mideastEscalation >= 1,
+        effects: (world) => {
+            world.geopolitical.mideastEscalation = 0;
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
+        },
+    },
+    {
+        id: 'mideast_withdrawal',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Under bipartisan pressure, Barron announces phased withdrawal: "We\'ve achieved our objectives." Polls show 68% support pulling out',
+        params: { mu: 0.03, theta: -0.015, lambda: -0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.mideastEscalation >= 2 && world.election.barronApproval < 35,
+        effects: (world) => {
+            world.geopolitical.mideastEscalation = 0;
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
+        },
+    },
+
+    // =====================================================================
+    //  ARC 8: SOUTH AMERICA OPERATIONS
+    // =====================================================================
+    {
+        id: 'south_america_covert_exposed',
+        category: 'macro',
+        likelihood: 0.5,
+        headline: 'The Continental reveals CIA-PNTH covert operations in South America; leaked memos show Atlas AI used for surveillance of civilian population',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.southAmericaOps === 0,
+        effects: (world) => {
+            world.geopolitical.southAmericaOps = 1;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+        },
+        followups: [
+            { id: 'south_america_advisors', mtth: 25, weight: 0.6 },
+            { id: 'un_condemns_south_america', mtth: 15, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'south_america_advisors',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Barron deploys 500 "military advisors" to South American nation; DoW insists they are "non-combat trainers." Congress skeptical',
+        params: { mu: -0.02, theta: 0.015, lambda: 0.5, sigmaR: 0.003 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.southAmericaOps === 1,
+        effects: (world) => {
+            world.geopolitical.southAmericaOps = 2;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+        followups: [
+            { id: 'south_america_collapse', mtth: 35, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'south_america_collapse',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'South American government collapses; transitional council installed under U.S. military protection. Street protests against "American puppets" spread regionally',
+        params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.southAmericaOps === 2,
+        effects: (world) => {
+            world.geopolitical.southAmericaOps = 3;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 4);
+        },
+        followups: [
+            { id: 'south_america_insurgency', mtth: 40, weight: 0.6 },
+            { id: 'south_america_withdrawal', mtth: 50, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'south_america_insurgency',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'Insurgency intensifies in South America; U.S. advisors come under fire, three killed. Barron doubles down: "We will not be driven out by thugs"',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.southAmericaOps === 3,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+        },
+    },
+    {
+        id: 'south_america_withdrawal',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'White House announces withdrawal of all military advisors from South America; operation quietly deemed "complete" despite no stated objectives being met',
+        params: { mu: 0.02, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.southAmericaOps >= 2,
+        effects: (world) => {
+            world.geopolitical.southAmericaOps = 0;
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 1);
+        },
+    },
+    {
+        id: 'un_condemns_south_america',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'UN General Assembly passes non-binding resolution condemning U.S. operations in South America 124-8; Barron calls it "meaningless theater"',
+        params: { mu: -0.01, theta: 0.005 },
+        magnitude: 'minor',
+        when: (sim, world) => world.geopolitical.southAmericaOps >= 1,
+    },
+
+    // =====================================================================
+    //  OTHER MACRO EVENTS
+    // =====================================================================
+    {
+        id: 'oil_shock_opec',
+        category: 'macro',
+        likelihood: 0.5,
+        headline: 'OPEC+ announces surprise 2M barrel/day production cut; oil surges 18% in a single session. Energy costs ripple through supply chains',
+        params: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.03, b: 0.01, sigmaR: 0.008 },
+        magnitude: 'major',
+        when: (sim, world) => !world.geopolitical.oilCrisis,
+        effects: (world) => {
+            world.geopolitical.oilCrisis = true;
+        },
+    },
+    {
+        id: 'energy_sanctions',
+        category: 'macro',
+        likelihood: 0.4,
+        headline: 'Barron imposes energy sanctions on major oil-exporting state; "They will feel the full force of American economic power." Crude jumps 8%',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.005 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.geopolitical.sanctionsActive,
+        effects: (world) => {
+            world.geopolitical.sanctionsActive = true;
+        },
+    },
+    {
+        id: 'cpi_surprise_high',
+        category: 'macro',
+        likelihood: 1.2,
+        headline: 'CPI comes in hot at 5.4% annualized, well above 4.8% consensus; core inflation re-accelerates. Rate-cut hopes evaporate immediately',
+        params: { mu: -0.02, theta: 0.01, b: 0.004, sigmaR: 0.003 },
+        magnitude: 'moderate',
+        when: (sim) => sim.b < 0.12,
+    },
+    {
+        id: 'cpi_surprise_low',
+        category: 'macro',
+        likelihood: 1.2,
+        headline: 'CPI falls to 2.1% — lowest in three years; "immaculate disinflation" narrative takes hold. Bond rally accelerates',
+        params: { mu: 0.02, theta: -0.008, b: -0.003, sigmaR: -0.002 },
+        magnitude: 'moderate',
+        when: (sim) => sim.b > 0.01,
+    },
+    {
+        id: 'jobs_report_strong',
+        category: 'macro',
+        likelihood: 1.5,
+        headline: 'Nonfarm payrolls blow past estimates: +312K vs +180K expected. Unemployment ticks down to 3.5%. "Goldilocks" chatter returns',
+        params: { mu: 0.015, theta: -0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'jobs_report_weak',
+        category: 'macro',
+        likelihood: 1.5,
+        headline: 'Jobs disappoint: +82K vs +175K expected, prior month revised down 50K. Recession whisperers grow louder',
+        params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'recession_declared',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'NBER officially declares recession began two quarters ago; Barron blames "obstructionist Congress and a reckless Fed." Markets already priced most of it',
+        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04, b: -0.01 },
+        magnitude: 'major',
+        when: (sim, world) => sim.mu < -0.05 && sim.theta > 0.12 && !world.geopolitical.recessionDeclared,
+        effects: (world) => {
+            world.geopolitical.recessionDeclared = true;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 8);
+        },
+    },
+    {
+        id: 'sovereign_debt_scare',
+        category: 'macro',
+        likelihood: 0.25,
+        headline: 'Major European sovereign downgraded two notches; contagion fears spike as CDS spreads widen across periphery. Flight to quality drives Treasury yields down',
+        params: { mu: -0.04, theta: 0.025, lambda: 1.5, muJ: -0.03, b: -0.005, sigmaR: 0.008 },
+        magnitude: 'major',
+    },
+    {
+        id: 'ceasefire_general',
+        category: 'macro',
+        likelihood: 0.8,
+        headline: 'Diplomatic breakthrough: ceasefire agreement signed at Camp David after weeks of secret negotiations. Barron takes full credit in primetime address',
+        params: { mu: 0.03, theta: -0.015, lambda: -0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.mideastEscalation >= 1 || world.geopolitical.southAmericaOps >= 1,
+        effects: (world) => {
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
+        },
+    },
+];
 const PNTH_EVENTS = [
     // =====================================================================
     //  ARC 1: THE GOTTLIEB-DIRKS WAR
@@ -968,10 +1357,472 @@ const PNTH_EARNINGS_EVENTS = [
     },
 ];
 const SECTOR_EVENTS = [];
-const POLITICAL_EVENTS = [];
-const INVESTIGATION_EVENTS = [];
+const POLITICAL_EVENTS = [
+    // =====================================================================
+    //  ARC 7: SENATOR OKAFOR'S RISE
+    // =====================================================================
+    {
+        id: 'okafor_grills_dirks',
+        category: 'political',
+        likelihood: 0.8,
+        headline: 'Sen. Okafor grills Dirks for six hours in televised hearing; "Did you or did you not discuss Atlas targeting with VP Bowman?" Clip goes viral, 40M views',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.senateProbeLaunched,
+        effects: (world) => {
+            world.investigations.okaforProbeStage = Math.max(1, world.investigations.okaforProbeStage);
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+        followups: [
+            { id: 'okafor_popularity_surge', mtth: 10, weight: 0.7 },
+        ],
+    },
+    {
+        id: 'okafor_popularity_surge',
+        category: 'political',
+        likelihood: 1.0,
+        headline: 'Okafor\'s favorability jumps 12 points post-hearing; "Okafor 2028" trending on social media. DNC donors reach out quietly',
+        params: { mu: -0.005, theta: 0.003 },
+        magnitude: 'minor',
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 1);
+        },
+    },
+    {
+        id: 'okafor_enters_race',
+        category: 'political',
+        likelihood: 0.7,
+        headline: 'BREAKING: Sen. Okafor announces presidential bid from the steps of the Capitol: "This administration has failed every test of leadership. I will not"',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => sim.day > 750 && !world.election.okaforRunning,
+        effects: (world) => {
+            world.election.okaforRunning = true;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+    },
+    {
+        id: 'okafor_scandal',
+        category: 'political',
+        likelihood: 0.5,
+        headline: 'Opposition research bombshell: Okafor\'s husband held Zhaowei stock while she chaired the Intelligence Committee. She calls it "a smear campaign"',
+        params: { mu: 0.02, theta: 0.008 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.election.okaforRunning || world.investigations.okaforProbeStage >= 1,
+        effects: (world) => {
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
+        },
+    },
+
+    // =====================================================================
+    //  BARRON POLITICS
+    // =====================================================================
+    {
+        id: 'dow_rename_eo',
+        category: 'political',
+        likelihood: 0.6,
+        headline: 'Barron signs executive order renaming Department of Defense to "Department of War"; says the old name was "weak and passive." Bipartisan backlash ensues',
+        params: { mu: -0.01, theta: 0.005 },
+        magnitude: 'minor',
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 1);
+        },
+    },
+    {
+        id: 'barron_primetime_address',
+        category: 'political',
+        likelihood: 1.5,
+        headline: 'Barron delivers primetime Oval Office address; long on patriotic rhetoric, short on policy specifics. Ratings strong, markets unmoved',
+        params: { mu: 0.003 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'barron_approval_recovery_high',
+        category: 'political',
+        likelihood: 3,
+        headline: 'New polls show slight uptick in Barron approval; economy cited as primary driver. "Things could be worse" sentiment prevails',
+        params: { mu: 0.003 },
+        magnitude: 'minor',
+        when: (sim, world) => world.election.barronApproval < 40,
+        effects: (world) => {
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
+        },
+    },
+    {
+        id: 'barron_approval_erosion',
+        category: 'political',
+        likelihood: 3,
+        headline: 'Barron approval slips in latest tracking poll; "fatigue factor" cited by analysts as scandals accumulate',
+        params: { mu: -0.003 },
+        magnitude: 'minor',
+        when: (sim, world) => world.election.barronApproval > 52,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+    },
+
+    // =====================================================================
+    //  CONGRESS
+    // =====================================================================
+    {
+        id: 'gridlock_spending',
+        category: 'political',
+        likelihood: 1.0,
+        headline: 'Government funding bill stalls as House Democrats refuse to pass Barron\'s defense spending increase; continuing resolution buys 45 days',
+        params: { mu: -0.01, theta: 0.005 },
+        magnitude: 'minor',
+        when: (sim, world, congress) => !congress.trifecta,
+    },
+    {
+        id: 'budget_deal_passes',
+        category: 'political',
+        likelihood: 0.8,
+        headline: 'Omnibus spending bill passes 218-215 on party-line vote; $1.4T in discretionary spending, defense up 8%. Bond yields tick higher',
+        params: { mu: 0.02, theta: -0.005, b: 0.002 },
+        magnitude: 'moderate',
+        when: (sim, world, congress) => congress.trifecta,
+    },
+    {
+        id: 'bipartisan_infrastructure',
+        category: 'political',
+        likelihood: 0.4,
+        headline: 'In rare bipartisan moment, Congress passes $500B infrastructure package; both parties claim credit. Construction and materials stocks jump',
+        params: { mu: 0.03, theta: -0.01, lambda: -0.2 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'shutdown_threat',
+        category: 'political',
+        likelihood: 0.8,
+        headline: 'Government shutdown looms as midnight deadline approaches; agencies prepare furlough notices. Markets pricing in 2-week disruption',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3, sigmaR: 0.003 },
+        magnitude: 'moderate',
+        when: (sim, world, congress) => !congress.trifecta,
+        followups: [
+            { id: 'shutdown_resolved', mtth: 8, weight: 0.7 },
+        ],
+    },
+    {
+        id: 'shutdown_resolved',
+        category: 'political',
+        likelihood: 1.0,
+        headline: 'Last-minute deal averts shutdown; short-term CR funds government through next quarter. "Kicking the can," says Okafor',
+        params: { mu: 0.015, theta: -0.005, lambda: -0.2 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'barron_tax_cut_proposal',
+        category: 'political',
+        likelihood: 0.6,
+        headline: 'Barron proposes sweeping corporate tax cut from 21% to 15%; analysts project $400B revenue shortfall. Markets rally, bond bears growl',
+        params: { mu: 0.03, theta: -0.005, b: 0.003 },
+        magnitude: 'moderate',
+        when: (sim, world, congress) => congress.trifecta,
+        effects: (world) => {
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
+        },
+    },
+    {
+        id: 'clay_opposition_rally',
+        category: 'political',
+        likelihood: 1.0,
+        headline: 'Former President Clay headlines massive opposition rally in D.C.; 200K attend. "This is not who we are," she declares to thunderous applause',
+        params: { mu: -0.005, theta: 0.003 },
+        magnitude: 'minor',
+        when: (sim, world) => world.election.barronApproval > 35,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 1);
+        },
+    },
+    {
+        id: 'barron_executive_overreach',
+        category: 'political',
+        likelihood: 0.6,
+        headline: 'Federal court blocks Barron executive order on media regulation; ruling calls it "a frontal assault on the First Amendment." DOJ will appeal',
+        params: { mu: -0.01, theta: 0.005, sigmaR: 0.002 },
+        magnitude: 'minor',
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+    },
+];
+const INVESTIGATION_EVENTS = [
+    // =====================================================================
+    //  RACHEL TAN JOURNALISM CHAIN
+    // =====================================================================
+    {
+        id: 'tan_bowman_initial',
+        category: 'investigation',
+        likelihood: 0.7,
+        headline: 'EXCLUSIVE (The Continental): Rachel Tan reveals VP Bowman held $4M in PNTH stock while personally lobbying Pentagon for Atlas contract. White House: "old news"',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.investigations.tanBowmanStory === 0,
+        effects: (world) => {
+            world.investigations.tanBowmanStory = 1;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+        },
+        followups: [
+            { id: 'bowman_denial', mtth: 3, weight: 0.9 },
+            { id: 'tan_bowman_followup', mtth: 25, weight: 0.6 },
+        ],
+    },
+    {
+        id: 'bowman_denial',
+        category: 'investigation',
+        likelihood: 1.0,
+        headline: 'VP Bowman issues defiant denial: "I divested before taking office. This is partisan mudslinging." Barron tweets: "The Fake News Continental is DYING"',
+        params: { mu: 0.01, theta: 0.005 },
+        magnitude: 'minor',
+        when: (sim, world) => world.investigations.tanBowmanStory >= 1,
+    },
+    {
+        id: 'tan_bowman_followup',
+        category: 'investigation',
+        likelihood: 1.0,
+        headline: 'Tan follow-up: Bowman\'s "blind trust" traded PNTH options 48 hours before contract announcements. Trust manager: Dirks\'s former assistant. The blind trust wasn\'t blind',
+        params: { mu: -0.04, theta: 0.02, lambda: 0.6, muJ: -0.02 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.investigations.tanBowmanStory === 1,
+        effects: (world) => {
+            world.investigations.tanBowmanStory = 2;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
+        },
+        followups: [
+            { id: 'doj_bowman_referral', mtth: 30, weight: 0.5 },
+            { id: 'tan_bombshell_recording', mtth: 40, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'tan_bombshell_recording',
+        category: 'investigation',
+        likelihood: 1.0,
+        headline: 'BOMBSHELL: Tan publishes recorded Bowman-Dirks phone call: "Just make sure the stock is in the trust before the announcement." Dirks: "Already done, Jay"',
+        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
+        magnitude: 'major',
+        when: (sim, world) => world.investigations.tanBowmanStory >= 2,
+        effects: (world) => {
+            world.investigations.tanBowmanStory = 3;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 8);
+            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
+            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
+        },
+        followups: [
+            { id: 'bowman_resigns', mtth: 20, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'tan_nsa_initial',
+        category: 'investigation',
+        likelihood: 0.5,
+        headline: 'Tan pivots to new story: PNTH provided NSA with backdoor access to Atlas commercial clients\' data. Three Fortune 500 companies threaten to sue',
+        params: { mu: -0.04, theta: 0.02, lambda: 0.8 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.investigations.tanNsaStory === 0 && world.investigations.tanBowmanStory >= 1,
+        effects: (world) => {
+            world.investigations.tanNsaStory = 1;
+        },
+        followups: [
+            { id: 'tan_nsa_followup', mtth: 30, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'tan_nsa_followup',
+        category: 'investigation',
+        likelihood: 1.0,
+        headline: 'Tan\'s second NSA piece: backdoor was approved personally by Dirks without board knowledge. EU threatens to ban Atlas from European markets entirely',
+        params: { mu: -0.05, theta: 0.025, lambda: 1.0, muJ: -0.03 },
+        magnitude: 'major',
+        when: (sim, world) => world.investigations.tanNsaStory === 1,
+        effects: (world) => {
+            world.investigations.tanNsaStory = 2;
+            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
+            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
+        },
+    },
+
+    // =====================================================================
+    //  OKAFOR SENATE PROBE
+    // =====================================================================
+    {
+        id: 'okafor_hearings_opened',
+        category: 'investigation',
+        likelihood: 0.8,
+        headline: 'Sen. Okafor formally opens Intelligence Committee hearings into PNTH-White House ties; witness list includes current and former PNTH executives',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.4 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.investigations.okaforProbeStage === 0 && world.pnth.senateProbeLaunched,
+        effects: (world) => {
+            world.investigations.okaforProbeStage = 1;
+        },
+    },
+    {
+        id: 'okafor_subpoenas',
+        category: 'investigation',
+        likelihood: 1.0,
+        headline: 'Okafor issues subpoenas for Bowman financial records and Dirks-Bowman communications; White House invokes executive privilege. Constitutional showdown looms',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.investigations.okaforProbeStage >= 1,
+        effects: (world) => {
+            world.investigations.okaforProbeStage = Math.max(2, world.investigations.okaforProbeStage);
+        },
+    },
+    {
+        id: 'okafor_criminal_referral',
+        category: 'investigation',
+        likelihood: 1.0,
+        headline: 'Okafor\'s committee votes 8-6 to refer Bowman to DOJ for criminal investigation; "The evidence of insider trading is overwhelming," she says',
+        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+        magnitude: 'major',
+        when: (sim, world) => world.investigations.okaforProbeStage >= 2,
+        effects: (world) => {
+            world.investigations.okaforProbeStage = 3;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+        },
+    },
+
+    // =====================================================================
+    //  BOWMAN RESOLUTION
+    // =====================================================================
+    {
+        id: 'doj_bowman_referral',
+        category: 'investigation',
+        likelihood: 1.0,
+        headline: 'DOJ opens formal investigation into VP Bowman\'s PNTH stock trades; FBI agents visit Bowman\'s financial advisor. White House: "Full cooperation"',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+        when: (sim, world, congress) => !congress.trifecta && world.investigations.tanBowmanStory >= 2,
+    },
+    {
+        id: 'bowman_resigns',
+        category: 'investigation',
+        likelihood: 0.8,
+        headline: 'BREAKING: VP Bowman resigns "to spend time with family and fight these baseless allegations." Barron: "Jay is a great patriot. Total witch hunt"',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+        magnitude: 'major',
+        when: (sim, world) => world.investigations.tanBowmanStory >= 2,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+        },
+    },
+    {
+        id: 'bowman_indicted',
+        category: 'investigation',
+        likelihood: 0.3,
+        headline: 'Federal grand jury indicts former VP Bowman on 12 counts of insider trading and conspiracy; bail set at $5M. First sitting or former VP indicted in U.S. history',
+        params: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.04 },
+        magnitude: 'major',
+        when: (sim, world) => world.investigations.tanBowmanStory >= 3 && world.investigations.okaforProbeStage >= 2,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
+        },
+    },
+
+    // =====================================================================
+    //  IMPEACHMENT
+    // =====================================================================
+    {
+        id: 'impeachment_inquiry',
+        category: 'investigation',
+        likelihood: 0.8,
+        headline: 'House Speaker announces formal impeachment inquiry into President Barron; cites "abuse of power, obstruction, and complicity in corruption"',
+        params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, sigmaR: 0.005 },
+        magnitude: 'major',
+        when: (sim, world, congress) => !congress.fedControlsHouse && world.investigations.impeachmentStage === 0 && world.investigations.tanBowmanStory >= 2,
+        effects: (world) => {
+            world.investigations.impeachmentStage = 1;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+        },
+        followups: [
+            { id: 'impeachment_vote', mtth: 40, weight: 0.6 },
+        ],
+    },
+    {
+        id: 'impeachment_vote',
+        category: 'investigation',
+        likelihood: 1.0,
+        headline: 'House votes 220-215 to impeach President Barron on two articles; only third presidential impeachment in U.S. history. Senate trial next',
+        params: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.03, sigmaR: 0.008 },
+        magnitude: 'major',
+        when: (sim, world, congress) => !congress.fedControlsHouse && world.investigations.impeachmentStage === 1,
+        effects: (world) => {
+            world.investigations.impeachmentStage = 2;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 4);
+        },
+        followups: [
+            { id: 'impeachment_trial', mtth: 30, weight: 0.7 },
+        ],
+    },
+    {
+        id: 'impeachment_trial',
+        category: 'investigation',
+        likelihood: 1.0,
+        headline: 'Senate impeachment trial begins; Chief Justice presides. Barron refuses to testify, calls it "the greatest political persecution in history"',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, sigmaR: 0.005 },
+        magnitude: 'major',
+        when: (sim, world, congress) => !congress.fedControlsSenate && world.investigations.impeachmentStage === 2,
+        effects: (world) => {
+            world.investigations.impeachmentStage = 3;
+        },
+    },
+];
 const COMPOUND_EVENTS = [];
-const MIDTERM_EVENTS = [];
+const MIDTERM_EVENTS = [
+    // Post-midterm followup events (referenced by ID from midterm handler)
+    {
+        id: 'midterm_barron_declares_mandate',
+        category: 'midterm',
+        likelihood: 1.0,
+        headline: 'Barron declares "massive mandate" after Federalist gains; announces aggressive second-half agenda. "The people have spoken, and they want MORE"',
+        params: { mu: 0.03, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
+        },
+    },
+    {
+        id: 'midterm_fl_speaker_elected',
+        category: 'midterm',
+        likelihood: 1.0,
+        headline: 'Farmer-Labor elects new House Speaker; pledges immediate investigations into Barron administration. "Accountability starts now"',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+    },
+    {
+        id: 'midterm_lame_duck_barron',
+        category: 'midterm',
+        likelihood: 1.0,
+        headline: 'Barron retreats to Mar-a-Lago after historic losses; agenda effectively dead. Aides describe him as "furious and isolated." Markets rally on gridlock',
+        params: { mu: 0.04, theta: -0.02, lambda: -0.5, sigmaR: -0.003 },
+        magnitude: 'major',
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 8);
+        },
+    },
+    {
+        id: 'midterm_status_quo',
+        category: 'midterm',
+        likelihood: 1.0,
+        headline: 'Midterms produce no major shift; both parties claim moral victory. Analysts call it "the most boring election in a generation." Markets shrug',
+        params: { mu: 0.01, theta: -0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'midterm_fl_senate_majority',
+        category: 'midterm',
+        likelihood: 1.0,
+        headline: 'Farmer-Labor takes Senate majority by one seat; committee chairmanships flip. Okafor gains full subpoena power over Intelligence Committee',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+        },
+    },
+];
 
 // -- Neutral / flavor events (~25) ----------------------------------------
 // High likelihood, minor magnitude, tiny params.
