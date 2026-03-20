@@ -40,7 +40,6 @@ let chart, strategy;
 let camera;
 let chain = [];
 let playing = false;
-let speed = 1;
 let speedIndex = 0;
 let strategyMode = false;
 let dirty = true;
@@ -246,7 +245,7 @@ function init() {
     chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
-    updateSpeedBtn($, speed);
+    updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
     lastSpot = sim.S;
     strategy.resetRange(sim.S, strategyLegs);
     updateUI();
@@ -340,7 +339,7 @@ function renderCurrentView() {
 
 function frame(now) {
     if (playing) {
-        const tickInterval = 1000 / speed;
+        const tickInterval = 1000 / SPEED_OPTIONS[speedIndex];
         const substepInterval = tickInterval / INTRADAY_STEPS;
 
         if (!dayInProgress) {
@@ -594,8 +593,7 @@ function step() {
 
 function cycleSpeed() {
     speedIndex = (speedIndex + 1) % SPEED_OPTIONS.length;
-    speed = SPEED_OPTIONS[speedIndex];
-    updateSpeedBtn($, speed);
+    updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
 
@@ -840,7 +838,13 @@ function handleSaveStrategy() {
 function handleExecStrategy() {
     if (strategyLegs.length === 0) return;
     const vol = Math.sqrt(Math.max(sim.v, 0));
+
+    // Snapshot portfolio state for rollback
+    const savedCash = portfolio.cash;
+    const savedPositions = portfolio.positions.map(p => ({ ...p }));
+
     const results = [];
+    let failed = false;
     for (const leg of strategyLegs) {
         const side = leg.qty < 0 ? 'short' : 'long';
         const absQty = Math.abs(leg.qty);
@@ -848,14 +852,24 @@ function handleExecStrategy() {
             leg.type, side, absQty, sim.S, vol, sim.r, sim.day,
             leg.strike, leg.expiryDay
         );
-        if (pos) results.push(pos);
+        if (pos) {
+            results.push(pos);
+        } else {
+            failed = true;
+            break;
+        }
     }
-    if (results.length > 0) {
+
+    if (failed) {
+        // Rollback: restore portfolio to pre-execution state
+        portfolio.cash = savedCash;
+        portfolio.positions.length = 0;
+        for (const p of savedPositions) portfolio.positions.push(p);
+        if (typeof showToast !== 'undefined') showToast('Strategy failed (leg ' + (results.length + 1) + ' rejected) — all legs unwound.');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('error');
+    } else if (results.length > 0) {
         if (typeof showToast !== 'undefined') showToast('Executed ' + results.length + ' leg(s).');
         if (typeof _haptics !== 'undefined') _haptics.trigger('success');
-    } else {
-        if (typeof showToast !== 'undefined') showToast('Execution failed -- insufficient funds.');
-        if (typeof _haptics !== 'undefined') _haptics.trigger('error');
     }
     updateUI();
     dirty = true;

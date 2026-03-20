@@ -219,8 +219,8 @@ export class ChartRenderer {
         let firstDay, lastDay;
 
         if (cam) {
-            const worldLeft  = cam.screenToWorld(plotX, 0).x;
-            const worldRight = cam.screenToWorld(plotX + plotW, 0).x;
+            const worldLeft  = cam.screenToWorldX ? cam.screenToWorldX(plotX) : cam.screenToWorld(plotX, 0).x;
+            const worldRight = cam.screenToWorldX ? cam.screenToWorldX(plotX + plotW) : cam.screenToWorld(plotX + plotW, 0).x;
             firstDay = Math.max(hMinDay, Math.floor(worldLeft)   - 1);
             lastDay  = Math.min(hMaxDay, Math.ceil(worldRight));
         } else {
@@ -303,7 +303,7 @@ export class ChartRenderer {
 
         if (cam) {
             for (let d = dayStart; d <= lastDay + dayInterval; d += dayInterval) {
-                const sx = Math.round(cam.worldToScreen(d, 0).x) + 0.5;
+                const sx = Math.round(cam.worldToScreenX ? cam.worldToScreenX(d) : cam.worldToScreen(d, 0).x) + 0.5;
                 if (sx < plotX || sx > plotX + plotW) continue;
                 ctx.beginPath();
                 ctx.moveTo(sx, plotY);
@@ -334,7 +334,7 @@ export class ChartRenderer {
             }
             const isUp = bClose >= bar.open;
             let cx;
-            if (cam) { cx = cam.worldToScreen(i + 0.5, 0).x; }
+            if (cam) { cx = cam.worldToScreenX ? cam.worldToScreenX(i + 0.5) : cam.worldToScreen(i + 0.5, 0).x; }
             else { cx = plotX + ((i + 0.5) / history.length) * plotW; }
             const yHigh = priceToY(bHigh), yLow = priceToY(bLow);
             const yOpen = priceToY(bar.open), yClose = priceToY(bClose);
@@ -399,7 +399,7 @@ export class ChartRenderer {
 
                 let cx;
                 if (cam) {
-                    cx = cam.worldToScreen(d + 0.5, 0).x;
+                    cx = cam.worldToScreenX ? cam.worldToScreenX(d + 0.5) : cam.worldToScreen(d + 0.5, 0).x;
                 } else {
                     cx = plotX + ((d + 0.5) / history.length) * plotW;
                 }
@@ -508,7 +508,7 @@ export class ChartRenderer {
 
         if (cam) {
             for (let d = dayStart; d <= lastDay + dayInterval; d += dayInterval) {
-                const sx = cam.worldToScreen(d, 0).x;
+                const sx = cam.worldToScreenX ? cam.worldToScreenX(d) : cam.worldToScreen(d, 0).x;
                 if (sx < plotX + 20 || sx > plotX + plotW - 20) continue;
                 ctx.fillText(`D${d}`, sx, xAxisY);
             }
@@ -570,7 +570,7 @@ export class ChartRenderer {
             // Day label on X-axis
             let hoverDay = -1;
             if (cam) {
-                hoverDay = Math.floor(cam.screenToWorld(mouseX, 0).x);
+                hoverDay = Math.floor(cam.screenToWorldX ? cam.screenToWorldX(mouseX) : cam.screenToWorld(mouseX, 0).x);
             }
 
             if (hoverDay >= hMinDay && hoverDay <= hMaxDay) {

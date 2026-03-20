@@ -18,6 +18,13 @@ body {
 .pnl-up   { color: var(--up); }
 .pnl-down { color: var(--down); }
 
+/* --- Greek Label Colors --- */
+.greek-label-delta { color: var(--delta); }
+.greek-label-gamma { color: var(--gamma); }
+.greek-label-theta { color: var(--theta); }
+.greek-label-vega  { color: var(--vega); }
+.greek-label-rho   { color: var(--rho); }
+
 /* --- Panel Hints --- */
 .panel-hint {
     color: var(--text-muted);
