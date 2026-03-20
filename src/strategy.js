@@ -255,6 +255,11 @@ export class StrategyRenderer {
         this._cache = null;    // { key, xs, pnls, greekData, breakevens }
         this._summaryCache = null; // { key, result }
 
+        // Theme color cache — invalidated when data-theme changes
+        this._cachedTheme = null;
+        this._cachedColors = null;
+        this._cachedThemeColors = null;
+
         // Legend hit areas (populated during draw)
         this._legendItems = [];
 
@@ -356,8 +361,14 @@ export class StrategyRenderer {
         const ctx  = this._ctx;
         const cssW = this._cssW;
         const cssH = this._cssH;
-        const clrs = _colors();
-        const themeClrs = _themeTextColors();
+        const currentTheme = document.documentElement.dataset.theme || 'light';
+        if (currentTheme !== this._cachedTheme) {
+            this._cachedTheme = currentTheme;
+            this._cachedColors = _colors();
+            this._cachedThemeColors = _themeTextColors();
+        }
+        const clrs = this._cachedColors;
+        const themeClrs = this._cachedThemeColors;
 
         // Clear
         ctx.clearRect(0, 0, cssW, cssH);
@@ -606,9 +617,11 @@ export class StrategyRenderer {
     // -----------------------------------------------------------------------
 
     _drawZeroLine(ctx, plotX, plotW, pnlToPixel) {
+        const isDark = (this._cachedTheme || document.documentElement.dataset.theme) === 'dark';
+        const muted = isDark ? _PALETTE.dark.textMuted : _PALETTE.light.textMuted;
         const y0 = pnlToPixel(0);
         ctx.save();
-        ctx.strokeStyle = _r(_PALETTE.light.textMuted, 0.6);
+        ctx.strokeStyle = _r(muted, 0.6);
         ctx.lineWidth   = 1.5;
         ctx.beginPath();
         ctx.moveTo(plotX, y0);
@@ -735,30 +748,25 @@ export class StrategyRenderer {
     }
 
     _drawGrid(ctx, plotX, plotY, plotW, plotH, xMin, xMax, yLo, yHi, xToPixel, pnlToPixel) {
+        const isDark = (this._cachedTheme || document.documentElement.dataset.theme) === 'dark';
+        const muted = isDark ? _PALETTE.dark.textMuted : _PALETTE.light.textMuted;
         ctx.save();
-        ctx.strokeStyle = _r(_PALETTE.light.textMuted, 0.15);
+        ctx.strokeStyle = _r(muted, 0.15);
         ctx.lineWidth   = 1;
-
-        // Horizontal grid lines (5 divisions)
+        ctx.beginPath();
         const yStep = (yHi - yLo) / 5;
         for (let i = 0; i <= 5; i++) {
             const y = pnlToPixel(yLo + i * yStep);
-            ctx.beginPath();
             ctx.moveTo(plotX, y);
             ctx.lineTo(plotX + plotW, y);
-            ctx.stroke();
         }
-
-        // Vertical grid lines (5 divisions)
         const xStep = (xMax - xMin) / 5;
         for (let i = 0; i <= 5; i++) {
             const x = xToPixel(xMin + i * xStep);
-            ctx.beginPath();
             ctx.moveTo(x, plotY);
             ctx.lineTo(x, plotY + plotH);
-            ctx.stroke();
         }
-
+        ctx.stroke();
         ctx.restore();
     }
 
@@ -841,7 +849,7 @@ export class StrategyRenderer {
 
         ctx.save();
         ctx.fillStyle   = isDark ? _r(_PALETTE.dark.canvas, 0.55) : _r(_PALETTE.light.canvas, 0.75);
-        ctx.strokeStyle = _r(_PALETTE.light.textMuted, isDark ? 0.3 : 0.4);
+        ctx.strokeStyle = _r(isDark ? _PALETTE.dark.textMuted : _PALETTE.light.textMuted, isDark ? 0.3 : 0.4);
         ctx.lineWidth   = 1;
         _roundRect(ctx, lx, ly, boxW, legendH, 6);
         ctx.fill();

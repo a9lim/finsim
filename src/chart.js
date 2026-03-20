@@ -41,6 +41,14 @@ export class ChartRenderer {
         this.BODY_RATIO = 0.6; // fraction of slot that is candle body
 
         this._dpr = window.devicePixelRatio || 1;
+
+        // Theme color cache — invalidated when data-theme changes
+        this._cachedTheme = null;
+        this._isDark = false;
+        this._gridColor = '';
+        this._textMuted = '';
+        this._textSec = '';
+
         this.resize();
     }
 
@@ -189,12 +197,20 @@ export class ChartRenderer {
         const ctx = this.ctx;
         const dpr = this._dpr;
 
-        // Resolve theme-sensitive colors
-        const theme     = document.documentElement.dataset.theme || 'light';
-        const isDark    = theme === 'dark';
+        // Resolve theme-sensitive colors (cached per theme)
+        const currentTheme = document.documentElement.dataset.theme || 'light';
+        if (currentTheme !== this._cachedTheme) {
+            this._cachedTheme = currentTheme;
+            this._isDark = currentTheme === 'dark';
+            const p = _PALETTE;
+            this._textMuted = this._isDark ? p.dark.textMuted : p.light.textMuted;
+            this._textSec   = this._isDark ? p.dark.textSecondary : p.light.textSecondary;
+            this._gridColor = this._isDark ? _r(p.dark.text, 0.06) : _r(p.light.text, 0.06);
+        }
+        const isDark = this._isDark;
+        const textMuted = this._textMuted;
+        const textSec = this._textSec;
         const palette   = _PALETTE;
-        const textMuted = isDark ? palette.dark.textMuted    : palette.light.textMuted;
-        const textSec   = isDark ? palette.dark.textSecondary: palette.light.textSecondary;
         // Layout constants
         const W   = this.width;
         const H   = this.height;
@@ -310,20 +326,17 @@ export class ChartRenderer {
         const priceInterval = _niceInterval(linearRange, 6);
         const priceStart    = Math.ceil(priceLo / priceInterval) * priceInterval;
 
-        const gridColor = isDark
-            ? _r(palette.dark.text,  0.06)
-            : _r(palette.light.text, 0.06);
+        const gridColor = this._gridColor;
 
         ctx.strokeStyle = gridColor;
         ctx.lineWidth   = 1;
+        ctx.beginPath();
 
         for (let p = priceStart; p <= priceHi + priceInterval * 0.01; p += priceInterval) {
             const py = Math.round(priceToY(p)) + 0.5;
             if (py < plotY || py > plotY + plotH) continue;
-            ctx.beginPath();
             ctx.moveTo(plotX, py);
             ctx.lineTo(plotX + plotW, py);
-            ctx.stroke();
         }
 
         // Vertical grid lines every N days (targeting ~5–8 vertical lines)
@@ -336,12 +349,11 @@ export class ChartRenderer {
             for (let d = dayStart; d <= lastDay + dayInterval; d += dayInterval) {
                 const sx = Math.round(cam.worldToScreenX ? cam.worldToScreenX(d) : cam.worldToScreen(d, 0).x) + 0.5;
                 if (sx < plotX || sx > plotX + plotW) continue;
-                ctx.beginPath();
                 ctx.moveTo(sx, plotY);
                 ctx.lineTo(sx, plotY + plotH);
-                ctx.stroke();
             }
         }
+        ctx.stroke();
 
         ctx.restore();
 
