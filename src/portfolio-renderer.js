@@ -247,12 +247,6 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
         const hint = $.strategyPositions.querySelector('.panel-hint');
         if (hint) hint.remove();
 
-        // Track which strategy groups exist
-        const existingGroupNames = new Set();
-        for (const g of $.strategyPositions.querySelectorAll('.strategy-group')) {
-            existingGroupNames.add(g.dataset.strategyName);
-        }
-
         // Remove groups for strategies no longer present
         for (const g of $.strategyPositions.querySelectorAll('.strategy-group')) {
             if (!strategyNames.includes(g.dataset.strategyName)) g.remove();

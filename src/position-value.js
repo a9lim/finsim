@@ -24,7 +24,6 @@ import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
  * @returns {number} Signed market value
  */
 export function computePositionValue(pos, S, vol, rate, day) {
-    const absQty = Math.abs(pos.qty);
     const dte = pos.expiryDay != null
         ? Math.max((pos.expiryDay - day) / TRADING_DAYS_PER_YEAR, 0)
         : 0;
@@ -48,7 +47,7 @@ export function computePositionValue(pos, S, vol, rate, day) {
     }
 
     // Long = positive value, Short = negative (liability)
-    return pos.qty > 0 ? absQty * unitValue : -absQty * unitValue;
+    return pos.qty * unitValue;
 }
 
 /**

@@ -4,7 +4,7 @@
  * Generates strike prices, expiry dates, and computed prices/Greeks
  * for every call and put in the chain.
  *
- * Exports: generateStrikes, buildChain
+ * Exports: buildChain
  */
 
 import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR } from './config.js';
@@ -77,7 +77,7 @@ export class ExpiryManager {
  * @param {number} currentPrice - Current underlying price
  * @returns {number[]} Sorted array of strike prices
  */
-export function generateStrikes(currentPrice) {
+function generateStrikes(currentPrice) {
     const atm = Math.round(currentPrice / STRIKE_INTERVAL) * STRIKE_INTERVAL;
     const strikes = [];
     for (let i = -STRIKE_RANGE; i <= STRIKE_RANGE; i++) {
