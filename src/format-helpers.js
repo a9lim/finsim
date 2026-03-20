@@ -2,10 +2,13 @@
 
 import { TRADING_DAYS_PER_YEAR } from './config.js';
 
+const _dollarFmt = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
+
 export function fmtDollar(v) {
-    const abs = Math.abs(v);
-    const formatted = abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return (v < 0 ? '-' : '') + '$' + formatted;
+    return (v < 0 ? '-$' : '$') + _dollarFmt.format(Math.abs(v));
 }
 
 export function fmtNum(v, dp = 4) { return Number(v).toFixed(dp); }
