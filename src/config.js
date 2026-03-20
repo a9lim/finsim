@@ -32,6 +32,16 @@ export const MONEYNESS_SPREAD_WEIGHT = 0.05; // weight on |log(S/K)| for options
 export const MAX_EVENT_LOG = 20;           // max event log entries displayed
 export const MAX_FOLLOWUP_DEPTH = 5;       // max recursion depth for MTTH chains
 export const FED_MEETING_INTERVAL = 32;    // ~252/8 trading days between FOMC meetings
+export const MIDTERM_DAY = 504;            // ~2 years of trading days
+export const CAMPAIGN_START_DAY = 440;     // campaign season starts ~2 months before midterms
+export const NON_FED_POISSON_RATE = 1 / 30; // base rate, effective ~1/41.5 with cooldown
+export const NON_FED_COOLDOWN_MIN = 8;
+export const NON_FED_COOLDOWN_MAX = 15;
+export const FED_MEETING_JITTER = 4;       // +/-4 day jitter on FOMC schedule
+export const BOREDOM_THRESHOLD = 3;        // consecutive minor events before boost
+export const TERM_END_DAY = 1008;          // 4 years of trading days (252 * 4)
+export const PNTH_EARNINGS_INTERVAL = 63;  // quarterly earnings, aligned with QUARTERLY_CYCLE
+export const PNTH_EARNINGS_JITTER = 5;     // +/-5 day jitter on earnings schedule
 
 // -- Chart rendering --
 export const CHART_Y_AXIS_W = 64;          // right-side Y-axis label area (CSS px)
