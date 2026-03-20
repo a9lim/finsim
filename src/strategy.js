@@ -565,18 +565,6 @@ export class StrategyRenderer {
     }
 
     /**
-     * Sum a specific Greek key across all legs at price S.
-     */
-    _totalGreek(legs, S, vol, rate, evalDay, fallbackDte, gKey) {
-        let total = 0;
-        for (const leg of legs) {
-            const g = this._legGreeks(leg, S, vol, rate, evalDay, fallbackDte);
-            total += g[gKey] ?? 0;
-        }
-        return total;
-    }
-
-    /**
      * Sum ALL Greeks across all legs at price S in a single pass.
      * Computes computeGreeks() once per option leg instead of once per Greek key.
      */
