@@ -10,6 +10,34 @@ import { priceAmerican } from './pricing.js';
 import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
 
 /**
+ * Compute the fair (mid) unit price for a single unit of an instrument.
+ *
+ * @param {string} type       - 'stock'|'bond'|'call'|'put'
+ * @param {number} S          - Current spot price
+ * @param {number} vol        - Current implied volatility (annualized)
+ * @param {number} rate       - Current risk-free rate
+ * @param {number} day        - Current simulation day
+ * @param {number} [strike]   - Strike price (options only)
+ * @param {number} [expiryDay] - Simulation day of expiry (options/bonds)
+ * @returns {number} Mid-market price per unit
+ */
+export function unitPrice(type, S, vol, rate, day, strike, expiryDay) {
+    const dte = expiryDay != null
+        ? Math.max((expiryDay - day) / TRADING_DAYS_PER_YEAR, 0)
+        : 0;
+    switch (type) {
+        case 'stock': return S;
+        case 'bond':  return BOND_FACE_VALUE * Math.exp(-rate * dte);
+        case 'call':
+        case 'put':
+            return dte > 0
+                ? priceAmerican(S, strike, dte, rate, vol, type === 'put')
+                : Math.max(0, type === 'call' ? S - strike : strike - S);
+        default: return 0;
+    }
+}
+
+/**
  * Compute the current mark-to-market value of a position.
  *
  * For long positions, returns the current market value (positive).
@@ -24,30 +52,7 @@ import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
  * @returns {number} Signed market value
  */
 export function computePositionValue(pos, S, vol, rate, day) {
-    const dte = pos.expiryDay != null
-        ? Math.max((pos.expiryDay - day) / TRADING_DAYS_PER_YEAR, 0)
-        : 0;
-
-    let unitValue;
-    switch (pos.type) {
-        case 'stock':
-            unitValue = S;
-            break;
-        case 'bond':
-            unitValue = BOND_FACE_VALUE * Math.exp(-rate * dte);
-            break;
-        case 'call':
-        case 'put':
-            unitValue = dte > 0
-                ? priceAmerican(S, pos.strike, dte, rate, vol, pos.type === 'put')
-                : Math.max(0, pos.type === 'call' ? S - pos.strike : pos.strike - S);
-            break;
-        default:
-            return 0;
-    }
-
-    // Long = positive value, Short = negative (liability)
-    return pos.qty * unitValue;
+    return pos.qty * unitPrice(pos.type, S, vol, rate, day, pos.strike, pos.expiryDay);
 }
 
 /**

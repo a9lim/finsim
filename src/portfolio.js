@@ -15,7 +15,7 @@ import {
 } from './config.js';
 
 import { priceAmerican, computeGreeks } from './pricing.js';
-import { computePositionValue } from './position-value.js';
+import { computePositionValue, unitPrice } from './position-value.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -60,32 +60,6 @@ export function resetPortfolio(capital) {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Compute the fair (mid) price for a given instrument at current market
- * conditions.  Returns the mid-market price per unit.
- */
-function _fairPrice(type, currentPrice, currentRate, currentDay, strike, expiryDay, currentVol) {
-    switch (type) {
-        case 'stock':
-            return currentPrice;
-
-        case 'bond': {
-            const dte = (expiryDay - currentDay) / TRADING_DAYS_PER_YEAR; // years
-            return BOND_FACE_VALUE * Math.exp(-currentRate * Math.max(dte, 0));
-        }
-
-        case 'call':
-        case 'put': {
-            const dte = Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0);
-            const isPut = type === 'put';
-            return priceAmerican(currentPrice, strike, dte, currentRate, currentVol, isPut);
-        }
-
-        default:
-            return 0;
-    }
-}
 
 /**
  * Compute fill price for a buy or sell, accounting for bid/ask spread on
@@ -206,7 +180,7 @@ export function executeMarketOrder(
     // Convert to signed qty: long = +qty, short = -qty
     const signedQty = side === 'long' ? qty : -qty;
 
-    const mid  = _fairPrice(type, currentPrice, currentRate, currentDay, strike, expiryDay, currentVol);
+    const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay);
     const fill = _fillPrice(type, side, mid, currentPrice, strike, currentVol);
 
     // Find existing position of same type+strike+expiry for netting
@@ -478,10 +452,7 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
 
     const pos = portfolio.positions[idx];
     const absQty = Math.abs(pos.qty);
-    const mid = _fairPrice(
-        pos.type, currentPrice, currentRate, currentDay,
-        pos.strike, pos.expiryDay, currentVol
-    );
+    const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay);
 
     if (pos.qty > 0) {
         const fill = _fillPrice(pos.type, 'short', mid, currentPrice, pos.strike, currentVol);
@@ -802,12 +773,46 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
 
 /**
  * Check whether the portfolio is at or below the maintenance margin threshold.
+ * Single-pass over positions: computes equity and required margin together.
  *
  * @returns {{ triggered: boolean, equity: number, required: number }}
  */
 export function checkMargin(currentPrice, currentVol, currentRate, currentDay) {
-    const equity   = portfolioValue(currentPrice, currentVol, currentRate, currentDay);
-    const required = marginRequirement(currentPrice, currentVol, currentRate, currentDay);
+    let equity = portfolio.cash;
+    let required = 0;
+
+    for (const pos of portfolio.positions) {
+        equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay);
+
+        if (pos.qty < 0) {
+            const absQty = Math.abs(pos.qty);
+            const dte = pos.expiryDay != null
+                ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
+                : 0;
+            switch (pos.type) {
+                case 'stock':
+                    required += MAINTENANCE_MARGIN * currentPrice * absQty;
+                    break;
+                case 'bond': {
+                    const bondPrice = BOND_FACE_VALUE * Math.exp(-currentRate * dte);
+                    required += MAINTENANCE_MARGIN * bondPrice * absQty;
+                    break;
+                }
+                case 'call':
+                case 'put': {
+                    const isPut = pos.type === 'put';
+                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut);
+                    required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
+                    break;
+                }
+            }
+        }
+    }
+
+    if (portfolio.cash < 0) {
+        required += MAINTENANCE_MARGIN * Math.abs(portfolio.cash);
+    }
+
     const triggered = required > 0 && equity < required;
     return { triggered, equity, required };
 }
@@ -820,10 +825,9 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay) {
  * Close all open positions at current market prices.
  */
 export function liquidateAll(currentPrice, currentVol, currentRate, currentDay) {
-    // Snapshot IDs first — closePosition modifies the array in place.
-    const ids = portfolio.positions.map(p => p.id);
-    for (const id of ids) {
-        closePosition(id, currentPrice, currentVol, currentRate, currentDay);
+    while (portfolio.positions.length > 0) {
+        const pos = portfolio.positions[portfolio.positions.length - 1];
+        closePosition(pos.id, currentPrice, currentVol, currentRate, currentDay);
     }
 }
 
