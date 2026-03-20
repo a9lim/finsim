@@ -27,28 +27,30 @@ Serve from `a9lim.github.io/` -- shared files load via absolute paths (`/shared-
 ## File Map
 
 ```
-main.js                864 lines  Entry point: DOM cache $, rAF loop, sub-step streaming,
+main.js                810 lines  Entry point: DOM cache $, rAF loop, sub-step streaming,
                                    live candle animation, camera, shortcuts, event wiring,
-                                   strategy builder, auto-scroll, ExpiryManager wiring
+                                   strategy builder (with rollback), auto-scroll, ExpiryManager
 index.html             500 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs:
                                    Trade/Portfolio/Strategy/Settings), chain overlay,
                                    trade dialog, margin call overlay, intro screen
-styles.css             880 lines  Project CSS: chain table, position rows, strategy builder,
-                                   trade dialog, margin alert, P&L coloring, Greeks grid,
-                                   time slider, responsive breakpoints
+styles.css             800 lines  Project CSS: chain table, position rows, strategy builder,
+                                   trade dialog, margin alert, P&L coloring, Greek label
+                                   classes, time slider, responsive breakpoints
 colors.js               59 lines  Financial color aliases (_PALETTE.up/down/call/put/stock/
                                    bond/delta/gamma/theta/vega/rho), CSS var injection,
                                    freezes _PALETTE
 src/
   config.js             26 lines  Named constants and PRESETS array (5 market regimes)
+  format-helpers.js     35 lines  Shared formatting: fmtDollar(), fmtNum(), pnlClass(),
+                                   fmtDte(), posTypeLabel(). Single source for UI modules.
   position-value.js    ~40 lines  Unified position valuation: computePositionValue(),
                                    computePositionPnl(). Imports pricing, config.
-  chain-renderer.js   ~230 lines  Chain table DOM building: renderChainInto(),
-                                   buildStockBondTable(). Extracted from ui.js.
-  portfolio-renderer.js ~200 lines Portfolio display with DOM diffing:
+  chain-renderer.js   ~200 lines  Chain table DOM building with event delegation:
+                                   renderChainInto(), buildStockBondTable(). Extracted from ui.js.
+  portfolio-renderer.js ~190 lines Portfolio display with DOM diffing:
                                    updatePortfolioDisplay(). Extracted from ui.js.
   events.js          ~500 lines  EventEngine: Poisson scheduler, MTTH followup chains,
-                                   offline event pool (~56 curated events for Palanthropic/PNTH),
+                                   offline event pool (~88 curated events for Palanthropic/PNTH),
                                    PARAM_RANGES canonical clamping. Shared by offline and LLM modes.
   history-buffer.js     86 lines  HistoryBuffer: fixed-capacity (256) ring buffer for OHLC bars
   llm.js             ~170 lines  LLMEventSource: Anthropic API via structured tool use
@@ -57,25 +59,26 @@ src/
   simulation.js        208 lines  GBM + Merton jumps + Heston stoch vol + Vasicek rate;
                                    beginDay()/substep()/finalizeDay() sub-step pipeline;
                                    prepopulate() fills buffer and scales to INITIAL_PRICE
-  pricing.js           443 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
+  pricing.js           435 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
                                    normal CDF (Drezner-Wesolowsky 1990) + finite-diff Greeks.
                                    Exports: priceAmerican, computeGreeks
-  chain.js             171 lines  ExpiryManager (rolling 8-expiry window, 21-day cycle),
-                                   generateStrikes(), buildChain()
-  portfolio.js         790 lines  Signed-qty positions, market/limit/stop orders, netting,
-                                   strategy groups, cash/margin, processExpiry(),
+  chain.js             158 lines  ExpiryManager (rolling 8-expiry window, 21-day cycle),
+                                   generateStrikes() (internal), buildChain()
+  portfolio.js         730 lines  Signed-qty positions, market/limit/stop orders, netting,
+                                   strategy groups, cash/margin, processExpiry() (options + bonds),
                                    exerciseOption(), aggregateGreeks(), liquidateAll(),
                                    computeBidAsk(), computeOptionBidAsk()
-  chart.js             683 lines  ChartRenderer: log Y-axis OHLC candles, auto-scale, grid,
+  chart.js             650 lines  ChartRenderer: log Y-axis OHLC candles, auto-scale, grid,
                                    crosshair, position markers, strike lines, live candle
-                                   lerp; uses shared-camera.js for pan/zoom
-  strategy.js          876 lines  StrategyRenderer: payoff P&L diagram, Greek overlays,
-                                   breakeven dots, scroll-wheel X zoom, clickable legend,
-                                   computeSummary(). Per-leg T from evalDay/entryDay.
-                                   Does NOT use shared-camera.js.
-  ui.js                966 lines  cacheDOMElements(), bindEvents(), updateChainDisplay(),
+                                   lerp, batched wick drawing; uses shared-camera.js
+                                   (worldToScreenX/screenToWorldX scalar methods) for pan/zoom
+  strategy.js          830 lines  StrategyRenderer: payoff P&L diagram, Greek overlays
+                                   (single-pass via _totalGreeksAll), breakeven dots,
+                                   scroll-wheel X zoom, clickable legend, computeSummary().
+                                   Per-leg T from evalDay/entryDay. No shared-camera.js.
+  ui.js                670 lines  cacheDOMElements(), bindEvents(), updateChainDisplay(),
                                    updateStrategyChainDisplay(), updateGreeksDisplay(),
-                                   showChainOverlay(), showTradeDialog(), showMarginCall(),
+                                   showChainOverlay(), showMarginCall(),
                                    toggleStrategyView(), renderStrategyBuilder(),
                                    updateStockBondPrices(), updateStrategySelectors();
                                    delegates to chain-renderer.js and portfolio-renderer.js
@@ -93,16 +96,18 @@ main.js
   |- src/portfolio.js     (portfolio, resetPortfolio, executeMarketOrder, computeBidAsk,
   |                         checkPendingOrders, processExpiry, checkMargin, aggregateGreeks,
   |                         closePosition, exerciseOption, liquidateAll, placePendingOrder,
-  |                         cancelOrder, saveStrategy, executeStrategy -- imports pricing, config)
+  |                         cancelOrder, saveStrategy, executeStrategy
+  |                         -- imports pricing, config, position-value)
   |- src/events.js      (EventEngine, OFFLINE_EVENTS, PARAM_RANGES -- no imports)
   |- src/llm.js         (LLMEventSource -- imports events.js)
   |- src/chart.js         (ChartRenderer -- no ES6 imports; reads _PALETTE, _r globals)
   |- src/strategy.js      (StrategyRenderer -- imports pricing, config)
+  |- src/format-helpers.js  (fmtDollar, fmtNum, pnlClass, fmtDte, posTypeLabel -- imports config)
   |- src/position-value.js  (imports pricing, config)
-  |- src/chain-renderer.js  (imports config; reads _PALETTE, _haptics globals)
-  |- src/portfolio-renderer.js (imports position-value, config)
-  |- src/ui.js            (cacheDOMElements, bindEvents, display updaters -- imports config,
-  |                         chain-renderer, portfolio-renderer;
+  |- src/chain-renderer.js  (imports format-helpers; reads _haptics globals)
+  |- src/portfolio-renderer.js (imports position-value, format-helpers)
+  |- src/ui.js            (cacheDOMElements, bindEvents, display updaters -- imports
+  |                         format-helpers, chain-renderer, portfolio-renderer;
   |                         reads _haptics, showToast, createInfoTip globals)
   +- src/theme.js         (initTheme, toggleTheme -- no imports)
 ```
@@ -135,7 +140,7 @@ Pausing mid-day leaves the partial bar frozen. Resuming continues from where it 
 GBM with Merton jumps and Heston stochastic volatility (Euler-Maruyama, full truncation):
 
 ```
-dS/S = (mu - lambda*k)dt + sqrt(v) * dW1 + J * dN(lambda)
+dS/S = (mu - lambda*k - 0.5*v)dt + sqrt(v) * dW1 + J * dN(lambda)
 dv   = kappa(theta - v)dt + xi*sqrt(v) * dW2      (dW1*dW2 = rho*dt)
 ```
 
@@ -148,8 +153,8 @@ Vasicek: `dr = a(b - r)dt + sigmaR * dW3` (independent of dW1, dW2). Rate uncons
 ### OHLC Sub-Step Pipeline
 
 16 sub-steps per day at `dt = 1/(252 * 16)`:
-1. **`beginDay()`** -- init partial bar, push to history by reference
-2. **`substep()`** -- one step of stochastic model, update partial in-place
+1. **`beginDay()`** -- init partial bar, push to history by reference; caches `_sqrtDt` and `_sqrtOneMinusRhoSq`
+2. **`substep()`** -- one step of stochastic model (with Ito correction), update partial in-place
 3. **`finalizeDay()`** -- clear partial, increment day
 
 ### Market Regime Presets
@@ -176,7 +181,7 @@ Analytical approximation for American options. Computes perpetual exercise bound
 |-------|--------|------|
 | Delta | central diff in S | `h_S = S * 0.01` |
 | Gamma | second central diff in S | same |
-| Theta | forward diff in T | `h_T = 1/252` |
+| Theta | central diff in T | `h_T = 1/252` (denominator adjusts near expiry) |
 | Vega | central diff in sigma | `h_sigma = 0.001` |
 | Rho | central diff in r | `h_r = 0.0001` |
 
@@ -184,19 +189,21 @@ Analytical approximation for American options. Computes perpetual exercise bound
 
 ### Bid/Ask Spread Model
 
-All instruments use volatility-aware spreads. Two functions in `portfolio.js`:
+All instruments use volatility-aware spreads. Two functions in `portfolio.js`. Callers pass `sigma = sqrt(v)` (not variance). Bids floored at 0.
 
-**`computeOptionBidAsk(mid, S, K, v)`** -- options (includes moneyness):
+**`computeOptionBidAsk(mid, S, K, sigma)`** -- options (includes moneyness):
 ```
-halfSpread = max(0.025, mid * 0.01 * (1 + sqrt(v)) + 0.05 * |log(S/K)|)
-```
-
-**`computeBidAsk(mid, S, v)`** -- stock/bond (moneyness = 0):
-```
-halfSpread = max(0.025, mid * 0.01 * (1 + sqrt(v)))
+halfSpread = max(0.025, mid * 0.01 * (1 + sigma) + 0.05 * |log(S/K)|)
+bid = max(0, mid - halfSpread), ask = mid + halfSpread
 ```
 
-Long fills at ask, short fills at bid. `chain.js` imports `computeOptionBidAsk` for chain construction. `_fillPrice()` in portfolio.js dispatches to the appropriate function.
+**`computeBidAsk(mid, S, sigma)`** -- stock/bond (moneyness = 0):
+```
+halfSpread = max(0.025, mid * 0.01 * (1 + sigma))
+bid = max(0, mid - halfSpread), ask = mid + halfSpread
+```
+
+Long fills at ask, short fills at bid. `chain.js` imports `computeOptionBidAsk` for chain construction. `_fillPrice()` in portfolio.js dispatches to the appropriate function. `closePosition()` uses `_fillPrice()` internally (no duplicated spread logic).
 
 ## Options Chain
 
@@ -245,15 +252,15 @@ Signed qty: `qty > 0` = long, `qty < 0` = short. No `side` field on positions.
 | Short bond | 50% of fill | 25% |
 | Short option | max(20% * S * qty, premium * qty) | same, marked to market |
 
-Margin call at `equity < 25% * totalPositionValue`. Pauses sim, shows overlay.
+Margin call at `equity < marginRequirement` (considers only short positions). Pauses sim, shows overlay.
 
 ### Option Expiry
 
-`processExpiry()`: ITM longs auto-exercised, OTM longs expire worthless, shorts removed with margin returned. Short ITM options are NOT assigned (simplified model).
+`processExpiry()`: Bonds settle at face value ($100) on maturity. ITM option longs auto-exercised, OTM longs expire worthless, shorts removed with margin returned. Short ITM options are NOT assigned (simplified model).
 
 ### Strategy System
 
-`strategyLegs[]` lives in `main.js`. Each leg: `{ type, qty, strike?, expiryDay? }` with signed qty. `saveStrategy()`/`executeStrategy()` in portfolio.js handle persistence and execution.
+`strategyLegs[]` lives in `main.js`. Each leg: `{ type, qty, strike?, expiryDay? }` with signed qty. `saveStrategy()`/`executeStrategy()` in portfolio.js handle persistence and execution. `handleExecStrategy()` in main.js executes legs sequentially; if any leg fails (e.g. insufficient margin), all previously filled legs are rolled back by restoring a portfolio snapshot.
 
 ## UI Architecture
 
@@ -404,7 +411,8 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Bond pricing**: `100 * exp(-r * T)`. Volatility-aware spread via `computeBidAsk()`. Strategy view shows theta (interest accrual) and rho.
 - **Auto-scroll**: keeps latest candle at ~85% from left when playing.
 - **Toast fill price**: trade toast shows actual fill price (including bid/ask spread) via `pos.fillPrice`.
-- **Shared chain renderer**: `_renderChainInto()` in ui.js builds both trade-tab and strategy-tab chain tables. Accepts container, chain data, dropdown element, and click callback. Trade tab passes `$._onChainCellClick`, strategy tab wraps `onAddLeg`.
+- **Shared chain renderer**: `renderChainInto()` in chain-renderer.js builds both trade-tab and strategy-tab chain tables. Uses event delegation (3 listeners on container, not per-cell). Trade tab passes `$._onChainCellClick`, strategy tab wraps `onAddLeg`.
+- **`_resetCore` helper**: shared reset logic for `loadPreset()` and `resetSim()` in main.js.
 - **Unified stock/bond prices**: `updateStockBondPrices($, spot, rate, chain)` computes bond price from each tab's selected expiry and updates all four cells (trade + strategy).
 
 ## Gotchas
@@ -420,7 +428,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Strategy legs live in main.js** -- `strategyLegs[]` is local state, not in portfolio.js.
 - **Inline qty editing** in strategy leg rows mutates `leg.qty` directly, bypasses netting.
 - **`portfolio` singleton** -- `resetPortfolio()` mutates in place. Never replace the reference.
-- **Chain table rebuilt every call** -- do not cache cell references. Clicks re-bound after each rebuild.
+- **Chain table rebuilt every call** -- do not cache cell references. Clicks use event delegation on container (not per-cell listeners).
 - **Trade dialog confirm button cloned** on each open to avoid stacking listeners.
 - **`ExpiryManager` is stateful** -- lives in main.js, `.init()` on reset, `.update()` each tick.
 - **Vasicek rate can go negative** -- BS2002 uses `rEff = max(r, 1e-7)` for beta only.
@@ -430,6 +438,11 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **`eventEngine` is null in non-Dynamic presets** -- always check `if (eventEngine)` before calling methods. `maybeFire()` returns an array of fired events (may be empty), not a single event/null.
 - **`_reservedMargin` field on short positions** stores actual margin reserved at open time. Use `?? _marginForShort(...)` fallback when reading.
 - **Event deltas are additive and clamped** to `PARAM_RANGES` -- never set absolute values via events.
-- **LLM followup events don't enter `_eventById` lookup** -- only offline pool events are indexed. LLM-generated followup IDs reference nothing.
+- **LLM followup events** now include `headline`, `params`, `magnitude` in the tool schema. Offline followups still resolved via `_getEventById`; LLM followups carry their own data.
 - **`_pendingFollowups` cleared on reset** -- switching presets mid-chain drops all scheduled followups.
 - **Slider ranges expanded globally** -- all 11 parameter sliders have wider min/max than the original presets use. Events can push params to extremes.
+- **`_haptics` must always be guarded** -- use `if (typeof _haptics !== 'undefined') _haptics.trigger(...)`. The global loads from `/shared-haptics.js`; ES6 modules may execute before it's defined.
+- **`generateStrikes` is not exported** from chain.js -- internal helper only.
+- **Strategy execution rolls back on partial failure** -- `handleExecStrategy()` snapshots portfolio state before executing legs; if any leg fails, it restores the snapshot.
+- **`speed` variable removed** -- use `SPEED_OPTIONS[speedIndex]` directly. `speedIndex` is the single source of truth for simulation speed.
+- **`worldToScreenX`/`screenToWorldX`** -- scalar camera methods in `shared-camera.js` avoid object allocation. chart.js uses these with fallback to `worldToScreen().x` for backwards compatibility.
