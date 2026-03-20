@@ -388,15 +388,7 @@ function frame(now) {
     // Lerp animation runs every frame (even when paused, for settling)
     chart.update(now);
     // Lerp always causes a redraw while targets differ from display
-    const L = chart._lerp;
-    if (L.day >= 0 && (
-        Math.abs(L.close - L._targetClose) > 0.001 ||
-        Math.abs(L.high  - L._targetHigh)  > 0.001 ||
-        Math.abs(L.low   - L._targetLow)   > 0.001
-    )) {
-        // Live candle lerp only affects chart, not strategy
-        if (!strategyMode) dirty = true;
-    }
+    if (chart.isLerpActive() && !strategyMode) dirty = true;
 
     // Check if strategy renderer flagged dirty from wheel zoom
     if (strategy._dirty) {

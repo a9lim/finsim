@@ -99,6 +99,20 @@ export class ChartRenderer {
     }
 
     /* -----------------------------------------------
+       isLerpActive()
+       Returns true if the live candle is still animating
+       (i.e., display values differ from targets).
+    ----------------------------------------------- */
+    isLerpActive() {
+        const L = this._lerp;
+        return L.day >= 0 && (
+            Math.abs(L.close - L._targetClose) > 0.001 ||
+            Math.abs(L.high  - L._targetHigh)  > 0.001 ||
+            Math.abs(L.low   - L._targetLow)   > 0.001
+        );
+    }
+
+    /* -----------------------------------------------
        update(now)
        Advance cubic interpolation toward the live
        candle's target. Call once per frame before draw().
