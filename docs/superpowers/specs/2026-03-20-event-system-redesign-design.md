@@ -142,6 +142,8 @@ The `congress` parameter is the pre-computed `congressHelpers(world)` result, av
 
 Categories expanded from 5 to 9 to accommodate new arc types. The `fed` category still gets special treatment (FOMC schedule). All others draw from the Poisson pool.
 
+**Migration note:** This is a full rewrite of the event pool. All ~88 existing events are replaced by ~200 new events. No existing events are carried forward — all new events use the 3-arity `when(sim, world, congress)` signature. The `category` field is **required** on every event in the new pool.
+
 ## 6. Revised EventEngine
 
 ### 6.1 New Fields
@@ -188,7 +190,7 @@ Also resets `this.world = createWorldState()`, `_nonFedCooldown = 0`, `_consecut
 
 ### 7.1 Non-Fed Poisson Rate
 
-Base rate: `1/40` (~6 events/year). After firing, cooldown of 8-15 days (uniform random) prevents clumping.
+Base rate: `1/30`. After firing, cooldown of 8-15 days (uniform random) prevents clumping. Effective rate accounting for cooldown: ~1 per `30 + 11.5 = 41.5` eligible days, giving ~6 non-Fed events per year (252 / 41.5 ≈ 6.1).
 
 ### 7.2 FOMC Schedule Jitter
 
@@ -323,6 +325,8 @@ Multi-stage: peace → tariffs → retaliation → decoupling → deal (or perma
 - 3→4: Framework deal (more likely late game / low approval)
 - OR: stays at 3 (permanent decoupling — good for PNTH if military contract active)
 
+**`chinaRelations` tracking:** Trade war events move `chinaRelations` alongside `tradeWarStage`: tariffs → -1, retaliation → -1, Zhaowei ban → -2 (to -3 cap), trade deal → +2. Ceasefire/detente events can also push it positive. Used by neutral events for color and by compound events as a gate (e.g., Beijing propaganda requires `chinaRelations <= -2`).
+
 **PNTH intersection:** At stage 3, if `militaryContractActive`, PNTH benefits from decoupling as domestic AI champion.
 
 ### 9.4 Arc 4: The Middle East Quagmire
@@ -410,10 +414,12 @@ These have likelihood >= 1.0 (the rarity comes from the flag requirements).
 
 Not narrative arcs but systemic shocks with dynamic likelihood:
 
-- **Flash crash**: more likely when `theta > 0.15`, `credibilityScore < 5`
+Note: `theta` here is the Heston long-run variance parameter, not implied volatility. `theta = 0.15` corresponds to ~38.7% annualized vol (`sqrt(0.15)`). The Crisis preset has `theta = 0.25` (~50% vol), so these thresholds are reachable during escalation.
+
+- **Flash crash**: more likely when `theta > 0.15` (~39% vol), `credibilityScore < 5`
 - **Liquidity crisis**: more likely when `qeActive === false`, `credibilityScore < 5`
 - **Short squeeze**: more likely when `borrowSpread` high, `theta` elevated
-- **Low vol grind**: only when `theta < 0.06`, `lambda < 1.5`
+- **Low vol grind**: only when `theta < 0.06` (~24% vol), `lambda < 1.5`
 
 Can trigger followups: SEC investigation, circuit breaker reform, etc.
 
@@ -482,7 +488,8 @@ High-likelihood, low-impact events that reference world state for color:
 - **Expected mu delta per year ≈ 0**: Every bullish event has a bearish counterpart. Neutral events carry tiny positive mu (+0.003 to +0.005) to offset negativity bias.
 - **Expected theta delta per year ≈ 0**: Crises spike theta, resolutions reduce it. Neutrals carry tiny negative theta.
 - **Escalation ladders have caps**: `tradeWarStage` caps at 4, `mideastEscalation` at 3, etc. At cap, only resolution events are eligible.
-- **`barronApproval` creates mean-reversion**: Bad events → low approval → midterm loss → opposition blocks further bad policy → recovery.
+- **`barronApproval` creates mean-reversion**: Bad events → low approval → midterm loss → opposition blocks further bad policy → recovery. Additionally, periodic neutral events nudge approval toward 45 (slight regression to mean) to prevent extreme early drift from locking in midterm outcomes.
+- **Balance verification**: During implementation, compute `sum(likelihood_i * mu_i) / sum(likelihood_i)` across the ungated pool for both mu and theta. Target: absolute value < 0.005 for both. This is a spot-check, not a runtime mechanic.
 
 ### 10.3 `borrowSpread` and `q`
 
@@ -514,13 +521,19 @@ export const OFFLINE_EVENTS = [
 
 Fed events are filtered out of the Poisson pool (drawn only on FOMC schedule). Midterm events are handled by the fixed-day mechanic, not the regular pool. All others eligible for Poisson draw.
 
+**File splitting:** With ~200 events, the event definitions alone will be 1500+ lines. Split into two files: `src/event-pool.js` (all event arrays + `OFFLINE_EVENTS` export) and `src/events.js` (EventEngine class, imports from event-pool.js and world-state.js). This keeps the engine logic readable and the event definitions editable independently.
+
 ## 12. Midterm Election Mechanic
 
-Checked at the top of `maybeFire()`, before followups and regular draws.
+Hard-coded checks inside `maybeFire()`, **not** pool events. The midterm is too structurally important to leave to Poisson chance — it fires at fixed days via dedicated `_checkMidterm(sim, day)` method, called at the top of `maybeFire()` before followups and regular draws.
 
-**Campaign season** fires at ~day 440: theta +0.01 uncertainty premium.
+**Campaign season** — `_checkMidterm` fires a hard-coded campaign event when `day >= CAMPAIGN_START_DAY` and `!this._midtermWarningFired`. Sets `_midtermWarningFired = true`. Returns a single log entry. On the same day, regular Poisson/FOMC draws are skipped (midterm takes priority).
 
-**Election** fires at ~day 504. Outcome computed:
+**Election** — `_checkMidterm` fires the election event when `day >= MIDTERM_DAY` and `!this.world.election.midtermComplete`. Computes outcome score, selects result, mutates congress, sets `midtermComplete = true`. Returns a single log entry. The four outcome events (fed_gain, fed_hold, fed_loss_house, fed_loss_both) are defined inline in `_checkMidterm`, not in the pool.
+
+**Post-midterm followups** — Each outcome event has followups that ARE added to `_pendingFollowups` and fire via the normal followup mechanic. These post-midterm followups live in the `MIDTERM_EVENTS` pool array (for ID-based lookup) but are never drawn by Poisson.
+
+Outcome computed:
 ```
 score = barronApproval - (recessionDeclared ? 15 : 0) - (atWar ? 8 : 0) + uniform(-10, +10)
 ```
@@ -540,7 +553,7 @@ Add to `src/config.js`:
 ```js
 export const MIDTERM_DAY = 504;
 export const CAMPAIGN_START_DAY = 440;
-export const NON_FED_POISSON_RATE = 1 / 40;
+export const NON_FED_POISSON_RATE = 1 / 30;
 export const NON_FED_COOLDOWN_MIN = 8;
 export const NON_FED_COOLDOWN_MAX = 15;
 export const FED_MEETING_JITTER = 4;
@@ -566,17 +579,43 @@ World state:
 - ...etc
 ```
 
-### 14.3 Tool Schema
+### 14.3 Tool Schema & LLM Effects
 
-Add `effects` description to the tool schema so LLM can suggest world state mutations. These are validated and applied by the engine (not blindly trusted).
+LLM events **cannot return JavaScript functions**, so world state mutations use a structured DSL. The `emit_events` tool schema gains an optional `effects` array on each event:
+
+```js
+effects: {
+    type: 'array',
+    description: 'World state mutations. Each entry is a path + operation.',
+    items: {
+        type: 'object',
+        properties: {
+            path:  { type: 'string', description: 'Dot-notation path, e.g. "pnth.boardDirks"' },
+            op:    { type: 'string', enum: ['set', 'add'] },
+            value: { type: 'number' },
+        },
+        required: ['path', 'op', 'value'],
+    },
+}
+```
+
+The engine validates LLM effects before applying:
+1. `path` must match a known key in the world state schema (whitelist check)
+2. `op: 'add'` adds `value` to the current field; `op: 'set'` replaces it
+3. Numeric fields are clamped to their valid ranges (e.g., `boardDirks` 0-10, `barronApproval` 0-100)
+4. Boolean fields accept `set` with 0 (false) or 1 (true)
+5. Invalid paths or ops are silently dropped (LLM is best-effort)
+
+Offline events continue to use `effects: (world) => void` functions directly. The engine checks `typeof event.effects === 'function'` vs `Array.isArray(event.effects)` to dispatch.
 
 ## 15. File Change Summary
 
 | File | Change type | Description |
 |------|------------|-------------|
 | `src/world-state.js` | **NEW** | World state factory + congress helpers |
-| `src/events.js` | **REWRITE** | ~200 events, revised EventEngine with world state, midterm mechanic, dynamic likelihood, timing improvements |
-| `src/llm.js` | **UPDATE** | System prompt rewrite, world state in messages, effects in tool schema |
+| `src/event-pool.js` | **NEW** | ~200 event definitions organized by category |
+| `src/events.js` | **REWRITE** | EventEngine class with world state, midterm mechanic, dynamic likelihood, timing improvements. Imports event pool from `event-pool.js` |
+| `src/llm.js` | **UPDATE** | System prompt rewrite, world state in messages, structured effects DSL in tool schema |
 | `src/config.js` | **UPDATE** | Add midterm/timing/cooldown constants |
 | `main.js` | **UPDATE** | Wire world state into event engine, reset on preset change, pass to UI for display |
 
