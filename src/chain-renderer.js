@@ -162,46 +162,46 @@ export function bindChainTableClicks(container, onChainCellClick) {
 // Exported: render chain into container
 // ---------------------------------------------------------------------------
 
-export function renderChainInto(container, chain, selectedIndex, dropdownEl, onClick, posMap) {
-    if (!chain || chain.length === 0) {
-        container.textContent = '';
-        const ph = document.createElement('div');
-        ph.className = 'chain-placeholder';
-        ph.textContent = 'No chain data.';
-        container.appendChild(ph);
-        if (dropdownEl) {
-            dropdownEl.textContent = '';
-            const opt = document.createElement('option');
-            opt.textContent = 'No expiries available';
-            dropdownEl.appendChild(opt);
-        }
+/**
+ * Rebuild the expiry dropdown from the skeleton.
+ * Only call when the skeleton changes (new day, reset, etc.) — not every substep.
+ */
+export function rebuildExpiryDropdown(dropdownEl, skeleton, selectedIndex) {
+    if (!dropdownEl) return;
+    if (!skeleton || skeleton.length === 0) {
+        dropdownEl.textContent = '';
+        const opt = document.createElement('option');
+        opt.textContent = 'No expiries available';
+        dropdownEl.appendChild(opt);
         return;
     }
-
-    // Rebuild dropdown options
-    if (dropdownEl) {
-        const prevVal = dropdownEl.value;
-        dropdownEl.textContent = '';
-        chain.forEach((exp, i) => {
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.textContent = fmtDte(exp.dte) + ' (' + exp.dte + 'd)';
-            dropdownEl.appendChild(opt);
-        });
-        // Preserve previous selection if still valid
-        if (prevVal !== '' && parseInt(prevVal, 10) < chain.length) {
-            dropdownEl.value = prevVal;
-        }
+    const prevVal = dropdownEl.value;
+    dropdownEl.textContent = '';
+    skeleton.forEach((exp, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = fmtDte(exp.dte) + ' (' + exp.dte + 'd)';
+        dropdownEl.appendChild(opt);
+    });
+    if (selectedIndex != null && selectedIndex < skeleton.length) {
+        dropdownEl.value = selectedIndex;
+    } else if (prevVal !== '' && parseInt(prevVal, 10) < skeleton.length) {
+        dropdownEl.value = prevVal;
     }
+}
 
-    const raw = selectedIndex ?? parseInt(dropdownEl?.value, 10);
-    const clamped = Math.min(Math.max((raw != null && !isNaN(raw)) ? raw : chain.length - 1, 0), chain.length - 1);
-    if (dropdownEl) dropdownEl.value = clamped;
-
-    const expiry = chain[clamped];
+/**
+ * Render a chain table into a container.
+ *
+ * @param {HTMLElement} container - DOM container to render into
+ * @param {{ day: number, dte: number, options: Array }} pricedExpiry - pre-priced expiry to display
+ * @param {function|null} onClick - chain cell click handler
+ * @param {object|null} posMap - position map for indicators
+ */
+export function renderChainInto(container, pricedExpiry, onClick, posMap) {
     container.textContent = '';
 
-    if (!expiry || !expiry.options || expiry.options.length === 0) {
+    if (!pricedExpiry || !pricedExpiry.options || pricedExpiry.options.length === 0) {
         const ph = document.createElement('div');
         ph.className = 'chain-placeholder';
         ph.textContent = 'No options for this expiry.';
@@ -209,7 +209,7 @@ export function renderChainInto(container, chain, selectedIndex, dropdownEl, onC
         return;
     }
 
-    container.appendChild(buildChainTable(expiry, true, posMap));
+    container.appendChild(buildChainTable(pricedExpiry, true, posMap));
     // Bind click delegation only once per container
     if (!container._chainClicksBound) {
         bindChainTableClicks(container, onClick);
