@@ -67,6 +67,8 @@ export function createWorldState() {
             dojSuitFiled: false,
             senateProbeLaunched: false,
             whistleblowerFiled: false,
+            acquired: false,            // true if hostile takeover event fired
+            gottliebStartedRival: false, // true if Covenant AI founded
         },
         geopolitical: {
             tradeWarStage: 0,          // 0=peace, 1=tariffs, 2=retaliation, 3=decoupling, 4=deal
@@ -97,6 +99,7 @@ export function createWorldState() {
             barronApproval: 50,        // 0-100
             primarySeason: false,
             okaforRunning: false,
+            presidentialResult: null,   // set by computeElectionOutcome() at term end
         },
     };
 }
@@ -631,20 +634,29 @@ Covers the presidential election that concludes the term. Content determined by 
   - **Barron removed/resigned**: If `impeachmentStage >= 3` reached. VP (or successor) ran instead. Text covers the unprecedented removal and its aftermath.
   - **Barron wins narrowly amid controversy**: If approval 42-45 range. Contested, recounts, legal challenges. Uncertainty premium.
 
+Note: if `okaforRunning` is true, she is the opponent regardless of score range. The score determines whether Barron wins or loses against her specifically:
+  - Score > 50: Barron defeats Okafor comfortably. "Okafor's campaign failed to overcome the incumbent advantage..."
+  - Score 45-50: Barron narrowly defeats Okafor. "The closest election in a generation; Okafor conceded at 3AM..."
+  - Score 38-45: Okafor defeats Barron. "Senator Okafor made history, the first woman and first Black woman to..."
+  - Score < 38: Okafor wins decisively. "It wasn't even close by midnight..."
+If `!okaforRunning`, the opponent is a generic Farmer-Labor candidate with less dramatic narrative.
+
 Text references specific events that shaped the outcome — the midterms, the wars, the scandals, the economy. 3-5 paragraphs, written in a retrospective journalistic style ("Looking back, the turning point was...").
 
 **Page 2: "The Fate of Palanthropic"**
 
 Covers PNTH's corporate resolution. Content branches heavily on world state:
 
-- **Gottlieb's PNTH** (`ceoIsGottlieb` and `boardGottlieb >= 6`): Commercial pivot succeeded. Atlas AI platform dominates enterprise. Military contracts wound down. Stock recovered after initial defense-revenue drop. "Gottlieb proved the skeptics wrong..."
-- **Dirks's PNTH** (`!ceoIsGottlieb` and `boardDirks >= 7`): Full defense contractor. Largest AI military supplier globally. Massive government revenue but commercial division gutted. "Dirks had won, but the company Gottlieb built was unrecognizable..."
-- **Post-acquisition PNTH** (if hostile takeover fired): Acquired by tech giant or broken up. "The name Palanthropic still appears on the building, but..."
-- **Covenant AI rivalry** (if Gottlieb started rival): Two-company landscape. PNTH weakened, Covenant growing. "The AI industry had split along ethical lines..."
-- **Scandal-ravaged PNTH** (if `dojSuitFiled` and `whistleblowerFiled` and `senateProbeLaunched`): Under consent decree, leadership replaced. "What was once the most promising AI company in America was now a cautionary tale..."
-- **Compromise PNTH** (both still there, no resolution): Uneasy peace. "The Gottlieb-Dirks détente held, but insiders said it was only a matter of time..."
+Branches are checked in priority order (first match wins):
 
-References Kassis's fate, the board composition, key contract wins/losses, the Bowman connection fallout. 3-5 paragraphs.
+1. **Post-acquisition PNTH** (if `world.pnth.acquired`): Acquired by tech giant or broken up. "The name Palanthropic still appears on the building, but..." Highest priority — acquisition overrides all internal dynamics.
+2. **Scandal-ravaged PNTH** (if `dojSuitFiled && whistleblowerFiled && senateProbeLaunched`): Under consent decree, leadership replaced. "What was once the most promising AI company in America was now a cautionary tale..."
+3. **Covenant AI rivalry** (if `!ceoIsGottlieb` and Gottlieb-starts-rival event fired): Two-company landscape. PNTH weakened, Covenant growing. "The AI industry had split along ethical lines..."
+4. **Gottlieb's PNTH** (`ceoIsGottlieb && boardGottlieb >= 6`): Commercial pivot succeeded. Atlas AI dominates enterprise. "Gottlieb proved the skeptics wrong..."
+5. **Dirks's PNTH** (`!ceoIsGottlieb && boardDirks >= 7`): Full defense contractor. Government revenue dominates. "Dirks had won, but the company Gottlieb built was unrecognizable..."
+6. **Compromise PNTH** (fallback — none of the above matched): Both still there, uneasy peace. "The Gottlieb-Dirks détente held, but insiders said it was only a matter of time..."
+
+Each branch also weaves in: Kassis's fate (based on `ctoIsMira`), board composition, key contract wins/losses, Bowman connection fallout. 3-5 paragraphs.
 
 **Page 3: "The World"**
 
@@ -656,7 +668,12 @@ Covers geopolitical and economic state. Synthesizes multiple world flags:
 - **The Fed**: Based on `hartleyFired`, `vaneAppointed`, `credibilityScore`. "Hartley served her full term, her independence intact..." or "The Vane Fed had delivered the rate cuts Barron wanted, but the dollar never recovered..."
 - **The Economy**: Based on `recessionDeclared`, current `b` (rates), `theta` (vol). Recession? Recovery? Boom? "Four years of whiplash had left the economy..."
 
-2-4 paragraphs covering the most dramatic threads. Skips arcs that never triggered (if `southAmericaOps` stayed at 0, don't mention it).
+2-4 paragraphs covering the most dramatic threads. Each subsection has an explicit skip condition:
+- **Trade/China**: skip if `tradeWarStage === 0` (tariffs never imposed)
+- **Middle East**: skip if `mideastEscalation === 0` (no military action)
+- **South America**: skip if `southAmericaOps === 0` (no operations)
+- **The Fed**: always included (Fed always acts; content varies by `hartleyFired`/`vaneAppointed`/`credibilityScore`)
+- **The Economy**: always included (economy always has a state to describe)
 
 **Page 4: "Your Legacy"**
 
@@ -665,7 +682,7 @@ A scorecard page with a different visual style — stat-rows and data rather tha
 - **Portfolio Performance**: Final portfolio value, total P&L (dollar and percentage), peak portfolio value, max drawdown
 - **Trading Activity**: Total trades executed, options exercised, positions liquidated by margin call, margin calls survived
 - **Market Summary**: Starting vs ending stock price, highest/lowest price seen, starting vs ending rate, peak volatility (theta)
-- **Timeline Highlights**: The 3-5 highest-magnitude events that fired during the playthrough, listed chronologically with day numbers. Pulled from `eventLog`.
+- **Timeline Highlights**: The 3-5 most impactful events from `eventLog`, listed chronologically with day numbers. Selection heuristic: filter to `magnitude === 'major'` entries first; if fewer than 3, include `'moderate'` entries sorted by absolute sum of their parameter deltas (larger total delta = more impactful). The `magnitude` field is already present on all event log entries (set in `_fireEvent` from the event definition).
 - **Rating**: A tongue-in-cheek title based on performance:
   - P&L > 200%: "Master of the Universe"
   - P&L > 100%: "Wolf of Wall Street"
@@ -681,18 +698,23 @@ Buttons at the bottom:
 
 ### 15.3 Epilogue Trigger
 
-New method `_checkEpilogue(sim, day)` in EventEngine, called at the very top of `maybeFire()` before midterms:
+The epilogue does **not** go through `maybeFire()`. Instead, `main.js` checks a separate method before calling `maybeFire`:
 
-```
-if (day >= TERM_END_DAY && !this._epilogueFired) {
-    this._epilogueFired = true;
-    return 'epilogue';  // special return value, not a log entry
+```js
+// In _onDayComplete() in main.js, before calling eventEngine.maybeFire():
+if (eventEngine.isEpilogueReady(sim.day)) {
+    playing = false;
+    eventEngine.computeElectionOutcome(sim);  // stores in world.election.presidentialResult
+    showEpilogue(eventEngine.world, sim, portfolio, eventEngine.eventLog);
+    return;  // skip maybeFire entirely
 }
 ```
 
-`maybeFire` returns `'epilogue'` as a sentinel. `main.js` checks for this and calls `showEpilogue(world, sim, portfolio, eventLog)` instead of processing normal event log entries.
+`EventEngine.isEpilogueReady(day)` is a pure check: `day >= TERM_END_DAY && !this._epilogueFired`. `EventEngine.computeElectionOutcome(sim)` runs the scoring formula from section 16 and stores the result.
 
-After epilogue, `maybeFire` returns `[]` for all subsequent days (event pool exhausted). The simulation loop continues but no events fire.
+After the epilogue fires, `maybeFire()` checks `this._epilogueFired` at the top and returns `[]` immediately. The `maybeFire` return type remains `Array<LogEntry>` — no sentinel values, no contract change.
+
+The "Keep Playing" button sets `this._epilogueFired = true` (already set) and resumes. The market model continues but no events fire.
 
 ### 15.4 Epilogue Content Generation
 
@@ -721,7 +743,7 @@ Uses the existing overlay pattern but with additions:
 - `.epilogue-nav` — bottom button row with Back/Next/Restart/Keep Playing
 - `.epilogue-dots` — page indicator dots (4 dots, active dot highlighted)
 - Page 4 uses `.stat-row` / `.stat-value` patterns from shared-base.css for the scorecard
-- Transitions between pages use a simple fade (opacity transition, 200ms)
+- Page transitions: fade applies only to `.epilogue-body` content (title and nav stay stable). Opacity transition 200ms. Scroll position resets to top on page change. Panel height is not animated — uses natural height of each page, with `min-height` to prevent jarring shrink.
 
 Responsive: at <= 600px, overlay goes fullscreen (same as `.sim-overlay` default behavior).
 
@@ -741,23 +763,27 @@ Some scorecard stats require tracking that doesn't currently exist. Add to portf
 - `portfolio.peakValue` — updated each substep: `Math.max(peakValue, currentEquity)`
 - `portfolio.maxDrawdown` — updated each substep: `Math.max(maxDrawdown, 1 - currentEquity / peakValue)`
 
+`peakValue` and `maxDrawdown` piggyback on the equity value already computed in `_onSubstep()` for the portfolio display (the same value used by `checkMargin`). No separate valuation pass needed — just capture the equity number that's already being calculated and run two comparisons.
+
 These are lightweight additions — one comparison per substep, reset on `resetPortfolio()`.
 
 ## 16. Election Outcome Computation
 
-The presidential election outcome at `TERM_END_DAY` is determined by a scoring function similar to the midterm but with more variables:
+The presidential election outcome at `TERM_END_DAY` is determined by a scoring function similar to the midterm but with more variables. Note: `barronApproval` starts at 50 (defined in `createWorldState()`, section 4.1) and drifts throughout the game via event `effects`. By term end, it has typically drifted 10-25 points from baseline depending on what happened.
 
 ```
 score = barronApproval
 if recessionDeclared: score -= 12
-if mideastEscalation >= 2: score -= 6
-if southAmericaOps >= 2: score -= 4
-if impeachmentStage >= 2: score -= 15
-if hartleyFired: score -= 5
-if tradeWarStage == 4 (deal): score += 5
-if oilCrisis: score -= 4
-noise: ± 8 (uniform random)
+if mideastEscalation >= 2: score -= 8
+if southAmericaOps >= 2: score -= 5
+if impeachmentStage >= 2: score -= 18
+if hartleyFired: score -= 6
+if tradeWarStage == 4 (deal): score += 6
+if oilCrisis: score -= 5
+noise: ± 5 (uniform random)
 ```
+
+Noise is kept small (±5) so that accumulated world state events meaningfully determine the outcome. Individual penalties are large enough to survive the noise — a war alone (-8) shifts the result by roughly one tier.
 
 | Score | Outcome |
 |-------|---------|
