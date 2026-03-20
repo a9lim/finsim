@@ -1356,7 +1356,133 @@ const PNTH_EARNINGS_EVENTS = [
         },
     },
 ];
-const SECTOR_EVENTS = [];
+const SECTOR_EVENTS = [
+    {
+        id: 'ai_regulation_bill',
+        category: 'sector',
+        likelihood: 0.7,
+        headline: 'AI regulation bill passes Congress with bipartisan support; mandates safety audits, licensing for frontier models. PNTH compliance costs estimated at $200M/year',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'doj_antitrust_cloud',
+        category: 'sector',
+        likelihood: 0.6,
+        headline: 'DOJ files antitrust suit against three major cloud providers alleging market allocation; enterprise AI contracts could be voided. Sector-wide repricing',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.6 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'semiconductor_shortage',
+        category: 'sector',
+        likelihood: 1.0,
+        headline: 'TSMC warns of 16-week lead times on advanced nodes; AI chip allocations cut 30%. PNTH scrambles for alternative supply',
+        params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'semiconductor_glut',
+        category: 'sector',
+        likelihood: 1.0,
+        headline: 'Semiconductor inventory correction hits: channel checks show 8 weeks of excess AI chip stock. ASPs under pressure across the supply chain',
+        params: { mu: -0.01, theta: 0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'data_breach_major',
+        category: 'sector',
+        likelihood: 0.8,
+        headline: '500M user records exposed in breach at major social platform; Congress demands hearings, calls for data privacy legislation. Tech sentiment sours',
+        params: { mu: -0.025, theta: 0.015, lambda: 0.4 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tech_ipo_frenzy',
+        category: 'sector',
+        likelihood: 1.2,
+        headline: 'Three major AI startups file S-1s in a single week; IPO market heats up as risk appetite returns. "Animal spirits are back," says Goldman',
+        params: { mu: 0.02, theta: -0.005, lambda: -0.2 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'enterprise_cloud_boom',
+        category: 'sector',
+        likelihood: 1.2,
+        headline: 'Gartner raises enterprise cloud spending forecast 20%; AI workloads driving "unprecedented demand." Hyperscaler capex guides surge',
+        params: { mu: 0.02, theta: -0.008 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'cyber_attack_infrastructure',
+        category: 'sector',
+        likelihood: 0.7,
+        headline: 'Major cyberattack takes down power grid in three states; CISA attributes to state-sponsored actors. Congress fast-tracks cybersecurity spending bill',
+        params: { mu: -0.025, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'ai_spending_forecast_up',
+        category: 'sector',
+        likelihood: 1.5,
+        headline: 'Morgan Stanley calls AI "the defining trade of the decade"; raises sector spending forecast to $1.3T by 2030. Momentum buyers pile in',
+        params: { mu: 0.015, theta: -0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'tech_earnings_mixed',
+        category: 'sector',
+        likelihood: 2.0,
+        headline: 'Big Tech earnings season delivers mixed results: cloud beats, advertising misses, AI capex higher than expected. Sector churns sideways',
+        params: { mu: 0.003, theta: 0.003 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'zhaowei_benchmark_win',
+        category: 'sector',
+        likelihood: 0.8,
+        headline: 'Zhaowei\'s Qilin-4 model tops PNTH Atlas on three major AI benchmarks; Liang Wei: "The gap is closed." Western analysts skeptical of methodology',
+        params: { mu: -0.02, theta: 0.01 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+        },
+    },
+    {
+        id: 'zhaowei_beijing_summit',
+        category: 'sector',
+        likelihood: 1.5,
+        headline: 'Zhaowei CEO Liang Wei keynotes Beijing AI Summit; announces state-backed $50B compute buildout. PNTH investors weigh competitive threat',
+        params: { mu: -0.005, theta: 0.003 },
+        magnitude: 'minor',
+        when: (sim, world) => world.geopolitical.chinaRelations <= 0,
+    },
+    {
+        id: 'ai_safety_framework',
+        category: 'sector',
+        likelihood: 1.0,
+        headline: 'G7 nations agree on international AI safety framework; voluntary compliance for now, but binding treaty language being drafted. Markets digest implications',
+        params: { mu: -0.005, theta: 0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'quantum_computing_breakthrough',
+        category: 'sector',
+        likelihood: 0.8,
+        headline: 'Major lab announces 1,000-qubit error-corrected quantum processor; "practical quantum advantage within 3 years." Quantum stocks surge, crypto trembles',
+        params: { mu: 0.015, theta: -0.005, lambda: 0.2 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'tech_layoffs_wave',
+        category: 'sector',
+        likelihood: 1.0,
+        headline: 'Tech layoffs accelerate: 40,000 cuts announced this month across six major firms. "Efficiency era" rhetoric masks slowing growth',
+        params: { mu: -0.015, theta: 0.008 },
+        magnitude: 'minor',
+    },
+];
 const POLITICAL_EVENTS = [
     // =====================================================================
     //  ARC 7: SENATOR OKAFOR'S RISE
@@ -1767,7 +1893,123 @@ const INVESTIGATION_EVENTS = [
         },
     },
 ];
-const COMPOUND_EVENTS = [];
+const COMPOUND_EVENTS = [
+    {
+        id: 'compound_war_recession',
+        category: 'compound',
+        likelihood: 1.0,
+        headline: 'Military spending bill fails as Congress balks at deficit during recession; defense stocks crater. Barron blames "weak politicians who don\'t support the troops"',
+        params: { mu: -0.06, theta: 0.03, lambda: 1.5 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.mideastEscalation >= 2 && world.geopolitical.recessionDeclared,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
+        },
+    },
+    {
+        id: 'compound_pnth_scandal_trade_war',
+        category: 'compound',
+        likelihood: 1.0,
+        headline: 'Beijing state media runs week-long exposé on Bowman-PNTH corruption; frames U.S. tech sector as "fundamentally compromised." Allied nations reconsider Atlas contracts',
+        params: { mu: -0.05, theta: 0.025, lambda: 1.0 },
+        magnitude: 'major',
+        when: (sim, world) => world.investigations.tanBowmanStory >= 2 && world.geopolitical.tradeWarStage >= 3,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
+        },
+    },
+    {
+        id: 'compound_fed_oil_stagflation',
+        category: 'compound',
+        likelihood: 1.0,
+        headline: 'Stagflation fears grip markets as oil hits $140 and Fed leadership vacuum deepens; no policy response in sight. "Who\'s steering the ship?" asks Okafor',
+        params: { mu: -0.07, theta: 0.04, lambda: 2.0, sigmaR: 0.01 },
+        magnitude: 'major',
+        when: (sim, world) => world.fed.hartleyFired && world.geopolitical.oilCrisis,
+    },
+    {
+        id: 'compound_full_meltdown',
+        category: 'compound',
+        likelihood: 1.0,
+        headline: '"Worst week since 2008": margin calls cascade as institutional investors flee; regulators hold emergency session. Circuit breakers triggered three days running',
+        params: { mu: -0.08, theta: 0.05, lambda: 3.0, muJ: -0.06, xi: 0.15 },
+        magnitude: 'major',
+        when: (sim, world) => world.fed.credibilityScore < 3 && world.geopolitical.recessionDeclared && sim.theta > 0.15,
+    },
+    {
+        id: 'compound_impeachment_war',
+        category: 'compound',
+        likelihood: 1.0,
+        headline: 'Constitutional crisis deepens as President faces impeachment while troops are deployed abroad; markets price in maximum political uncertainty',
+        params: { mu: -0.05, theta: 0.03, lambda: 1.5, sigmaR: 0.008 },
+        magnitude: 'major',
+        when: (sim, world) => world.investigations.impeachmentStage >= 1 && world.geopolitical.mideastEscalation >= 2,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
+        },
+    },
+    {
+        id: 'compound_pnth_hostile_bid_crisis',
+        category: 'compound',
+        likelihood: 1.0,
+        headline: 'Major tech conglomerate launches hostile bid for scandal-plagued PNTH at 40% premium; "buying at the point of maximum pessimism," says acquirer CEO',
+        params: { mu: 0.08, theta: 0.04, lambda: 2.0 },
+        magnitude: 'major',
+        when: (sim, world) => (world.pnth.dojSuitFiled || world.pnth.whistleblowerFiled) && sim.theta > 0.12 && !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.acquired = true;
+        },
+    },
+    {
+        id: 'compound_war_crimes_pnth',
+        category: 'compound',
+        likelihood: 1.0,
+        headline: 'Leaked PNTH internal memo shows engineers flagged civilian targeting errors and were overruled by management; ICC opens preliminary investigation',
+        params: { mu: -0.07, theta: 0.03, lambda: 1.5 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.mideastEscalation >= 2 && world.pnth.militaryContractActive,
+        effects: (world) => {
+            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
+            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
+        },
+    },
+    {
+        id: 'compound_dollar_crisis_vane',
+        category: 'compound',
+        likelihood: 1.0,
+        headline: 'Dollar drops 8% against reserve currency basket; foreign central banks accelerate reserve diversification as Vane\'s rate cuts erode confidence',
+        params: { mu: -0.05, theta: 0.03, lambda: 1.5, b: 0.01, sigmaR: 0.01 },
+        magnitude: 'major',
+        when: (sim, world) => world.fed.vaneAppointed && sim.b < 0.02,
+    },
+    {
+        id: 'compound_recession_recovery',
+        category: 'compound',
+        likelihood: 1.5,
+        headline: 'GDP rebounds sharply; recession officially over after two quarters of contraction. "V-shaped recovery" narrative takes hold, shorts scramble to cover',
+        params: { mu: 0.04, theta: -0.015, lambda: -0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.recessionDeclared && sim.mu > 0.03,
+        effects: (world) => {
+            world.geopolitical.recessionDeclared = false;
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
+        },
+    },
+    {
+        id: 'compound_oil_crisis_resolves',
+        category: 'compound',
+        likelihood: 1.5,
+        headline: 'OPEC+ reverses supply cuts; oil prices stabilize as geopolitical tensions ease. Consumer confidence rebounds on cheaper gas',
+        params: { mu: 0.03, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.oilCrisis && sim.theta < 0.10,
+        effects: (world) => {
+            world.geopolitical.oilCrisis = false;
+        },
+    },
+];
 const MIDTERM_EVENTS = [
     // Post-midterm followup events (referenced by ID from midterm handler)
     {
