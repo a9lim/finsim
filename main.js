@@ -201,7 +201,7 @@ function init() {
     document.addEventListener('shoals:exerciseOption', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
-            const result = exerciseOption(id, sim.S, sim.day);
+            const result = exerciseOption(id, sim.S, sim.day, Math.sqrt(Math.max(sim.v, 0)), sim.r);
             if (typeof showToast !== 'undefined') {
                 showToast(result ? 'Option exercised.' : 'Cannot exercise.');
             }

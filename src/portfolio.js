@@ -29,6 +29,7 @@ export const portfolio = {
     orders:    [],  // { id, type, side, qty, orderType, triggerPrice, strike?, expiryDay?, strategyName? }
     strategies:[],  // { name, legs: [{ type, side, qty, strike?, expiryDay? }] }
     closedBorrowCost: 0, // cumulative borrow cost from closed positions
+    marginDebitCost:  0, // cumulative interest on negative cash (margin debit)
 };
 
 // Auto-increment counters (not exported — internal)
@@ -51,6 +52,7 @@ export function resetPortfolio(capital) {
     portfolio.orders         = [];
     portfolio.strategies     = [];
     portfolio.closedBorrowCost = 0;
+    portfolio.marginDebitCost  = 0;
     _nextPositionId = 1;
     _nextOrderId    = 1;
 }
@@ -118,6 +120,31 @@ export function computeOptionBidAsk(mid, currentPrice, strike, currentVol) {
     const moneyness = Math.abs(Math.log(currentPrice / strike));
     const halfSpread = Math.max(0.025, mid * 0.01 * (1 + currentVol) + 0.05 * moneyness);
     return { bid: Math.max(0, mid - halfSpread), ask: mid + halfSpread };
+}
+
+/**
+ * Check whether a prospective cash change would violate initial margin (Reg-T).
+ * When cash would go negative, the debit is a margin loan. We require that
+ * post-trade equity (which is roughly unchanged by a fully-priced buy) covers
+ * REG_T_MARGIN (50%) of the total debit.
+ *
+ * @param {number} cashDelta      - Proposed change to portfolio.cash
+ * @param {number} currentPrice   - Spot price (for portfolioValue)
+ * @param {number} currentVol
+ * @param {number} currentRate
+ * @param {number} currentDay
+ * @returns {boolean} true if the trade would be allowed
+ */
+function _checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay) {
+    const newCash = portfolio.cash + cashDelta;
+    if (newCash >= 0) return true; // no debit, no margin concern
+
+    // Equity ≈ cash + positions MTM. A buy adds position value ≈ cost, so
+    // equity is roughly unchanged. Compute current equity as the baseline.
+    const equity = portfolioValue(currentPrice, currentVol, currentRate, currentDay);
+
+    // Initial margin: equity must cover REG_T_MARGIN of the debit
+    return equity >= REG_T_MARGIN * Math.abs(newCash);
 }
 
 /**
@@ -239,17 +266,18 @@ export function executeMarketOrder(
             }
             // Cost to buy back the short portion
             const buybackCost = fill * closingShortQty;
-            // Cost of new long portion
+            // Cost of new long portion (allowed on margin -- cash can go negative)
             const longCost = fill * openingLongQty;
 
             cashDelta = returnedMargin - buybackCost - longCost;
-            if (portfolio.cash + cashDelta < 0) return null;
+            if (!_checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay)) return null;
 
         } else if (signedQty > 0) {
             // Extending a long position (oldQty >= 0)
+            // Allowed on margin -- cash can go negative
             const cost = fill * signedQty;
-            if (portfolio.cash < cost) return null;
             cashDelta = -cost;
+            if (!_checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay)) return null;
 
         } else {
             // Extending a short position (oldQty <= 0, signedQty < 0)
@@ -300,9 +328,10 @@ export function executeMarketOrder(
     let cashDelta = 0;
 
     if (side === 'long') {
+        // Allowed on margin -- cash can go negative (up to initial margin limit)
         const cost = fill * qty;
-        if (portfolio.cash < cost) return null;
         cashDelta = -cost;
+        if (!_checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay)) return null;
     } else {
         const proceeds = fill * qty;
         const margin = _marginForShort(
@@ -483,9 +512,14 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
  * Call exercise: pay strike * qty, receive stock position.
  * Put  exercise: receive strike * qty in cash.
  *
+ * @param {number}  positionId
+ * @param {number}  currentPrice
+ * @param {number}  currentDay
+ * @param {number}  [currentVol]  - If provided, checks initial margin on debit
+ * @param {number}  [currentRate] - If provided, checks initial margin on debit
  * @returns {Object|null} The resulting stock position (calls) or null (puts / error).
  */
-export function exerciseOption(positionId, currentPrice, currentDay) {
+export function exerciseOption(positionId, currentPrice, currentDay, currentVol, currentRate) {
     const idx = portfolio.positions.findIndex(p => p.id === positionId);
     if (idx === -1) return null;
 
@@ -498,8 +532,11 @@ export function exerciseOption(positionId, currentPrice, currentDay) {
 
     if (pos.type === 'call') {
         // Must pay strike per share; receive a long stock position
+        // Allowed on margin -- cash can go negative (up to initial margin limit)
         const cost = pos.strike * absQty;
-        if (portfolio.cash < cost) return null;
+        if (currentVol != null && currentRate != null) {
+            if (!_checkInitialMarginDebit(-cost, currentPrice, currentVol, currentRate, currentDay)) return null;
+        }
         portfolio.cash -= cost;
         stockPos = {
             id:          _nextPositionId++,
@@ -540,6 +577,7 @@ export function chargeBorrowInterest(currentPrice, currentVol, currentRate, borr
     const annualRate = Math.max(currentRate, 0) + borrowSpread * currentVol;
     const dailyRate = annualRate / TRADING_DAYS_PER_YEAR;
 
+    // Charge interest on short stock/bond positions
     for (const pos of portfolio.positions) {
         if (pos.qty >= 0) continue;
         if (pos.type !== 'stock' && pos.type !== 'bond') continue;
@@ -557,6 +595,14 @@ export function chargeBorrowInterest(currentPrice, currentVol, currentRate, borr
         portfolio.cash -= cost;
         pos.borrowCost = (pos.borrowCost || 0) + cost;
         totalCharged += cost;
+    }
+
+    // Charge interest on negative cash (margin debit)
+    if (portfolio.cash < 0) {
+        const debitCost = Math.abs(portfolio.cash) * dailyRate;
+        portfolio.cash -= debitCost;
+        portfolio.marginDebitCost = (portfolio.marginDebitCost || 0) + debitCost;
+        totalCharged += debitCost;
     }
 
     return totalCharged;
@@ -739,6 +785,12 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
                 break;
             }
         }
+    }
+
+    // Margin debit (negative cash from buying on margin) requires maintenance too.
+    // The debit itself is the "loan" -- require maintenance margin on the debit amount.
+    if (portfolio.cash < 0) {
+        total += MAINTENANCE_MARGIN * Math.abs(portfolio.cash);
     }
 
     return total;

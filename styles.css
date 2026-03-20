@@ -442,12 +442,14 @@ main {
 }
 
 /* --- Margin Status --- */
-#margin-status.margin-alert {
+#margin-status.margin-alert,
+#margin-status-label.margin-alert {
     color: var(--down);
     font-weight: 700;
 }
 
-#margin-status.margin-warn {
+#margin-status.margin-warn,
+#margin-status-label.margin-warn {
     color: var(--gamma);
     font-weight: 600;
 }
