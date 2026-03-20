@@ -599,16 +599,14 @@ export function processExpiry(expiryDay, currentPrice, currentDay) {
     const exercised = [];
     const expired   = [];
 
-    // Collect positions expiring today
-    const expiring = portfolio.positions.filter(p => p.expiryDay === expiryDay);
+    for (let i = portfolio.positions.length - 1; i >= 0; i--) {
+        const pos = portfolio.positions[i];
+        if (pos.expiryDay !== expiryDay) continue;
 
-    for (const pos of expiring) {
         if (pos.type === 'bond') {
-            // Bond maturity: settle at face value
             if (pos.qty > 0) {
                 portfolio.cash += BOND_FACE_VALUE * Math.abs(pos.qty);
             } else {
-                // Short bond: return margin, debit face value
                 const returnedMargin = pos._reservedMargin ?? _marginForShort(
                     pos.type, Math.abs(pos.qty), pos.entryPrice, 0, 0,
                     0, currentDay, pos.strike, pos.expiryDay
@@ -616,8 +614,7 @@ export function processExpiry(expiryDay, currentPrice, currentDay) {
                 portfolio.cash += returnedMargin - BOND_FACE_VALUE * Math.abs(pos.qty);
             }
             if (pos.borrowCost) portfolio.closedBorrowCost += pos.borrowCost;
-            const idx = portfolio.positions.findIndex(p => p.id === pos.id);
-            if (idx !== -1) portfolio.positions.splice(idx, 1);
+            portfolio.positions.splice(i, 1);
             expired.push(pos);
             continue;
         }
@@ -631,9 +628,6 @@ export function processExpiry(expiryDay, currentPrice, currentDay) {
             const result = exerciseOption(pos.id, currentPrice, currentDay);
             exercised.push({ position: pos, result });
         } else {
-            // Expire worthless: for short positions, the premium is kept (already in cash);
-            // for long positions, the option value goes to zero.
-            // Return margin on short options.
             if (pos.qty < 0) {
                 const returnedMargin = pos._reservedMargin ?? _marginForShort(
                     pos.type, Math.abs(pos.qty), pos.entryPrice, currentPrice, 0,
@@ -641,8 +635,7 @@ export function processExpiry(expiryDay, currentPrice, currentDay) {
                 );
                 portfolio.cash += returnedMargin;
             }
-            const idx = portfolio.positions.findIndex(p => p.id === pos.id);
-            if (idx !== -1) portfolio.positions.splice(idx, 1);
+            portfolio.positions.splice(i, 1);
             expired.push(pos);
         }
     }
