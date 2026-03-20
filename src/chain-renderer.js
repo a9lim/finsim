@@ -117,34 +117,29 @@ function bindCellTrade(cell, type, onChainCellClick) {
 }
 
 export function bindChainTableClicks(container, onChainCellClick) {
-    container.querySelectorAll('[data-type]').forEach(cell => {
+    function handleAction(cell, side) {
         const info = {
-            strike:    parseInt(cell.dataset.strike, 10),
+            strike: parseInt(cell.dataset.strike, 10),
             expiryDay: parseInt(cell.dataset.expiryDay, 10),
-            type:      cell.dataset.type,
+            type: cell.dataset.type,
+            side,
         };
-        cell.addEventListener('click', () => {
-            if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
-            if (typeof onChainCellClick === 'function') {
-                onChainCellClick({ ...info, side: 'long' });
-            }
-        });
-        cell.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
-            if (typeof onChainCellClick === 'function') {
-                onChainCellClick({ ...info, side: 'short' });
-            }
-        });
-        cell.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
-                if (typeof onChainCellClick === 'function') {
-                    onChainCellClick({ ...info, side: 'long' });
-                }
-            }
-        });
+        if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
+        if (typeof onChainCellClick === 'function') onChainCellClick(info);
+    }
+    container.addEventListener('click', (e) => {
+        const cell = e.target.closest('[data-type]');
+        if (cell && container.contains(cell)) handleAction(cell, 'long');
+    });
+    container.addEventListener('contextmenu', (e) => {
+        const cell = e.target.closest('[data-type]');
+        if (cell && container.contains(cell)) { e.preventDefault(); handleAction(cell, 'short'); }
+    });
+    container.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            const cell = e.target.closest('[data-type]');
+            if (cell && container.contains(cell)) { e.preventDefault(); handleAction(cell, 'long'); }
+        }
     });
 }
 

@@ -139,6 +139,8 @@ export class ChartRenderer {
             if (L.close < L.low)  L.low  = L.close;
         }
         L._targetClose = bar.close;
+        L._targetHigh = bar.high;
+        L._targetLow  = bar.low;
     }
 
     /* -----------------------------------------------
@@ -162,8 +164,6 @@ export class ChartRenderer {
         const palette   = _PALETTE;
         const textMuted = isDark ? palette.dark.textMuted    : palette.light.textMuted;
         const textSec   = isDark ? palette.dark.textSecondary: palette.light.textSecondary;
-        const canvasBg  = isDark ? palette.dark.canvas       : palette.light.canvas;
-
         // Layout constants
         const W   = this.width;
         const H   = this.height;
@@ -235,17 +235,12 @@ export class ChartRenderer {
             ? (d) => history.get(d)
             : (d) => history[d];
 
-        const visibleBars = [];
-        for (let d = firstDay; d <= lastDay; d++) {
-            const bar = _get(d);
-            if (bar) visibleBars.push(bar);
-        }
-
         // ── 2. Auto-scale Y (logarithmic) ──────────────────────────
         let minPrice =  Infinity;
         let maxPrice = -Infinity;
-
-        for (const bar of visibleBars) {
+        for (let d = firstDay; d <= lastDay; d++) {
+            const bar = _get(d);
+            if (!bar) continue;
             if (bar.low  < minPrice) minPrice = bar.low;
             if (bar.high > maxPrice) maxPrice = bar.high;
         }
@@ -325,56 +320,42 @@ export class ChartRenderer {
         ctx.rect(plotX, plotY, plotW, plotH);
         ctx.clip();
 
+        const upWicks = [], downWicks = [], upBodies = [], downBodies = [];
         const liveDay = this._lerp.day;
 
         for (let i = firstDay; i <= lastDay; i++) {
             const bar = _get(i);
             if (!bar) continue;
-
-            // Use lerped values for the live candle
             let bHigh, bLow, bClose;
             if (i === liveDay && liveDay >= 0) {
-                bHigh  = this._lerp.high;
-                bLow   = this._lerp.low;
-                bClose = this._lerp.close;
+                bHigh = this._lerp.high; bLow = this._lerp.low; bClose = this._lerp.close;
             } else {
-                bHigh  = bar.high;
-                bLow   = bar.low;
-                bClose = bar.close;
+                bHigh = bar.high; bLow = bar.low; bClose = bar.close;
             }
-
             const isUp = bClose >= bar.open;
-            const color = isUp ? palette.up : palette.down;
-
-            // Screen X center of this candle
             let cx;
-            if (cam) {
-                cx = cam.worldToScreen(i + 0.5, 0).x;
-            } else {
-                cx = plotX + ((i + 0.5) / history.length) * plotW;
+            if (cam) { cx = cam.worldToScreen(i + 0.5, 0).x; }
+            else { cx = plotX + ((i + 0.5) / history.length) * plotW; }
+            const yHigh = priceToY(bHigh), yLow = priceToY(bLow);
+            const yOpen = priceToY(bar.open), yClose = priceToY(bClose);
+            const yTop = Math.min(yOpen, yClose), yBot = Math.max(yOpen, yClose);
+            const bodyH = Math.max(1, yBot - yTop);
+            const bodyLeft = cx - candleWidthRaw / 2;
+            (isUp ? upWicks : downWicks).push(cx, yHigh, yLow);
+            (isUp ? upBodies : downBodies).push(bodyLeft, yTop, candleWidthRaw, bodyH);
+        }
+
+        for (const [wicks, bodies, color] of [[upWicks, upBodies, palette.up], [downWicks, downBodies, palette.down]]) {
+            if (wicks.length === 0) continue;
+            ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath();
+            for (let j = 0; j < wicks.length; j += 3) {
+                ctx.moveTo(wicks[j], wicks[j + 1]); ctx.lineTo(wicks[j], wicks[j + 2]);
             }
-
-            const bodyLeft  = cx - candleWidthRaw / 2;
-
-            const yHigh  = priceToY(bHigh);
-            const yLow   = priceToY(bLow);
-            const yOpen  = priceToY(bar.open);
-            const yClose = priceToY(bClose);
-            const yTop   = Math.min(yOpen, yClose);
-            const yBot   = Math.max(yOpen, yClose);
-            const bodyH  = Math.max(1, yBot - yTop);
-
-            // Wick (high–low line)
-            ctx.beginPath();
-            ctx.strokeStyle = color;
-            ctx.lineWidth   = 1;
-            ctx.moveTo(cx, yHigh);
-            ctx.lineTo(cx, yLow);
             ctx.stroke();
-
-            // Body
             ctx.fillStyle = color;
-            ctx.fillRect(bodyLeft, yTop, candleWidthRaw, bodyH);
+            for (let j = 0; j < bodies.length; j += 4) {
+                ctx.fillRect(bodies[j], bodies[j + 1], bodies[j + 2], bodies[j + 3]);
+            }
         }
 
         ctx.restore();

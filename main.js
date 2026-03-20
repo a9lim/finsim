@@ -10,7 +10,7 @@ import { Simulation } from './src/simulation.js';
 import { buildChain, ExpiryManager } from './src/chain.js';
 import {
     portfolio, resetPortfolio, checkPendingOrders, processExpiry,
-    checkMargin, aggregateGreeks, portfolioValue,
+    checkMargin, aggregateGreeks,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
     saveStrategy, executeStrategy, computeBidAsk,
@@ -181,7 +181,7 @@ function init() {
         onLiquidate:      () => handleLiquidate(),
         onDismissMargin:  () => { /* sim stays paused, overlay hidden by ui.js */ },
         onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
-        onStrategyExpiryChange: (idx) => { updateStrategyChainDisplay($, chain, idx, _addLegFromChain); updateStockBondPrices($, sim.S, sim.r, chain); dirty = true; },
+        onStrategyExpiryChange: (idx) => { updateStrategyChainDisplay($, chain, idx, handleAddLeg); updateStockBondPrices($, sim.S, sim.r, chain); dirty = true; },
         onSaveStrategy:   () => handleSaveStrategy(),
         onExecStrategy:   () => handleExecStrategy(),
         onLLMKeyChange:   (key) => { if (llmSource) llmSource.setApiKey(key); },
@@ -462,7 +462,7 @@ function _onDayComplete() {
         lastSpot = sim.S;
     }
 
-    updateUI();
+    updateUI(margin);
     dirty = true;
 }
 
@@ -498,13 +498,13 @@ function tick() {
 // UI update helper
 // ---------------------------------------------------------------------------
 
-function updateUI() {
+function updateUI(precomputedMargin) {
     const vol = Math.sqrt(Math.max(sim.v, 0));
-    const margin = checkMargin(sim.S, vol, sim.r, sim.day);
+    const margin = precomputedMargin || checkMargin(sim.S, vol, sim.r, sim.day);
     if (chainDirty) {
         updateChainDisplay($, chain);
         updateStockBondPrices($, sim.S, sim.r, chain);
-        updateStrategySelectors($, chain, sim.S, _addLegFromChain);
+        updateStrategySelectors($, chain, sim.S, handleAddLeg);
         chainDirty = false;
     }
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin);
@@ -582,13 +582,13 @@ function togglePlay() {
         if (!dayInProgress) lastTickTime -= 2000; // force immediate beginDay
     }
     updatePlayBtn($, playing);
-    _haptics.trigger(playing ? 'medium' : 'light');
+    if (typeof _haptics !== 'undefined') _haptics.trigger(playing ? 'medium' : 'light');
 }
 
 function step() {
     if (!playing) {
         tick();
-        _haptics.trigger('light');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
     }
 }
 
@@ -596,20 +596,17 @@ function cycleSpeed() {
     speedIndex = (speedIndex + 1) % SPEED_OPTIONS.length;
     speed = SPEED_OPTIONS[speedIndex];
     updateSpeedBtn($, speed);
-    _haptics.trigger('selection');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
 
 function toggleSidebar() {
     $.sidebar.classList.toggle('open');
     const isOpen = $.sidebar.classList.contains('open');
     $.panelToggle.setAttribute('aria-expanded', String(isOpen));
-    _haptics.trigger('light');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('light');
 }
 
-function loadPreset(index) {
-    // Sync dropdown when called from keyboard shortcut (keys 6/7)
-    $.presetSelect.selectedIndex = index;
-
+function _resetCore(index) {
     sim.reset(index);
     resetPortfolio();
     sim.prepopulate();
@@ -624,8 +621,12 @@ function loadPreset(index) {
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateDynamicSections($, index);
+}
 
-    // Event engine lifecycle
+function loadPreset(index) {
+    $.presetSelect.selectedIndex = index;
+    _resetCore(index);
+
     if (_isDynamicPreset(index)) {
         if (_isLLMPreset(index)) {
             if (!llmSource) llmSource = new LLMEventSource();
@@ -642,27 +643,13 @@ function loadPreset(index) {
     updateUI();
     _repositionCamera();
     dirty = true;
-    _haptics.trigger('medium');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
 }
 
 function resetSim() {
     const index = $.presetSelect.selectedIndex;
-    sim.reset(index);
-    resetPortfolio();
-    sim.prepopulate();
-    dayInProgress = false;
-    chart._lerp.day = -1;
-    expiryMgr.init(sim.day);
-    chain = buildChain(sim.S, sim.v, sim.r, sim.day, expiryMgr.update(sim.day));
-    chainDirty = true;
-    playing = false;
-    lastSpot = sim.S;
-    strategy.resetRange(sim.S, strategyLegs);
-    syncSettingsUI($, _simSettingsObj());
-    updatePlayBtn($, playing);
-    updateDynamicSections($, index);
+    _resetCore(index);
 
-    // Reset event engine if in dynamic mode
     if (eventEngine) eventEngine.reset();
     if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
     updateEventLog($, eventEngine ? eventEngine.eventLog : []);
@@ -670,7 +657,7 @@ function resetSim() {
     updateUI();
     _repositionCamera();
     dirty = true;
-    _haptics.trigger('heavy');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
 }
 
 function _isDynamicPreset(index) { return index >= 5; }
@@ -702,16 +689,16 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
         if (pos) {
             const label = side === 'short' ? 'Shorted' : 'Bought';
             if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + pos.fillPrice.toFixed(2));
-            _haptics.trigger('success');
+            if (typeof _haptics !== 'undefined') _haptics.trigger('success');
         } else {
             if (typeof showToast !== 'undefined') showToast('Insufficient funds/margin.');
-            _haptics.trigger('error');
+            if (typeof _haptics !== 'undefined') _haptics.trigger('error');
         }
     } else {
         const triggerPrice = _getTriggerPrice();
         placePendingOrder(type, side, qty, orderType, triggerPrice, strike, expiryDay);
         if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' order placed for ' + qty + ' ' + type + '.');
-        _haptics.trigger('medium');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
     }
     updateUI();
     dirty = true;
@@ -763,15 +750,15 @@ function handleTradeSubmit(data) {
         );
         if (pos) {
             if (typeof showToast !== 'undefined') showToast('Order filled: ' + type + ' x' + qty);
-            _haptics.trigger('success');
+            if (typeof _haptics !== 'undefined') _haptics.trigger('success');
         } else {
             if (typeof showToast !== 'undefined') showToast('Order failed — insufficient funds.');
-            _haptics.trigger('error');
+            if (typeof _haptics !== 'undefined') _haptics.trigger('error');
         }
     } else {
         placePendingOrder(type, side, qty, orderType, limitPrice, strike, expiryDay);
         if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' order placed.');
-        _haptics.trigger('medium');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
     }
 
     updateUI();
@@ -784,16 +771,12 @@ function handleLiquidate() {
     updateUI();
     dirty = true;
     if (typeof showToast !== 'undefined') showToast('All positions liquidated.');
-    _haptics.trigger('heavy');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
 }
 
 // ---------------------------------------------------------------------------
 // Strategy builder handlers
 // ---------------------------------------------------------------------------
-
-function _addLegFromChain(type, side, strike, expiryDay) {
-    handleAddLeg(type, side, strike, expiryDay);
-}
 
 function handleAddLeg(type, side, strike, expiryDay) {
     const absQty = parseInt($.strategyQty?.value, 10) || 1;
