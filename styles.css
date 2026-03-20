@@ -19,11 +19,11 @@ body {
 .pnl-down { color: var(--down); }
 
 /* --- Greek Label Colors --- */
-.greek-label-delta { color: var(--delta); }
-.greek-label-gamma { color: var(--gamma); }
-.greek-label-theta { color: var(--theta); }
-.greek-label-vega  { color: var(--vega); }
-.greek-label-rho   { color: var(--rho); }
+#greek-delta { color: var(--delta); }
+#greek-gamma { color: var(--gamma); }
+#greek-theta { color: var(--theta); }
+#greek-vega  { color: var(--vega); }
+#greek-rho   { color: var(--rho); }
 
 /* --- Panel Hints --- */
 .panel-hint {
@@ -204,7 +204,7 @@ main {
 }
 
 .chain-th {
-    font-size: 0.62rem;
+    font-size: 0.72rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -217,6 +217,9 @@ main {
 .chain-cell {
     padding: 4px 6px;
     text-align: center;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.82rem;
     transition: background 0.12s;
 }
 
@@ -254,41 +257,26 @@ main {
     font-size: 0.66rem;
 }
 
-#stock-bond-table {
+#stock-bond-table,
+#strategy-stock-bond-table {
     margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
 }
 
 #stock-price-cell,
-#bond-price-cell,
 #strategy-stock-cell,
-#strategy-bond-cell,
-.stock-overlay-cell,
-.bond-overlay-cell {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    font-size: 0.82rem;
-}
-
 .stock-overlay-cell {
     color: var(--stock);
 }
 
+#bond-price-cell,
+#strategy-bond-cell,
 .bond-overlay-cell {
     color: var(--bond);
 }
 
 .overlay-stock-bond {
     margin-bottom: 10px;
-}
-
-#stock-price-cell,
-#strategy-stock-cell {
-    color: var(--stock);
-}
-
-#bond-price-cell,
-#strategy-bond-cell {
-    color: var(--bond);
 }
 
 .chain-expiry-tabs {
