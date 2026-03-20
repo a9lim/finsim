@@ -69,18 +69,35 @@ export class HistoryBuffer {
     }
 
     /**
-     * Scale all stored OHLC prices by a multiplier.
-     * Used for pre-population so history ends at a target price.
-     * @param {number} factor
+     * Reverse stored bars in place and re-number days.
+     * Used for synthetic backfill: simulate forward from target
+     * state, then reverse so history arrives at that state.
      */
-    scaleAll(factor) {
+    reverse() {
+        if (this._size < 2) return;
+
+        // Extract bars in chronological order
+        const bars = new Array(this._size);
         for (let i = 0; i < this._size; i++) {
             const idx = (this._head - this._size + i + this._cap) % this._cap;
-            const bar = this._buf[idx];
-            bar.open  *= factor;
-            bar.high  *= factor;
-            bar.low   *= factor;
-            bar.close *= factor;
+            bars[i] = this._buf[idx];
         }
+
+        // Reverse and re-number days, swap open/close
+        bars.reverse();
+        for (let i = 0; i < this._size; i++) {
+            const bar = bars[i];
+            bar.day = this._offset + i;
+            const tmpOpen = bar.open;
+            bar.open = bar.close;
+            bar.close = tmpOpen;
+        }
+
+        // Write back into a clean contiguous layout
+        this._head = 0;
+        for (let i = 0; i < this._size; i++) {
+            this._buf[i] = bars[i];
+        }
+        this._head = this._size % this._cap;
     }
 }

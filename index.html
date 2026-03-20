@@ -20,6 +20,7 @@
     <script src="/shared-touch.js"></script>
     <script src="/shared-info.js"></script>
     <script src="/shared-shortcuts.js"></script>
+    <script src="/shared-sparkline.js"></script>
     <link rel="stylesheet" href="/shared-base.css">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -356,6 +357,7 @@
                             <span class="stat-label">Risk-Free Rate</span>
                             <span class="stat-value" id="rate-display">0.00%</span>
                         </div>
+                        <canvas class="rate-sparkline" id="rate-sparkline" width="280" height="40"></canvas>
                     </div>
                     <div id="llm-settings-section" class="stat-group hidden">
                         <div class="group-label">LLM Settings</div>

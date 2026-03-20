@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY } from './src/config.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
 import {
@@ -56,6 +56,20 @@ let sliderPct = 100;  // percentage of max DTE (100% = full time, 0% = at expiry
 let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let llmSource = null;     // LLMEventSource singleton
+let rateHistory = null;   // sparkline ring buffer for risk-free rate
+
+// ---------------------------------------------------------------------------
+// Rate sparkline helpers
+// ---------------------------------------------------------------------------
+
+function _initRateHistory() {
+    rateHistory = createSparkHistory(HISTORY_CAPACITY);
+    const h = sim.history;
+    for (let d = h.minDay; d <= h.maxDay; d++) {
+        const bar = h.get(d);
+        if (bar) pushSparkSample(rateHistory, bar.r);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Position map builders (for chain pill indicators)
@@ -295,6 +309,7 @@ function init() {
 
     // 13. Pre-populate full history buffer (prices scaled so final close = $100)
     sim.prepopulate();
+    _initRateHistory();
     chart.dayOrigin = sim.day;
 
     // 14. Build initial chain and update UI
@@ -494,6 +509,9 @@ function _onSubstep() {
 function _onDayComplete() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
 
+    // Record rate for sparkline
+    if (rateHistory) pushSparkSample(rateHistory, sim.r);
+
     chargeBorrowInterest(sim.S, vol, sim.r, sim.borrowSpread, sim.day);
     processExpiry(sim.day, sim.S, sim.day);
 
@@ -605,7 +623,7 @@ function updateUI(precomputedMargin) {
     if (activeTab === 'portfolio') {
         updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
     }
-    updateRateDisplay($, sim.r);
+    updateRateDisplay($, sim.r, rateHistory);
     if (strategyMode && strategyLegs.length > 0) {
         updateStrategyBuilder();
     }
@@ -632,7 +650,7 @@ function updateSubstepUI() {
     if (activeTab === 'portfolio') {
         updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
     }
-    updateRateDisplay($, sim.r);
+    updateRateDisplay($, sim.r, rateHistory);
 
     if (strategyMode && strategyLegs.length > 0) {
         updateStrategyBuilder();
@@ -749,6 +767,7 @@ function _resetCore(index) {
     sim.reset(index);
     resetPortfolio();
     sim.prepopulate();
+    _initRateHistory();
     chart.dayOrigin = sim.day;
     dayInProgress = false;
     chart._lerp.day = -1;

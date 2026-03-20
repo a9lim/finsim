@@ -45,6 +45,8 @@ export function cacheDOMElements($) {
     $.greekRho        = document.getElementById('greek-rho');
     $.presetSelect    = document.getElementById('preset-select');
     $.rateDisplay     = document.getElementById('rate-display');
+    $.rateSparkCanvas = document.getElementById('rate-sparkline');
+    $.rateSparkCtx    = $.rateSparkCanvas ? $.rateSparkCanvas.getContext('2d') : null;
     $.advancedToggle  = document.getElementById('advanced-toggle');
     $.advancedSection = document.getElementById('advanced-section');
     $.resetBtn        = document.getElementById('reset-btn');
@@ -338,8 +340,14 @@ export function updateGreeksDisplay($, greeks) {
 // updateRateDisplay
 // ---------------------------------------------------------------------------
 
-export function updateRateDisplay($, rate) {
+export function updateRateDisplay($, rate, rateHistory) {
     if ($.rateDisplay) $.rateDisplay.textContent = (rate * 100).toFixed(2) + '%';
+    if ($.rateSparkCtx && rateHistory && rateHistory.count >= 2
+        && typeof drawSparkline !== 'undefined') {
+        const c = $.rateSparkCanvas;
+        const accent = typeof _PALETTE !== 'undefined' ? _PALETTE.accent : '#FE3B01';
+        drawSparkline($.rateSparkCtx, rateHistory, c.width, c.height, accent, accent + '44');
+    }
 }
 
 // ---------------------------------------------------------------------------

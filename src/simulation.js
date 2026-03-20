@@ -176,19 +176,18 @@ export class Simulation {
 
     /* -----------------------------------------------
        prepopulate()
-       Fill the history buffer with dummy data that
-       ends at INITIAL_PRICE. Runs the sim forward,
-       then scales all OHLC prices so the final close
-       lands exactly at the starting price.
+       Synthetically backfill the history buffer so it
+       ends at the target starting state (S = INITIAL_PRICE,
+       v = theta, r = b). Simulates forward from those
+       values, then reverses the path so the final bar
+       naturally arrives at the starting point.
     ----------------------------------------------- */
     prepopulate() {
         const count = HISTORY_CAPACITY;
         for (let i = 0; i < count; i++) this.tick();
 
-        // Scale so that final close = INITIAL_PRICE
-        const finalClose = this.S;
-        const factor = INITIAL_PRICE / finalClose;
-        this.history.scaleAll(factor);
+        // Collect bars in chronological order, then reverse
+        this.history.reverse();
 
         // Reset live state to the target starting point
         this.S = INITIAL_PRICE;

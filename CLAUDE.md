@@ -55,13 +55,13 @@ src/
   events.js          ~500 lines  EventEngine: Poisson scheduler, MTTH followup chains,
                                    offline event pool (~88 curated events for Palanthropic/PNTH),
                                    PARAM_RANGES canonical clamping. Shared by offline and LLM modes.
-  history-buffer.js     86 lines  HistoryBuffer: fixed-capacity (252) ring buffer for OHLC bars
+  history-buffer.js    103 lines  HistoryBuffer: fixed-capacity (252) ring buffer for OHLC bars
   llm.js             ~170 lines  LLMEventSource: Anthropic API via structured tool use
                                    (emit_events tool with JSON schema, forced via tool_choice).
                                    Full universe lore in system prompt. Fallback to offline on failure.
-  simulation.js        208 lines  GBM + Merton jumps + Heston stoch vol + Vasicek rate;
+  simulation.js        245 lines  GBM + Merton jumps + Heston stoch vol + Vasicek rate;
                                    beginDay()/substep()/finalizeDay() sub-step pipeline;
-                                   prepopulate() fills buffer and scales to INITIAL_PRICE
+                                   prepopulate() synthetically backfills buffer via reverse
   pricing.js           435 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
                                    normal CDF (Drezner-Wesolowsky 1990) + finite-diff Greeks.
                                    Exports: priceAmerican, computeGreeks
@@ -144,7 +144,7 @@ Pausing mid-day leaves the partial bar frozen. Resuming continues from where it 
 
 ### Bootstrap
 
-`sim.prepopulate()` fills the 252-bar HistoryBuffer, then scales all prices so final close = $100. `ExpiryManager` initialized after prepopulation.
+`sim.prepopulate()` synthetically backfills the 252-bar HistoryBuffer: simulates forward from the target state (S=100, v=theta, r=b), then reverses the path so history naturally arrives at those values. No price scaling. `ExpiryManager` initialized after prepopulation. Rate history sparkline (`rateHistory`) also populated from the backfilled bars.
 
 ## Simulation Engine
 

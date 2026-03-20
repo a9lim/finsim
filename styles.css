@@ -724,6 +724,16 @@ main {
     }
 }
 
+/* -- Rate sparkline -- */
+.rate-sparkline {
+    display: block;
+    width: 100%;
+    height: 40px;
+    margin-top: 4px;
+    border-radius: 4px;
+    background: var(--bg-elevated);
+}
+
 /* -- Dynamic regime: LLM settings & event log -- */
 .key-input-wrap {
     display: flex;
