@@ -34,6 +34,11 @@ export const portfolio = {
     closedBorrowCost: 0, // cumulative borrow cost from closed positions
     marginDebitCost:  0, // cumulative interest on negative cash (margin debit)
     totalDividends:   0, // cumulative net dividend income/cost
+    totalTrades:      0, // incremented on every executeMarketOrder call
+    totalExercises:   0, // incremented on every exerciseOption call
+    marginCallCount:  0, // incremented when margin call triggers
+    peakValue:        INITIAL_CAPITAL, // max equity seen
+    maxDrawdown:      0, // max (1 - equity/peak) seen
 };
 
 // Auto-increment counters (not exported — internal)
@@ -58,6 +63,11 @@ export function resetPortfolio(capital) {
     portfolio.closedBorrowCost = 0;
     portfolio.marginDebitCost  = 0;
     portfolio.totalDividends   = 0;
+    portfolio.totalTrades      = 0;
+    portfolio.totalExercises   = 0;
+    portfolio.marginCallCount  = 0;
+    portfolio.peakValue        = cap;
+    portfolio.maxDrawdown      = 0;
     _nextPositionId = 1;
     _nextOrderId    = 1;
 }
@@ -268,6 +278,8 @@ export function executeMarketOrder(
 ) {
     // Convert to signed qty: long = +qty, short = -qty
     const signedQty = side === 'long' ? qty : -qty;
+
+    portfolio.totalTrades++;
 
     const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
     const fill = _fillPrice(type, side, mid, currentPrice, strike, currentVol);
@@ -597,6 +609,8 @@ export function exerciseOption(positionId, currentPrice, currentDay, currentVol,
     const pos = portfolio.positions[idx];
     if (pos.type !== 'call' && pos.type !== 'put') return null;
     if (pos.qty <= 0) return null; // Can only exercise long options
+
+    portfolio.totalExercises++;
 
     const absQty = pos.qty;
     let stockPos = null;
