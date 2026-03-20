@@ -441,7 +441,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Shared chain renderer**: `renderChainInto()` in chain-renderer.js builds both trade-tab and strategy-tab chain tables. Uses event delegation (3 listeners on container, not per-cell). Trade tab passes `$._onChainCellClick`, strategy tab wraps `onAddLeg`.
 - **`_resetCore` helper**: shared reset logic for `loadPreset()` and `resetSim()` in main.js.
 - **Unified stock/bond prices**: `updateStockBondPrices($, spot, rate, chain, posMap, stratPosMap)` computes bond price from each tab's selected expiry and updates all four cells (trade + strategy). Applies position indicator classes via posMap.
-- **Position indicators on chain cells**: Chain cells show **bold** text for long positions, **bold italic** for short. `posKey(type, strike, expiryDay)` generates map keys. `_buildPosMap()` (portfolio) and `_buildStrategyPosMap()` (strategy legs) in main.js build maps passed to all chain rendering functions. Trade tab uses portfolio positions; strategy tab uses strategy legs. `chainDirty = true` set after every trade action for immediate update.
+- **Position indicators on chain cells**: Chain cells show **bold** text for long positions, *italic* for short. `posKey(type, strike, expiryDay)` generates map keys. `_buildPosMap()` (portfolio) and `_buildStrategyPosMap()` (strategy legs) in main.js build maps passed to all chain rendering functions. Trade tab uses portfolio positions; strategy tab uses strategy legs. `chainDirty = true` set after every trade action for immediate update.
 
 ## Gotchas
 
