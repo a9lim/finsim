@@ -116,35 +116,46 @@ export function getEventById() { return null; }
 
 Key changes from current implementation:
 
-**Constructor** creates `this.world = createWorldState()` and adds fields: `_nonFedCooldown`, `_consecutiveMinor`, `_midtermWarningFired`, `_epilogueFired`.
+**Constructor** creates `this.world = createWorldState()` and adds: `_pulses` (pulse schedule array), `_randomCooldown`, `_consecutiveMinor`, `_epilogueFired`.
+
+**Pulse schedule** (`this._pulses`): An array of pulse definitions, checked in order each day. Two types:
+- **Recurring**: `{ type: 'recurring', id, interval, jitter, nextDay: -1, pool }` -- draws from a category-filtered pool on schedule. Used for FOMC (interval 32, jitter ±4, pool `'fed'`) and PNTH earnings (interval 63, jitter ±5, pool `'pnth_earnings'`).
+- **Fixed**: `{ type: 'fixed', id, day, fired: false, handler }` -- calls a handler method once at a specific day. Used for campaign season (`CAMPAIGN_START_DAY`) and midterm election (`MIDTERM_DAY`).
+
+Pre-filter pools at startup from `OFFLINE_EVENTS`:
+- `_fedPool`: `category === 'fed'`
+- `_earningsPool`: `category === 'pnth_earnings'`
+- `_randomPool`: category NOT in `['fed', 'pnth_earnings', 'midterm']`
 
 **`maybeFire(sim, day)`** flow:
 1. If `_epilogueFired`, return `[]` immediately
-2. `_checkMidterm(sim, day)` -- fixed-day campaign season and election
-3. `_checkFollowups(sim, day)` -- same grouping logic, but `when()` now receives `(sim, world, congress)`
-4. FOMC schedule with jitter: `nextFedDay = day + FED_MEETING_INTERVAL + floor(random() * (JITTER*2+1)) - JITTER`
-5. Non-fed Poisson with cooldown: decrement cooldown if > 0, else roll against `NON_FED_POISSON_RATE`, on hit set cooldown `MIN + floor(random() * (MAX-MIN+1))`
+2. Check all pulses in array order (first hit wins for the day):
+   - Recurring: if `day >= nextDay`, filter+pick from pool, fire, reschedule `nextDay = day + interval + jitter_roll`
+   - Fixed: if `day >= pulse.day && !pulse.fired`, call handler, set `fired = true`
+   - If any pulse fires, return its result immediately
+3. `_checkFollowups(sim, day)` -- same grouping logic, `when()` receives `(sim, world, congress)`
+4. Random Poisson draw with cooldown: decrement `_randomCooldown` if > 0, else roll against `NON_FED_POISSON_RATE`, on hit draw from `_randomPool`, set cooldown
+
+**Fixed pulse handlers:**
+- `_onCampaignSeason(sim, day)`: fires hard-coded campaign event, theta +0.01
+- `_onMidterm(sim, day)`: computes score from `barronApproval`, recession, war penalties, ±10 noise. Determines `fed_gain`/`fed_hold`/`fed_loss_house`/`fed_loss_both`. Mutates `congress` seat counts via `effects`. Sets `midtermComplete`, `midtermResult`.
 
 **`_fireEvent(event, sim, day, depth)`** adds:
 - Calls `event.effects(this.world)` if function, `applyStructuredEffects(this.world, event.effects)` if array
 - Tracks `_consecutiveMinor` (increment on minor/neutral, reset on moderate/major)
 - Uses `_followupDelay(mtth)` instead of `_poissonSample(mtth)` for followup scheduling
 
-**`_weightedPick(events, sim)`** resolves dynamic `likelihood` functions by calling `ev.likelihood(sim, this.world, congress)`. Applies boredom boost (2x likelihood for non-minor events when `_consecutiveMinor >= BOREDOM_THRESHOLD`).
+**`_weightedPick(events, sim)`** resolves dynamic `likelihood` functions. Applies boredom boost (2x for non-minor when `_consecutiveMinor >= BOREDOM_THRESHOLD`).
 
 **`_filterEligible(pool, sim)`** passes `(sim, this.world, congressHelpers(this.world))` to `when()` guards.
 
-**`_followupDelay(mtth)`** uses clamped Gaussian: `center = mtth, sigma = mtth * 0.3, clamp = [mtth*0.4, mtth*2.0]`. Uses Box-Muller `_gaussianSample()`.
-
-**`_checkMidterm(sim, day)`** handles:
-- Campaign season at `CAMPAIGN_START_DAY`: fires a hard-coded campaign event, sets `_midtermWarningFired`
-- Election at `MIDTERM_DAY`: computes score from `barronApproval`, recession, war penalties, +/-10 noise. Determines `fed_gain`/`fed_hold`/`fed_loss_house`/`fed_loss_both`. Mutates `congress` seat counts via `effects`. Sets `midtermComplete`, `midtermResult`.
+**`_followupDelay(mtth)`** uses clamped Gaussian: `center = mtth, sigma = mtth * 0.3, clamp = [mtth*0.4, mtth*2.0]`. Box-Muller `_gaussianSample()`.
 
 **`isEpilogueReady(day)`** -- pure check: `day >= TERM_END_DAY && !_epilogueFired`
 
 **`computeElectionOutcome(sim)`** -- scoring formula per spec section 16. Sets `world.election.presidentialResult` and `_epilogueFired = true`.
 
-**`reset()`** also resets: `world = createWorldState()`, all timing fields to initial values.
+**`reset()`** resets: `world = createWorldState()`, all pulse states (`nextDay = -1`, `fired = false`), `_randomCooldown = 0`, `_consecutiveMinor = 0`, `_epilogueFired = false`.
 
 **`applyDeltas(sim, params)`** -- preserve unchanged from current implementation. Iterates param entries, clamps to `PARAM_RANGES`, calls `sim._recomputeRhoDerived()` if rho changed. This is called internally by `_fireEvent` and may be used externally.
 
@@ -175,7 +186,7 @@ Structure:
 - `MARKET_EVENTS` array (~12 events, dynamic likelihood functions for flash crash/liquidity crisis/etc.)
 - Placeholder empty arrays for: `FED_EVENTS`, `MACRO_EVENTS`, `PNTH_EVENTS`, `SECTOR_EVENTS`, `POLITICAL_EVENTS`, `INVESTIGATION_EVENTS`, `COMPOUND_EVENTS`, `MIDTERM_EVENTS`
 - `OFFLINE_EVENTS` merged via spread (includes all arrays)
-- Note: `MIDTERM_EVENTS` are included in `OFFLINE_EVENTS` for `getEventById` lookup, but the engine's `_drawOffline` filters out both `category: 'fed'` and `category: 'midterm'` from the Poisson pool (this is already handled in Task 3's `_nonFedEvents` filter: `e.category !== 'fed' && e.category !== 'midterm'`)
+- Note: All events are in `OFFLINE_EVENTS` for `getEventById` lookup, but the engine pre-filters into separate pools: `_fedPool` (category `'fed'`), `_earningsPool` (category `'pnth_earnings'`), and `_randomPool` (everything except `'fed'`, `'pnth_earnings'`, `'midterm'`). Pulse events draw from their dedicated pools; random events draw from `_randomPool`.
 - `getEventById(id)` with lazy Map cache
 
 **Neutral events** must reference world state in `when()` guards per spec section 9.11:
@@ -262,7 +273,7 @@ Largest category. Write ~50 events per spec Arcs 1 (Gottlieb-Dirks War) and rela
 - Whistleblower complaint
 
 **Routine PNTH (~22 events):**
-- Earnings beat/miss (common, likelihood dynamic based on `commercialMomentum`)
+- Earnings beat/miss: use `category: 'pnth_earnings'` (NOT `'pnth'`). These are drawn by the quarterly earnings recurring pulse, not by Poisson. Dynamic likelihood based on `commercialMomentum`.
 - Defense contract won/cancelled
 - Analyst upgrade/downgrade (likelihood 1.5 each)
 - Product launch Atlas, cloud partnership, contract renewal, DHS expansion
