@@ -8,6 +8,8 @@
    zoom/pan; Y-axis auto-scales to visible range.
    =================================================== */
 
+import { fmtRelDay } from './format-helpers.js';
+
 export class ChartRenderer {
     /**
      * @param {HTMLCanvasElement} canvas
@@ -558,15 +560,7 @@ export class ChartRenderer {
             for (let d = dayStart; d <= lastDay + dayInterval; d += dayInterval) {
                 const sx = cam.worldToScreenX ? cam.worldToScreenX(d) : cam.worldToScreen(d, 0).x;
                 if (sx < plotX + 20 || sx > plotX + plotW - 20) continue;
-                const rel = d - this.dayOrigin;
-                const sign = rel < 0 ? -1 : 1;
-                const abs = Math.abs(rel);
-                const yr = Math.floor(abs / 252);
-                const rem = abs - yr * 252;
-                const mo = Math.floor(rem / 21);
-                const dy = rem - mo * 21;
-                const neg = sign < 0 ? '-' : '';
-                ctx.fillText(`${neg}Y${yr} M${mo} D${dy}`, sx, xAxisY);
+                ctx.fillText(fmtRelDay(d, this.dayOrigin), sx, xAxisY);
             }
         }
 
@@ -630,7 +624,10 @@ export class ChartRenderer {
             }
 
             if (hoverDay >= hMinDay && hoverDay <= hMaxDay) {
-                const dayLabelW = 36;
+                const dayText = fmtRelDay(hoverDay, this.dayOrigin);
+
+                ctx.font        = `11px var(--font-mono, monospace)`;
+                const dayLabelW = ctx.measureText(dayText).width + 10;
                 const dayLabelH = 18;
                 const dayLabelX = Math.round(mouseX) - dayLabelW / 2;
                 const dayLabelY = plotY + plotH;
@@ -638,10 +635,9 @@ export class ChartRenderer {
                 ctx.fillStyle = palette.accent;
                 ctx.fillRect(dayLabelX, dayLabelY, dayLabelW, dayLabelH);
                 ctx.fillStyle = palette.light.canvas;
-                ctx.font        = `11px var(--font-mono, monospace)`;
                 ctx.textAlign   = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(`D${hoverDay}`, dayLabelX + dayLabelW / 2, dayLabelY + dayLabelH / 2);
+                ctx.fillText(dayText, dayLabelX + dayLabelW / 2, dayLabelY + dayLabelH / 2);
             }
 
             ctx.restore();

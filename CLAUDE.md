@@ -41,8 +41,8 @@ colors.js               59 lines  Financial color aliases (_PALETTE.up/down/call
                                    freezes _PALETTE
 src/
   config.js             26 lines  Named constants and PRESETS array (5 static + 2 dynamic regimes)
-  format-helpers.js     35 lines  Shared formatting: fmtDollar(), fmtNum(), pnlClass(),
-                                   fmtDte(), posTypeLabel(). Single source for UI modules.
+  format-helpers.js     48 lines  Shared formatting: fmtDollar(), fmtNum(), pnlClass(),
+                                   fmtDte(), fmtRelDay(), posTypeLabel(). Single source for UI modules.
   position-value.js    ~40 lines  Unified position valuation: computePositionValue(),
                                    computePositionPnl(). Imports pricing, config.
   chain-renderer.js   ~220 lines  Chain table DOM building with event delegation:
@@ -110,9 +110,9 @@ main.js
   |                         executeStrategy -- imports pricing, config, position-value)
   |- src/events.js      (EventEngine, OFFLINE_EVENTS, PARAM_RANGES -- no imports)
   |- src/llm.js         (LLMEventSource -- imports events.js)
-  |- src/chart.js         (ChartRenderer -- no ES6 imports; reads _PALETTE, _r globals)
+  |- src/chart.js         (ChartRenderer -- imports format-helpers; reads _PALETTE, _r globals)
   |- src/strategy.js      (StrategyRenderer -- imports pricing, config)
-  |- src/format-helpers.js  (fmtDollar, fmtNum, pnlClass, fmtDte, posTypeLabel -- imports config)
+  |- src/format-helpers.js  (fmtDollar, fmtNum, pnlClass, fmtDte, fmtRelDay, posTypeLabel -- imports config)
   |- src/position-value.js  (imports pricing, config)
   |- src/chain-renderer.js  (posKey, renderChainInto, rebuildExpiryDropdown,
   |                         buildStockBondTable, buildChainTable, bindChainTableClicks

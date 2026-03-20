@@ -6,7 +6,7 @@
    Pure functions -- no internal state.
    ===================================================== */
 
-import { fmtDollar, fmtNum, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
+import { fmtDollar, fmtNum, pnlClass, fmtDte, fmtRelDay, posTypeLabel } from './format-helpers.js';
 import { renderChainInto, rebuildExpiryDropdown, buildStockBondTable, buildChainTable, bindChainTableClicks, posKey } from './chain-renderer.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
@@ -775,7 +775,7 @@ export function updateDynamicSections($, presetIndex) {
 // updateEventLog
 // ---------------------------------------------------------------------------
 
-export function updateEventLog($, eventLog) {
+export function updateEventLog($, eventLog, dayOrigin) {
     if (!$.eventLog) return;
     if (!eventLog || eventLog.length === 0) {
         $.eventLog.textContent = '';
@@ -795,7 +795,7 @@ export function updateEventLog($, eventLog) {
 
         const daySpan = document.createElement('span');
         daySpan.className = 'event-log-day';
-        daySpan.textContent = 'D' + e.day;
+        daySpan.textContent = fmtRelDay(e.day, dayOrigin || 0);
 
         const headlineSpan = document.createElement('span');
         headlineSpan.className = 'event-log-headline';

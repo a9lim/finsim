@@ -521,7 +521,7 @@ function _onDayComplete() {
         if (events.length > 0) {
             sim.recomputeK();
             syncSettingsUI($, _simSettingsObj());
-            updateEventLog($, eventEngine.eventLog);
+            updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
             if (typeof showToast !== 'undefined') {
                 for (let i = 0; i < events.length; i++) {
                     const ev = events[i];
@@ -799,7 +799,7 @@ function loadPreset(index) {
     } else {
         eventEngine = null;
     }
-    updateEventLog($, eventEngine ? eventEngine.eventLog : []);
+    updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
 
     updateUI();
     _repositionCamera();
@@ -813,7 +813,7 @@ function resetSim() {
 
     if (eventEngine) eventEngine.reset();
     if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
-    updateEventLog($, eventEngine ? eventEngine.eventLog : []);
+    updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
 
     updateUI();
     _repositionCamera();

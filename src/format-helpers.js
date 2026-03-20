@@ -25,6 +25,18 @@ export function fmtDte(dte) {
     return dte + 'd';
 }
 
+export function fmtRelDay(day, origin) {
+    const rel = day - origin;
+    const sign = rel < 0 ? -1 : 1;
+    const abs = Math.abs(rel);
+    const yr = Math.floor(abs / 252);
+    const rem = abs - yr * 252;
+    const mo = Math.floor(rem / 21);
+    const dy = rem - mo * 21;
+    const neg = sign < 0 ? '-' : '';
+    return `${neg}Y${yr} M${mo} D${dy}`;
+}
+
 export function posTypeLabel(type, sideOrQty) {
     const isShort = typeof sideOrQty === 'number' ? sideOrQty < 0 : sideOrQty === 'short';
     const prefix = isShort ? 'S' : 'L';
