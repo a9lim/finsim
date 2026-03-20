@@ -147,57 +147,105 @@ Categories expanded from 5 to 9 to accommodate new arc types. The `fed` category
 
 **Migration note:** This is a full rewrite of the event pool. All ~88 existing events are replaced by ~200 new events. No existing events are carried forward — all new events use the 3-arity `when(sim, world, congress)` signature. The `category` field is **required** on every event in the new pool.
 
-## 6. Revised EventEngine
+## 6. Pulse Event System
 
-### 6.1 New Fields
+### 6.1 Concept
+
+Events are divided into two categories by **scheduling mechanism**:
+
+- **Pulse events** fire on a deterministic schedule (with optional jitter). They are not in the random pool. Examples: FOMC meetings, campaign season, midterm election, quarterly PNTH earnings, term-end epilogue check.
+- **Random events** are drawn from the Poisson pool. Everything else — macro shocks, PNTH drama, investigations, neutral flavor, market structure, etc.
+
+This replaces the previous design where FOMC and midterms were special-cased independently. Now all scheduled events use a unified pulse system.
+
+### 6.2 Pulse Schedule
+
+The pulse schedule is an array of pulse definitions, checked each day in `maybeFire()`:
 
 ```js
-constructor(source, llmSource = null) {
-    // ...existing...
-    this.world = createWorldState();
-    this._nonFedCooldown = 0;
-    this._consecutiveMinor = 0;
-    this._midtermWarningFired = false;
-}
+// Two pulse types:
+// RECURRING: fires every `interval` days (± jitter), draws from a category pool
+// FIXED: fires once at a specific day
+
+this._pulses = [
+    {
+        type: 'recurring',
+        id: 'fomc',
+        interval: FED_MEETING_INTERVAL,  // 32 days
+        jitter: FED_MEETING_JITTER,      // ±4 days
+        nextDay: -1,                     // computed on first call
+        pool: 'fed',                     // draw from FED_EVENTS
+    },
+    {
+        type: 'recurring',
+        id: 'pnth_earnings',
+        interval: 63,                   // quarterly, aligned with QUARTERLY_CYCLE
+        jitter: 5,                      // ±5 days
+        nextDay: -1,
+        pool: 'pnth_earnings',          // draw from a sub-pool of PNTH earnings events
+    },
+    {
+        type: 'fixed',
+        id: 'campaign_season',
+        day: CAMPAIGN_START_DAY,         // ~440
+        fired: false,
+        handler: '_onCampaignSeason',    // method name on EventEngine
+    },
+    {
+        type: 'fixed',
+        id: 'midterm',
+        day: MIDTERM_DAY,               // ~504
+        fired: false,
+        handler: '_onMidterm',
+    },
+];
 ```
 
-### 6.2 Revised `maybeFire(sim, day)`
+**Recurring pulses**: When `day >= nextDay`, draw an eligible event from the pulse's category pool using the standard `_filterEligible` + `_weightedPick` flow. Then schedule next: `nextDay = day + interval + jitter_roll`. If no eligible event exists, skip (don't fire nothing, just reschedule).
 
+**Fixed pulses**: When `day >= pulse.day && !pulse.fired`, call the handler method. Set `fired = true`. The handler builds and fires a hard-coded event (like the midterm scoring logic).
+
+On `reset()`, all pulses reset: `nextDay = -1`, `fired = false`.
+
+### 6.3 Revised EventEngine
+
+**Constructor** creates `this.world = createWorldState()` and adds: `_pulses` (the schedule array above), `_randomCooldown`, `_consecutiveMinor`, `_epilogueFired`.
+
+**`maybeFire(sim, day)`** flow:
 ```
-1. Check midterm (fixed day trigger) → fires campaign season or election results
-2. Check pending followups (same as before, but when() now gets world)
-3. Check FOMC schedule (with jitter)
-4. Non-fed Poisson draw with cooldown
+1. If _epilogueFired, return []
+2. Check all pulses (in array order = priority order):
+   - For each recurring pulse: if day >= nextDay, draw from pool, fire, reschedule
+   - For each fixed pulse: if day >= pulse.day && !fired, call handler
+   - If ANY pulse fires, return its result (first pulse wins for the day)
+3. Check pending followups
+4. Random Poisson draw with cooldown
    - If cooldown > 0, decrement and skip
-   - Roll against 1/40 rate
-   - On hit, apply boredom adjustment, draw event, set cooldown 8-15 days
+   - Roll against NON_FED_POISSON_RATE
+   - On hit, apply boredom adjustment, draw from random pool, set cooldown
 ```
 
-### 6.3 Revised `_fireEvent(event, sim, day, depth)`
+Only one pulse fires per day. If multiple are due on the same day, priority is array order (FOMC > earnings > campaign > midterm). This prevents event pile-ups.
 
-Same as before, plus: call `event.effects(this.world)` if defined. Track `_consecutiveMinor` (reset on moderate/major, increment on minor).
+### 6.4 Other Engine Methods
 
-### 6.4 Revised `_weightedPick(events, sim)`
+**`_fireEvent(event, sim, day, depth)`**: Same as before, plus: call `event.effects(this.world)` if function, `applyStructuredEffects` if array. Track `_consecutiveMinor` (increment on minor/neutral, reset on moderate/major).
 
-Resolves dynamic `likelihood` functions before weighting. Uses `_adjustedLikelihood` from boredom system if present.
+**`_weightedPick(events, sim)`**: Resolves dynamic `likelihood` functions. Applies boredom boost (2x for non-minor when `_consecutiveMinor >= BOREDOM_THRESHOLD`).
 
-### 6.5 Revised `_filterEligible(pool, sim)`
+**`_filterEligible(pool, sim)`**: Passes `(sim, this.world, congressHelpers(this.world))` to `when()` guards.
 
-Passes `(sim, this.world, congressHelpers(this.world))` to `when()` guards.
-
-### 6.6 `reset()`
-
-Also resets `this.world = createWorldState()`, `_nonFedCooldown = 0`, `_consecutiveMinor = 0`, `_midtermWarningFired = false`.
+**`reset()`**: Resets `this.world = createWorldState()`, all pulse states, `_randomCooldown = 0`, `_consecutiveMinor = 0`, `_epilogueFired = false`.
 
 ## 7. Timing Mechanics
 
-### 7.1 Non-Fed Poisson Rate
+### 7.1 Random Event Rate
 
-Base rate: `1/30`. After firing, cooldown of 8-15 days (uniform random) prevents clumping. Effective rate accounting for cooldown: ~1 per `30 + 11.5 = 41.5` eligible days, giving ~6 non-Fed events per year (252 / 41.5 ≈ 6.1).
+Base rate: `1/30`. After firing, cooldown of 8-15 days (uniform random) prevents clumping. Effective rate accounting for cooldown: ~1 per `30 + 11.5 = 41.5` eligible days, giving ~6 random events per year (252 / 41.5 ≈ 6.1). The random pool excludes all pulse-category events (`fed`, `pnth_earnings`, `midterm`).
 
-### 7.2 FOMC Schedule Jitter
+### 7.2 Pulse Scheduling
 
-Next meeting scheduled at `day + FED_MEETING_INTERVAL + floor(random() * 9) - 4`. Adds ±4 day jitter (±1 week).
+All recurring pulses use the same jitter formula: `nextDay = day + interval + floor(random() * (jitter * 2 + 1)) - jitter`. FOMC: interval 32, jitter ±4. Earnings: interval 63, jitter ±5. Fixed pulses fire exactly once at their configured day.
 
 ### 7.3 Followup Timing: Clamped Gaussian
 
@@ -522,19 +570,26 @@ export const OFFLINE_EVENTS = [
 ];
 ```
 
-Fed events are filtered out of the Poisson pool (drawn only on FOMC schedule). Midterm events are handled by the fixed-day mechanic, not the regular pool. All others eligible for Poisson draw.
+**Pulse vs Random pool separation:** Events with `category: 'fed'` are drawn only by the FOMC recurring pulse. Events with `category: 'pnth_earnings'` (a subset of PNTH events — earnings beat/miss) are drawn only by the earnings recurring pulse. Events with `category: 'midterm'` are only used for followup ID lookup from the midterm fixed pulse. All other categories are eligible for the random Poisson draw.
+
+The engine pre-filters pools at startup:
+- `_fedPool`: events with `category === 'fed'`
+- `_earningsPool`: events with `category === 'pnth_earnings'`
+- `_randomPool`: all events where category is NOT `'fed'`, `'pnth_earnings'`, or `'midterm'`
+
+All events remain in `OFFLINE_EVENTS` for `getEventById` lookups (followup chains can reference any event by ID regardless of scheduling).
 
 **File splitting:** With ~200 events, the event definitions alone will be 1500+ lines. Split into two files: `src/event-pool.js` (all event arrays + `OFFLINE_EVENTS` export) and `src/events.js` (EventEngine class, imports from event-pool.js and world-state.js). This keeps the engine logic readable and the event definitions editable independently.
 
 ## 12. Midterm Election Mechanic
 
-Hard-coded checks inside `maybeFire()`, **not** pool events. The midterm is too structurally important to leave to Poisson chance — it fires at fixed days via dedicated `_checkMidterm(sim, day)` method, called at the top of `maybeFire()` before followups and regular draws.
+Campaign season and midterm election are **fixed pulses** in the unified pulse system (see section 6.2). They fire at their configured days via the pulse check loop in `maybeFire()`, not via Poisson.
 
-**Campaign season** — `_checkMidterm` fires a hard-coded campaign event when `day >= CAMPAIGN_START_DAY` and `!this._midtermWarningFired`. Sets `_midtermWarningFired = true`. Returns a single log entry. On the same day, regular Poisson/FOMC draws are skipped (midterm takes priority).
+**Campaign season** — Fixed pulse at `CAMPAIGN_START_DAY`. Handler `_onCampaignSeason` fires a hard-coded campaign event. Returns a single log entry.
 
-**Election** — `_checkMidterm` fires the election event when `day >= MIDTERM_DAY` and `!this.world.election.midtermComplete`. Computes outcome score, selects result, mutates congress, sets `midtermComplete = true`. Returns a single log entry. The four outcome events (fed_gain, fed_hold, fed_loss_house, fed_loss_both) are defined inline in `_checkMidterm`, not in the pool.
+**Election** — Fixed pulse at `MIDTERM_DAY`. Handler `_onMidterm` computes outcome score, selects result, mutates congress, sets `midtermComplete = true`. Returns a single log entry. The four outcome events are built inline in the handler.
 
-**Post-midterm followups** — Each outcome event has followups that ARE added to `_pendingFollowups` and fire via the normal followup mechanic. These post-midterm followups live in the `MIDTERM_EVENTS` pool array (for ID-based lookup) but are never drawn by Poisson.
+**Post-midterm followups** — Each outcome event has followups that ARE added to `_pendingFollowups` and fire via the normal followup mechanic. These post-midterm followups live in the `MIDTERM_EVENTS` pool array (for ID-based lookup) but are never drawn randomly.
 
 Outcome computed:
 ```
@@ -698,7 +753,7 @@ Buttons at the bottom:
 
 ### 15.3 Epilogue Trigger
 
-The epilogue does **not** go through `maybeFire()`. Instead, `main.js` checks a separate method before calling `maybeFire`:
+The epilogue does **not** go through the pulse system or `maybeFire()`. Instead, `main.js` checks a separate method before calling `maybeFire`:
 
 ```js
 // In _onDayComplete() in main.js, before calling eventEngine.maybeFire():
