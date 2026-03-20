@@ -608,16 +608,182 @@ The engine validates LLM effects before applying:
 
 Offline events continue to use `effects: (world) => void` functions directly. The engine checks `typeof event.effects === 'function'` vs `Array.isArray(event.effects)` to dispatch.
 
-## 15. File Change Summary
+## 15. Epilogue System
+
+### 15.1 Overview
+
+When the simulation reaches the end of the presidential term (~day 1008 for a 4-year term, configurable via `TERM_END_DAY` in config.js), the event engine fires a special epilogue sequence. The simulation pauses automatically (like a margin call) and displays a multi-page popup overlay. This is the narrative conclusion of the playthrough.
+
+The epilogue uses the existing `.sim-overlay` / `.sim-overlay-panel` pattern (same as margin call overlay) but larger — full `.sim-overlay-body` with scrollable content. Each page has a title, rich narrative text, and navigation buttons.
+
+### 15.2 Epilogue Pages
+
+Four pages, displayed sequentially. Player clicks "Next" to advance, "Back" to revisit. Final page has "Restart" and "Keep Playing" buttons.
+
+**Page 1: "The Election"**
+
+Covers the presidential election that concludes the term. Content determined by world state:
+
+- Who won? Computed from `barronApproval`, `midtermResult`, accumulated state. Possible outcomes:
+  - **Barron re-elected**: If approval > 45 at term end, no impeachment, economy not in recession. Text covers his victory speech, second-term agenda, opposition's reaction.
+  - **Barron loses to Okafor**: If `okaforRunning` and approval < 42. Text covers Okafor's historic win, her inauguration promises re: PNTH and AI regulation, Barron's bitter concession (or refusal to concede).
+  - **Barron loses to generic Farmer-Labor candidate**: If approval < 42 but `!okaforRunning`. Less dramatic, more "change election."
+  - **Barron removed/resigned**: If `impeachmentStage >= 3` reached. VP (or successor) ran instead. Text covers the unprecedented removal and its aftermath.
+  - **Barron wins narrowly amid controversy**: If approval 42-45 range. Contested, recounts, legal challenges. Uncertainty premium.
+
+Text references specific events that shaped the outcome — the midterms, the wars, the scandals, the economy. 3-5 paragraphs, written in a retrospective journalistic style ("Looking back, the turning point was...").
+
+**Page 2: "The Fate of Palanthropic"**
+
+Covers PNTH's corporate resolution. Content branches heavily on world state:
+
+- **Gottlieb's PNTH** (`ceoIsGottlieb` and `boardGottlieb >= 6`): Commercial pivot succeeded. Atlas AI platform dominates enterprise. Military contracts wound down. Stock recovered after initial defense-revenue drop. "Gottlieb proved the skeptics wrong..."
+- **Dirks's PNTH** (`!ceoIsGottlieb` and `boardDirks >= 7`): Full defense contractor. Largest AI military supplier globally. Massive government revenue but commercial division gutted. "Dirks had won, but the company Gottlieb built was unrecognizable..."
+- **Post-acquisition PNTH** (if hostile takeover fired): Acquired by tech giant or broken up. "The name Palanthropic still appears on the building, but..."
+- **Covenant AI rivalry** (if Gottlieb started rival): Two-company landscape. PNTH weakened, Covenant growing. "The AI industry had split along ethical lines..."
+- **Scandal-ravaged PNTH** (if `dojSuitFiled` and `whistleblowerFiled` and `senateProbeLaunched`): Under consent decree, leadership replaced. "What was once the most promising AI company in America was now a cautionary tale..."
+- **Compromise PNTH** (both still there, no resolution): Uneasy peace. "The Gottlieb-Dirks détente held, but insiders said it was only a matter of time..."
+
+References Kassis's fate, the board composition, key contract wins/losses, the Bowman connection fallout. 3-5 paragraphs.
+
+**Page 3: "The World"**
+
+Covers geopolitical and economic state. Synthesizes multiple world flags:
+
+- **Trade/China**: Based on `tradeWarStage` and `chinaRelations`. Decoupled tech blocs? Framework deal? Cold peace? "The Zhaowei ban had reshaped global supply chains permanently..." or "The framework deal was Barron's crowning achievement, even his critics admitted..."
+- **Middle East**: Based on `mideastEscalation`. Withdrawal? Ceasefire? Ongoing quagmire? "The Department of War — as Barron insisted on calling it — had its first true test..."
+- **South America**: Based on `southAmericaOps`. Regime change? Insurgency? Quiet withdrawal?
+- **The Fed**: Based on `hartleyFired`, `vaneAppointed`, `credibilityScore`. "Hartley served her full term, her independence intact..." or "The Vane Fed had delivered the rate cuts Barron wanted, but the dollar never recovered..."
+- **The Economy**: Based on `recessionDeclared`, current `b` (rates), `theta` (vol). Recession? Recovery? Boom? "Four years of whiplash had left the economy..."
+
+2-4 paragraphs covering the most dramatic threads. Skips arcs that never triggered (if `southAmericaOps` stayed at 0, don't mention it).
+
+**Page 4: "Your Legacy"**
+
+A scorecard page with a different visual style — stat-rows and data rather than narrative prose. Contains:
+
+- **Portfolio Performance**: Final portfolio value, total P&L (dollar and percentage), peak portfolio value, max drawdown
+- **Trading Activity**: Total trades executed, options exercised, positions liquidated by margin call, margin calls survived
+- **Market Summary**: Starting vs ending stock price, highest/lowest price seen, starting vs ending rate, peak volatility (theta)
+- **Timeline Highlights**: The 3-5 highest-magnitude events that fired during the playthrough, listed chronologically with day numbers. Pulled from `eventLog`.
+- **Rating**: A tongue-in-cheek title based on performance:
+  - P&L > 200%: "Master of the Universe"
+  - P&L > 100%: "Wolf of Wall Street"
+  - P&L > 50%: "Seasoned Trader"
+  - P&L > 0%: "Survived"
+  - P&L > -50%: "Learning Experience"
+  - P&L > -90%: "Blown Up"
+  - P&L <= -90%: "Lehman'd"
+
+Buttons at the bottom:
+- **"Restart"**: Calls `resetSim()`. Clears everything, fresh playthrough.
+- **"Keep Playing"**: Dismisses overlay, resumes simulation. Event pool is exhausted (no more narrative events fire) but the market model continues. Player can keep trading in a post-narrative sandbox. A small toast confirms: "Event storyline complete. Market simulation continues."
+
+### 15.3 Epilogue Trigger
+
+New method `_checkEpilogue(sim, day)` in EventEngine, called at the very top of `maybeFire()` before midterms:
+
+```
+if (day >= TERM_END_DAY && !this._epilogueFired) {
+    this._epilogueFired = true;
+    return 'epilogue';  // special return value, not a log entry
+}
+```
+
+`maybeFire` returns `'epilogue'` as a sentinel. `main.js` checks for this and calls `showEpilogue(world, sim, portfolio, eventLog)` instead of processing normal event log entries.
+
+After epilogue, `maybeFire` returns `[]` for all subsequent days (event pool exhausted). The simulation loop continues but no events fire.
+
+### 15.4 Epilogue Content Generation
+
+The epilogue text is generated by a pure function `generateEpilogue(world, sim, portfolio, eventLog)` in a new file `src/epilogue.js`. Returns an array of 4 page objects:
+
+```js
+[
+    { title: 'The Election', body: 'html string...' },
+    { title: 'The Fate of Palanthropic', body: 'html string...' },
+    { title: 'The World', body: 'html string...' },
+    { title: 'Your Legacy', body: 'html string...' },
+]
+```
+
+Each page's body is built from conditional blocks keyed on world state flags. The function reads world state, sim parameters, portfolio stats, and event log to compose the narrative. No LLM involved — all offline, deterministic from state.
+
+Page 4 reads from portfolio: `portfolio.cash`, `portfolio.positions`, `portfolio.closedBorrowCost`, `portfolio.marginDebitCost`, `portfolio.totalDividends`, and the event log for timeline highlights.
+
+### 15.5 Epilogue UI
+
+Uses the existing overlay pattern but with additions:
+
+- `.epilogue-overlay` extends `.sim-overlay` with a wider panel (max-width ~600px vs the default)
+- `.epilogue-title` — page title, uses `--font-display` (Noto Serif)
+- `.epilogue-body` — narrative text, uses `--font-body`, line-height 1.6, scrollable
+- `.epilogue-nav` — bottom button row with Back/Next/Restart/Keep Playing
+- `.epilogue-dots` — page indicator dots (4 dots, active dot highlighted)
+- Page 4 uses `.stat-row` / `.stat-value` patterns from shared-base.css for the scorecard
+- Transitions between pages use a simple fade (opacity transition, 200ms)
+
+Responsive: at <= 600px, overlay goes fullscreen (same as `.sim-overlay` default behavior).
+
+### 15.6 Config
+
+```js
+export const TERM_END_DAY = 1008;  // 4 years of trading days (252 * 4)
+```
+
+### 15.7 Portfolio Stats Tracking
+
+Some scorecard stats require tracking that doesn't currently exist. Add to portfolio.js:
+
+- `portfolio.totalTrades` — incremented on every `executeMarketOrder` call (already countable, just not tracked)
+- `portfolio.totalExercises` — incremented on every `exerciseOption` call
+- `portfolio.marginCallCount` — incremented when margin call triggers
+- `portfolio.peakValue` — updated each substep: `Math.max(peakValue, currentEquity)`
+- `portfolio.maxDrawdown` — updated each substep: `Math.max(maxDrawdown, 1 - currentEquity / peakValue)`
+
+These are lightweight additions — one comparison per substep, reset on `resetPortfolio()`.
+
+## 16. Election Outcome Computation
+
+The presidential election outcome at `TERM_END_DAY` is determined by a scoring function similar to the midterm but with more variables:
+
+```
+score = barronApproval
+if recessionDeclared: score -= 12
+if mideastEscalation >= 2: score -= 6
+if southAmericaOps >= 2: score -= 4
+if impeachmentStage >= 2: score -= 15
+if hartleyFired: score -= 5
+if tradeWarStage == 4 (deal): score += 5
+if oilCrisis: score -= 4
+noise: ± 8 (uniform random)
+```
+
+| Score | Outcome |
+|-------|---------|
+| > 50 | Barron re-elected comfortably |
+| 45-50 | Barron wins narrowly, contested |
+| 38-45 | Barron loses to Okafor (if `okaforRunning`) or generic FL candidate |
+| < 38 | Barron loses decisively |
+
+If `impeachmentStage >= 3` (removal), Barron is already gone — the election is between VP successor and FL candidate, with different narrative text.
+
+The outcome is stored in `world.election.presidentialResult` and consumed by `generateEpilogue()`.
+
+## 17. File Change Summary
 
 | File | Change type | Description |
 |------|------------|-------------|
 | `src/world-state.js` | **NEW** | World state factory + congress helpers |
 | `src/event-pool.js` | **NEW** | ~200 event definitions organized by category |
-| `src/events.js` | **REWRITE** | EventEngine class with world state, midterm mechanic, dynamic likelihood, timing improvements. Imports event pool from `event-pool.js` |
+| `src/epilogue.js` | **NEW** | `generateEpilogue(world, sim, portfolio, eventLog)` — builds 4-page epilogue from state |
+| `src/events.js` | **REWRITE** | EventEngine class with world state, midterm mechanic, epilogue trigger, dynamic likelihood, timing improvements. Imports event pool from `event-pool.js` |
 | `src/llm.js` | **UPDATE** | System prompt rewrite, world state in messages, structured effects DSL in tool schema |
-| `src/config.js` | **UPDATE** | Add midterm/timing/cooldown constants |
-| `main.js` | **UPDATE** | Wire world state into event engine, reset on preset change, pass to UI for display |
+| `src/config.js` | **UPDATE** | Add midterm/timing/cooldown/term-end constants |
+| `src/portfolio.js` | **UPDATE** | Add tracking fields: `totalTrades`, `totalExercises`, `marginCallCount`, `peakValue`, `maxDrawdown` |
+| `main.js` | **UPDATE** | Wire world state, epilogue overlay, reset on preset change |
+| `index.html` | **UPDATE** | Add epilogue overlay markup |
+| `styles.css` | **UPDATE** | Add epilogue overlay styles (`.epilogue-*`) |
 
 ### What stays the same
 
@@ -629,6 +795,6 @@ Offline events continue to use `effects: (world) => void` functions directly. Th
 - LLM batch-fetch + offline fallback pattern
 - `_checkFollowups` grouping by `chainId` for mutual exclusion
 
-## 16. Event Count Target
+## 18. Event Count Target
 
-~180-220 total events. With ~6 non-Fed draws/year over 4 years, plus ~32 FOMC meetings, plus followup chains, a playthrough sees ~60-80 events. Each run samples a different slice of the pool based on which arcs trigger and which branches fire.
+~180-220 total events in the pool. With ~6 non-Fed draws/year over 4 years, plus ~32 FOMC meetings, plus followup chains, a playthrough sees ~60-80 events before the epilogue fires. Each run samples a different slice of the pool based on which arcs trigger and which branches fire. The epilogue synthesizes whatever state accumulated into a coherent conclusion.
