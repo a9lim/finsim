@@ -618,6 +618,9 @@ export const OFFLINE_EVENTS = [
     },
 ];
 
+const _FED_EVENTS = OFFLINE_EVENTS.filter(e => e.category === 'fed');
+const _NON_FED_EVENTS = OFFLINE_EVENTS.filter(e => e.category !== 'fed');
+
 // -- Event-by-id lookup (built lazily) ----------------------------------
 let _eventById = null;
 function _getEventById(id) {
@@ -742,7 +745,7 @@ export class EventEngine {
         // Group by chainId for mutually exclusive branching
         const chains = new Map();
         for (const pf of ready) {
-            const key = pf.chainId || ('_ungrouped_' + Math.random());
+            const key = pf.chainId || '_ungrouped';
             if (!chains.has(key)) chains.set(key, []);
             chains.get(key).push(pf);
         }
@@ -778,17 +781,16 @@ export class EventEngine {
     }
 
     _drawFed(sim) {
-        const fedEvents = OFFLINE_EVENTS.filter(
-            ev => ev.category === 'fed' && (!ev.when || ev.when(sim))
+        const fedEvents = _FED_EVENTS.filter(
+            ev => !ev.when || ev.when(sim)
         );
         if (fedEvents.length === 0) return null;
         return this._weightedPick(fedEvents);
     }
 
     _drawOffline(sim, excludeFed = false) {
-        const eligible = OFFLINE_EVENTS.filter(ev =>
-            (!ev.when || ev.when(sim)) && (!excludeFed || ev.category !== 'fed')
-        );
+        const pool = excludeFed ? _NON_FED_EVENTS : OFFLINE_EVENTS;
+        const eligible = pool.filter(ev => !ev.when || ev.when(sim));
         if (eligible.length === 0) return null;
         return this._weightedPick(eligible);
     }
@@ -822,6 +824,7 @@ export class EventEngine {
 
     _poissonSample(mean) {
         if (mean <= 0) return 0;
+        if (mean > 500) return Math.round(mean);
         const L = Math.exp(-mean);
         let k = 0, p = 1;
         do { k++; p *= Math.random(); } while (p > L);

@@ -300,6 +300,7 @@ export function executeMarketOrder(
 
     // --- No existing position: open new ---
     let cashDelta = 0;
+    let margin = 0;
 
     if (side === 'long') {
         // Allowed on margin -- cash can go negative (up to initial margin limit)
@@ -308,7 +309,7 @@ export function executeMarketOrder(
         if (!_checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay)) return null;
     } else {
         const proceeds = fill * qty;
-        const margin = _marginForShort(
+        margin = _marginForShort(
             type, qty, fill, currentPrice, currentVol, currentRate,
             currentDay, strike, expiryDay
         );
@@ -333,10 +334,7 @@ export function executeMarketOrder(
 
     portfolio.positions.push(position);
     if (side === 'short') {
-        position._reservedMargin = _marginForShort(
-            type, qty, fill, currentPrice, currentVol, currentRate,
-            currentDay, strike, expiryDay
-        );
+        position._reservedMargin = margin;
     }
     return position;
 }

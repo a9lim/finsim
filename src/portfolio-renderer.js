@@ -115,17 +115,25 @@ function _buildOrderRow(order) {
 // ---------------------------------------------------------------------------
 
 function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint) {
+    if (!container._rowMap) container._rowMap = new Map();
+    const rowMap = container._rowMap;
+
     const currentIds = new Set(positions.map(p => String(p.id)));
 
     // Remove rows for closed positions
     for (const row of container.querySelectorAll('[data-pos-id]')) {
-        if (!currentIds.has(row.dataset.posId)) row.remove();
+        const posId = row.dataset.posId;
+        if (!currentIds.has(posId)) {
+            rowMap.delete(posId);
+            row.remove();
+        }
     }
 
     if (positions.length === 0) {
         // Show hint only if not already present
         if (!container.querySelector('.panel-hint')) {
             container.textContent = '';
+            rowMap.clear();
             const hint = document.createElement('p');
             hint.className = 'panel-hint';
             hint.textContent = emptyHint;
@@ -141,7 +149,7 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint) {
     // Add new or update existing
     for (const pos of positions) {
         const posId = String(pos.id);
-        const existing = container.querySelector('[data-pos-id="' + posId + '"]');
+        const existing = rowMap.get(posId);
         if (existing) {
             // Update P&L in-place
             const pnl = computePositionPnl(pos, S, vol, rate, day);
@@ -160,7 +168,9 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint) {
             const labelEl = existing.querySelector('.pos-label');
             if (labelEl) labelEl.textContent = labelStr;
         } else {
-            container.appendChild(_buildPositionRow(pos, S, vol, rate, day));
+            const row = _buildPositionRow(pos, S, vol, rate, day);
+            rowMap.set(posId, row);
+            container.appendChild(row);
         }
     }
 }
