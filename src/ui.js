@@ -392,7 +392,7 @@ export function updateRateDisplay($, rate, rateHistory) {
     if ($.rateSparkCtx && rateHistory && rateHistory.count >= 2
         && typeof drawSparkline !== 'undefined') {
         const c = $.rateSparkCanvas;
-        const accent = typeof _PALETTE !== 'undefined' ? _PALETTE.accent : '#FE3B01';
+        const accent = typeof _PALETTE !== 'undefined' ? _PALETTE.accent : '#E11107';
         drawSparkline($.rateSparkCtx, rateHistory, c.width, c.height, accent, accent + '44');
     }
 }

@@ -46,14 +46,14 @@ function _paletteColor(key, fallback) {
 
 function _colors() {
     return {
-        up:     _paletteColor('green',   '#509878'),
-        down:   _paletteColor('rose',    '#C46272'),
-        accent: _paletteColor('accent',  '#FE3B01'),
-        delta:  _paletteColor('blue',    '#5C92A8'),
-        gamma:  _paletteColor('orange',  '#CC8E4E'),
-        theta:  _paletteColor('cyan',    '#4AACA0'),
-        vega:   _paletteColor('purple',  '#9C7EB0'),
-        rho:    _paletteColor('slate',   '#8A7E72'),
+        up:     _paletteColor('green',   '#3A9C68'),
+        down:   _paletteColor('rose',    '#C25478'),
+        accent: _paletteColor('accent',  '#E11107'),
+        delta:  _paletteColor('blue',    '#3892B8'),
+        gamma:  _paletteColor('orange',  '#B88C38'),
+        theta:  _paletteColor('cyan',    '#00A09C'),
+        vega:   _paletteColor('purple',  '#9472BC'),
+        rho:    _paletteColor('slate',   '#848890'),
     };
 }
 
@@ -66,15 +66,15 @@ function _themeTextColors() {
         if (typeof _PALETTE !== 'undefined') {
             const pal = isDark ? _PALETTE.dark : _PALETTE.light;
             return {
-                text:          pal.text          || (isDark ? '#E8DED4' : '#1A1612'),
-                textSecondary: pal.textSecondary || (isDark ? '#8A8278' : '#78706A'),
-                textMuted:     pal.textMuted     || (isDark ? '#5A544C' : '#A8A098'),
+                text:          pal.text          || (isDark ? '#E2E4E9' : '#181B20'),
+                textSecondary: pal.textSecondary || (isDark ? '#8B8FA0' : '#636B78'),
+                textMuted:     pal.textMuted     || (isDark ? '#505462' : '#9CA3AF'),
             };
         }
     } catch (_) { /* ignore */ }
     return isDark
-        ? { text: '#E8DED4', textSecondary: '#8A8278', textMuted: '#5A544C' }
-        : { text: '#1A1612', textSecondary: '#78706A', textMuted: '#A8A098' };
+        ? { text: '#E2E4E9', textSecondary: '#8B8FA0', textMuted: '#505462' }
+        : { text: '#181B20', textSecondary: '#636B78', textMuted: '#9CA3AF' };
 }
 
 // ---------------------------------------------------------------------------
