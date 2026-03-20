@@ -44,4 +44,12 @@ Vanilla HTML/CSS/JS with ES6 modules. No build step, no bundler, no npm. Canvas 
 
 ## License
 
+## Sibling Projects
+
+- [Geon](https://github.com/a9lim/physsim) -- [a9l.im/physsim](https://a9l.im/physsim)
+- [Metabolism](https://github.com/a9lim/biosim) -- [a9l.im/biosim](https://a9l.im/biosim)
+- [Redistricting](https://github.com/a9lim/gerry) -- [a9l.im/gerry](https://a9l.im/gerry)
+
+## License
+
 Part of the [a9l.im](https://a9l.im) portfolio.
