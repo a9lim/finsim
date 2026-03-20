@@ -291,8 +291,682 @@ const FED_EVENTS = [
     },
 ];
 const MACRO_EVENTS = [];
-const PNTH_EVENTS = [];
-const PNTH_EARNINGS_EVENTS = [];
+const PNTH_EVENTS = [
+    // =====================================================================
+    //  ARC 1: THE GOTTLIEB-DIRKS WAR
+    // =====================================================================
+
+    // -- Inciting incident chain -------------------------------------------
+    {
+        id: 'gottlieb_ethics_keynote',
+        category: 'pnth',
+        likelihood: 0.8,
+        headline: 'PNTH CEO Gottlieb delivers blistering keynote: "We built Atlas to heal, not to kill. I will not let this company become a weapons factory"',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ceoIsGottlieb && world.pnth.boardDirks >= 6,
+        followups: [
+            { id: 'dirks_cnbc_rebuttal', mtth: 10, weight: 0.8 },
+        ],
+    },
+    {
+        id: 'dirks_cnbc_rebuttal',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Dirks fires back on CNBC: "Eugene is a brilliant engineer but a naive businessman. Defense contracts are our fastest-growing segment"',
+        params: { mu: 0.01, theta: 0.008, lambda: 0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ceoIsGottlieb,
+        followups: [
+            { id: 'board_closed_session', mtth: 20, weight: 0.7 },
+            { id: 'kassis_caught_middle', mtth: 15, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'board_closed_session',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH board convenes emergency closed session; sources say "the room was nuclear" as Dirks and Gottlieb factions clash',
+        params: { mu: -0.01, theta: 0.01, lambda: 0.4 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ceoIsGottlieb,
+        followups: [
+            { id: 'gottlieb_stripped_oversight', mtth: 15, weight: 0.5 },
+            { id: 'dirks_blocked', mtth: 15, weight: 0.3 },
+            { id: 'board_compromise', mtth: 10, weight: 0.5 },
+        ],
+    },
+
+    // -- Board closed session branches ------------------------------------
+    {
+        id: 'gottlieb_stripped_oversight',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH board votes 8-2 to strip Gottlieb of product oversight; CEO title retained but authority gutted. Gottlieb "considering all options"',
+        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+        magnitude: 'major',
+        when: (sim, world) => world.pnth.ceoIsGottlieb && world.pnth.boardDirks >= 8,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+        },
+        followups: [
+            { id: 'gottlieb_resigns', mtth: 25, weight: 0.6 },
+            { id: 'gottlieb_digs_in', mtth: 20, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'dirks_blocked',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'In surprise upset, PNTH board blocks Dirks\' military expansion plan 6-4; Gottlieb allies hold firm. Dirks visibly furious leaving boardroom',
+        params: { mu: 0.02, theta: 0.01, lambda: 0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ceoIsGottlieb && world.pnth.boardDirks <= 6,
+        followups: [
+            { id: 'dirks_proxy_fight', mtth: 30, weight: 0.6 },
+            { id: 'dirks_resigns', mtth: 40, weight: 0.15 },
+        ],
+    },
+    {
+        id: 'board_compromise',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH board reaches fragile compromise: defense contracts continue but with new ethics review process. Both sides claim victory',
+        params: { mu: 0.01, theta: -0.005 },
+        magnitude: 'minor',
+        when: (sim, world) => world.pnth.ceoIsGottlieb,
+    },
+
+    // -- Kassis branch ----------------------------------------------------
+    {
+        id: 'kassis_caught_middle',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'CTO Kassis breaks silence in internal all-hands: "I didn\'t leave Google to build targeting systems." Standing ovation from engineers, cold stares from defense team',
+        params: { mu: -0.01, theta: 0.008 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ctoIsMira && world.pnth.ceoIsGottlieb,
+        followups: [
+            { id: 'kassis_sides_gottlieb', mtth: 20, weight: 0.4 },
+            { id: 'kassis_sides_dirks', mtth: 20, weight: 0.3 },
+            { id: 'kassis_quits', mtth: 20, weight: 0.3 },
+        ],
+    },
+    {
+        id: 'kassis_sides_gottlieb',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Kassis publicly backs Gottlieb in board letter signed by 200+ engineers; "Atlas was built for medicine, climate, and discovery — not warfare"',
+        params: { mu: 0.02, theta: -0.005 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ctoIsMira,
+        effects: (world) => {
+            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
+            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
+        },
+    },
+    {
+        id: 'kassis_sides_dirks',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Kassis reverses course after private meeting with Dirks; sources say she was shown classified Pentagon briefing on Zhaowei\'s military AI',
+        params: { mu: 0.01, theta: 0.005 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ctoIsMira,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+        },
+    },
+    {
+        id: 'kassis_quits',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'BREAKING: PNTH CTO Mira Kassis resigns effective immediately. LinkedIn post: "I cannot in good conscience remain at a company at war with itself"',
+        params: { mu: -0.04, theta: 0.02, lambda: 0.6, muJ: -0.02 },
+        magnitude: 'major',
+        when: (sim, world) => world.pnth.ctoIsMira,
+        effects: (world) => {
+            world.pnth.ctoIsMira = false;
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+        },
+    },
+
+    // -- Gottlieb resignation chain ---------------------------------------
+    {
+        id: 'gottlieb_resigns',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'BREAKING: PNTH CEO Eugene Gottlieb resigns. In emotional letter to employees: "I built this company to make the world better. I no longer believe it will."',
+        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
+        magnitude: 'major',
+        when: (sim, world) => world.pnth.ceoIsGottlieb,
+        effects: (world) => {
+            world.pnth.ceoIsGottlieb = false;
+            world.pnth.boardGottlieb = Math.max(0, world.pnth.boardGottlieb - 1);
+            world.pnth.boardDirks = Math.min(10, world.pnth.boardDirks + 1);
+        },
+        followups: [
+            { id: 'successor_search', mtth: 20, weight: 0.8 },
+            { id: 'gottlieb_covenant_ai', mtth: 60, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'gottlieb_digs_in',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Gottlieb hires activist defense attorney, signals he will fight removal: "They\'ll have to drag me out. This is still my company"',
+        params: { mu: -0.02, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ceoIsGottlieb,
+        followups: [
+            { id: 'gottlieb_lawsuit', mtth: 30, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'gottlieb_lawsuit',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Gottlieb files suit against PNTH board alleging breach of fiduciary duty; seeks injunction restoring oversight powers. Discovery could expose Bowman ties',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ceoIsGottlieb,
+    },
+    {
+        id: 'successor_search',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH retains Spencer Stuart for CEO search; Dirks named interim CEO. Street skeptical of "foxes guarding the henhouse" governance',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.ceoIsGottlieb,
+    },
+    {
+        id: 'gottlieb_covenant_ai',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Gottlieb announces Covenant AI, a "safety-first" rival to PNTH. Backed by $2B from Sequoia and a16z. Immediately poaches 40 PNTH engineers',
+        params: { mu: -0.05, theta: 0.025, lambda: 1.0, muJ: -0.03 },
+        magnitude: 'major',
+        when: (sim, world) => !world.pnth.ceoIsGottlieb,
+        effects: (world) => {
+            world.pnth.gottliebStartedRival = true;
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+        },
+    },
+
+    // -- Dirks proxy fight / board dynamics --------------------------------
+    {
+        id: 'dirks_proxy_fight',
+        category: 'pnth',
+        likelihood: 0.6,
+        headline: 'Dirks launches proxy fight to replace two Gottlieb-aligned board members; solicits support from institutional holders controlling 35% of shares',
+        params: { mu: -0.02, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ceoIsGottlieb && world.pnth.boardDirks < 9,
+        followups: [
+            { id: 'dirks_proxy_wins', mtth: 25, weight: 0.5 },
+            { id: 'dirks_proxy_loses', mtth: 25, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'dirks_proxy_wins',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Dirks prevails in proxy vote; two new defense-friendly directors seated. Board now firmly in Dirks camp. Gottlieb allies down to two seats',
+        params: { mu: 0.02, theta: 0.008, lambda: 0.2 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.pnth.boardDirks = Math.min(10, world.pnth.boardDirks + 2);
+            world.pnth.boardGottlieb = Math.max(0, world.pnth.boardGottlieb - 2);
+        },
+    },
+    {
+        id: 'dirks_proxy_loses',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Dirks proxy fight fails as ISS recommends against her nominees; institutional investors side with Gottlieb on governance concerns',
+        params: { mu: -0.01, theta: 0.005 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
+            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
+        },
+    },
+    {
+        id: 'dirks_resigns',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH Chairwoman Dirks steps down citing "irreconcilable differences" with management; VP Bowman\'s office releases terse one-line statement',
+        params: { mu: 0.03, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.boardDirks <= 4,
+        effects: (world) => {
+            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 2);
+            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 2);
+        },
+    },
+
+    // -- Activist investor ------------------------------------------------
+    {
+        id: 'activist_hedge_fund_stake',
+        category: 'pnth',
+        likelihood: 0.5,
+        headline: 'Crescent Capital discloses 8.1% stake in PNTH via 13D filing; demands board overhaul, threatens to nominate four independent directors',
+        params: { mu: 0.03, theta: 0.02, lambda: 0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.activistStakeRevealed && !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.activistStakeRevealed = true;
+        },
+        followups: [
+            { id: 'activist_board_seats', mtth: 35, weight: 0.6 },
+            { id: 'activist_buyback_demand', mtth: 20, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'activist_board_seats',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Crescent Capital wins two board seats in consent solicitation; new directors demand strategic review including potential sale',
+        params: { mu: 0.02, theta: 0.015 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.activistStakeRevealed,
+        effects: (world) => {
+            // Activist directors are independent — take from Dirks faction
+            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
+            world.pnth.boardGottlieb = Math.max(0, world.pnth.boardGottlieb - 1);
+        },
+    },
+    {
+        id: 'activist_buyback_demand',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Crescent Capital publishes open letter demanding $5B buyback and cost cuts; says PNTH "trades at a conglomerate discount due to governance chaos"',
+        params: { mu: 0.03, theta: -0.005 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.activistStakeRevealed,
+    },
+
+    // -- Hostile takeover -------------------------------------------------
+    {
+        id: 'hostile_takeover_bid',
+        category: 'pnth',
+        likelihood: 0.1,
+        headline: 'BREAKING: Northvane Technologies launches $68B hostile bid for PNTH at 45% premium; "the internal dysfunction has created a generational buying opportunity"',
+        params: { mu: 0.08, theta: 0.04, lambda: 2.0 },
+        magnitude: 'major',
+        when: (sim, world) => (world.pnth.boardDirks <= 5 || (world.pnth.dojSuitFiled && world.pnth.whistleblowerFiled)) && !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.acquired = true;
+        },
+    },
+
+    // -- Both ousted (rare, requires multiple scandal flags) ---------------
+    {
+        id: 'both_ousted',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH board fires both Dirks and Gottlieb in extraordinary session; independent directors take control. "A fresh start," says acting Chair. Street reels',
+        params: { mu: -0.04, theta: 0.035, lambda: 1.5, muJ: -0.03 },
+        magnitude: 'major',
+        when: (sim, world) => world.pnth.ceoIsGottlieb && world.pnth.whistleblowerFiled && world.pnth.dojSuitFiled && world.pnth.senateProbeLaunched,
+        effects: (world) => {
+            world.pnth.ceoIsGottlieb = false;
+            world.pnth.boardDirks = 3;
+            world.pnth.boardGottlieb = 2;
+        },
+    },
+
+    // =====================================================================
+    //  ARC 2: BOWMAN / CORRUPTION
+    // =====================================================================
+    {
+        id: 'bowman_lobbying_report',
+        category: 'pnth',
+        likelihood: 0.7,
+        headline: 'The Continental reports VP Bowman held $4M in PNTH stock while lobbying Pentagon for Atlas AI contract; White House calls it "old news"',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.senateProbeLaunched,
+        followups: [
+            { id: 'senate_investigation_opened', mtth: 30, weight: 0.5 },
+            { id: 'bowman_intervenes', mtth: 15, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'aclu_lawsuit_surveillance',
+        category: 'pnth',
+        likelihood: 0.6,
+        headline: 'ACLU files landmark suit alleging PNTH battlefield AI used for mass surveillance of civilians; seeks injunction blocking Department of War contracts',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.02 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.militaryContractActive,
+    },
+    {
+        id: 'senate_investigation_opened',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Sen. Okafor opens formal Senate Intelligence Committee investigation into PNTH-Bowman ties; subpoenas issued for financial records',
+        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+        magnitude: 'major',
+        when: (sim, world) => !world.pnth.senateProbeLaunched,
+        effects: (world) => {
+            world.pnth.senateProbeLaunched = true;
+            world.investigations.okaforProbeStage = Math.max(world.investigations.okaforProbeStage, 1);
+        },
+        followups: [
+            { id: 'congressional_hearing_pnth', mtth: 25, weight: 0.7 },
+        ],
+    },
+    {
+        id: 'doj_antitrust_suit',
+        category: 'pnth',
+        likelihood: 0.4,
+        headline: 'DOJ files antitrust suit against PNTH alleging monopolistic control of government AI procurement; stock drops sharply on headline',
+        params: { mu: -0.05, theta: 0.025, lambda: 1.0, muJ: -0.03 },
+        magnitude: 'major',
+        when: (sim, world) => !world.pnth.dojSuitFiled && world.pnth.militaryContractActive,
+        effects: (world) => {
+            world.pnth.dojSuitFiled = true;
+        },
+    },
+    {
+        id: 'bowman_intervenes',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'VP Bowman calls PNTH contracts "vital to national security" and pressures DOD to fast-track renewals; stock rallies on government support signal',
+        params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.senateProbeLaunched,
+    },
+    {
+        id: 'congressional_hearing_pnth',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Dirks and Gottlieb testify before Senate Intelligence Committee; Okafor grills Dirks on Bowman meetings. Gottlieb: "I warned the board repeatedly"',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.6 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.senateProbeLaunched,
+        followups: [
+            { id: 'ethics_board_revolt', mtth: 15, weight: 0.5 },
+            { id: 'whistleblower_complaint', mtth: 30, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'ethics_board_revolt',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Three of five PNTH ethics advisory board members resign in protest; joint statement says company "systematically ignored our recommendations"',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ethicsBoardIntact,
+        effects: (world) => {
+            world.pnth.ethicsBoardIntact = false;
+            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
+            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
+        },
+    },
+    {
+        id: 'whistleblower_complaint',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'BREAKING: Senior PNTH engineer files SEC whistleblower complaint alleging company falsified safety testing on Atlas military modules',
+        params: { mu: -0.07, theta: 0.03, lambda: 1.5, muJ: -0.04 },
+        magnitude: 'major',
+        when: (sim, world) => !world.pnth.whistleblowerFiled,
+        effects: (world) => {
+            world.pnth.whistleblowerFiled = true;
+            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
+            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
+        },
+    },
+
+    // =====================================================================
+    //  ROUTINE PNTH (~14 events)
+    // =====================================================================
+    {
+        id: 'defense_contract_won',
+        category: 'pnth',
+        likelihood: 0.7,
+        headline: 'PNTH wins $3.2B Department of War contract for Atlas AI battlefield integration; largest defense AI award in history',
+        params: { mu: 0.06, theta: -0.01, lambda: -0.4 },
+        magnitude: 'major',
+        when: (sim, world) => !world.pnth.militaryContractActive && !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.militaryContractActive = true;
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+        },
+    },
+    {
+        id: 'defense_contract_cancelled',
+        category: 'pnth',
+        likelihood: 0.5,
+        headline: 'Pentagon cancels PNTH Atlas contract citing "unresolved governance concerns"; $3.2B evaporates overnight. Dirks scrambles to save deal',
+        params: { mu: -0.05, theta: 0.02, lambda: 0.8, muJ: -0.03 },
+        magnitude: 'major',
+        when: (sim, world) => world.pnth.militaryContractActive,
+        effects: (world) => {
+            world.pnth.militaryContractActive = false;
+        },
+    },
+    {
+        id: 'dhs_contract_renewal',
+        category: 'pnth',
+        likelihood: 1.2,
+        headline: 'DHS quietly renews PNTH border surveillance contract for another 3 years; $800M deal draws little public attention',
+        params: { mu: 0.02, theta: -0.005 },
+        magnitude: 'minor',
+        when: (sim, world) => !world.pnth.acquired,
+    },
+    {
+        id: 'atlas_product_launch',
+        category: 'pnth',
+        likelihood: 0.8,
+        headline: 'PNTH unveils Atlas AI for Healthcare: diagnostic imaging, drug discovery, clinical trials. Gottlieb: "This is what we were built for"',
+        params: { mu: 0.04, theta: -0.01, lambda: -0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ceoIsGottlieb && !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
+        },
+    },
+    {
+        id: 'cloud_partnership',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH announces strategic cloud partnership with major hyperscaler; Atlas AI to be offered as managed service. Analysts raise price targets',
+        params: { mu: 0.03, theta: -0.008 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
+        },
+    },
+    {
+        id: 'analyst_upgrade',
+        category: 'pnth',
+        likelihood: 1.5,
+        headline: 'Goldman initiates PNTH at Overweight with $240 price target; cites "unmatched AI moat" and defense revenue visibility',
+        params: { mu: 0.02, theta: -0.005 },
+        magnitude: 'minor',
+        when: (sim, world) => !world.pnth.acquired,
+    },
+    {
+        id: 'analyst_downgrade',
+        category: 'pnth',
+        likelihood: 1.5,
+        headline: 'Morgan Stanley downgrades PNTH to Equal Weight; "governance overhang makes risk/reward unfavorable despite strong fundamentals"',
+        params: { mu: -0.02, theta: 0.005 },
+        magnitude: 'minor',
+        when: (sim, world) => !world.pnth.acquired,
+    },
+    {
+        id: 'hires_cto_kassis',
+        category: 'pnth',
+        likelihood: 0.8,
+        headline: 'PNTH hires back Mira Kassis as CTO after five-month absence; negotiated expanded authority over product safety. Engineers cheer',
+        params: { mu: 0.03, theta: -0.01, lambda: -0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.ctoIsMira && !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.ctoIsMira = true;
+            world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
+        },
+    },
+    {
+        id: 'pnth_annual_meeting',
+        category: 'pnth',
+        likelihood: 1.2,
+        headline: 'PNTH annual shareholder meeting draws record attendance; heated Q&A on military contracts, governance, and Bowman relationship',
+        params: { mu: -0.005, theta: 0.005 },
+        magnitude: 'minor',
+        when: (sim, world) => !world.pnth.acquired,
+    },
+    {
+        id: 'patent_suit_rival',
+        category: 'pnth',
+        likelihood: 0.8,
+        headline: 'DeepStar Labs sues PNTH for patent infringement on transformer architecture; seeks injunction and $1.5B in damages',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired,
+    },
+    {
+        id: 'pnth_hyperscaler_deal',
+        category: 'pnth',
+        likelihood: 0.8,
+        headline: 'PNTH signs multi-year inference partnership with top-3 cloud provider; guaranteed $1.8B minimum commitment. Commercial pivot gains traction',
+        params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired && !world.pnth.militaryContractActive,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
+        },
+    },
+    {
+        id: 'pnth_talent_exodus',
+        category: 'pnth',
+        likelihood: (sim, world) => {
+            let base = 0.4;
+            if (!world.pnth.ctoIsMira) base += 0.3;
+            if (world.pnth.gottliebStartedRival) base += 0.4;
+            return base;
+        },
+        headline: 'PNTH loses 15% of senior research staff in a single quarter; departures accelerating to Covenant AI and Big Tech. "Brain drain is real," says recruiter',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.4 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+        },
+    },
+    {
+        id: 'pnth_stock_buyback',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH board authorizes $3B accelerated share buyback program; Dirks: "The market dramatically undervalues this company"',
+        params: { mu: 0.03, theta: -0.005, lambda: -0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired && world.pnth.boardDirks >= 6,
+    },
+    {
+        id: 'pnth_data_center_fire',
+        category: 'pnth',
+        likelihood: 0.3,
+        headline: 'Fire at PNTH primary data center in Ashburn; Atlas AI services offline for 18 hours. Insurance covers damage but customer trust shaken',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.02 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired,
+    },
+];
+
+const PNTH_EARNINGS_EVENTS = [
+    {
+        id: 'pnth_earnings_beat_strong',
+        category: 'pnth_earnings',
+        likelihood: (sim, world) => {
+            let base = 1.0;
+            if (world.pnth.commercialMomentum > 0) base += 0.8;
+            if (world.pnth.militaryContractActive) base += 0.3;
+            return base;
+        },
+        headline: 'PNTH crushes estimates: revenue +32% YoY, Atlas AI bookings up 60%. Raises full-year guidance. Stock surges after hours',
+        params: { mu: 0.04, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'pnth_earnings_beat_mild',
+        category: 'pnth_earnings',
+        likelihood: 2.0,
+        headline: 'PNTH edges past consensus: EPS $1.42 vs $1.38 expected. Revenue in line. Guidance maintained. "Solid but unspectacular," says Barclays',
+        params: { mu: 0.02, theta: -0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'pnth_earnings_inline',
+        category: 'pnth_earnings',
+        likelihood: 3.0,
+        headline: 'PNTH reports exactly in line with consensus; no guidance change. Conference call focused on governance questions rather than financials',
+        params: { mu: 0.005, theta: 0.002 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'pnth_earnings_miss_mild',
+        category: 'pnth_earnings',
+        likelihood: 2.0,
+        headline: 'PNTH misses on revenue, beats on EPS via cost cuts. Management blames "contract timing delays." Analysts question organic growth trajectory',
+        params: { mu: -0.02, theta: 0.008, lambda: 0.3 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'pnth_earnings_miss_bad',
+        category: 'pnth_earnings',
+        likelihood: (sim, world) => {
+            let base = 0.8;
+            if (world.pnth.commercialMomentum < 0) base += 0.5;
+            if (world.investigations.okaforProbeStage >= 2) base += 0.4;
+            if (!world.pnth.ctoIsMira) base += 0.2;
+            return base;
+        },
+        headline: 'PNTH disaster quarter: revenue misses by 12%, operating loss widens, three major customers paused contracts. Guidance slashed. Dirks faces board questions',
+        params: { mu: -0.04, theta: 0.015, lambda: 0.6, muJ: -0.02 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+        },
+    },
+    {
+        id: 'pnth_guidance_raise',
+        category: 'pnth_earnings',
+        likelihood: (sim, world) => {
+            let base = 1.0;
+            if (world.pnth.commercialMomentum >= 2) base += 0.5;
+            return base;
+        },
+        headline: 'PNTH raises full-year revenue guidance by 15% citing "unprecedented enterprise AI adoption"; lifts margin target. Bull case intact',
+        params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
+        },
+    },
+    {
+        id: 'pnth_guidance_cut',
+        category: 'pnth_earnings',
+        likelihood: (sim, world) => {
+            let base = 0.8;
+            if (world.pnth.commercialMomentum <= -1) base += 0.5;
+            if (world.pnth.dojSuitFiled) base += 0.3;
+            return base;
+        },
+        headline: 'PNTH slashes guidance mid-quarter citing "regulatory headwinds and customer hesitation"; withdraws full-year outlook entirely. CFO: "Visibility is low"',
+        params: { mu: -0.03, theta: 0.012, lambda: 0.5, muJ: -0.01 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+        },
+    },
+];
 const SECTOR_EVENTS = [];
 const POLITICAL_EVENTS = [];
 const INVESTIGATION_EVENTS = [];
