@@ -136,6 +136,101 @@ function _legDte(leg, evalDay, fallbackDte) {
     return fallbackDte;
 }
 
+/**
+ * Precompute per-leg constants that don't vary across sample prices.
+ * Entry values (priceAmerican at entryS) are computed once instead of
+ * 200× per leg in the sample loop.
+ */
+function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte) {
+    return legs.map(leg => {
+        const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
+                   : (leg.side === 'short') ? -1 : 1;
+        const qty  = Math.abs(leg.qty ?? 1);
+        const mult = qty * sign;
+        const curDte   = _legDte(leg, evalDay, fallbackDte);
+        const entryDte = (leg.expiryDay != null && entryDay != null)
+            ? Math.max(leg.expiryDay - entryDay, 0) : fallbackDte;
+        const T      = _dteToT(curDte);
+        const entryT = _dteToT(entryDte);
+
+        const info = { type: leg.type, mult, T, rate, vol };
+
+        switch (leg.type) {
+            case 'call':
+            case 'put': {
+                const isPut = leg.type === 'put';
+                const K = leg.strike ?? entryS;
+                info.K = K;
+                info.isPut = isPut;
+                info.entryVal = priceAmerican(entryS, K, entryT, rate, vol, isPut);
+                break;
+            }
+            case 'stock':
+                info.entryS = entryS;
+                break;
+            case 'bond':
+                info.entryVal = BOND_FACE_VALUE * Math.exp(-rate * entryT);
+                info.bondCurVal = BOND_FACE_VALUE * Math.exp(-rate * T);
+                break;
+        }
+        return info;
+    });
+}
+
+/** P&L for a precomputed leg at hypothetical price S. */
+function _legPnlFast(info, S) {
+    switch (info.type) {
+        case 'call':
+        case 'put':
+            return (priceAmerican(S, info.K, info.T, info.rate, info.vol, info.isPut) - info.entryVal) * info.mult;
+        case 'stock':
+            return (S - info.entryS) * info.mult;
+        case 'bond':
+            return (info.bondCurVal - info.entryVal) * info.mult;
+        default:
+            return 0;
+    }
+}
+
+/** Greeks for a precomputed leg at hypothetical price S. */
+function _legGreeksFast(info, S) {
+    switch (info.type) {
+        case 'call':
+        case 'put': {
+            const g = computeGreeks(S, info.K, info.T, info.rate, info.vol, info.isPut);
+            return {
+                delta: g.delta * info.mult, gamma: g.gamma * info.mult,
+                theta: g.theta * info.mult, vega:  g.vega  * info.mult,
+                rho:   g.rho   * info.mult,
+            };
+        }
+        case 'stock':
+            return { delta: info.mult, gamma: 0, theta: 0, vega: 0, rho: 0 };
+        case 'bond': {
+            const bRho = -info.T * info.bondCurVal * info.mult;
+            const bTheta = info.rate * info.bondCurVal / TRADING_DAYS_PER_YEAR * info.mult;
+            return { delta: 0, gamma: 0, theta: bTheta, vega: 0, rho: bRho };
+        }
+        default:
+            return { delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 };
+    }
+}
+
+/**
+ * Build a cache key string from draw/summary inputs.
+ * Cheap string comparison avoids re-pricing when nothing changed.
+ */
+function _cacheKey(legs, vol, rate, evalDay, entryDay, dte, extra) {
+    let k = '';
+    if (legs) {
+        for (const l of legs) k += l.type + l.qty + (l.strike ?? '') + (l.expiryDay ?? '') + '|';
+    }
+    // Round floats to avoid spurious misses from floating-point noise
+    k += (vol * 1e6 | 0) + ',' + (rate * 1e6 | 0) + ',' + evalDay + ',' + entryDay + ',' + dte;
+    if (extra) k += ',' + extra;
+    return k;
+}
+
 // ---------------------------------------------------------------------------
 // StrategyRenderer
 // ---------------------------------------------------------------------------
@@ -155,6 +250,10 @@ export class StrategyRenderer {
         this._xRange  = 30;    // half-width
         this._xRangeMin = 5;   // will be recomputed per spot
         this._xRangeMax = 100; // will be recomputed per spot
+
+        // Computation cache — avoids re-pricing when inputs haven't changed
+        this._cache = null;    // { key, xs, pnls, greekData, breakevens }
+        this._summaryCache = null; // { key, result }
 
         // Legend hit areas (populated during draw)
         this._legendItems = [];
@@ -292,15 +391,62 @@ export class StrategyRenderer {
         }
 
         const fallbackDte = dte;
+        const activeGreeks = Object.keys(greekToggles || {}).filter(k => greekToggles[k]);
 
-        // --- Build sample arrays ---
-        const xs   = [];
-        const pnls = [];
+        // --- Cached computation: only re-price when inputs change ---
+        const drawKey = _cacheKey(legs, vol, rate, evalDay, entryDay, dte,
+            (xMin * 100 | 0) + ',' + (xMax * 100 | 0) + ',' + (spot * 100 | 0) + ',' + activeGreeks.join(''));
+        let xs, pnls, greekData, breakevens;
 
-        for (let i = 0; i < SAMPLE_COUNT; i++) {
-            const S = xMin + (i / (SAMPLE_COUNT - 1)) * (xMax - xMin);
-            xs.push(S);
-            pnls.push(this._totalPnl(legs, S, vol, rate, evalDay, entryDay, fallbackDte, spot));
+        if (this._cache && this._cache.key === drawKey) {
+            ({ xs, pnls, greekData, breakevens } = this._cache);
+        } else {
+            // Precompute per-leg entry values (constant across all sample Ss)
+            const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte);
+
+            const wantGreeks = activeGreeks.length > 0;
+            xs   = new Array(SAMPLE_COUNT);
+            pnls = new Array(SAMPLE_COUNT);
+            const greekArrays = {};
+            if (wantGreeks) {
+                for (const gKey of activeGreeks) greekArrays[gKey] = new Array(SAMPLE_COUNT);
+            }
+
+            for (let i = 0; i < SAMPLE_COUNT; i++) {
+                const S = xMin + (i / (SAMPLE_COUNT - 1)) * (xMax - xMin);
+                xs[i] = S;
+
+                let pnl = 0;
+                let gDelta = 0, gGamma = 0, gTheta = 0, gVega = 0, gRho = 0;
+                for (const info of legInfos) {
+                    pnl += _legPnlFast(info, S);
+                    if (wantGreeks) {
+                        const g = _legGreeksFast(info, S);
+                        gDelta += g.delta; gGamma += g.gamma;
+                        gTheta += g.theta; gVega  += g.vega; gRho += g.rho;
+                    }
+                }
+                pnls[i] = pnl;
+                if (wantGreeks) {
+                    const totals = { delta: gDelta, gamma: gGamma, theta: gTheta, vega: gVega, rho: gRho };
+                    for (const gKey of activeGreeks) greekArrays[gKey][i] = totals[gKey] ?? 0;
+                }
+            }
+
+            greekData = {};
+            if (wantGreeks) {
+                for (const gKey of activeGreeks) {
+                    const vals = greekArrays[gKey];
+                    let gMin = Infinity, gMax = -Infinity;
+                    for (const v of vals) { if (v < gMin) gMin = v; if (v > gMax) gMax = v; }
+                    if (gMin === gMax) { gMin -= 0.01; gMax += 0.01; }
+                    const gPad = (gMax - gMin) * Y_PADDING_PCT;
+                    greekData[gKey] = { vals, yLo: gMin - gPad, yHi: gMax + gPad };
+                }
+            }
+
+            breakevens = _zeroCrossings(xs, pnls);
+            this._cache = { key: drawKey, xs, pnls, greekData, breakevens };
         }
 
         // --- Y scale for P&L ---
@@ -311,37 +457,13 @@ export class StrategyRenderer {
         const yLo = pnlMin - pnlPad;
         const yHi = pnlMax + pnlPad;
 
-        const xToPixel  = (S)   => plotX + ((S   - xMin) / (xMax - xMin)) * plotW;
-        const pnlToPixel = (p)  => plotY + ((yHi - p)    / (yHi - yLo))   * plotH;
+        const xToPixel   = (S) => plotX + ((S   - xMin) / (xMax - xMin)) * plotW;
+        const pnlToPixel = (p) => plotY + ((yHi - p)    / (yHi - yLo))   * plotH;
 
-        // --- Greek data (only for enabled toggles) ---
-        const activeGreeks = Object.keys(greekToggles || {}).filter(k => greekToggles[k]);
-        const greekData = {};
-
-        if (activeGreeks.length > 0) {
-            const greekArrays = {};
-            for (const gKey of activeGreeks) greekArrays[gKey] = new Array(SAMPLE_COUNT);
-
-            for (let i = 0; i < SAMPLE_COUNT; i++) {
-                const allGreeks = this._totalGreeksAll(legs, xs[i], vol, rate, evalDay, fallbackDte);
-                for (const gKey of activeGreeks) {
-                    greekArrays[gKey][i] = allGreeks[gKey] ?? 0;
-                }
-            }
-
-            for (const gKey of activeGreeks) {
-                const vals = greekArrays[gKey];
-                let gMin = Infinity, gMax = -Infinity;
-                for (const v of vals) { if (v < gMin) gMin = v; if (v > gMax) gMax = v; }
-                if (gMin === gMax) { gMin -= 0.01; gMax += 0.01; }
-                const gPad = (gMax - gMin) * Y_PADDING_PCT;
-                const gLo = gMin - gPad;
-                const gHi = gMax + gPad;
-                greekData[gKey] = {
-                    vals, yLo: gLo, yHi: gHi,
-                    toPixel: (v) => plotY + ((gHi - v) / (gHi - gLo)) * plotH,
-                };
-            }
+        // Rebuild pixel mappers for cached greek data (depend on plotH which may change)
+        for (const gKey of activeGreeks) {
+            const gd = greekData[gKey];
+            gd.toPixel = (v) => plotY + ((gd.yHi - v) / (gd.yHi - gd.yLo)) * plotH;
         }
 
         // --- Draw grid / axes ---
@@ -366,7 +488,6 @@ export class StrategyRenderer {
         this._drawPnlCurve(ctx, xs, pnls, xToPixel, pnlToPixel, clrs.up, clrs.down);
 
         // --- Breakeven dots + labels ---
-        const breakevens = _zeroCrossings(xs, pnls);
         this._drawBreakevens(ctx, breakevens, pnlToPixel(0), xToPixel, clrs.accent);
 
         // --- Y axis labels ---
@@ -389,6 +510,11 @@ export class StrategyRenderer {
             return { maxProfit: 0, maxLoss: 0, breakevens: [], netCost: 0 };
         }
 
+        const sumKey = _cacheKey(legs, vol, rate, evalDay, entryDay, dte, (spot * 100 | 0));
+        if (this._summaryCache && this._summaryCache.key === sumKey) {
+            return this._summaryCache.result;
+        }
+
         const fallbackDte = dte;
         // Extend sampling range to cover near-zero and far-upside
         let xMin = 0.01;
@@ -398,13 +524,16 @@ export class StrategyRenderer {
                 xMax = Math.max(xMax, leg.strike * 5);
             }
         }
-        const xs   = [];
-        const pnls = [];
+        const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte);
+        const xs   = new Array(SAMPLE_COUNT);
+        const pnls = new Array(SAMPLE_COUNT);
 
         for (let i = 0; i < SAMPLE_COUNT; i++) {
             const S = xMin + (i / (SAMPLE_COUNT - 1)) * (xMax - xMin);
-            xs.push(S);
-            pnls.push(this._totalPnl(legs, S, vol, rate, evalDay, entryDay, fallbackDte, spot));
+            xs[i] = S;
+            let pnl = 0;
+            for (const info of legInfos) pnl += _legPnlFast(info, S);
+            pnls[i] = pnl;
         }
 
         let maxProfit = -Infinity, maxLoss = Infinity;
@@ -434,7 +563,9 @@ export class StrategyRenderer {
             netCost += this._legEntryCost(leg, spot, vol, rate, _dteToT(legEntryDte));
         }
 
-        return { maxProfit, maxLoss, breakevens, netCost };
+        const result = { maxProfit, maxLoss, breakevens, netCost };
+        this._summaryCache = { key: sumKey, result };
+        return result;
     }
 
     // -----------------------------------------------------------------------
@@ -468,117 +599,6 @@ export class StrategyRenderer {
             default:
                 return 0;
         }
-    }
-
-    /**
-     * P&L for a single leg at price S (current_value - entry_cost_at_spot).
-     *
-     * @param {object} leg
-     * @param {number} S          - Hypothetical spot to evaluate at
-     * @param {number} vol
-     * @param {number} rate
-     * @param {number} evalDay    - Evaluation day (sim day number)
-     * @param {number} entryDay   - Entry day (sim day number)
-     * @param {number} fallbackDte - Fallback DTE for legs without expiryDay
-     * @param {number} entryS     - Original spot (entry price reference)
-     */
-    _legPnl(leg, S, vol, rate, evalDay, entryDay, fallbackDte, entryS) {
-        const sign  = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
-                    : (leg.side === 'short') ? -1 : 1;
-        const qty   = Math.abs(leg.qty ?? 1);
-        const curDte   = _legDte(leg, evalDay, fallbackDte);
-        const entryDte = (leg.expiryDay != null && entryDay != null)
-            ? Math.max(leg.expiryDay - entryDay, 0) : fallbackDte;
-        const T      = _dteToT(curDte);
-        const entryT = _dteToT(entryDte);
-
-        switch (leg.type) {
-            case 'call':
-            case 'put': {
-                const isPut    = leg.type === 'put';
-                const K        = leg.strike ?? entryS;
-                const curVal   = priceAmerican(S,      K, T,      rate, vol, isPut);
-                const entryVal = priceAmerican(entryS, K, entryT, rate, vol, isPut);
-                return (curVal - entryVal) * qty * sign;
-            }
-            case 'stock': {
-                return (S - entryS) * qty * sign;
-            }
-            case 'bond': {
-                const curVal   = BOND_FACE_VALUE * Math.exp(-rate * T);
-                const entryVal = BOND_FACE_VALUE * Math.exp(-rate * entryT);
-                return (curVal - entryVal) * qty * sign;
-            }
-            default:
-                return 0;
-        }
-    }
-
-    /**
-     * Sum P&L across all legs at price S.
-     */
-    _totalPnl(legs, S, vol, rate, evalDay, entryDay, fallbackDte, entryS) {
-        let total = 0;
-        for (const leg of legs) {
-            total += this._legPnl(leg, S, vol, rate, evalDay, entryDay, fallbackDte, entryS);
-        }
-        return total;
-    }
-
-    /**
-     * Greeks for a single leg at price S.
-     *
-     * @returns {object} { delta, gamma, theta, vega, rho }
-     */
-    _legGreeks(leg, S, vol, rate, evalDay, fallbackDte) {
-        const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
-                   : (leg.side === 'short') ? -1 : 1;
-        const qty  = Math.abs(leg.qty ?? 1);
-        const mult = qty * sign;
-        const T = _dteToT(_legDte(leg, evalDay, fallbackDte));
-
-        switch (leg.type) {
-            case 'call':
-            case 'put': {
-                const isPut = leg.type === 'put';
-                const K     = leg.strike ?? S;
-                const g     = computeGreeks(S, K, T, rate, vol, isPut);
-                return {
-                    delta: g.delta * mult,
-                    gamma: g.gamma * mult,
-                    theta: g.theta * mult,
-                    vega:  g.vega  * mult,
-                    rho:   g.rho   * mult,
-                };
-            }
-            case 'stock':
-                return { delta: mult, gamma: 0, theta: 0, vega: 0, rho: 0 };
-            case 'bond': {
-                const bv = BOND_FACE_VALUE * Math.exp(-rate * T);
-                const bRho = -T * bv * mult;
-                const bTheta = rate * bv / 252 * mult;
-                return { delta: 0, gamma: 0, theta: bTheta, vega: 0, rho: bRho };
-            }
-            default:
-                return { delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 };
-        }
-    }
-
-    /**
-     * Sum ALL Greeks across all legs at price S in a single pass.
-     * Computes computeGreeks() once per option leg instead of once per Greek key.
-     */
-    _totalGreeksAll(legs, S, vol, rate, evalDay, fallbackDte) {
-        let delta = 0, gamma = 0, theta = 0, vega = 0, rho = 0;
-        for (const leg of legs) {
-            const g = this._legGreeks(leg, S, vol, rate, evalDay, fallbackDte);
-            delta += g.delta;
-            gamma += g.gamma;
-            theta += g.theta;
-            vega  += g.vega;
-            rho   += g.rho;
-        }
-        return { delta, gamma, theta, vega, rho };
     }
 
     // -----------------------------------------------------------------------

@@ -71,12 +71,15 @@ src/
                                    computeBidAsk(), computeOptionBidAsk()
   chart.js             650 lines  ChartRenderer: log Y-axis OHLC candles, auto-scale, grid,
                                    crosshair, position markers, strike lines, live candle
-                                   lerp, batched wick drawing; uses shared-camera.js
+                                   cubic interpolation (smoothstep), setSubstepInterval(),
+                                   batched wick drawing; uses shared-camera.js
                                    (worldToScreenX/screenToWorldX scalar methods) for pan/zoom
-  strategy.js          830 lines  StrategyRenderer: payoff P&L diagram, Greek overlays
-                                   (single-pass via _totalGreeksAll), breakeven dots,
-                                   scroll-wheel X zoom, clickable legend, computeSummary().
-                                   Per-leg T from evalDay/entryDay. No shared-camera.js.
+  strategy.js          830 lines  StrategyRenderer: payoff P&L diagram, Greek overlays,
+                                   breakeven dots, scroll-wheel X zoom, clickable legend,
+                                   computeSummary(). Input-keyed caching (_cache, _summaryCache)
+                                   skips re-pricing when inputs unchanged. Precomputed per-leg
+                                   entry values (_precomputeLegs). Per-leg T from
+                                   evalDay/entryDay. No shared-camera.js.
   ui.js                670 lines  cacheDOMElements(), bindEvents(), updateChainDisplay(),
                                    updateStrategyChainDisplay(), updateGreeksDisplay(),
                                    showChainOverlay(), showMarginCall(),
@@ -119,7 +122,7 @@ main.js
 
 1. `frame()` calls `sim.beginDay()` -- pushes a partial bar into `sim.history` by reference
 2. Sub-steps paced across tick interval (`tickInterval / INTRADAY_STEPS`). Each `sim.substep()` mutates partial bar in-place
-3. `chart.setLiveCandle(bar)` snaps close to previous sub-step value, lerps toward new target. High/low are water marks of the lerped path
+3. `chart.setLiveCandle(bar)` snaps close to previous sub-step value, starts a new cubic interpolation segment toward the new target. Smoothstep (`t²(3-2t)`) fills the full substep interval so the candle is always in motion. High/low are water marks of the interpolated path
 4. After 16 sub-steps, `sim.finalizeDay()` increments day. `_onDayComplete()` runs `checkPendingOrders()`, `chargeBorrowInterest()`, `processExpiry()`, `buildChain()`, `checkMargin()`, auto-scroll, UI update
 
 ### Instant Tick
@@ -326,9 +329,11 @@ Log Y-axis OHLC candles. Up = green, down = rose. Auto-scale, grid, crosshair, p
 
 ### Strategy View
 
-`draw(legs, spot, vol, rate, dte, greekToggles, evalDay, entryDay)`: P&L curve (green/rose split at zero), Greek overlays on independent Y-axes, breakeven dots, clickable legend. Per-leg T from `leg.expiryDay - evalDay`; entry T from `leg.expiryDay - entryDay`.
+`draw(legs, spot, vol, rate, dte, greekToggles, evalDay, entryDay)`: P&L curve (green/rose split at zero), Greek overlays on independent Y-axes, breakeven dots, clickable legend. Per-leg T from `leg.expiryDay - evalDay`; entry T from `leg.expiryDay - entryDay`. Results cached by input key -- repeated calls with unchanged inputs skip all pricing.
 
-`computeSummary(legs, spot, vol, rate, dte, evalDay, entryDay)` -> `{ maxProfit, maxLoss, breakevens, netCost }`. Detects unbounded P&L at sample boundary.
+`computeSummary(legs, spot, vol, rate, dte, evalDay, entryDay)` -> `{ maxProfit, maxLoss, breakevens, netCost }`. Detects unbounded P&L at sample boundary. Cached separately from `draw()`.
+
+Both use `_precomputeLegs()` to compute entry values once per leg (not per sample point), then `_legPnlFast()`/`_legGreeksFast()` for the 200-point sample loop.
 
 ### Time-to-Expiry Slider
 
@@ -421,9 +426,9 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 ## Key Patterns
 
 - **`$` DOM cache**: populated by `cacheDOMElements($)`, passed to all ui.js functions. Also stores closures: `$._onChainCellClick`, `$._onTradeSubmit`.
-- **Dirty flag**: `dirty = true` on state change; rAF loop skips render when false.
+- **Dirty flag**: `dirty = true` on state change; rAF loop skips render when false. In strategy mode, substep-level dirties are suppressed (strategy inputs only change daily); only day-complete, user actions, and tab switches set dirty.
 - **Sub-step streaming**: 16 intraday sub-steps distributed across tick interval. `dayInProgress` tracks active streaming. `lastTickTime` advances by `tickInterval` to prevent drift.
-- **Live candle lerp**: frame-rate-independent exponential lerp (speed=15). High/low are water marks that never retract.
+- **Live candle interpolation**: smoothstep cubic (`t²(3-2t)`) fills the full substep interval. `setSubstepInterval(ms)` tunes segment duration to match current speed. `_syncLerpSpeed()` in main.js calls it on init and speed changes. High/low are water marks that never retract.
 - **Camera (chart only)**: `shared-camera.js`, world X = day index. Strategy canvas manages its own X-range.
 - **Pure module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator.
 - **Custom event bus**: `shoals:*` events from ui.js to main.js, decouples DOM from portfolio state.
@@ -442,7 +447,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **`dayInProgress` must be reset** on preset load and sim reset. Pausing does NOT finalize the day.
 - **Step button finishes partial days** -- completes remaining sub-steps instantly.
 - **`chart._lerp.day = -1`** disables live candle rendering. Set on reset.
-- **`setLiveCandle()` finalizes previous day** -- snaps to final target before transitioning to new open.
+- **`setLiveCandle()` finalizes previous day** -- snaps to final target before transitioning to new open. Sets `_from` and resets `_t = 0` for new cubic segment.
 - **Strategy renderer has no camera** -- manages `_xRange`/`_xCenter` directly.
 - **Strategy legs live in main.js** -- `strategyLegs[]` is local state, not in portfolio.js.
 - **Inline qty editing** in strategy leg rows mutates `leg.qty` directly, bypasses netting.
@@ -467,3 +472,6 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Strategy execution rolls back on partial failure** -- `handleExecStrategy()` snapshots portfolio state before executing legs; if any leg fails, it restores the snapshot.
 - **`speed` variable removed** -- use `SPEED_OPTIONS[speedIndex]` directly. `speedIndex` is the single source of truth for simulation speed.
 - **`worldToScreenX`/`screenToWorldX`** -- scalar camera methods in `shared-camera.js` avoid object allocation. chart.js uses these with fallback to `worldToScreen().x` for backwards compatibility.
+- **Strategy caches invalidate by key** -- `_cache` and `_summaryCache` use string keys from inputs. Changing legs, vol, rate, evalDay, zoom, or greek toggles auto-invalidates. Do not manually clear caches; they self-manage.
+- **`_precomputeLegs` / `_legPnlFast` / `_legGreeksFast`** -- standalone functions (not class methods) that precompute per-leg entry values once. The old `_legPnl`, `_totalPnl`, `_legGreeks`, `_totalGreeksAll` instance methods have been removed.
+- **No hardcoded colors in JS** -- chart.js and strategy.js use `_PALETTE` and `_r()` for all colors. CSS slider-track fallbacks in styles.css are the only remaining hardcoded rgba values (defensive fallback for when shared-tokens.js hasn't loaded).

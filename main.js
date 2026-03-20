@@ -353,7 +353,7 @@ function frame(now) {
                 // to prevent burst catch-up after tab was backgrounded
                 lastTickTime = Math.max(lastTickTime + tickInterval, now - tickInterval);
                 chart.setLiveCandle(sim._partial);
-                dirty = true;
+                if (!strategyMode) dirty = true;
             }
         }
 
@@ -368,7 +368,7 @@ function frame(now) {
             while (sim.substepsDone < targetSteps) {
                 sim.substep();
                 chart.setLiveCandle(sim._partial);
-                dirty = true;
+                if (!strategyMode) dirty = true;
             }
             // All sub-steps done — finalize the day
             if (sim.dayComplete) {
@@ -388,7 +388,8 @@ function frame(now) {
         Math.abs(L.high  - L._targetHigh)  > 0.001 ||
         Math.abs(L.low   - L._targetLow)   > 0.001
     )) {
-        dirty = true;
+        // Live candle lerp only affects chart, not strategy
+        if (!strategyMode) dirty = true;
     }
 
     // Check if strategy renderer flagged dirty from wheel zoom
