@@ -588,7 +588,7 @@ export class StrategyRenderer {
     _drawZeroLine(ctx, plotX, plotW, pnlToPixel) {
         const y0 = pnlToPixel(0);
         ctx.save();
-        ctx.strokeStyle = '#A8A09899';
+        ctx.strokeStyle = _r(_PALETTE.light.textMuted, 0.6);
         ctx.lineWidth   = 1.5;
         ctx.beginPath();
         ctx.moveTo(plotX, y0);
@@ -716,7 +716,7 @@ export class StrategyRenderer {
 
     _drawGrid(ctx, plotX, plotY, plotW, plotH, xMin, xMax, yLo, yHi, xToPixel, pnlToPixel) {
         ctx.save();
-        ctx.strokeStyle = '#A8A09826';
+        ctx.strokeStyle = _r(_PALETTE.light.textMuted, 0.15);
         ctx.lineWidth   = 1;
 
         // Horizontal grid lines (5 divisions)
@@ -802,7 +802,7 @@ export class StrategyRenderer {
         for (const [key, meta] of Object.entries(GREEK_META)) {
             items.push({
                 label:  meta.label,
-                color:  clrs[key] || '#888',
+                color:  clrs[key] || _PALETTE.light.textMuted,
                 active: !!(greekToggles && greekToggles[key]),
                 key:    key,
             });
@@ -820,8 +820,8 @@ export class StrategyRenderer {
         const isDark = document.documentElement.dataset.theme === 'dark';
 
         ctx.save();
-        ctx.fillStyle   = isDark ? 'rgba(12,11,9,0.55)' : 'rgba(240,235,228,0.75)';
-        ctx.strokeStyle = isDark ? 'rgba(168,160,152,0.3)' : 'rgba(168,160,152,0.4)';
+        ctx.fillStyle   = isDark ? _r(_PALETTE.dark.canvas, 0.55) : _r(_PALETTE.light.canvas, 0.75);
+        ctx.strokeStyle = _r(_PALETTE.light.textMuted, isDark ? 0.3 : 0.4);
         ctx.lineWidth   = 1;
         _roundRect(ctx, lx, ly, boxW, legendH, 6);
         ctx.fill();

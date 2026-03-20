@@ -574,7 +574,7 @@ export class ChartRenderer {
 
             ctx.fillStyle = palette.accent;
             ctx.fillRect(priceLabelX, priceLabelY, priceLabelW, priceLabelH);
-            ctx.fillStyle = '#FFFFFF';
+            ctx.fillStyle = palette.light.canvas;
             ctx.font        = `11px var(--font-mono, monospace)`;
             ctx.textAlign   = 'center';
             ctx.textBaseline = 'middle';
@@ -598,7 +598,7 @@ export class ChartRenderer {
 
                 ctx.fillStyle = palette.accent;
                 ctx.fillRect(dayLabelX, dayLabelY, dayLabelW, dayLabelH);
-                ctx.fillStyle = '#FFFFFF';
+                ctx.fillStyle = palette.light.canvas;
                 ctx.font        = `11px var(--font-mono, monospace)`;
                 ctx.textAlign   = 'center';
                 ctx.textBaseline = 'middle';
