@@ -38,6 +38,7 @@ export function cacheDOMElements($) {
     $.totalPnl          = document.getElementById('total-pnl');
     $.marginStatus      = document.getElementById('margin-status');
     $.borrowCostDisplay = document.getElementById('borrow-cost');
+    $.dividendDisplay   = document.getElementById('dividend-income');
     $.greeksAggregate = document.getElementById('greeks-aggregate');
     $.greekDelta      = document.getElementById('greek-delta');
     $.greekGamma      = document.getElementById('greek-gamma');
@@ -52,7 +53,7 @@ export function cacheDOMElements($) {
     $.advancedSection = document.getElementById('advanced-section');
     $.resetBtn        = document.getElementById('reset-btn');
     $.sliders = {};
-    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR','borrowSpread']) {
+    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR','borrowSpread','q']) {
         $.sliders[p]         = document.getElementById('slider-' + p);
         $.sliders[p + 'Val'] = document.getElementById('slider-' + p + '-val');
     }
@@ -161,7 +162,7 @@ export function bindEvents($, handlers) {
         if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
     });
 
-    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR','borrowSpread']) {
+    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR','borrowSpread','q']) {
         const slider  = $.sliders[p];
         const valSpan = $.sliders[p + 'Val'];
         if (!slider) continue;
@@ -467,7 +468,7 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
 export function syncSettingsUI($, sim) {
     if (!sim || !sim.params) return;
     if (sim.presetIndex != null) $.presetSelect.selectedIndex = sim.presetIndex;
-    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR','borrowSpread']) {
+    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR','borrowSpread','q']) {
         const slider  = $.sliders[p];
         const valSpan = $.sliders[p + 'Val'];
         if (!slider || sim.params[p] == null) continue;

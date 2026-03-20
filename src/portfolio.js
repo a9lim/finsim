@@ -12,6 +12,9 @@ import {
     SHORT_OPTION_MARGIN_PCT,
     BOND_FACE_VALUE,
     TRADING_DAYS_PER_YEAR,
+    MIN_HALF_SPREAD,
+    SPREAD_PCT,
+    MONEYNESS_SPREAD_WEIGHT,
 } from './config.js';
 
 import { priceAmerican, computeGreeks } from './pricing.js';
@@ -30,6 +33,7 @@ export const portfolio = {
     strategies:[],  // { name, legs: [{ type, side, qty, strike?, expiryDay? }] }
     closedBorrowCost: 0, // cumulative borrow cost from closed positions
     marginDebitCost:  0, // cumulative interest on negative cash (margin debit)
+    totalDividends:   0, // cumulative net dividend income/cost
 };
 
 // Auto-increment counters (not exported — internal)
@@ -53,6 +57,7 @@ export function resetPortfolio(capital) {
     portfolio.strategies     = [];
     portfolio.closedBorrowCost = 0;
     portfolio.marginDebitCost  = 0;
+    portfolio.totalDividends   = 0;
     _nextPositionId = 1;
     _nextOrderId    = 1;
 }
@@ -83,7 +88,7 @@ function _fillPrice(type, side, mid, currentPrice, strike, currentVol) {
  * Bid/ask for stock or bond (K = currentPrice, moneyness = 0).
  */
 export function computeBidAsk(mid, currentPrice, currentVol) {
-    const halfSpread = Math.max(0.025, mid * 0.01 * (1 + currentVol));
+    const halfSpread = Math.max(MIN_HALF_SPREAD, mid * SPREAD_PCT * (1 + currentVol));
     return { bid: Math.max(0, mid - halfSpread), ask: mid + halfSpread };
 }
 
@@ -92,7 +97,7 @@ export function computeBidAsk(mid, currentPrice, currentVol) {
  */
 export function computeOptionBidAsk(mid, currentPrice, strike, currentVol) {
     const moneyness = Math.abs(Math.log(currentPrice / strike));
-    const halfSpread = Math.max(0.025, mid * 0.01 * (1 + currentVol) + 0.05 * moneyness);
+    const halfSpread = Math.max(MIN_HALF_SPREAD, mid * SPREAD_PCT * (1 + currentVol) + MONEYNESS_SPREAD_WEIGHT * moneyness);
     return { bid: Math.max(0, mid - halfSpread), ask: mid + halfSpread };
 }
 
@@ -109,13 +114,13 @@ export function computeOptionBidAsk(mid, currentPrice, strike, currentVol) {
  * @param {number} currentDay
  * @returns {boolean} true if the trade would be allowed
  */
-function _checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay) {
+function _checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay, q) {
     const newCash = portfolio.cash + cashDelta;
     if (newCash >= 0) return true; // no debit, no margin concern
 
     // Equity ≈ cash + positions MTM. A buy adds position value ≈ cost, so
     // equity is roughly unchanged. Compute current equity as the baseline.
-    const equity = portfolioValue(currentPrice, currentVol, currentRate, currentDay);
+    const equity = portfolioValue(currentPrice, currentVol, currentRate, currentDay, q);
 
     // Initial margin: equity must cover REG_T_MARGIN of the debit
     return equity >= REG_T_MARGIN * Math.abs(newCash);
@@ -152,7 +157,7 @@ function _marginForShort(type, qty, fillPrice, currentPrice, currentVol, current
 /**
  * Compute maintenance margin for a single short position (proposed or actual).
  */
-function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay) {
+function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q) {
     switch (type) {
         case 'stock':
             return MAINTENANCE_MARGIN * currentPrice * absQty;
@@ -166,7 +171,7 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
             const dte = expiryDay != null
                 ? Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0) : 0;
             const optMid = dte > 0
-                ? priceAmerican(currentPrice, strike, dte, currentRate, currentVol, type === 'put')
+                ? priceAmerican(currentPrice, strike, dte, currentRate, currentVol, type === 'put', q)
                 : Math.max(0, type === 'call' ? currentPrice - strike : strike - currentPrice);
             return Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
         }
@@ -194,14 +199,14 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
  */
 function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
                             currentPrice, currentVol, currentRate, currentDay,
-                            skipIdx) {
+                            skipIdx, q) {
     let equity = portfolio.cash + cashDelta;
     let required = shortMaintenance;
 
     for (let i = 0; i < portfolio.positions.length; i++) {
         if (i === skipIdx) continue;
         const pos = portfolio.positions[i];
-        equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay);
+        equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
 
         if (pos.qty < 0) {
             const absQty = Math.abs(pos.qty);
@@ -219,7 +224,7 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
                 }
                 case 'call':
                 case 'put': {
-                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, pos.type === 'put');
+                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, pos.type === 'put', q);
                     required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                     break;
                 }
@@ -259,12 +264,12 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
 export function executeMarketOrder(
     type, side, qty,
     currentPrice, currentVol, currentRate, currentDay,
-    strike, expiryDay, strategyName
+    strike, expiryDay, strategyName, q
 ) {
     // Convert to signed qty: long = +qty, short = -qty
     const signedQty = side === 'long' ? qty : -qty;
 
-    const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay);
+    const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
     const fill = _fillPrice(type, side, mid, currentPrice, strike, currentVol);
 
     // Find existing position of same type+strike+expiry for netting
@@ -308,8 +313,8 @@ export function executeMarketOrder(
                 cashDelta += proceeds - margin;
                 // Post-trade margin check (skip existing long being closed)
                 const shortMtm = -openingShortQty * mid;
-                const shortMaint = _maintenanceForShort(type, openingShortQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay);
-                if (!_postTradeMarginOk(cashDelta, shortMtm, shortMaint, currentPrice, currentVol, currentRate, currentDay, existingIdx)) return null;
+                const shortMaint = _maintenanceForShort(type, openingShortQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
+                if (!_postTradeMarginOk(cashDelta, shortMtm, shortMaint, currentPrice, currentVol, currentRate, currentDay, existingIdx, q)) return null;
             }
 
         } else if (oldQty < 0 && signedQty > 0) {
@@ -332,14 +337,14 @@ export function executeMarketOrder(
             const longCost = fill * openingLongQty;
 
             cashDelta = returnedMargin - buybackCost - longCost;
-            if (!_checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay)) return null;
+            if (!_checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay, q)) return null;
 
         } else if (signedQty > 0) {
             // Extending a long position (oldQty >= 0)
             // Allowed on margin -- cash can go negative
             const cost = fill * signedQty;
             cashDelta = -cost;
-            if (!_checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay)) return null;
+            if (!_checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay, q)) return null;
 
         } else {
             // Extending a short position (oldQty <= 0, signedQty < 0)
@@ -354,8 +359,8 @@ export function executeMarketOrder(
             // Post-trade margin check: combined position (old + new)
             const totalAbsQty = Math.abs(oldQty) + absQty;
             const combinedMtm = -totalAbsQty * mid;
-            const combinedMaint = _maintenanceForShort(type, totalAbsQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay);
-            if (!_postTradeMarginOk(cashDelta, combinedMtm, combinedMaint, currentPrice, currentVol, currentRate, currentDay, existingIdx)) return null;
+            const combinedMaint = _maintenanceForShort(type, totalAbsQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
+            if (!_postTradeMarginOk(cashDelta, combinedMtm, combinedMaint, currentPrice, currentVol, currentRate, currentDay, existingIdx, q)) return null;
             existing._reservedMargin = (existing._reservedMargin || 0) + margin;
         }
 
@@ -399,7 +404,7 @@ export function executeMarketOrder(
         // Allowed on margin -- cash can go negative (up to initial margin limit)
         const cost = fill * qty;
         cashDelta = -cost;
-        if (!_checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay)) return null;
+        if (!_checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRate, currentDay, q)) return null;
     } else {
         const proceeds = fill * qty;
         margin = _marginForShort(
@@ -410,8 +415,8 @@ export function executeMarketOrder(
         cashDelta = proceeds - margin;
         // Verify post-trade equity exceeds maintenance margin
         const shortMtm = -qty * mid;
-        const shortMaint = _maintenanceForShort(type, qty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay);
-        if (!_postTradeMarginOk(cashDelta, shortMtm, shortMaint, currentPrice, currentVol, currentRate, currentDay)) return null;
+        const shortMaint = _maintenanceForShort(type, qty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
+        if (!_postTradeMarginOk(cashDelta, shortMtm, shortMaint, currentPrice, currentVol, currentRate, currentDay, undefined, q)) return null;
     }
 
     portfolio.cash += cashDelta;
@@ -495,7 +500,7 @@ export function cancelOrder(orderId) {
  *
  * @returns {Object[]} Array of filled position objects.
  */
-export function checkPendingOrders(currentPrice, currentVol, currentRate, currentDay) {
+export function checkPendingOrders(currentPrice, currentVol, currentRate, currentDay, q) {
     const filled = [];
     const remaining = [];
 
@@ -517,7 +522,7 @@ export function checkPendingOrders(currentPrice, currentVol, currentRate, curren
             const pos = executeMarketOrder(
                 order.type, order.side, order.qty,
                 currentPrice, currentVol, currentRate, currentDay,
-                order.strike, order.expiryDay, order.strategyName
+                order.strike, order.expiryDay, order.strategyName, q
             );
             if (pos) filled.push(pos);
             // If order could not be filled (null), silently drop it.
@@ -541,13 +546,13 @@ export function checkPendingOrders(currentPrice, currentVol, currentRate, curren
  *
  * @returns {boolean} true if position was found and closed.
  */
-export function closePosition(positionId, currentPrice, currentVol, currentRate, currentDay) {
+export function closePosition(positionId, currentPrice, currentVol, currentRate, currentDay, q) {
     const idx = portfolio.positions.findIndex(p => p.id === positionId);
     if (idx === -1) return false;
 
     const pos = portfolio.positions[idx];
     const absQty = Math.abs(pos.qty);
-    const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay);
+    const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
 
     if (pos.qty > 0) {
         const fill = _fillPrice(pos.type, 'short', mid, currentPrice, pos.strike, currentVol);
@@ -585,7 +590,7 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
  * @param {number}  [currentRate] - If provided, checks initial margin on debit
  * @returns {Object|null} The resulting stock position (calls) or null (puts / error).
  */
-export function exerciseOption(positionId, currentPrice, currentDay, currentVol, currentRate) {
+export function exerciseOption(positionId, currentPrice, currentDay, currentVol, currentRate, q) {
     const idx = portfolio.positions.findIndex(p => p.id === positionId);
     if (idx === -1) return null;
 
@@ -601,7 +606,7 @@ export function exerciseOption(positionId, currentPrice, currentDay, currentVol,
         // Allowed on margin -- cash can go negative (up to initial margin limit)
         const cost = pos.strike * absQty;
         if (currentVol != null && currentRate != null) {
-            if (!_checkInitialMarginDebit(-cost, currentPrice, currentVol, currentRate, currentDay)) return null;
+            if (!_checkInitialMarginDebit(-cost, currentPrice, currentVol, currentRate, currentDay, q)) return null;
         }
         portfolio.cash -= cost;
         stockPos = {
@@ -672,6 +677,36 @@ export function chargeBorrowInterest(currentPrice, currentVol, currentRate, borr
     }
 
     return totalCharged;
+}
+
+// ---------------------------------------------------------------------------
+// processDividends
+// ---------------------------------------------------------------------------
+
+/**
+ * Pay quarterly dividends on stock positions.
+ * Called every 63 trading days (aligned with chain expiry cycle).
+ * Long stock receives cash; short stock pays cash.
+ *
+ * @param {number} currentPrice - Spot price S
+ * @param {number} q            - Continuous dividend yield (annualized)
+ * @returns {number} Net dividend payment (positive = received, negative = paid)
+ */
+export function processDividends(currentPrice, q) {
+    if (!q || q <= 0) return 0;
+    const dividendPerShare = currentPrice * q / 4; // quarterly
+    let net = 0;
+
+    for (const pos of portfolio.positions) {
+        if (pos.type !== 'stock') continue;
+        // pos.qty is signed: positive = long (receive), negative = short (pay)
+        const payment = pos.qty * dividendPerShare;
+        portfolio.cash += payment;
+        net += payment;
+    }
+
+    portfolio.totalDividends = (portfolio.totalDividends || 0) + net;
+    return net;
 }
 
 // ---------------------------------------------------------------------------
@@ -768,7 +803,7 @@ export function saveStrategy(name, legs) {
  * @param {number} currentDay
  * @returns {Object[]} Array of filled position objects (nulls filtered out).
  */
-export function executeStrategy(strategyName, currentPrice, currentVol, currentRate, currentDay) {
+export function executeStrategy(strategyName, currentPrice, currentVol, currentRate, currentDay, q) {
     const strategy = portfolio.strategies.find(s => s.name === strategyName);
     if (!strategy) return [];
 
@@ -777,7 +812,7 @@ export function executeStrategy(strategyName, currentPrice, currentVol, currentR
         const pos = executeMarketOrder(
             leg.type, leg.side, leg.qty,
             currentPrice, currentVol, currentRate, currentDay,
-            leg.strike, leg.expiryDay, strategyName
+            leg.strike, leg.expiryDay, strategyName, q
         );
         if (pos) positions.push(pos);
     }
@@ -794,10 +829,10 @@ export function executeStrategy(strategyName, currentPrice, currentVol, currentR
  *
  * @returns {number} Total portfolio value in dollars.
  */
-export function portfolioValue(currentPrice, currentVol, currentRate, currentDay) {
+export function portfolioValue(currentPrice, currentVol, currentRate, currentDay, q) {
     let total = portfolio.cash;
     for (const pos of portfolio.positions) {
-        total += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay);
+        total += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
     }
     return total;
 }
@@ -814,7 +849,7 @@ export function portfolioValue(currentPrice, currentVol, currentRate, currentDay
  *
  * @returns {number} Total margin dollars required.
  */
-export function marginRequirement(currentPrice, currentVol, currentRate, currentDay) {
+export function marginRequirement(currentPrice, currentVol, currentRate, currentDay, q) {
     let total = 0;
 
     for (const pos of portfolio.positions) {
@@ -839,7 +874,7 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
             case 'call':
             case 'put': {
                 const isPut  = pos.type === 'put';
-                const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut);
+                const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q);
                 total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                 break;
             }
@@ -865,12 +900,12 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
  *
  * @returns {{ triggered: boolean, equity: number, required: number }}
  */
-export function checkMargin(currentPrice, currentVol, currentRate, currentDay) {
+export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q) {
     let equity = portfolio.cash;
     let required = 0;
 
     for (const pos of portfolio.positions) {
-        equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay);
+        equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
 
         if (pos.qty < 0) {
             const absQty = Math.abs(pos.qty);
@@ -889,7 +924,7 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay) {
                 case 'call':
                 case 'put': {
                     const isPut = pos.type === 'put';
-                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut);
+                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q);
                     required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                     break;
                 }
@@ -912,10 +947,10 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay) {
 /**
  * Close all open positions at current market prices.
  */
-export function liquidateAll(currentPrice, currentVol, currentRate, currentDay) {
+export function liquidateAll(currentPrice, currentVol, currentRate, currentDay, q) {
     while (portfolio.positions.length > 0) {
         const pos = portfolio.positions[portfolio.positions.length - 1];
-        closePosition(pos.id, currentPrice, currentVol, currentRate, currentDay);
+        closePosition(pos.id, currentPrice, currentVol, currentRate, currentDay, q);
     }
 }
 
@@ -931,7 +966,7 @@ export function liquidateAll(currentPrice, currentVol, currentRate, currentDay) 
  *
  * @returns {{ delta: number, gamma: number, theta: number, vega: number, rho: number }}
  */
-export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDay) {
+export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDay, q) {
     let delta = 0, gamma = 0, theta = 0, vega = 0, rho = 0;
 
     for (const pos of portfolio.positions) {
@@ -941,7 +976,7 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
             ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
             : 0;
         const isPut  = pos.type === 'put';
-        const greeks = computeGreeks(currentPrice, pos.strike, dte, currentRate, currentVol, isPut);
+        const greeks = computeGreeks(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q);
 
         // qty is already signed: positive = long, negative = short
         const w = pos.qty;

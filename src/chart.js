@@ -9,6 +9,10 @@
    =================================================== */
 
 import { fmtRelDay } from './format-helpers.js';
+import {
+    CHART_Y_AXIS_W, CHART_Y_LABEL_W, CHART_X_AXIS_H, CHART_PADDING_T,
+    CHART_SLOT_PX, CHART_BODY_RATIO,
+} from './config.js';
 
 export class ChartRenderer {
     /**
@@ -33,15 +37,15 @@ export class ChartRenderer {
         this._segmentDur = 0.25; // seconds per substep (updated by setSubstepInterval)
         this._lastFrameTime = 0;
 
-        // Axis gutter sizes (CSS px)
-        this.Y_AXIS_W  = 64;   // right-side Y-axis label area
-        this.Y_LABEL_W = 18;   // left-side rotated Y-axis label
-        this.X_AXIS_H  = 32;   // bottom X-axis label area
-        this.PADDING_T = 24;   // top padding above chart area
+        // Axis gutter sizes (CSS px) — from config.js
+        this.Y_AXIS_W  = CHART_Y_AXIS_W;
+        this.Y_LABEL_W = CHART_Y_LABEL_W;
+        this.X_AXIS_H  = CHART_X_AXIS_H;
+        this.PADDING_T = CHART_PADDING_T;
 
-        // Candle sizing: each day occupies SLOT_PX screen pixels at zoom=1
-        this.SLOT_PX = 12;     // px per day at zoom=1 (body + gap)
-        this.BODY_RATIO = 0.6; // fraction of slot that is candle body
+        // Candle sizing — from config.js
+        this.SLOT_PX    = CHART_SLOT_PX;
+        this.BODY_RATIO = CHART_BODY_RATIO;
 
         this._dpr = window.devicePixelRatio || 1;
 

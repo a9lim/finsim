@@ -8,7 +8,7 @@
  * Exports: buildChainSkeleton, priceChainExpiry, generateStrikes, ExpiryManager
  */
 
-import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR } from './config.js';
+import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT } from './config.js';
 import { priceAmerican, computeGreeks } from './pricing.js';
 import { computeOptionBidAsk } from './portfolio.js';
 
@@ -16,8 +16,7 @@ import { computeOptionBidAsk } from './portfolio.js';
 // Expiry management — rolling window of expiry dates
 // ---------------------------------------------------------------------------
 
-const EXPIRY_CYCLE = 63; // trading days per quarter (approximate)
-const EXPIRY_COUNT = 8;  // number of active expiries to maintain
+const EXPIRY_CYCLE = QUARTERLY_CYCLE;
 
 /**
  * Persistent rolling manager for option/bond expiry dates.
@@ -119,16 +118,18 @@ export function buildChainSkeleton(S, currentDay, expiries) {
  * @param {number} r     - Risk-free rate
  * @param {{ day: number, dte: number, strikes: number[] }} expiry - skeleton entry
  * @param {boolean} [greeks=false] - compute full Greeks (delta/gamma/theta/vega/rho)
+ * @param {number} [q=0] - Continuous dividend yield
  * @returns {{ day: number, dte: number, options: Array }}
  */
-export function priceChainExpiry(S, v, r, expiry, greeks) {
+export function priceChainExpiry(S, v, r, expiry, greeks, q) {
+    q = q || 0;
     const sigma = Math.sqrt(Math.max(v, 0));
     const T = expiry.dte / TRADING_DAYS_PER_YEAR;
 
     const options = expiry.strikes.map(K => {
         if (greeks) {
-            const callG = computeGreeks(S, K, T, r, sigma, false);
-            const putG  = computeGreeks(S, K, T, r, sigma, true);
+            const callG = computeGreeks(S, K, T, r, sigma, false, q);
+            const putG  = computeGreeks(S, K, T, r, sigma, true, q);
             const callBA = computeOptionBidAsk(callG.price, S, K, sigma);
             const putBA  = computeOptionBidAsk(putG.price,  S, K, sigma);
             return {
@@ -142,8 +143,8 @@ export function priceChainExpiry(S, v, r, expiry, greeks) {
             };
         }
         // Price-only path: 1 call per option type (not 9)
-        const callP = priceAmerican(S, K, T, r, sigma, false);
-        const putP  = priceAmerican(S, K, T, r, sigma, true);
+        const callP = priceAmerican(S, K, T, r, sigma, false, q);
+        const putP  = priceAmerican(S, K, T, r, sigma, true, q);
         const callBA = computeOptionBidAsk(callP, S, K, sigma);
         const putBA  = computeOptionBidAsk(putP,  S, K, sigma);
         return {
