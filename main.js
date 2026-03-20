@@ -10,7 +10,7 @@ import { Simulation } from './src/simulation.js';
 import { buildChain, ExpiryManager } from './src/chain.js';
 import {
     portfolio, resetPortfolio, checkPendingOrders, processExpiry,
-    checkMargin, aggregateGreeks,
+    chargeBorrowInterest, checkMargin, aggregateGreeks,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
     saveStrategy, executeStrategy, computeBidAsk,
@@ -412,6 +412,7 @@ function _onDayComplete() {
             showToast(side + ' ' + Math.abs(pos.qty) + ' ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
         }
     }
+    chargeBorrowInterest(sim.S, vol, sim.r, sim.borrowSpread, sim.day);
     processExpiry(sim.day, sim.S, sim.day);
 
     // Fire dynamic events
@@ -919,6 +920,7 @@ function _simSettingsObj() {
             a:      sim.a,
             b:      sim.b,
             sigmaR: sim.sigmaR,
+            borrowSpread: sim.borrowSpread,
         },
         initialCapital: portfolio.initialCapital,
     };

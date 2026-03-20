@@ -17,7 +17,8 @@ export const PARAM_RANGES = {
     sigmaJ: { min: 0.005, max: 0.25 },
     a:      { min: 0.01,  max: 2.0 },
     b:      { min: -0.05, max: 0.20 },
-    sigmaR: { min: 0.001, max: 0.050 },
+    sigmaR:       { min: 0.001, max: 0.050 },
+    borrowSpread: { min: 0.0,   max: 5.0 },
 };
 
 const MAX_LOG = 20;

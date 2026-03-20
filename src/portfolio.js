@@ -28,6 +28,7 @@ export const portfolio = {
                     //   qty > 0 = long, qty < 0 = short
     orders:    [],  // { id, type, side, qty, orderType, triggerPrice, strike?, expiryDay?, strategyName? }
     strategies:[],  // { name, legs: [{ type, side, qty, strike?, expiryDay? }] }
+    closedBorrowCost: 0, // cumulative borrow cost from closed positions
 };
 
 // Auto-increment counters (not exported — internal)
@@ -49,6 +50,7 @@ export function resetPortfolio(capital) {
     portfolio.positions      = [];
     portfolio.orders         = [];
     portfolio.strategies     = [];
+    portfolio.closedBorrowCost = 0;
     _nextPositionId = 1;
     _nextOrderId    = 1;
 }
@@ -266,6 +268,7 @@ export function executeMarketOrder(
 
         if (newQty === 0) {
             // Position fully closed
+            if (existing.borrowCost) portfolio.closedBorrowCost += existing.borrowCost;
             portfolio.positions.splice(existingIdx, 1);
             existing.fillPrice = fill;
             return existing;
@@ -276,6 +279,11 @@ export function executeMarketOrder(
         if ((oldQty > 0 && newQty < 0) || (oldQty < 0 && newQty > 0)) {
             existing.entryPrice = fill;
             existing.entryDay = currentDay;
+            // Finalize borrow cost from the old short side
+            if (existing.borrowCost) {
+                portfolio.closedBorrowCost += existing.borrowCost;
+                existing.borrowCost = 0;
+            }
         }
         existing.qty = newQty;
         existing.fillPrice = fill;
@@ -458,6 +466,7 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
         portfolio.cash += returnedMargin - fill * absQty;
     }
 
+    if (pos.borrowCost) portfolio.closedBorrowCost += pos.borrowCost;
     portfolio.positions.splice(idx, 1);
     return true;
 }
@@ -512,6 +521,48 @@ export function exerciseOption(positionId, currentPrice, currentDay) {
 }
 
 // ---------------------------------------------------------------------------
+// chargeBorrowInterest
+// ---------------------------------------------------------------------------
+
+/**
+ * Charge daily borrow interest on short stock and bond positions.
+ * dailyCost = |qty| * price * (max(r,0) + borrowSpread * sigma) / 252
+ *
+ * @param {number} currentPrice - Spot price S
+ * @param {number} currentVol   - sqrt(v), NOT variance
+ * @param {number} currentRate  - Risk-free rate r
+ * @param {number} borrowSpread - Borrow spread factor k
+ * @param {number} currentDay   - Current simulation day (for bond pricing)
+ * @returns {number} Total interest charged this day
+ */
+export function chargeBorrowInterest(currentPrice, currentVol, currentRate, borrowSpread, currentDay) {
+    let totalCharged = 0;
+    const annualRate = Math.max(currentRate, 0) + borrowSpread * currentVol;
+    const dailyRate = annualRate / TRADING_DAYS_PER_YEAR;
+
+    for (const pos of portfolio.positions) {
+        if (pos.qty >= 0) continue;
+        if (pos.type !== 'stock' && pos.type !== 'bond') continue;
+
+        let notional;
+        if (pos.type === 'stock') {
+            notional = Math.abs(pos.qty) * currentPrice;
+        } else {
+            const T = Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0);
+            const bondPrice = BOND_FACE_VALUE * Math.exp(-currentRate * T);
+            notional = Math.abs(pos.qty) * bondPrice;
+        }
+
+        const cost = notional * dailyRate;
+        portfolio.cash -= cost;
+        pos.borrowCost = (pos.borrowCost || 0) + cost;
+        totalCharged += cost;
+    }
+
+    return totalCharged;
+}
+
+// ---------------------------------------------------------------------------
 // processExpiry
 // ---------------------------------------------------------------------------
 
@@ -547,6 +598,7 @@ export function processExpiry(expiryDay, currentPrice, currentDay) {
                 );
                 portfolio.cash += returnedMargin - BOND_FACE_VALUE * Math.abs(pos.qty);
             }
+            if (pos.borrowCost) portfolio.closedBorrowCost += pos.borrowCost;
             const idx = portfolio.positions.findIndex(p => p.id === pos.id);
             if (idx !== -1) portfolio.positions.splice(idx, 1);
             expired.push(pos);

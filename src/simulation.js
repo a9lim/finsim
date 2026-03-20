@@ -39,6 +39,7 @@ export class Simulation {
         this.a      = p.a;       // mean-reversion speed (rate)
         this.b      = p.b;       // long-run rate
         this.sigmaR = p.sigmaR;  // rate vol
+        this.borrowSpread = p.borrowSpread; // short borrow spread factor
 
         // State
         this.day     = 0;

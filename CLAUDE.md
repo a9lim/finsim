@@ -40,7 +40,7 @@ colors.js               59 lines  Financial color aliases (_PALETTE.up/down/call
                                    bond/delta/gamma/theta/vega/rho), CSS var injection,
                                    freezes _PALETTE
 src/
-  config.js             26 lines  Named constants and PRESETS array (5 market regimes)
+  config.js             26 lines  Named constants and PRESETS array (5 static + 2 dynamic regimes)
   format-helpers.js     35 lines  Shared formatting: fmtDollar(), fmtNum(), pnlClass(),
                                    fmtDte(), posTypeLabel(). Single source for UI modules.
   position-value.js    ~40 lines  Unified position valuation: computePositionValue(),
@@ -64,8 +64,9 @@ src/
                                    Exports: priceAmerican, computeGreeks
   chain.js             158 lines  ExpiryManager (rolling 8-expiry window, 21-day cycle),
                                    generateStrikes() (internal), buildChain()
-  portfolio.js         730 lines  Signed-qty positions, market/limit/stop orders, netting,
-                                   strategy groups, cash/margin, processExpiry() (options + bonds),
+  portfolio.js         770 lines  Signed-qty positions, market/limit/stop orders, netting,
+                                   strategy groups, cash/margin, chargeBorrowInterest() (short
+                                   stock/bond daily borrow cost), processExpiry() (options + bonds),
                                    exerciseOption(), aggregateGreeks(), liquidateAll(),
                                    computeBidAsk(), computeOptionBidAsk()
   chart.js             650 lines  ChartRenderer: log Y-axis OHLC candles, auto-scale, grid,
@@ -94,10 +95,10 @@ main.js
   |- src/history-buffer.js (HistoryBuffer -- no imports)
   |- src/chain.js         (buildChain, ExpiryManager -- imports pricing, portfolio, config)
   |- src/portfolio.js     (portfolio, resetPortfolio, executeMarketOrder, computeBidAsk,
-  |                         checkPendingOrders, processExpiry, checkMargin, aggregateGreeks,
-  |                         closePosition, exerciseOption, liquidateAll, placePendingOrder,
-  |                         cancelOrder, saveStrategy, executeStrategy
-  |                         -- imports pricing, config, position-value)
+  |                         checkPendingOrders, chargeBorrowInterest, processExpiry,
+  |                         checkMargin, aggregateGreeks, closePosition, exerciseOption,
+  |                         liquidateAll, placePendingOrder, cancelOrder, saveStrategy,
+  |                         executeStrategy -- imports pricing, config, position-value)
   |- src/events.js      (EventEngine, OFFLINE_EVENTS, PARAM_RANGES -- no imports)
   |- src/llm.js         (LLMEventSource -- imports events.js)
   |- src/chart.js         (ChartRenderer -- no ES6 imports; reads _PALETTE, _r globals)
@@ -119,7 +120,7 @@ main.js
 1. `frame()` calls `sim.beginDay()` -- pushes a partial bar into `sim.history` by reference
 2. Sub-steps paced across tick interval (`tickInterval / INTRADAY_STEPS`). Each `sim.substep()` mutates partial bar in-place
 3. `chart.setLiveCandle(bar)` snaps close to previous sub-step value, lerps toward new target. High/low are water marks of the lerped path
-4. After 16 sub-steps, `sim.finalizeDay()` increments day. `_onDayComplete()` runs `checkPendingOrders()`, `processExpiry()`, `buildChain()`, `checkMargin()`, auto-scroll, UI update
+4. After 16 sub-steps, `sim.finalizeDay()` increments day. `_onDayComplete()` runs `checkPendingOrders()`, `chargeBorrowInterest()`, `processExpiry()`, `buildChain()`, `checkMargin()`, auto-scroll, UI update
 
 ### Instant Tick
 
@@ -159,13 +160,13 @@ Vasicek: `dr = a(b - r)dt + sigmaR * dW3` (independent of dW1, dW2). Rate uncons
 
 ### Market Regime Presets
 
-| Preset | mu | theta | kappa | xi | rho | lambda | muJ | sigmaJ | a | b | sigmaR |
-|--------|-----|-------|-------|----|------|--------|------|--------|-----|------|--------|
-| Calm Bull | 0.08 | 0.04 | 3.0 | 0.3 | -0.5 | 0.5 | -0.02 | 0.03 | 0.5 | 0.04 | 0.005 |
-| Sideways | 0.02 | 0.06 | 2.0 | 0.4 | -0.6 | 1.0 | -0.01 | 0.04 | 0.5 | 0.03 | 0.008 |
-| Volatile | 0.05 | 0.12 | 1.5 | 0.6 | -0.7 | 3.0 | -0.03 | 0.06 | 0.3 | 0.05 | 0.012 |
-| Crisis | -0.10 | 0.25 | 0.5 | 0.8 | -0.85 | 8.0 | -0.08 | 0.10 | 0.2 | 0.02 | 0.020 |
-| Rate Hike | 0.04 | 0.08 | 2.0 | 0.5 | -0.6 | 1.5 | -0.02 | 0.05 | 0.8 | 0.08 | 0.015 |
+| Preset | mu | theta | kappa | xi | rho | lambda | muJ | sigmaJ | a | b | sigmaR | borrowSpread |
+|--------|-----|-------|-------|----|------|--------|------|--------|-----|------|--------|--------------|
+| Calm Bull | 0.08 | 0.04 | 3.0 | 0.3 | -0.5 | 0.5 | -0.02 | 0.03 | 0.5 | 0.04 | 0.005 | 0.5 |
+| Sideways | 0.02 | 0.06 | 2.0 | 0.4 | -0.6 | 1.0 | -0.01 | 0.04 | 0.5 | 0.03 | 0.008 | 0.5 |
+| Volatile | 0.05 | 0.12 | 1.5 | 0.6 | -0.7 | 3.0 | -0.03 | 0.06 | 0.3 | 0.05 | 0.012 | 0.5 |
+| Crisis | -0.10 | 0.25 | 0.5 | 0.8 | -0.85 | 8.0 | -0.08 | 0.10 | 0.2 | 0.02 | 0.020 | 0.5 |
+| Rate Hike | 0.04 | 0.08 | 2.0 | 0.5 | -0.6 | 1.5 | -0.02 | 0.05 | 0.8 | 0.08 | 0.015 | 0.5 |
 
 On reset: `S = 100`, `v = theta`, `r = b`. History cleared, prepopulated, camera repositioned.
 
@@ -254,6 +255,20 @@ Signed qty: `qty > 0` = long, `qty < 0` = short. No `side` field on positions.
 
 Margin call at `equity < marginRequirement` (considers only short positions). Pauses sim, shows overlay.
 
+### Short Borrow Interest
+
+`chargeBorrowInterest()` in portfolio.js charges daily interest on short stock and bond positions:
+
+```
+dailyCost = |qty| * notional * (max(r, 0) + borrowSpread * sigma) / 252
+```
+
+- `borrowSpread` (default 0.5, range [0, 5]) is a sim parameter controllable via slider and events
+- Stock shorts: notional = `|qty| * S`. Bond shorts: notional = `|qty| * 100 * exp(-r * T)`
+- Deducted from `portfolio.cash` daily. Cumulative cost tracked per-position (`pos.borrowCost`) and for closed positions (`portfolio.closedBorrowCost`)
+- Does NOT apply to short options (writing doesn't require borrowing)
+- Called in `_onDayComplete()` before `processExpiry()`
+
 ### Option Expiry
 
 `processExpiry()`: Bonds settle at face value ($100) on maturity. ITM option longs auto-exercised, OTM longs expire worthless, shorts removed with margin returned. Short ITM options are NOT assigned (simplified model).
@@ -281,7 +296,7 @@ Play/pause, speed (1x-16x), step, reset, theme toggle (hidden <=440px), panel to
 - "Left-click: buy / Right-click: sell/short" hint
 
 **Portfolio tab:**
-- Account: Cash, Portfolio Value, Total P&L, Margin Status
+- Account: Cash, Portfolio Value, Total P&L, Margin Status, Borrow Cost
 - Positions with close (X) and exercise (Ex) buttons
 - Strategy positions grouped by name
 - Pending orders with cancel buttons
@@ -299,7 +314,7 @@ Play/pause, speed (1x-16x), step, reset, theme toggle (hidden <=440px), panel to
 
 **Settings tab:**
 - Market Regime preset dropdown
-- Advanced Parameters (11 sliders)
+- Advanced Parameters (12 sliders)
 
 ### Candlestick Chart
 
@@ -440,7 +455,8 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Event deltas are additive and clamped** to `PARAM_RANGES` -- never set absolute values via events.
 - **LLM followup events** now include `headline`, `params`, `magnitude` in the tool schema. Offline followups still resolved via `_getEventById`; LLM followups carry their own data.
 - **`_pendingFollowups` cleared on reset** -- switching presets mid-chain drops all scheduled followups.
-- **Slider ranges expanded globally** -- all 11 parameter sliders have wider min/max than the original presets use. Events can push params to extremes.
+- **Slider ranges expanded globally** -- all 12 parameter sliders have wider min/max than the original presets use. Events can push params to extremes.
+- **`borrowCost` on positions** -- cumulative borrow interest charged to short stock/bond positions. Preserved in `portfolio.closedBorrowCost` when positions close/flip/expire.
 - **`_haptics` must always be guarded** -- use `if (typeof _haptics !== 'undefined') _haptics.trigger(...)`. The global loads from `/shared-haptics.js`; ES6 modules may execute before it's defined.
 - **`generateStrikes` is not exported** from chain.js -- internal helper only.
 - **Strategy execution rolls back on partial failure** -- `handleExecStrategy()` snapshots portfolio state before executing legs; if any leg fails, it restores the snapshot.

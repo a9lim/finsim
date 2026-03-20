@@ -153,7 +153,8 @@ export class LLMEventSource {
               ', rho=' + sim.rho.toFixed(2) + ', lambda=' + sim.lambda.toFixed(1) +
               ', muJ=' + sim.muJ.toFixed(3) + ', sigmaJ=' + sim.sigmaJ.toFixed(3) +
               ', a=' + sim.a.toFixed(2) + ', b=' + sim.b.toFixed(4) +
-              ', sigmaR=' + sim.sigmaR.toFixed(4),
+              ', sigmaR=' + sim.sigmaR.toFixed(4) +
+              ', borrowSpread=' + sim.borrowSpread.toFixed(2),
         ];
 
         const recentEvents = eventLog.length > 0

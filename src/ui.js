@@ -36,6 +36,7 @@ export function cacheDOMElements($) {
     $.portfolioValue    = document.getElementById('portfolio-value');
     $.totalPnl          = document.getElementById('total-pnl');
     $.marginStatus      = document.getElementById('margin-status');
+    $.borrowCostDisplay = document.getElementById('borrow-cost');
     $.greeksAggregate = document.getElementById('greeks-aggregate');
     $.greekDelta      = document.getElementById('greek-delta');
     $.greekGamma      = document.getElementById('greek-gamma');
@@ -48,7 +49,7 @@ export function cacheDOMElements($) {
     $.advancedSection = document.getElementById('advanced-section');
     $.resetBtn        = document.getElementById('reset-btn');
     $.sliders = {};
-    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR']) {
+    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR','borrowSpread']) {
         $.sliders[p]         = document.getElementById('slider-' + p);
         $.sliders[p + 'Val'] = document.getElementById('slider-' + p + '-val');
     }
@@ -156,7 +157,7 @@ export function bindEvents($, handlers) {
         if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
     });
 
-    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR']) {
+    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR','borrowSpread']) {
         const slider  = $.sliders[p];
         const valSpan = $.sliders[p + 'Val'];
         if (!slider) continue;
@@ -362,7 +363,7 @@ export function updateStockBondPrices($, spot, rate, chain) {
 export function syncSettingsUI($, sim) {
     if (!sim || !sim.params) return;
     if (sim.presetIndex != null) $.presetSelect.selectedIndex = sim.presetIndex;
-    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR']) {
+    for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR','borrowSpread']) {
         const slider  = $.sliders[p];
         const valSpan = $.sliders[p + 'Val'];
         if (!slider || sim.params[p] == null) continue;
@@ -702,6 +703,7 @@ export function wireInfoTips($) {
         'slider-a':      { title: 'Rate Reversion (a)', body: 'Speed at which the risk-free rate reverts to its long-run level.' },
         'slider-b':      { title: 'Rate Mean (b)', body: 'Long-run equilibrium level for the risk-free interest rate.' },
         'slider-sigmaR': { title: 'Rate Vol (sigmaR)', body: 'Volatility of the interest rate process.' },
+        'slider-borrowSpread': { title: 'Borrow Spread (k)', body: 'Volatility scaling factor for short borrow cost. Daily charge = notional × (max(r,0) + k×σ) / 252. Events like short squeezes can push this higher.' },
     };
 
     for (const [sliderId, tipData] of Object.entries(tips)) {

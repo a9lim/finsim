@@ -17,12 +17,12 @@ export const HISTORY_CAPACITY = 256;
 export const SPEED_OPTIONS = [1, 2, 4, 8, 16];
 
 export const PRESETS = [
-    { name: 'Calm Bull', mu: 0.08, theta: 0.04, kappa: 3.0, xi: 0.3, rho: -0.5, lambda: 0.5, muJ: -0.02, sigmaJ: 0.03, a: 0.5, b: 0.04, sigmaR: 0.005 },
-    { name: 'Sideways', mu: 0.02, theta: 0.06, kappa: 2.0, xi: 0.4, rho: -0.6, lambda: 1.0, muJ: -0.01, sigmaJ: 0.04, a: 0.5, b: 0.03, sigmaR: 0.008 },
-    { name: 'Volatile', mu: 0.05, theta: 0.12, kappa: 1.5, xi: 0.6, rho: -0.7, lambda: 3.0, muJ: -0.03, sigmaJ: 0.06, a: 0.3, b: 0.05, sigmaR: 0.012 },
-    { name: 'Crisis', mu: -0.10, theta: 0.25, kappa: 0.5, xi: 0.8, rho: -0.85, lambda: 8.0, muJ: -0.08, sigmaJ: 0.10, a: 0.2, b: 0.02, sigmaR: 0.020 },
-    { name: 'Rate Hike', mu: 0.04, theta: 0.08, kappa: 2.0, xi: 0.5, rho: -0.6, lambda: 1.5, muJ: -0.02, sigmaJ: 0.05, a: 0.8, b: 0.08, sigmaR: 0.015 },
-    { name: 'Dynamic (Offline)', mu: 0.08, theta: 0.04, kappa: 3.0, xi: 0.3, rho: -0.5, lambda: 0.5, muJ: -0.02, sigmaJ: 0.03, a: 0.5, b: 0.04, sigmaR: 0.005 },
-    { name: 'Dynamic (LLM)',     mu: 0.08, theta: 0.04, kappa: 3.0, xi: 0.3, rho: -0.5, lambda: 0.5, muJ: -0.02, sigmaJ: 0.03, a: 0.5, b: 0.04, sigmaR: 0.005 },
+    { name: 'Calm Bull', mu: 0.08, theta: 0.04, kappa: 3.0, xi: 0.3, rho: -0.5, lambda: 0.5, muJ: -0.02, sigmaJ: 0.03, a: 0.5, b: 0.04, sigmaR: 0.005, borrowSpread: 0.5 },
+    { name: 'Sideways', mu: 0.02, theta: 0.06, kappa: 2.0, xi: 0.4, rho: -0.6, lambda: 1.0, muJ: -0.01, sigmaJ: 0.04, a: 0.5, b: 0.03, sigmaR: 0.008, borrowSpread: 0.5 },
+    { name: 'Volatile', mu: 0.05, theta: 0.12, kappa: 1.5, xi: 0.6, rho: -0.7, lambda: 3.0, muJ: -0.03, sigmaJ: 0.06, a: 0.3, b: 0.05, sigmaR: 0.012, borrowSpread: 0.5 },
+    { name: 'Crisis', mu: -0.10, theta: 0.25, kappa: 0.5, xi: 0.8, rho: -0.85, lambda: 8.0, muJ: -0.08, sigmaJ: 0.10, a: 0.2, b: 0.02, sigmaR: 0.020, borrowSpread: 0.5 },
+    { name: 'Rate Hike', mu: 0.04, theta: 0.08, kappa: 2.0, xi: 0.5, rho: -0.6, lambda: 1.5, muJ: -0.02, sigmaJ: 0.05, a: 0.8, b: 0.08, sigmaR: 0.015, borrowSpread: 0.5 },
+    { name: 'Dynamic (Offline)', mu: 0.08, theta: 0.04, kappa: 3.0, xi: 0.3, rho: -0.5, lambda: 0.5, muJ: -0.02, sigmaJ: 0.03, a: 0.5, b: 0.04, sigmaR: 0.005, borrowSpread: 0.5 },
+    { name: 'Dynamic (LLM)',     mu: 0.08, theta: 0.04, kappa: 3.0, xi: 0.3, rho: -0.5, lambda: 0.5, muJ: -0.02, sigmaJ: 0.03, a: 0.5, b: 0.04, sigmaR: 0.005, borrowSpread: 0.5 },
 ];
 export const DEFAULT_PRESET = 0;

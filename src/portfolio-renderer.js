@@ -222,6 +222,17 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     $.marginStatus.textContent = marginDisplay.label;
     $.marginStatus.className   = 'stat-value ' + marginDisplay.cls;
 
+    // Cumulative borrow cost across all positions (including closed -- tracked on portfolio)
+    let totalBorrowCost = 0;
+    for (const pos of portfolio.positions) {
+        if (pos.borrowCost) totalBorrowCost += pos.borrowCost;
+    }
+    totalBorrowCost += portfolio.closedBorrowCost || 0;
+    if ($.borrowCostDisplay) {
+        $.borrowCostDisplay.textContent = fmtDollar(-totalBorrowCost);
+        $.borrowCostDisplay.className = 'stat-value ' + (totalBorrowCost > 0 ? pnlClass(-totalBorrowCost) : '');
+    }
+
     // Default (non-strategy) positions -- DOM diff
     const defaultPos = portfolio.positions.filter(p => !p.strategyName);
     _diffPositionRows($.defaultPositions, defaultPos, currentPrice, vol, rate, day, 'No open positions.');
