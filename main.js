@@ -162,7 +162,8 @@ function init() {
     bindEvents($, {
         onTogglePlay:     () => togglePlay(),
         onStep:           () => step(),
-        onSpeedChange:    () => cycleSpeed(),
+        onSpeedUp:        () => cycleSpeed(),
+        onSpeedDown:      () => decycleSpeed(),
         onToggleTheme:    () => toggleTheme(),
         onToggleSidebar:  () => toggleSidebar(),
         onPresetChange:   (index) => loadPreset(index),
@@ -594,6 +595,12 @@ function step() {
 
 function cycleSpeed() {
     speedIndex = (speedIndex + 1) % SPEED_OPTIONS.length;
+    updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
+    if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
+}
+
+function decycleSpeed() {
+    speedIndex = (speedIndex - 1 + SPEED_OPTIONS.length) % SPEED_OPTIONS.length;
     updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }

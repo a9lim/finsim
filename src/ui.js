@@ -109,7 +109,7 @@ export function cacheDOMElements($) {
 
 export function bindEvents($, handlers) {
     const {
-        onTogglePlay, onStep, onSpeedChange, onToggleTheme, onToggleSidebar,
+        onTogglePlay, onStep, onSpeedUp, onSpeedDown, onToggleTheme, onToggleSidebar,
         onPresetChange, onReset, onSliderChange, onTimeSlider,
         onBuyStock, onShortStock, onBuyBond, onShortBond,
         onChainCellClick, onFullChainOpen, onExpiryChange,
@@ -119,7 +119,8 @@ export function bindEvents($, handlers) {
 
     $.playBtn.addEventListener('click', onTogglePlay);
     $.stepBtn.addEventListener('click', onStep);
-    $.speedBtn.addEventListener('click', onSpeedChange);
+    $.speedBtn.addEventListener('click', onSpeedUp);
+    $.speedBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); onSpeedDown(); });
     $.themeBtn.addEventListener('click', onToggleTheme);
     $.panelToggle.addEventListener('click', onToggleSidebar);
     $.closePanel.addEventListener('click', onToggleSidebar);

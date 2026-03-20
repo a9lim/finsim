@@ -285,7 +285,7 @@ dailyCost = |qty| * notional * (max(r, 0) + borrowSpread * sigma) / 252
 
 ### Toolbar
 
-Play/pause, speed (1x-16x), step, reset, theme toggle (hidden <=440px), panel toggle.
+Play/pause, speed (0.25x-4x, left-click faster / right-click slower), step, reset, theme toggle (hidden <=440px), panel toggle.
 
 ### Sidebar (4 tabs)
 
