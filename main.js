@@ -242,13 +242,13 @@ function init() {
         onBuyBond:        () => handleBuyBond(),
         onShortBond:      () => handleShortBond(),
         onChainCellClick: (info) => handleChainCellClick(info),
-        onExpiryChange:   (idx) => { const pe = _priceExpiry(idx); updateChainDisplay($, pe, _buildPosMap()); updateStockBondPrices($, sim.S, sim.r, chainSkeleton, _buildPosMap(), strategyMode ? _buildStrategyPosMap() : null); dirty = true; },
+        onExpiryChange:   (idx) => { const pe = _priceExpiry(idx); updateChainDisplay($, pe, _buildPosMap()); updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), strategyMode ? _buildStrategyPosMap() : null); dirty = true; },
         onFullChainOpen:  () => openFullChain(),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
         onDismissMargin:  () => { /* sim stays paused, overlay hidden by ui.js */ },
         onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
-        onStrategyExpiryChange: (idx) => { const pe = _priceExpiry(idx); updateStrategyChainDisplay($, pe, handleAddLeg, _buildStrategyPosMap()); updateStockBondPrices($, sim.S, sim.r, chainSkeleton, _buildPosMap(), _buildStrategyPosMap()); dirty = true; },
+        onStrategyExpiryChange: (idx) => { const pe = _priceExpiry(idx); updateStrategyChainDisplay($, pe, handleAddLeg, _buildStrategyPosMap()); updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap()); dirty = true; },
         onSaveStrategy:   () => handleSaveStrategy(),
         onExecStrategy:   () => handleExecStrategy(),
         onLLMKeyChange:   (key) => { if (llmSource) llmSource.setApiKey(key); },
@@ -393,7 +393,7 @@ function init() {
                 rebuildStrategyDropdown($, chainSkeleton);
                 const stratPriced = _priceExpiry(_strategyExpiryIdx());
                 updateStrategySelectors($, stratPriced, sim.S, handleAddLeg, _buildStrategyPosMap());
-                updateStockBondPrices($, sim.S, sim.r, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+                updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
             }
         });
     });
@@ -611,7 +611,7 @@ function updateUI(precomputedMargin) {
         rebuildTradeDropdown($, chainSkeleton);
         const tradePriced = _priceExpiry(_tradeExpiryIdx());
         updateChainDisplay($, tradePriced, pMap);
-        updateStockBondPrices($, sim.S, sim.r, chainSkeleton, pMap, sMap);
+        updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap);
         if (strategyMode) {
             rebuildStrategyDropdown($, chainSkeleton);
             const stratPriced = _priceExpiry(_strategyExpiryIdx());
@@ -638,7 +638,7 @@ function updateSubstepUI() {
     // Reprice the visible trade chain expiry (no dropdown rebuild)
     const tradePriced = _priceExpiry(_tradeExpiryIdx());
     updateChainDisplay($, tradePriced, pMap);
-    updateStockBondPrices($, sim.S, sim.r, chainSkeleton, pMap, sMap);
+    updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap);
 
     if (strategyMode) {
         const stratPriced = _priceExpiry(_strategyExpiryIdx());
@@ -975,7 +975,7 @@ function handleAddLeg(type, side, strike, expiryDay) {
     strategy.resetRange(sim.S, strategyLegs);
     const spe = _priceExpiry(_strategyExpiryIdx());
     updateStrategyChainDisplay($, spe, handleAddLeg, _buildStrategyPosMap());
-    updateStockBondPrices($, sim.S, sim.r, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+    updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
     updateStrategyBuilder();
     updateTimeSliderRange();
     dirty = true;
@@ -987,7 +987,7 @@ function handleRemoveLeg(index) {
     strategy.resetRange(sim.S, strategyLegs);
     const spe = _priceExpiry(_strategyExpiryIdx());
     updateStrategyChainDisplay($, spe, handleAddLeg, _buildStrategyPosMap());
-    updateStockBondPrices($, sim.S, sim.r, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+    updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
     updateStrategyBuilder();
     updateTimeSliderRange();
     dirty = true;

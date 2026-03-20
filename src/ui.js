@@ -7,6 +7,7 @@
    ===================================================== */
 
 import { fmtDollar, fmtNum, pnlClass, fmtDte, fmtRelDay, posTypeLabel } from './format-helpers.js';
+import { computeBidAsk } from './portfolio.js';
 import { renderChainInto, rebuildExpiryDropdown, buildStockBondTable, buildChainTable, bindChainTableClicks, posKey } from './chain-renderer.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
@@ -290,6 +291,51 @@ export function bindEvents($, handlers) {
     if ($.execStrategyBtn && typeof handlers.onExecStrategy === 'function') {
         $.execStrategyBtn.addEventListener('click', handlers.onExecStrategy);
     }
+
+    // Tooltip delegation for [data-tooltip] cells
+    if (typeof createSimTooltip === 'function') {
+        const tip = createSimTooltip();
+        let tipTarget = null;
+        $.panel.addEventListener('mouseover', (e) => {
+            const el = e.target.closest('[data-tooltip]');
+            if (el === tipTarget) return;
+            if (el) {
+                tipTarget = el;
+                tip.show(e.clientX, e.clientY, el.dataset.tooltip);
+            } else if (tipTarget) {
+                tipTarget = null;
+                tip.hide();
+            }
+        });
+        $.panel.addEventListener('mouseout', (e) => {
+            if (!tipTarget) return;
+            const related = e.relatedTarget;
+            if (!related || !tipTarget.contains(related)) {
+                tipTarget = null;
+                tip.hide();
+            }
+        });
+        // Also cover the chain overlay
+        $.chainOverlay.addEventListener('mouseover', (e) => {
+            const el = e.target.closest('[data-tooltip]');
+            if (el === tipTarget) return;
+            if (el) {
+                tipTarget = el;
+                tip.show(e.clientX, e.clientY, el.dataset.tooltip);
+            } else if (tipTarget) {
+                tipTarget = null;
+                tip.hide();
+            }
+        });
+        $.chainOverlay.addEventListener('mouseout', (e) => {
+            if (!tipTarget) return;
+            const related = e.relatedTarget;
+            if (!related || !tipTarget.contains(related)) {
+                tipTarget = null;
+                tip.hide();
+            }
+        });
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -354,34 +400,44 @@ export function updateRateDisplay($, rate, rateHistory) {
 // updateStockBondPrices -- updates both trade-tab and strategy-tab cells
 // ---------------------------------------------------------------------------
 
-function _applyPill(el, text, qty) {
+function _applyPill(el, text, qty, tooltipText) {
     el.textContent = text;
     el.classList.remove('pos-long', 'pos-short');
     if (qty) el.classList.add(qty > 0 ? 'pos-long' : 'pos-short');
+    if (tooltipText) el.dataset.tooltip = tooltipText;
+    else delete el.dataset.tooltip;
+}
+
+function _bidAskTip(mid, spot, sigma) {
+    if (mid == null || spot == null || sigma == null) return null;
+    const ba = computeBidAsk(mid, spot, sigma);
+    return 'Bid ' + ba.bid.toFixed(2) + ' / Ask ' + ba.ask.toFixed(2);
 }
 
 /**
  * @param {Array} skeleton - chain skeleton (has .day, .dte per entry)
  */
-export function updateStockBondPrices($, spot, rate, skeleton, posMap, stratPosMap) {
+export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, stratPosMap) {
     const dash = '\u2014';
     const stockTxt = spot != null ? spot.toFixed(2) : dash;
+    const stockTip = _bidAskTip(spot, spot, sigma);
 
     // Trade tab bond: from trade expiry dropdown
     const tradeIdx = parseInt($.tradeExpiry?.value, 10);
     const tradeExp = skeleton && skeleton.length > 0
         ? skeleton[isNaN(tradeIdx) ? skeleton.length - 1 : Math.min(tradeIdx, skeleton.length - 1)]
         : null;
-    const tradeBond = tradeExp && rate != null
-        ? (100 * Math.exp(-rate * tradeExp.dte / 252)).toFixed(2)
-        : dash;
+    const tradeBondMid = tradeExp && rate != null
+        ? 100 * Math.exp(-rate * tradeExp.dte / 252)
+        : null;
+    const tradeBond = tradeBondMid != null ? tradeBondMid.toFixed(2) : dash;
 
-    if ($.stockPriceCell) _applyPill($.stockPriceCell, stockTxt, posMap && posMap['stock']);
+    if ($.stockPriceCell) _applyPill($.stockPriceCell, stockTxt, posMap && posMap['stock'], stockTip);
     if ($.bondPriceCell) {
         const bondQty = posMap && tradeExp
             ? posMap[posKey('bond', null, tradeExp.day)]
             : null;
-        _applyPill($.bondPriceCell, tradeBond, bondQty);
+        _applyPill($.bondPriceCell, tradeBond, bondQty, _bidAskTip(tradeBondMid, spot, sigma));
     }
 
     // Strategy tab bond: from strategy expiry dropdown
@@ -389,17 +445,18 @@ export function updateStockBondPrices($, spot, rate, skeleton, posMap, stratPosM
     const stratExp = skeleton && skeleton.length > 0
         ? skeleton[isNaN(stratIdx) ? skeleton.length - 1 : Math.min(stratIdx, skeleton.length - 1)]
         : null;
-    const stratBond = stratExp && rate != null
-        ? (100 * Math.exp(-rate * stratExp.dte / 252)).toFixed(2)
-        : dash;
+    const stratBondMid = stratExp && rate != null
+        ? 100 * Math.exp(-rate * stratExp.dte / 252)
+        : null;
+    const stratBond = stratBondMid != null ? stratBondMid.toFixed(2) : dash;
 
     const sMap = stratPosMap || posMap;
-    if ($.strategyStockCell) _applyPill($.strategyStockCell, stockTxt, sMap && sMap['stock']);
+    if ($.strategyStockCell) _applyPill($.strategyStockCell, stockTxt, sMap && sMap['stock'], stockTip);
     if ($.strategyBondCell) {
         const bondQty = sMap && stratExp
             ? sMap[posKey('bond', null, stratExp.day)]
             : null;
-        _applyPill($.strategyBondCell, stratBond, bondQty);
+        _applyPill($.strategyBondCell, stratBond, bondQty, _bidAskTip(stratBondMid, spot, sigma));
     }
 }
 

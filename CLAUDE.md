@@ -119,8 +119,8 @@ main.js
   |                         -- imports format-helpers; reads _haptics globals)
   |- src/portfolio-renderer.js (imports position-value, format-helpers)
   |- src/ui.js            (cacheDOMElements, bindEvents, display updaters -- imports
-  |                         format-helpers, chain-renderer, portfolio-renderer;
-  |                         reads _haptics, showToast, createInfoTip globals)
+  |                         format-helpers, chain-renderer, portfolio-renderer, portfolio;
+  |                         reads _haptics, showToast, createInfoTip, createSimTooltip globals)
   +- src/theme.js         (initTheme, toggleTheme -- no imports)
 ```
 

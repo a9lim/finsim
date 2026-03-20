@@ -35,7 +35,7 @@ function buildChainRow(row, expiry, isAtm, compact, posMap) {
 
         const callTd = document.createElement('td');
         callTd.className = 'chain-cell call-cell';
-        callTd.title = 'Bid ' + row.call.bid.toFixed(2) + ' / Ask ' + row.call.ask.toFixed(2);
+        callTd.dataset.tooltip = 'Bid ' + row.call.bid.toFixed(2) + ' / Ask ' + row.call.ask.toFixed(2);
         callTd.setAttribute('tabindex', '0');
         callTd.setAttribute('role', 'button');
         callTd.dataset.strike    = row.strike;
@@ -49,7 +49,7 @@ function buildChainRow(row, expiry, isAtm, compact, posMap) {
 
         const putTd = document.createElement('td');
         putTd.className = 'chain-cell put-cell';
-        putTd.title = 'Bid ' + row.put.bid.toFixed(2) + ' / Ask ' + row.put.ask.toFixed(2);
+        putTd.dataset.tooltip = 'Bid ' + row.put.bid.toFixed(2) + ' / Ask ' + row.put.ask.toFixed(2);
         putTd.setAttribute('tabindex', '0');
         putTd.setAttribute('role', 'button');
         putTd.dataset.strike    = row.strike;
