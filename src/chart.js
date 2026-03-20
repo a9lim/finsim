@@ -21,12 +21,13 @@ export class ChartRenderer {
         this.width  = 0;
         this.height = 0;
 
-        // Live candle lerp state
+        // Live candle interpolation state
         this._lerp = {
             day: -1, close: 0, high: 0, low: 0,
-            _targetClose: 0, _targetHigh: 0, _targetLow: 0,
+            _from: 0, _targetClose: 0, _targetHigh: 0, _targetLow: 0,
+            _t: 1, // progress 0→1 through current segment
         };
-        this._lerpSpeed = 15;   // higher = snappier response
+        this._segmentDur = 0.25; // seconds per substep (updated by setSubstepInterval)
         this._lastFrameTime = 0;
 
         // Axis gutter sizes (CSS px)
@@ -88,9 +89,19 @@ export class ChartRenderer {
     }
 
     /* -----------------------------------------------
+       setSubstepInterval(ms)
+       Set the expected duration between substeps so the
+       cubic interpolation fills the full interval.
+       @param {number} ms  milliseconds between substeps
+    ----------------------------------------------- */
+    setSubstepInterval(ms) {
+        this._segmentDur = ms / 1000;
+    }
+
+    /* -----------------------------------------------
        update(now)
-       Advance lerp state toward the live candle's
-       actual values. Call once per frame before draw().
+       Advance cubic interpolation toward the live
+       candle's target. Call once per frame before draw().
        @param {number} now  performance.now() timestamp
     ----------------------------------------------- */
     update(now) {
@@ -100,11 +111,14 @@ export class ChartRenderer {
         this._lastFrameTime = now;
 
         const L = this._lerp;
-        if (L.day < 0) return; // no live candle yet
+        if (L.day < 0 || L._t >= 1) return;
 
-        const alpha = 1 - Math.exp(-this._lerpSpeed * dt);
-        L.close += (L._targetClose - L.close) * alpha;
-        // High/low are water marks of the lerped close path
+        L._t = Math.min(1, L._t + dt / this._segmentDur);
+        // Smoothstep: cubic ease-in-out, zero velocity at endpoints
+        const t = L._t;
+        const s = t * t * (3 - 2 * t);
+        L.close = L._from + (L._targetClose - L._from) * s;
+        // High/low are water marks of the interpolated path
         if (L.close > L.high) L.high = L.close;
         if (L.close < L.low)  L.low  = L.close;
     }
@@ -138,6 +152,9 @@ export class ChartRenderer {
             if (L.close > L.high) L.high = L.close;
             if (L.close < L.low)  L.low  = L.close;
         }
+        // Start new cubic segment from current close to new target
+        L._from = L.close;
+        L._t = 0;
         L._targetClose = bar.close;
         L._targetHigh = bar.high;
         L._targetLow  = bar.low;

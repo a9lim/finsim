@@ -247,6 +247,7 @@ function init() {
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
+    _syncLerpSpeed();
     lastSpot = sim.S;
     strategy.resetRange(sim.S, strategyLegs);
     updateUI();
@@ -488,6 +489,8 @@ function tick() {
         chart._lerp.close = last.close;
         chart._lerp.high  = last.high;
         chart._lerp.low   = last.low;
+        chart._lerp._from = last.close;
+        chart._lerp._t = 1;
         chart._lerp._targetClose = last.close;
         chart._lerp._targetHigh  = last.high;
         chart._lerp._targetLow   = last.low;
@@ -593,15 +596,21 @@ function step() {
     }
 }
 
+function _syncLerpSpeed() {
+    chart.setSubstepInterval(1000 / (SPEED_OPTIONS[speedIndex] * INTRADAY_STEPS));
+}
+
 function cycleSpeed() {
     speedIndex = (speedIndex + 1) % SPEED_OPTIONS.length;
     updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
+    _syncLerpSpeed();
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
 
 function decycleSpeed() {
     speedIndex = (speedIndex - 1 + SPEED_OPTIONS.length) % SPEED_OPTIONS.length;
     updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
+    _syncLerpSpeed();
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
 
