@@ -534,14 +534,6 @@ main {
     flex: 1;
 }
 
-/* --- Intro Subtitle --- */
-.intro-subtitle {
-    font-size: 0.55em;
-    font-weight: 300;
-    display: block;
-    letter-spacing: 0.04em;
-}
-
 /* --- Trade Hint --- */
 .trade-hint {
     padding: 2px 0 0;
