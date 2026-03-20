@@ -95,7 +95,24 @@ This is the engine rewrite. The event pool (Task 4) is separate. This task creat
 
 - [ ] **Step 1: Rewrite events.js with the new EventEngine**
 
-Replace the entire file. The new engine imports from `world-state.js`, `event-pool.js` (which does not exist yet -- use the import, it will resolve after Task 4), and `config.js`.
+Replace the entire file. The new engine imports from `world-state.js`, `event-pool.js`, and `config.js`.
+
+**Important:** Before writing events.js, create a minimal stub `src/event-pool.js` so the import resolves and the app can load:
+
+```js
+// Stub -- filled in Tasks 4-8
+export const PARAM_RANGES = {
+    mu: { min: -0.50, max: 0.50 }, theta: { min: 0.005, max: 1.00 },
+    kappa: { min: 0.05, max: 10.0 }, xi: { min: 0.05, max: 1.50 },
+    rho: { min: -0.99, max: 0.50 }, lambda: { min: 0.0, max: 15.0 },
+    muJ: { min: -0.25, max: 0.15 }, sigmaJ: { min: 0.005, max: 0.25 },
+    a: { min: 0.01, max: 2.0 }, b: { min: -0.05, max: 0.20 },
+    sigmaR: { min: 0.001, max: 0.050 }, borrowSpread: { min: 0.0, max: 5.0 },
+    q: { min: 0.0, max: 0.10 },
+};
+export const OFFLINE_EVENTS = [];
+export function getEventById() { return null; }
+```
 
 Key changes from current implementation:
 
@@ -129,12 +146,17 @@ Key changes from current implementation:
 
 **`reset()`** also resets: `world = createWorldState()`, all timing fields to initial values.
 
-Re-exports `PARAM_RANGES` from event-pool.js for backwards compatibility (main.js and llm.js may import it from events.js).
+**`applyDeltas(sim, params)`** -- preserve unchanged from current implementation. Iterates param entries, clamps to `PARAM_RANGES`, calls `sim._recomputeRhoDerived()` if rho changed. This is called internally by `_fireEvent` and may be used externally.
+
+Add explicit re-export at the top of the file for backwards compatibility (llm.js imports PARAM_RANGES from events.js):
+```js
+export { PARAM_RANGES } from './event-pool.js';
+```
 
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/events.js
+git add src/events.js src/event-pool.js
 git commit -m "feat: rewrite EventEngine with world state, timing improvements, midterm, epilogue"
 ```
 
@@ -152,7 +174,8 @@ Structure:
 - `NEUTRAL_EVENTS` array (~25 events, likelihood 2-6, minor magnitude)
 - `MARKET_EVENTS` array (~12 events, dynamic likelihood functions for flash crash/liquidity crisis/etc.)
 - Placeholder empty arrays for: `FED_EVENTS`, `MACRO_EVENTS`, `PNTH_EVENTS`, `SECTOR_EVENTS`, `POLITICAL_EVENTS`, `INVESTIGATION_EVENTS`, `COMPOUND_EVENTS`, `MIDTERM_EVENTS`
-- `OFFLINE_EVENTS` merged via spread
+- `OFFLINE_EVENTS` merged via spread (includes all arrays)
+- Note: `MIDTERM_EVENTS` are included in `OFFLINE_EVENTS` for `getEventById` lookup, but the engine's `_drawOffline` filters out both `category: 'fed'` and `category: 'midterm'` from the Poisson pool (this is already handled in Task 3's `_nonFedEvents` filter: `e.category !== 'fed' && e.category !== 'midterm'`)
 - `getEventById(id)` with lazy Map cache
 
 **Neutral events** must reference world state in `when()` guards per spec section 9.11:
@@ -393,70 +416,12 @@ git commit -m "feat: add portfolio tracking fields for epilogue scorecard"
 
 ---
 
-## Task 10: Main.js Integration
-
-**Files:**
-- Modify: `main.js`
-
-- [ ] **Step 1: Add epilogue import**
-
-Add to imports at top:
-```js
-import { generateEpilogue } from './src/epilogue.js';
-```
-
-- [ ] **Step 2: Add epilogue trigger to _onDayComplete**
-
-In `_onDayComplete()` (~line 519), add before the existing `if (eventEngine)` block:
-
-```js
-    if (eventEngine && eventEngine.isEpilogueReady(sim.day)) {
-        playing = false;
-        updatePlayBtn($, playing);
-        eventEngine.computeElectionOutcome(sim);
-        _showEpilogue();
-        return;
-    }
-```
-
-- [ ] **Step 3: Add peakValue/maxDrawdown tracking to substep path**
-
-In the substep callback (where portfolio display is updated), after equity is computed for the portfolio display, add peak/drawdown tracking. Piggyback on the equity value already computed -- do not trigger a separate valuation pass.
-
-- [ ] **Step 4: Add marginCallCount increment**
-
-Find where `showMarginCall` is called. Add `portfolio.marginCallCount++` just before it.
-
-- [ ] **Step 5: Add _showEpilogue function**
-
-Create function that:
-1. Calls `generateEpilogue(eventEngine.world, sim, portfolio, eventEngine.eventLog)` to get 4 page objects
-2. Gets DOM references from the epilogue overlay
-3. Manages `currentPage` state with `render()` function that:
-   - Fades `.epilogue-body` opacity to 0
-   - After 200ms timeout: sets title via `textContent`, sets body content, resets scrollTop, fades opacity back to 1
-   - Toggles dot active states, shows/hides Back/Next/Restart/Keep Playing buttons based on current page
-4. Wires button onclick handlers:
-   - Back/Next: decrement/increment page, re-render
-   - Restart: hide overlay, call `_resetCore` with offline Dynamic preset index
-   - Keep Playing: hide overlay, show toast "Event storyline complete. Market simulation continues."
-5. Shows the overlay and calls initial render
-
-**Security note:** The epilogue body content is generated entirely by our own `generateEpilogue` function from trusted state -- it is not user input or external data. The HTML is constructed from hardcoded template strings with numeric values inserted via string concatenation. This is safe in this context as there is no user-controlled or external input in the generated HTML.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add main.js
-git commit -m "feat: wire epilogue trigger, portfolio tracking, and overlay controller"
-```
-
----
-
-## Task 11: Epilogue Content Generator
+## Task 10: Epilogue Content Generator
 
 **Files:**
 - Create: `src/epilogue.js`
+
+Note: This task creates epilogue.js BEFORE main.js integration (Task 12) so the import resolves.
 
 - [ ] **Step 1: Create epilogue.js with generateEpilogue function**
 
@@ -479,7 +444,7 @@ git commit -m "feat: add epilogue content generator with 4-page narrative"
 
 ---
 
-## Task 12: Epilogue UI (HTML + CSS)
+## Task 11: Epilogue UI (HTML + CSS)
 
 **Files:**
 - Modify: `index.html`
@@ -523,6 +488,76 @@ Styles for `.epilogue-panel` (max-width 600px), `.epilogue-title` (font-display)
 ```bash
 git add index.html styles.css
 git commit -m "feat: add epilogue overlay markup and styles"
+```
+
+---
+
+## Task 12: Main.js Integration
+
+**Files:**
+- Modify: `main.js`
+
+Dependencies: Tasks 10 (epilogue.js exists) and 11 (HTML overlay exists).
+
+- [ ] **Step 1: Add epilogue import**
+
+Add to imports at top:
+```js
+import { generateEpilogue } from './src/epilogue.js';
+```
+
+- [ ] **Step 2: Add epilogue trigger to _onDayComplete**
+
+In `_onDayComplete()` (~line 519), add before the existing `if (eventEngine)` block:
+
+```js
+    if (eventEngine && eventEngine.isEpilogueReady(sim.day)) {
+        playing = false;
+        updatePlayBtn($, playing);
+        eventEngine.computeElectionOutcome(sim);
+        _showEpilogue();
+        return;
+    }
+```
+
+- [ ] **Step 3: Add peakValue/maxDrawdown tracking to substep path**
+
+In the substep callback, find where equity is computed for portfolio display / margin checks. The `updatePortfolioDisplay` function in ui.js computes equity internally. To avoid recomputing, add equity tracking directly in `_onSubstep` where the portfolio value is already available. If the equity isn't directly accessible, compute it as `portfolio.cash + sum(computePositionValue(pos, sim.S, sim.v, sim.r, sim.day, sim.q) * pos.qty for each position)`. Then:
+
+```js
+    if (equity > portfolio.peakValue) portfolio.peakValue = equity;
+    if (portfolio.peakValue > 0) {
+        const dd = 1 - equity / portfolio.peakValue;
+        if (dd > portfolio.maxDrawdown) portfolio.maxDrawdown = dd;
+    }
+```
+
+- [ ] **Step 4: Add marginCallCount increment**
+
+Find where `showMarginCall` is called. Add `portfolio.marginCallCount++` just before it.
+
+- [ ] **Step 5: Add _showEpilogue function**
+
+Create function that:
+1. Calls `generateEpilogue(eventEngine.world, sim, portfolio, eventEngine.eventLog)` to get 4 page objects
+2. Gets DOM references from the epilogue overlay
+3. Manages `currentPage` state with `render()` function that:
+   - Fades `.epilogue-body` opacity to 0
+   - After 200ms timeout: sets title via `textContent`, sets body content, resets scrollTop, fades opacity back to 1
+   - Toggles dot active states, shows/hides Back/Next/Restart/Keep Playing buttons based on current page
+4. Wires button onclick handlers:
+   - Back/Next: decrement/increment page, re-render
+   - Restart: hide overlay, call `_resetCore` with offline Dynamic preset index
+   - Keep Playing: hide overlay, show toast "Event storyline complete. Market simulation continues."
+5. Shows the overlay and calls initial render
+
+**Security note:** The epilogue body content is generated entirely by our own `generateEpilogue` function from trusted state -- it is not user input or external data. The HTML is constructed from hardcoded template strings with numeric values inserted via string concatenation. This is safe in this context as there is no user-controlled or external input in the generated HTML.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add main.js
+git commit -m "feat: wire epilogue trigger, portfolio tracking, and overlay controller"
 ```
 
 ---
@@ -592,7 +627,7 @@ Switching between non-Dynamic and Dynamic presets correctly creates/destroys `ev
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -A
+git add main.js src/events.js
 git commit -m "feat: final integration and wiring for event system redesign"
 ```
 
@@ -604,15 +639,15 @@ git commit -m "feat: final integration and wiring for event system redesign"
 |------|-------|---------|-------------|
 | 1 | config.js | 0 | New constants |
 | 2 | world-state.js | 0 | World state module |
-| 3 | events.js | 0 | Engine rewrite |
+| 3 | events.js + event-pool.js stub | 0 | Engine rewrite |
 | 4 | event-pool.js | ~37 | Scaffold + neutral + market |
 | 5 | event-pool.js | ~20 | Fed events |
 | 6 | event-pool.js | ~50 | PNTH events |
 | 7 | event-pool.js | ~60 | Macro + political + investigation |
 | 8 | event-pool.js | ~25 | Sector + compound + balance check |
 | 9 | portfolio.js | 0 | Tracking fields |
-| 10 | main.js | 0 | Epilogue trigger + wiring |
-| 11 | epilogue.js | 0 | Content generator |
-| 12 | index.html, styles.css | 0 | Epilogue UI |
+| 10 | epilogue.js | 0 | Content generator |
+| 11 | index.html, styles.css | 0 | Epilogue UI |
+| 12 | main.js | 0 | Epilogue trigger + wiring |
 | 13 | llm.js | 0 | LLM update |
 | 14 | main.js | 0 | Final integration |
