@@ -100,47 +100,48 @@ function cbnd(a, b, rho) {
     return _cbndCore(a, 0, rhoA) + _cbndCore(b, 0, rhoB) - delta;
 }
 
+// 20-point Gauss-Legendre nodes and weights (hoisted for reuse)
+const _GL_X = [
+    -0.9931285991850949, -0.9639719272779138,
+    -0.9122344282513259, -0.8391169718222188,
+    -0.7463319064601508, -0.6360536807265150,
+    -0.5108670019508271, -0.3737060887154195,
+    -0.2277858511416451, -0.0765265211334973,
+     0.0765265211334973,  0.2277858511416451,
+     0.3737060887154195,  0.5108670019508271,
+     0.6360536807265150,  0.7463319064601508,
+     0.8391169718222188,  0.9122344282513259,
+     0.9639719272779138,  0.9931285991850949,
+];
+const _GL_W = [
+    0.0176140071391521, 0.0406014298003869,
+    0.0626720483341091, 0.0832767415767048,
+    0.1019301198172404, 0.1181945319615184,
+    0.1316886384491766, 0.1420961093183820,
+    0.1491729864726037, 0.1527533871307258,
+    0.1527533871307258, 0.1491729864726037,
+    0.1420961093183820, 0.1316886384491766,
+    0.1181945319615184, 0.1019301198172404,
+    0.0832767415767048, 0.0626720483341091,
+    0.0406014298003869, 0.0176140071391521,
+];
+
 /**
  * Core quadrature for cbnd when a <= 0, b <= 0, rho <= 0.
  * Uses 20-point Gauss-Legendre on [0, rho] for higher precision.
  */
 function _cbndCore(a, b, rho) {
-    const X = [
-        -0.9931285991850949, -0.9639719272779138,
-        -0.9122344282513259, -0.8391169718222188,
-        -0.7463319064601508, -0.6360536807265150,
-        -0.5108670019508271, -0.3737060887154195,
-        -0.2277858511416451, -0.0765265211334973,
-         0.0765265211334973,  0.2277858511416451,
-         0.3737060887154195,  0.5108670019508271,
-         0.6360536807265150,  0.7463319064601508,
-         0.8391169718222188,  0.9122344282513259,
-         0.9639719272779138,  0.9931285991850949,
-    ];
-    const W = [
-        0.0176140071391521, 0.0406014298003869,
-        0.0626720483341091, 0.0832767415767048,
-        0.1019301198172404, 0.1181945319615184,
-        0.1316886384491766, 0.1420961093183820,
-        0.1491729864726037, 0.1527533871307258,
-        0.1527533871307258, 0.1491729864726037,
-        0.1420961093183820, 0.1316886384491766,
-        0.1181945319615184, 0.1019301198172404,
-        0.0832767415767048, 0.0626720483341091,
-        0.0406014298003869, 0.0176140071391521,
-    ];
-
     const aS = a * a;
     const bS = b * b;
     const limit = rho;
     let sum = 0;
 
     for (let i = 0; i < 20; i++) {
-        const r = limit * (1 + X[i]) / 2;
+        const r = limit * (1 + _GL_X[i]) / 2;
         const r2 = r * r;
         const denom = Math.sqrt(Math.max(1 - r2, 1e-15));
         const exponent = (2 * r * a * b - aS - bS) / (2 * (1 - r2));
-        sum += W[i] * Math.exp(exponent) / denom;
+        sum += _GL_W[i] * Math.exp(exponent) / denom;
     }
     return Math.max(0, (limit / 2) * sum / (2 * Math.PI) + cnd(a) * cnd(b));
 }
@@ -269,6 +270,70 @@ function _psi(S, T, gamma, H, I2, I1, t1, r, b, sigma) {
 }
 
 // ---------------------------------------------------------------------------
+// Precomputed-parameter variants of phi and psi (performance path)
+// ---------------------------------------------------------------------------
+
+/**
+ * _phiPre — same as _phi but accepts precomputed v2 and sqrtT.
+ * Used by bs2002Call where v2 and sqrtT are already known.
+ *
+ * Note: the `sqrtT` parameter here corresponds to sqrt of the TIME argument,
+ * which may be t1 or T depending on the caller.
+ */
+function _phiPre(S, T, gamma, H, I, r, b, v2, sqrtT) {
+    if (T <= 0) return 0;
+    const sigma  = Math.sqrt(v2);
+    const lambda = (-r + gamma * b + 0.5 * gamma * (gamma - 1) * v2) * T;
+    const d      = -(Math.log(S / H) + (b + (gamma - 0.5) * v2) * T) / (sigma * sqrtT);
+    const kappa  = 2 * b / v2 + (2 * gamma - 1);
+    const lnIS   = Math.log(I / S);
+    const term2  = Math.pow(I / S, kappa) * cnd(d - 2 * lnIS / (sigma * sqrtT));
+    return Math.exp(lambda) * Math.pow(S, gamma) * (cnd(d) - term2);
+}
+
+/**
+ * _psiPre — same as _psi but accepts precomputed v2, sqrtT, sqrtt1.
+ * Computes rho as sqrtt1/sqrtT. Precomputes shared sub-expressions.
+ */
+function _psiPre(S, T, gamma, H, I2, I1, t1, r, b, v2, sqrtT, sqrtt1) {
+    if (T <= 0 || t1 <= 0) return 0;
+
+    const sigma     = Math.sqrt(v2);
+    const rho       = sqrtt1 / sqrtT;
+
+    const lambda = (-r + gamma * b + 0.5 * gamma * (gamma - 1) * v2) * T;
+    const kappa  = 2 * b / v2 + (2 * gamma - 1);
+
+    const bGammaTerm  = b + (gamma - 0.5) * v2;
+    const sigSqrtt1   = sigma * sqrtt1;
+    const sigSqrtT    = sigma * sqrtT;
+    const lnI1S       = Math.log(I1 / S);
+    const lnI1S_sigSqrtT  = 2 * lnI1S / sigSqrtT;
+    const lnI1S_sigSqrtt1 = 2 * lnI1S / sigSqrtt1;
+
+    const d1 = -(Math.log(S / H)  + bGammaTerm * t1) / sigSqrtt1;
+    const d2 = -(Math.log(I2 * I2 / (S * H)) + bGammaTerm * t1) / sigSqrtt1;
+    const d3 = -(Math.log(S / H)  + bGammaTerm * T)  / sigSqrtT;
+    const d4 = -(Math.log(I2 * I2 / (S * H)) + bGammaTerm * T)  / sigSqrtT;
+
+    const n2_1 = cbnd(-d3, -d1,  rho);
+    const n2_2 = cbnd(-d4, -d2,  rho);
+    const n2_3 = cbnd(-d3 + lnI1S_sigSqrtT,
+                       -d1 + lnI1S_sigSqrtt1,
+                       rho);
+    const n2_4 = cbnd(-d4 + lnI1S_sigSqrtT,
+                       -d2 + lnI1S_sigSqrtt1,
+                       rho);
+
+    const term1 =  n2_1;
+    const term2 = -Math.pow(I2 / S, kappa) * n2_2;
+    const term3 = -Math.pow(I1 / S, kappa) * n2_3;
+    const term4 =  Math.pow(I1 / I2, kappa) * n2_4;
+
+    return Math.exp(lambda) * Math.pow(S, gamma) * (term1 + term2 + term3 + term4);
+}
+
+// ---------------------------------------------------------------------------
 // Bjerksund-Stensland 2002 American Call
 // ---------------------------------------------------------------------------
 
@@ -322,13 +387,15 @@ function bs2002Call(S, K, T, r, q, sigma) {
 
     // Golden-ratio time split
     const t1 = 0.5 * (Math.sqrt(5) - 1) * T;
+    const sqrtT  = Math.sqrt(T);
+    const sqrtt1 = Math.sqrt(t1);
 
     // Exercise boundary at t1
-    const ht1 = -(b * t1 + 2 * sigma * Math.sqrt(t1)) * B0 / (BInfinity - B0);
+    const ht1 = -(b * t1 + 2 * sigma * sqrtt1) * B0 / (BInfinity - B0);
     const I1  = B0 + (BInfinity - B0) * (1 - Math.exp(ht1));
 
     // Exercise boundary at T
-    const ht2 = -(b * T + 2 * sigma * Math.sqrt(T)) * B0 / (BInfinity - B0);
+    const ht2 = -(b * T + 2 * sigma * sqrtT) * B0 / (BInfinity - B0);
     const I2  = B0 + (BInfinity - B0) * (1 - Math.exp(ht2));
 
     // Deep in-the-money: immediate exercise
@@ -340,19 +407,21 @@ function bs2002Call(S, K, T, r, q, sigma) {
 
     // Full BS2002 price formula (eq. 10 in the paper)
     // Uses rEff throughout to match beta/B0/BInfinity computation
+    // _phiPre calls use t1 as time → pass v2, sqrtt1
+    // _psiPre calls use T as time  → pass v2, sqrtT, sqrtt1
     const price =
         alpha2 * Math.pow(S, beta)
-        - alpha2 * _phi(S, t1, beta, I2, I2, rEff, b, sigma)
-        + _phi(S, t1, 1,    I2, I2, rEff, b, sigma)
-        - _phi(S, t1, 1,    I1, I2, rEff, b, sigma)
-        - K    * _phi(S, t1, 0,    I2, I2, rEff, b, sigma)
-        + K    * _phi(S, t1, 0,    I1, I2, rEff, b, sigma)
-        + alpha1 * _phi(S, t1, beta, I1, I2, rEff, b, sigma)
-        - alpha1 * _psi(S, T, beta, I1, I2, I1, t1, rEff, b, sigma)
-        + _psi(S, T, 1,    I1, I2, I1, t1, rEff, b, sigma)
-        - _psi(S, T, 1,    K,  I2, I1, t1, rEff, b, sigma)
-        - K    * _psi(S, T, 0,    I1, I2, I1, t1, rEff, b, sigma)
-        + K    * _psi(S, T, 0,    K,  I2, I1, t1, rEff, b, sigma);
+        - alpha2 * _phiPre(S, t1, beta, I2, I2, rEff, b, v2, sqrtt1)
+        + _phiPre(S, t1, 1,    I2, I2, rEff, b, v2, sqrtt1)
+        - _phiPre(S, t1, 1,    I1, I2, rEff, b, v2, sqrtt1)
+        - K    * _phiPre(S, t1, 0,    I2, I2, rEff, b, v2, sqrtt1)
+        + K    * _phiPre(S, t1, 0,    I1, I2, rEff, b, v2, sqrtt1)
+        + alpha1 * _phiPre(S, t1, beta, I1, I2, rEff, b, v2, sqrtt1)
+        - alpha1 * _psiPre(S, T, beta, I1, I2, I1, t1, rEff, b, v2, sqrtT, sqrtt1)
+        + _psiPre(S, T, 1,    I1, I2, I1, t1, rEff, b, v2, sqrtT, sqrtt1)
+        - _psiPre(S, T, 1,    K,  I2, I1, t1, rEff, b, v2, sqrtT, sqrtt1)
+        - K    * _psiPre(S, T, 0,    I1, I2, I1, t1, rEff, b, v2, sqrtT, sqrtt1)
+        + K    * _psiPre(S, T, 0,    K,  I2, I1, t1, rEff, b, v2, sqrtT, sqrtt1);
 
     // Floor at intrinsic value
     return Math.max(price, S - K);
