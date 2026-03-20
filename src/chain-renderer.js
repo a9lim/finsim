@@ -195,7 +195,11 @@ export function renderChainInto(container, chain, selectedIndex, dropdownEl, onC
     }
 
     container.appendChild(buildChainTable(expiry, true));
-    bindChainTableClicks(container, onClick);
+    // Bind click delegation only once per container
+    if (!container._chainClicksBound) {
+        bindChainTableClicks(container, onClick);
+        container._chainClicksBound = true;
+    }
 }
 
 // ---------------------------------------------------------------------------
