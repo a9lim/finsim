@@ -834,7 +834,7 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
             if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + pos.fillPrice.toFixed(2));
             if (typeof _haptics !== 'undefined') _haptics.trigger('success');
         } else {
-            if (typeof showToast !== 'undefined') showToast('Insufficient funds/margin.');
+            if (typeof showToast !== 'undefined') showToast('Insufficient margin.');
             if (typeof _haptics !== 'undefined') _haptics.trigger('error');
         }
     } else {
@@ -896,7 +896,7 @@ function handleTradeSubmit(data) {
             if (typeof showToast !== 'undefined') showToast('Order filled: ' + type + ' x' + qty);
             if (typeof _haptics !== 'undefined') _haptics.trigger('success');
         } else {
-            if (typeof showToast !== 'undefined') showToast('Order failed — insufficient funds.');
+            if (typeof showToast !== 'undefined') showToast('Order failed — insufficient margin.');
             if (typeof _haptics !== 'undefined') _haptics.trigger('error');
         }
     } else {

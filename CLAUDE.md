@@ -274,7 +274,7 @@ Signed qty: `qty > 0` = long, `qty < 0` = short. No `side` field on positions.
 
 Long positions can be bought on margin -- cash goes negative when insufficient, up to a limit. `_checkInitialMarginDebit()` enforces Reg-T: post-trade equity must be >= `REG_T_MARGIN (50%) * |newCash|`. This prevents buying into a margin call. Negative cash incurs the same volatility-weighted borrow cost as short positions: `dailyCost = |cash| * (max(r,0) + borrowSpread * sigma) / 252`. Tracked in `portfolio.marginDebitCost`.
 
-Margin call at `equity < marginRequirement` (considers short positions + margin debit). Pauses sim, shows overlay. Cash display turns red when negative; margin status label and value both color-match (OK/Low/MARGIN CALL).
+Margin call at `equity < marginRequirement` (considers short positions + margin debit). Pauses sim, shows overlay. Cash display turns red when negative; margin status value colored (OK/LOW/MARGIN CALL), label stays default color. Short trades also checked at open time via `_postTradeMarginOk()` to prevent immediately triggering a margin call.
 
 ### Short Borrow Interest
 
@@ -477,6 +477,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Time slider clamped to min DTE** -- stops at first leg expiry; per-leg T computed individually.
 - **`eventEngine` is null in non-Dynamic presets** -- always check `if (eventEngine)` before calling methods. `maybeFire()` returns an array of fired events (may be empty), not a single event/null.
 - **`_reservedMargin` field on short positions** stores actual margin reserved at open time. Use `?? _marginForShort(...)` fallback when reading.
+- **`_postTradeMarginOk()` guards all short-opening paths** -- new short, extend short, flip long-to-short. Simulates post-trade equity vs maintenance margin to prevent trades that would immediately trigger a margin call. `_maintenanceForShort()` computes single-position maintenance.
 - **Event deltas are additive and clamped** to `PARAM_RANGES` -- never set absolute values via events.
 - **LLM followup events** now include `headline`, `params`, `magnitude` in the tool schema. Offline followups still resolved via `_getEventById`; LLM followups carry their own data.
 - **`_pendingFollowups` cleared on reset** -- switching presets mid-chain drops all scheduled followups.

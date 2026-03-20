@@ -17,7 +17,7 @@ function _computeMarginDisplay(equity, required) {
     if (required <= 0) return { label: 'OK', cls: 'margin-ok' };
     if (equity < required) return { label: 'MARGIN CALL', cls: 'margin-alert' };
     const pct = Math.min((equity / required) * 100, 999);
-    if (equity < required * 1.2) return { label: 'Low (' + pct.toFixed(0) + '%)', cls: 'margin-warn' };
+    if (equity < required * 1.2) return { label: 'LOW (' + pct.toFixed(0) + '%)', cls: 'margin-warn' };
     return { label: 'OK (' + pct.toFixed(0) + '%)', cls: 'margin-ok' };
 }
 
@@ -233,10 +233,6 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     $.marginStatus.textContent = marginDisplay.label;
     $.marginStatus.className   = 'stat-value ' + marginDisplay.cls;
 
-    // Color the margin status label to match
-    if ($.marginStatusLabel) {
-        $.marginStatusLabel.className = 'stat-label ' + marginDisplay.cls;
-    }
 
     // Cumulative borrow cost across all positions (including closed -- tracked on portfolio)
     let totalBorrowCost = 0;

@@ -434,19 +434,16 @@ main {
     gap: 4px;
 }
 
-#margin-status.margin-ok,
-#margin-status-label.margin-ok {
+#margin-status.margin-ok {
     color: var(--up);
 }
 
-#margin-status.margin-alert,
-#margin-status-label.margin-alert {
+#margin-status.margin-alert {
     color: var(--down);
     font-weight: 700;
 }
 
-#margin-status.margin-warn,
-#margin-status-label.margin-warn {
+#margin-status.margin-warn {
     color: var(--gamma);
     font-weight: 600;
 }
