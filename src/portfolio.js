@@ -149,6 +149,90 @@ function _marginForShort(type, qty, fillPrice, currentPrice, currentVol, current
     }
 }
 
+/**
+ * Compute maintenance margin for a single short position (proposed or actual).
+ */
+function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay) {
+    switch (type) {
+        case 'stock':
+            return MAINTENANCE_MARGIN * currentPrice * absQty;
+        case 'bond': {
+            const dte = expiryDay != null
+                ? Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0) : 0;
+            return MAINTENANCE_MARGIN * BOND_FACE_VALUE * Math.exp(-currentRate * dte) * absQty;
+        }
+        case 'call':
+        case 'put': {
+            const dte = expiryDay != null
+                ? Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0) : 0;
+            const optMid = dte > 0
+                ? priceAmerican(currentPrice, strike, dte, currentRate, currentVol, type === 'put')
+                : Math.max(0, type === 'call' ? currentPrice - strike : strike - currentPrice);
+            return Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
+        }
+        default: return 0;
+    }
+}
+
+/**
+ * Check whether opening a short position (given a cashDelta already computed)
+ * would immediately violate maintenance margin.  Computes post-trade equity
+ * and post-trade maintenance requirement by adding the proposed short to the
+ * current portfolio state.
+ *
+ * @param {number} cashDelta       - Net cash change from the trade
+ * @param {number} shortMtm        - MTM value of the NEW short piece (negative)
+ * @param {number} shortMaintenance - Maintenance margin for the NEW short piece
+ * @param {number} currentPrice
+ * @param {number} currentVol
+ * @param {number} currentRate
+ * @param {number} currentDay
+ * @param {number} [skipIdx]       - Index in portfolio.positions to exclude
+ *                                   (used when extending existing short, to
+ *                                    avoid double-counting the old position)
+ * @returns {boolean} true if the trade is safe
+ */
+function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
+                            currentPrice, currentVol, currentRate, currentDay,
+                            skipIdx) {
+    let equity = portfolio.cash + cashDelta;
+    let required = shortMaintenance;
+
+    for (let i = 0; i < portfolio.positions.length; i++) {
+        if (i === skipIdx) continue;
+        const pos = portfolio.positions[i];
+        equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay);
+
+        if (pos.qty < 0) {
+            const absQty = Math.abs(pos.qty);
+            const dte = pos.expiryDay != null
+                ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
+                : 0;
+            switch (pos.type) {
+                case 'stock':
+                    required += MAINTENANCE_MARGIN * currentPrice * absQty;
+                    break;
+                case 'bond': {
+                    const bp = BOND_FACE_VALUE * Math.exp(-currentRate * dte);
+                    required += MAINTENANCE_MARGIN * bp * absQty;
+                    break;
+                }
+                case 'call':
+                case 'put': {
+                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, pos.type === 'put');
+                    required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
+                    break;
+                }
+            }
+        }
+    }
+
+    // Add the proposed short position's MTM to equity
+    equity += shortMtm;
+
+    return equity >= required;
+}
+
 // ---------------------------------------------------------------------------
 // executeMarketOrder
 // ---------------------------------------------------------------------------
@@ -222,6 +306,10 @@ export function executeMarketOrder(
                 );
                 if (portfolio.cash + cashDelta + proceeds < margin) return null;
                 cashDelta += proceeds - margin;
+                // Post-trade margin check (skip existing long being closed)
+                const shortMtm = -openingShortQty * mid;
+                const shortMaint = _maintenanceForShort(type, openingShortQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay);
+                if (!_postTradeMarginOk(cashDelta, shortMtm, shortMaint, currentPrice, currentVol, currentRate, currentDay, existingIdx)) return null;
             }
 
         } else if (oldQty < 0 && signedQty > 0) {
@@ -263,6 +351,11 @@ export function executeMarketOrder(
             );
             if (portfolio.cash + proceeds < margin) return null;
             cashDelta = proceeds - margin;
+            // Post-trade margin check: combined position (old + new)
+            const totalAbsQty = Math.abs(oldQty) + absQty;
+            const combinedMtm = -totalAbsQty * mid;
+            const combinedMaint = _maintenanceForShort(type, totalAbsQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay);
+            if (!_postTradeMarginOk(cashDelta, combinedMtm, combinedMaint, currentPrice, currentVol, currentRate, currentDay, existingIdx)) return null;
             existing._reservedMargin = (existing._reservedMargin || 0) + margin;
         }
 
@@ -315,6 +408,10 @@ export function executeMarketOrder(
         );
         if (portfolio.cash + proceeds < margin) return null;
         cashDelta = proceeds - margin;
+        // Verify post-trade equity exceeds maintenance margin
+        const shortMtm = -qty * mid;
+        const shortMaint = _maintenanceForShort(type, qty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay);
+        if (!_postTradeMarginOk(cashDelta, shortMtm, shortMaint, currentPrice, currentVol, currentRate, currentDay)) return null;
     }
 
     portfolio.cash += cashDelta;
