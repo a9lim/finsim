@@ -34,8 +34,8 @@ index.html             500 lines  Toolbar, chart/strategy canvases, sidebar (4 t
                                    Trade/Portfolio/Strategy/Settings), chain overlay,
                                    trade dialog, margin call overlay, intro screen
 styles.css             800 lines  Project CSS: chain table, position rows, strategy builder,
-                                   trade dialog, margin alert, P&L coloring, Greek label
-                                   classes, time slider, responsive breakpoints
+                                   trade dialog, margin alert, P&L coloring, Greek value
+                                   colors, time slider, responsive breakpoints
 colors.js               59 lines  Financial color aliases (_PALETTE.up/down/call/put/stock/
                                    bond/delta/gamma/theta/vega/rho), CSS var injection,
                                    freezes _PALETTE
@@ -428,7 +428,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Strategy legs live in main.js** -- `strategyLegs[]` is local state, not in portfolio.js.
 - **Inline qty editing** in strategy leg rows mutates `leg.qty` directly, bypasses netting.
 - **`portfolio` singleton** -- `resetPortfolio()` mutates in place. Never replace the reference.
-- **Chain table rebuilt every call** -- do not cache cell references. Clicks use event delegation on container (not per-cell listeners).
+- **Chain table rebuilt every call** -- do not cache cell references. Clicks use event delegation on container (not per-cell listeners). Delegation is bound once per container (`_chainClicksBound` flag) -- never re-bind.
 - **Trade dialog confirm button cloned** on each open to avoid stacking listeners.
 - **`ExpiryManager` is stateful** -- lives in main.js, `.init()` on reset, `.update()` each tick.
 - **Vasicek rate can go negative** -- BS2002 uses `rEff = max(r, 1e-7)` for beta only.
