@@ -51,11 +51,19 @@ export class Simulation {
         this.recomputeK();
         this._spareValid = false;
         this._spare = 0;
+        this._dt = 1 / (TRADING_DAYS_PER_YEAR * INTRADAY_STEPS);
+        this._sqrtDt = Math.sqrt(this._dt);
+        this._recomputeRhoDerived();
     }
 
     /** Recompute jump compensation. Call after muJ or sigmaJ change. */
     recomputeK() {
         this._k = Math.exp(this.muJ + 0.5 * this.sigmaJ * this.sigmaJ) - 1;
+    }
+
+    /** Recompute rho-derived cached value. Call after rho changes. */
+    _recomputeRhoDerived() {
+        this._sqrtOneMinusRhoSq = Math.sqrt(1 - this.rho * this.rho);
     }
 
     /* -----------------------------------------------
@@ -65,9 +73,7 @@ export class Simulation {
        the live candle forming.
     ----------------------------------------------- */
     beginDay() {
-        this._dt = 1 / (TRADING_DAYS_PER_YEAR * INTRADAY_STEPS);
-        this._sqrtDt = Math.sqrt(this._dt);
-        this._sqrtOneMinusRhoSq = Math.sqrt(1 - this.rho * this.rho);
+        this._poissonL = Math.exp(-this.lambda * this._dt);
         this._substepIndex = 0;
 
         this._partial = {
@@ -109,7 +115,7 @@ export class Simulation {
         this.v = Math.max(this.v, 0);
 
         // 3. Merton jumps
-        const nJumps = this._poisson(this.lambda * dt);
+        const nJumps = this._poissonFast();
         let jumpSum = 0;
         for (let j = 0; j < nJumps; j++) {
             jumpSum += this.muJ + this.sigmaJ * this._randn();
@@ -222,6 +228,19 @@ export class Simulation {
             k++;
             p *= Math.random();
         } while (p > L);
+        return k - 1;
+    }
+
+    /* -----------------------------------------------
+       _poissonFast()
+       Like _poisson() but uses the pre-cached L value
+       (_poissonL) computed once per day in beginDay().
+    ----------------------------------------------- */
+    _poissonFast() {
+        const L = this._poissonL;
+        if (L >= 1) return 0;
+        let k = 0, p = 1;
+        do { k++; p *= Math.random(); } while (p > L);
         return k - 1;
     }
 }

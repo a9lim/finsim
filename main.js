@@ -681,6 +681,7 @@ function _isLLMPreset(index) { return index >= 6; }
 
 function syncSliderToSim(param, value) {
     sim[param] = value;
+    if (param === 'rho') sim._recomputeRhoDerived();
     dirty = true;
 }
 

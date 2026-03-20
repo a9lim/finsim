@@ -684,6 +684,7 @@ export class EventEngine {
             if (!range) continue;
             sim[key] = Math.min(range.max, Math.max(range.min, sim[key] + delta));
         }
+        if (params.rho !== undefined) sim._recomputeRhoDerived();
     }
 
     /** Clear all state. */
