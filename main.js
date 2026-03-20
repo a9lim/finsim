@@ -48,6 +48,7 @@ let lastTickTime = 0;
 let dayInProgress = false; // true between beginDay() and finalizeDay()
 let mouseX = -1, mouseY = -1;
 let strategyLegs = [];
+let activeTab = 'trade';
 let greekToggles = { delta: true, gamma: false, theta: false, vega: false, rho: false };
 let sliderPct = 100;  // percentage of max DTE (100% = full time, 0% = at expiry)
 let lastSpot = 0; // track spot changes for range reset
@@ -292,23 +293,28 @@ function init() {
         const rect = $.chartCanvas.getBoundingClientRect();
         mouseX = e.clientX - rect.left;
         mouseY = e.clientY - rect.top;
-        dirty = true;
+        if (!strategyMode) dirty = true;
     });
     $.chartCanvas.addEventListener('mouseleave', () => {
         mouseX = -1;
         mouseY = -1;
-        dirty = true;
+        if (!strategyMode) dirty = true;
     });
 
     // 18. Wire tab switching to strategy mode
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            const isStrategy = btn.dataset.tab === 'strategy';
+            activeTab = btn.dataset.tab || 'trade';
+            const isStrategy = activeTab === 'strategy';
             if (isStrategy !== strategyMode) {
                 strategyMode = isStrategy;
                 toggleStrategyView($, strategyMode);
                 if (strategyMode) strategy.resize();
                 dirty = true;
+            }
+            if (isStrategy) {
+                updateStrategySelectors($, chain, sim.S, handleAddLeg);
+                updateStockBondPrices($, sim.S, sim.r, chain);
             }
         });
     });
@@ -452,7 +458,9 @@ function _onDayComplete() {
         const lastDay = sim.history.maxDay;
         const viewW = $.chartCanvas.clientWidth || 800;
         const targetWorldX = lastDay + 1;
-        const rightEdgeWorld = camera.screenToWorld(viewW * 0.85, 0).x;
+        const rightEdgeWorld = camera.screenToWorldX
+            ? camera.screenToWorldX(viewW * 0.85)
+            : camera.screenToWorld(viewW * 0.85, 0).x;
         if (targetWorldX > rightEdgeWorld) {
             const dx = targetWorldX - rightEdgeWorld;
             camera.panBy(-dx * camera.zoom, 0);
@@ -509,14 +517,19 @@ function updateUI(precomputedMargin) {
     if (chainDirty) {
         updateChainDisplay($, chain);
         updateStockBondPrices($, sim.S, sim.r, chain);
-        updateStrategySelectors($, chain, sim.S, handleAddLeg);
+        if (strategyMode) {
+            updateStrategySelectors($, chain, sim.S, handleAddLeg);
+        }
         chainDirty = false;
     }
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin);
-    updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
+    if (activeTab === 'portfolio') {
+        updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day));
+    }
     updateRateDisplay($, sim.r);
-    updateStrategyBuilder();
-    updateTimeSliderRange();
+    if (strategyMode && strategyLegs.length > 0) {
+        updateStrategyBuilder();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -546,8 +559,9 @@ function _getMinDTE() {
 }
 
 /** Elapsed trading days at the current slider position (0 at 100%, minDTE at 0%). */
-function _sliderElapsed() {
-    return Math.round(_getMinDTE() * (100 - sliderPct) / 100);
+function _sliderElapsed(minDTE) {
+    if (minDTE === undefined) minDTE = _getMinDTE();
+    return Math.round(minDTE * (100 - sliderPct) / 100);
 }
 
 /** Evaluation day for strategy diagram at current slider position. */
@@ -569,7 +583,7 @@ function updateTimeSliderRange() {
         sliderPct = 100;
         $.timeSlider.value = 100;
     }
-    const elapsed = _sliderElapsed();
+    const elapsed = _sliderElapsed(minDTE);
     const nearestRemaining = minDTE - elapsed;
     if ($.timeSliderLabel) $.timeSliderLabel.textContent = nearestRemaining + ' DTE';
 }
@@ -633,6 +647,8 @@ function _resetCore(index) {
     chainDirty = true;
     playing = false;
     lastSpot = sim.S;
+    strategyLegs.length = 0;
+    sliderPct = 100;
     strategy.resetRange(sim.S, strategyLegs);
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
