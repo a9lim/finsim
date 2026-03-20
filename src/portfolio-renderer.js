@@ -36,7 +36,7 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day) {
     const labelStr   = typeLabel + strikeStr + expiryStr + ' x' + absQty;
 
     const row = document.createElement('div');
-    row.className = 'pos-row stat-row';
+    row.className = 'data-row pos-row stat-row';
     row.dataset.posId = pos.id;
 
     const labelEl = document.createElement('span');
@@ -89,7 +89,7 @@ function _buildOrderRow(order) {
     const labelStr  = typeLabel + strikeStr + ' x' + order.qty + ' ' + order.orderType + ' @ ' + fmtDollar(order.triggerPrice);
 
     const row = document.createElement('div');
-    row.className = 'order-row stat-row';
+    row.className = 'data-row order-row stat-row';
     row.dataset.orderId = order.id;
 
     const labelEl = document.createElement('span');

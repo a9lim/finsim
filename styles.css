@@ -357,8 +357,8 @@ main {
 }
 
 /* --- Greeks Display --- */
-/* --- Portfolio Positions --- */
-.pos-row {
+/* --- Shared row base for positions and orders --- */
+.data-row {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -369,10 +369,12 @@ main {
     font-size: 0.75rem;
     transition: background 0.12s;
 }
-
-.pos-row:hover {
+.data-row:hover {
     background: var(--bg-hover);
 }
+
+/* --- Portfolio Positions --- */
+.pos-row {}
 
 .pos-label {
     flex: 1;
@@ -406,21 +408,7 @@ main {
 }
 
 /* --- Order Rows --- */
-.order-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 8px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    margin-bottom: 3px;
-    font-size: 0.75rem;
-    transition: background 0.12s;
-}
-
-.order-row:hover {
-    background: var(--bg-hover);
-}
+.order-row {}
 
 .order-label {
     flex: 1;
