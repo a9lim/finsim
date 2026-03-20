@@ -7,7 +7,7 @@
    ===================================================== */
 
 import { fmtDollar, fmtNum, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
-import { renderChainInto, buildStockBondTable, buildChainTable, bindChainTableClicks, posKey } from './chain-renderer.js';
+import { renderChainInto, rebuildExpiryDropdown, buildStockBondTable, buildChainTable, bindChainTableClicks, posKey } from './chain-renderer.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
 // ---------------------------------------------------------------------------
@@ -295,8 +295,26 @@ export function bindEvents($, handlers) {
 // updateChainDisplay
 // ---------------------------------------------------------------------------
 
-export function updateChainDisplay($, chain, selectedExpiryIndex, posMap) {
-    renderChainInto($.chainTable, chain, selectedExpiryIndex, $.tradeExpiry, $._onChainCellClick, posMap);
+/**
+ * Update trade-tab chain table with a pre-priced expiry.
+ */
+export function updateChainDisplay($, pricedExpiry, posMap) {
+    renderChainInto($.chainTable, pricedExpiry, $._onChainCellClick, posMap);
+}
+
+/**
+ * Rebuild the trade-tab expiry dropdown from the skeleton.
+ * Call only when skeleton changes (day complete, reset).
+ */
+export function rebuildTradeDropdown($, skeleton, selectedIndex) {
+    rebuildExpiryDropdown($.tradeExpiry, skeleton, selectedIndex);
+}
+
+/**
+ * Rebuild the strategy-tab expiry dropdown from the skeleton.
+ */
+export function rebuildStrategyDropdown($, skeleton, selectedIndex) {
+    rebuildExpiryDropdown($.strategyExpiry, skeleton, selectedIndex);
 }
 
 
@@ -335,14 +353,17 @@ function _applyPill(el, text, qty) {
     if (qty) el.classList.add(qty > 0 ? 'pos-long' : 'pos-short');
 }
 
-export function updateStockBondPrices($, spot, rate, chain, posMap, stratPosMap) {
+/**
+ * @param {Array} skeleton - chain skeleton (has .day, .dte per entry)
+ */
+export function updateStockBondPrices($, spot, rate, skeleton, posMap, stratPosMap) {
     const dash = '\u2014';
     const stockTxt = spot != null ? spot.toFixed(2) : dash;
 
     // Trade tab bond: from trade expiry dropdown
     const tradeIdx = parseInt($.tradeExpiry?.value, 10);
-    const tradeExp = chain && chain.length > 0
-        ? chain[isNaN(tradeIdx) ? chain.length - 1 : Math.min(tradeIdx, chain.length - 1)]
+    const tradeExp = skeleton && skeleton.length > 0
+        ? skeleton[isNaN(tradeIdx) ? skeleton.length - 1 : Math.min(tradeIdx, skeleton.length - 1)]
         : null;
     const tradeBond = tradeExp && rate != null
         ? (100 * Math.exp(-rate * tradeExp.dte / 252)).toFixed(2)
@@ -358,8 +379,8 @@ export function updateStockBondPrices($, spot, rate, chain, posMap, stratPosMap)
 
     // Strategy tab bond: from strategy expiry dropdown
     const stratIdx = parseInt($.strategyExpiry?.value, 10);
-    const stratExp = chain && chain.length > 0
-        ? chain[isNaN(stratIdx) ? chain.length - 1 : Math.min(stratIdx, chain.length - 1)]
+    const stratExp = skeleton && skeleton.length > 0
+        ? skeleton[isNaN(stratIdx) ? skeleton.length - 1 : Math.min(stratIdx, skeleton.length - 1)]
         : null;
     const stratBond = stratExp && rate != null
         ? (100 * Math.exp(-rate * stratExp.dte / 252)).toFixed(2)
@@ -396,10 +417,17 @@ export function syncSettingsUI($, sim) {
 // showChainOverlay
 // ---------------------------------------------------------------------------
 
-export function showChainOverlay($, chain, stockBA, bondBA, posMap) {
+/**
+ * @param {Array} skeleton - chain skeleton
+ * @param {function} priceExpiry - (index) => priced expiry with greeks
+ * @param {{ bid, ask }} stockBA
+ * @param {{ bid, ask }} bondBA
+ * @param {object} posMap
+ */
+export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posMap) {
     $.chainOverlayTable.textContent = '';
 
-    if (!chain || chain.length === 0) {
+    if (!skeleton || skeleton.length === 0) {
         const hint = document.createElement('p');
         hint.className = 'panel-hint';
         hint.textContent = 'No chain data available.';
@@ -415,7 +443,7 @@ export function showChainOverlay($, chain, stockBA, bondBA, posMap) {
 
         const tabBar = document.createElement('div');
         tabBar.className = 'chain-expiry-tabs';
-        chain.forEach((exp, i) => {
+        skeleton.forEach((exp, i) => {
             const btn = document.createElement('button');
             btn.className = 'ghost-btn chain-expiry-tab' + (i === selectedExpiry ? ' active' : '');
             btn.textContent = fmtDte(exp.dte);
@@ -433,7 +461,7 @@ export function showChainOverlay($, chain, stockBA, bondBA, posMap) {
             buildStockBondTable(stockBA, bondBA, $._onChainCellClick, posMap)
         );
 
-        const expiry = chain[selectedExpiry];
+        const expiry = priceExpiry(selectedExpiry);
         $.chainOverlayTable.appendChild(buildChainTable(expiry, false, posMap));
         if (!$.chainOverlayTable._chainClicksBound) {
             bindChainTableClicks($.chainOverlayTable, $._onChainCellClick);
@@ -512,9 +540,11 @@ export function updateSpeedBtn($, speed) {
  * Update the strategy chain table, stock/bond prices, and trigger price slider.
  * Called whenever the chain is rebuilt.
  */
-export function updateStrategySelectors($, chain, spot, onAddLeg, posMap) {
-    // Strategy chain table + expiry dropdown (built together by renderChainInto)
-    updateStrategyChainDisplay($, chain, null, onAddLeg, posMap);
+/**
+ * Update strategy selectors: chain table + trigger price slider.
+ */
+export function updateStrategySelectors($, pricedExpiry, spot, onAddLeg, posMap) {
+    updateStrategyChainDisplay($, pricedExpiry, onAddLeg, posMap);
 
     // Trigger price slider range based on current spot (+-30%)
     if ($.triggerPrice && spot) {
@@ -530,19 +560,21 @@ export function updateStrategySelectors($, chain, spot, onAddLeg, posMap) {
     }
 }
 
-export function updateStrategyChainDisplay($, chain, selectedIndex, onAddLeg, posMap) {
+/**
+ * Update strategy chain table with a pre-priced expiry.
+ */
+export function updateStrategyChainDisplay($, pricedExpiry, onAddLeg, posMap) {
     if (!$.strategyChainTable) return;
 
-    // Wrap onAddLeg into the { type, side, strike, expiryDay } callback shape
     const onClick = typeof onAddLeg === 'function'
         ? (info) => onAddLeg(info.type, info.side, info.strike, info.expiryDay)
         : null;
 
-    renderChainInto($.strategyChainTable, chain, selectedIndex, $.strategyExpiry, onClick, posMap);
+    renderChainInto($.strategyChainTable, pricedExpiry, onClick, posMap);
 }
 
 
-export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain, onLegChange) {
+export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, onLegChange) {
     if (!$.strategyLegsList) return;
 
     $.strategyLegsList.textContent = '';
@@ -555,7 +587,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain, onLe
     } else {
         for (let i = 0; i < legs.length; i++) {
             const leg = legs[i];
-            $.strategyLegsList.appendChild(_buildLegRow(leg, i, onRemoveLeg, chain, onLegChange));
+            $.strategyLegsList.appendChild(_buildLegRow(leg, i, onRemoveLeg, skeleton, onLegChange));
         }
     }
 
@@ -602,7 +634,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, chain, onLe
     if ($.execStrategyBtn) $.execStrategyBtn.disabled = !hasLegs;
 }
 
-function _buildLegRow(leg, index, onRemoveLeg, chain, onLegChange) {
+function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
     const row = document.createElement('div');
     row.className = 'leg-row stat-row';
 
@@ -614,7 +646,7 @@ function _buildLegRow(leg, index, onRemoveLeg, chain, onLegChange) {
     let desc = sideStr + ' ' + leg.type.toUpperCase();
     if (leg.strike != null) desc += ' K' + leg.strike;
     if (leg.expiryDay != null) {
-        const expiry = chain ? chain.find(e => e.day === leg.expiryDay) : null;
+        const expiry = skeleton ? skeleton.find(e => e.day === leg.expiryDay) : null;
         if (expiry) desc += ' ' + expiry.dte + 'd';
     }
     label.textContent = desc;

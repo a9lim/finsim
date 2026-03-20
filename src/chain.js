@@ -1,21 +1,22 @@
 /**
  * chain.js — Options chain generator for the Shoals trading simulator.
  *
- * Generates strike prices, expiry dates, and computed prices/Greeks
- * for every call and put in the chain.
+ * Generates strike prices, expiry dates, and lazy per-expiry pricing.
+ * buildChainSkeleton() returns metadata only (no pricing calls).
+ * priceChainExpiry() prices a single expiry on demand.
  *
- * Exports: buildChain
+ * Exports: buildChainSkeleton, priceChainExpiry, generateStrikes, ExpiryManager
  */
 
 import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR } from './config.js';
-import { computeGreeks } from './pricing.js';
+import { priceAmerican, computeGreeks } from './pricing.js';
 import { computeOptionBidAsk } from './portfolio.js';
 
 // ---------------------------------------------------------------------------
 // Expiry management — rolling window of expiry dates
 // ---------------------------------------------------------------------------
 
-const EXPIRY_CYCLE = 84; // trading days per quarter (approximate)
+const EXPIRY_CYCLE = 63; // trading days per quarter (approximate)
 const EXPIRY_COUNT = 8;  // number of active expiries to maintain
 
 /**
@@ -77,7 +78,7 @@ export class ExpiryManager {
  * @param {number} currentPrice - Current underlying price
  * @returns {number[]} Sorted array of strike prices
  */
-function generateStrikes(currentPrice) {
+export function generateStrikes(currentPrice) {
     const atm = Math.round(currentPrice / STRIKE_INTERVAL) * STRIKE_INTERVAL;
     const strikes = [];
     for (let i = -STRIKE_RANGE; i <= STRIKE_RANGE; i++) {
@@ -90,68 +91,69 @@ function generateStrikes(currentPrice) {
 }
 
 // ---------------------------------------------------------------------------
-// Full chain builder
+// Lazy chain builder — skeleton + per-expiry pricing
 // ---------------------------------------------------------------------------
 
 /**
- * Build the full options chain.
+ * Build the chain skeleton: expiry metadata + strikes, no pricing.
  *
- * For each expiry × strike combination, computes call and put Greeks
- * (price, delta, gamma, theta, vega, rho) and model bid/ask spreads.
- *
- * @param {number} S          - Spot price
- * @param {number} v          - Heston variance (converted to volatility internally)
- * @param {number} r          - Risk-free rate (continuously compounded)
- * @param {number} currentDay - Current simulation day (integer)
- * @returns {Array<{
- *   day: number,
- *   dte: number,
- *   options: Array<{
- *     strike: number,
- *     call: { price: number, delta: number, gamma: number, theta: number, vega: number, rho: number, bid: number, ask: number },
- *     put:  { price: number, delta: number, gamma: number, theta: number, vega: number, rho: number, bid: number, ask: number },
- *   }>
- * }>}
+ * @param {number} S          - Spot price (used to centre strikes)
+ * @param {number} currentDay - Current simulation day (unused, kept for API symmetry)
+ * @param {{ day: number, dte: number }[]} expiries
+ * @returns {Array<{ day: number, dte: number, strikes: number[] }>}
  */
-export function buildChain(S, v, r, currentDay, expiries) {
+export function buildChainSkeleton(S, currentDay, expiries) {
     const strikes = generateStrikes(S);
+    return expiries.map(({ day, dte }) => ({ day, dte, strikes }));
+}
+
+/**
+ * Price a single chain expiry on demand.
+ *
+ * When greeks=false (default), calls priceAmerican once per option (50 calls
+ * for 25 strikes). When greeks=true, calls computeGreeks (9 pricing calls
+ * per option = 450 calls). Use greeks=true only for the full chain overlay.
+ *
+ * @param {number} S     - Spot price
+ * @param {number} v     - Heston variance (converted to sigma internally)
+ * @param {number} r     - Risk-free rate
+ * @param {{ day: number, dte: number, strikes: number[] }} expiry - skeleton entry
+ * @param {boolean} [greeks=false] - compute full Greeks (delta/gamma/theta/vega/rho)
+ * @returns {{ day: number, dte: number, options: Array }}
+ */
+export function priceChainExpiry(S, v, r, expiry, greeks) {
     const sigma = Math.sqrt(Math.max(v, 0));
+    const T = expiry.dte / TRADING_DAYS_PER_YEAR;
 
-    return expiries.map(({ day, dte }) => {
-        const T = dte / TRADING_DAYS_PER_YEAR; // convert trading days to years
-
-        const options = strikes.map(K => {
-            const callGreeks = computeGreeks(S, K, T, r, sigma, false);
-            const putGreeks  = computeGreeks(S, K, T, r, sigma, true);
-
-            const callBA = computeOptionBidAsk(callGreeks.price, S, K, sigma);
-            const putBA  = computeOptionBidAsk(putGreeks.price,  S, K, sigma);
-
+    const options = expiry.strikes.map(K => {
+        if (greeks) {
+            const callG = computeGreeks(S, K, T, r, sigma, false);
+            const putG  = computeGreeks(S, K, T, r, sigma, true);
+            const callBA = computeOptionBidAsk(callG.price, S, K, sigma);
+            const putBA  = computeOptionBidAsk(putG.price,  S, K, sigma);
             return {
                 strike: K,
-                call: {
-                    price: callGreeks.price,
-                    delta: callGreeks.delta,
-                    gamma: callGreeks.gamma,
-                    theta: callGreeks.theta,
-                    vega:  callGreeks.vega,
-                    rho:   callGreeks.rho,
-                    bid:   Math.max(0, callBA.bid),
-                    ask:   callBA.ask,
-                },
-                put: {
-                    price: putGreeks.price,
-                    delta: putGreeks.delta,
-                    gamma: putGreeks.gamma,
-                    theta: putGreeks.theta,
-                    vega:  putGreeks.vega,
-                    rho:   putGreeks.rho,
-                    bid:   Math.max(0, putBA.bid),
-                    ask:   putBA.ask,
-                },
+                call: { price: callG.price, delta: callG.delta, gamma: callG.gamma,
+                         theta: callG.theta, vega: callG.vega, rho: callG.rho,
+                         bid: Math.max(0, callBA.bid), ask: callBA.ask },
+                put:  { price: putG.price, delta: putG.delta, gamma: putG.gamma,
+                         theta: putG.theta, vega: putG.vega, rho: putG.rho,
+                         bid: Math.max(0, putBA.bid), ask: putBA.ask },
             };
-        });
-
-        return { day, dte, options };
+        }
+        // Price-only path: 1 call per option type (not 9)
+        const callP = priceAmerican(S, K, T, r, sigma, false);
+        const putP  = priceAmerican(S, K, T, r, sigma, true);
+        const callBA = computeOptionBidAsk(callP, S, K, sigma);
+        const putBA  = computeOptionBidAsk(putP,  S, K, sigma);
+        return {
+            strike: K,
+            call: { price: callP, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0,
+                     bid: Math.max(0, callBA.bid), ask: callBA.ask },
+            put:  { price: putP, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0,
+                     bid: Math.max(0, putBA.bid), ask: putBA.ask },
+        };
     });
+
+    return { day: expiry.day, dte: expiry.dte, options };
 }

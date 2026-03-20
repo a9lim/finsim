@@ -46,9 +46,10 @@ src/
   position-value.js    ~40 lines  Unified position valuation: computePositionValue(),
                                    computePositionPnl(). Imports pricing, config.
   chain-renderer.js   ~220 lines  Chain table DOM building with event delegation:
-                                   renderChainInto(), buildStockBondTable(), posKey().
-                                   Position indicators: accepts posMap param, applies
-                                   .pos-long/.pos-short CSS classes to cells with positions.
+                                   renderChainInto(), rebuildExpiryDropdown(),
+                                   buildStockBondTable(), posKey(). Position indicators:
+                                   accepts posMap param, applies .pos-long/.pos-short
+                                   CSS classes to cells with positions.
   portfolio-renderer.js ~190 lines Portfolio display with DOM diffing:
                                    updatePortfolioDisplay(). Extracted from ui.js.
   events.js          ~500 lines  EventEngine: Poisson scheduler, MTTH followup chains,
@@ -64,8 +65,9 @@ src/
   pricing.js           435 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
                                    normal CDF (Drezner-Wesolowsky 1990) + finite-diff Greeks.
                                    Exports: priceAmerican, computeGreeks
-  chain.js             158 lines  ExpiryManager (rolling 8-expiry window, 84-day cycle),
-                                   generateStrikes() (internal), buildChain()
+  chain.js             170 lines  ExpiryManager (rolling 8-expiry window, 63-day cycle),
+                                   generateStrikes(), buildChainSkeleton(),
+                                   priceChainExpiry() (lazy per-expiry pricing)
   portfolio.js         770 lines  Signed-qty positions, market/limit/stop orders, netting,
                                    strategy groups, cash/margin, chargeBorrowInterest() (short
                                    stock/bond daily borrow cost), processExpiry() (options + bonds),
@@ -83,6 +85,7 @@ src/
                                    entry values (_precomputeLegs). Per-leg T from
                                    evalDay/entryDay. No shared-camera.js.
   ui.js                670 lines  cacheDOMElements(), bindEvents(), updateChainDisplay(),
+                                   rebuildTradeDropdown(), rebuildStrategyDropdown(),
                                    updateStrategyChainDisplay(), updateGreeksDisplay(),
                                    showChainOverlay(), showMarginCall(),
                                    toggleStrategyView(), renderStrategyBuilder(),
@@ -98,7 +101,8 @@ main.js
   |- src/config.js        (SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE)
   |- src/simulation.js    (Simulation -- imports config, history-buffer)
   |- src/history-buffer.js (HistoryBuffer -- no imports)
-  |- src/chain.js         (buildChain, ExpiryManager -- imports pricing, portfolio, config)
+  |- src/chain.js         (buildChainSkeleton, priceChainExpiry, generateStrikes,
+  |                         ExpiryManager -- imports pricing, portfolio, config)
   |- src/portfolio.js     (portfolio, resetPortfolio, executeMarketOrder, computeBidAsk,
   |                         checkPendingOrders, chargeBorrowInterest, processExpiry,
   |                         checkMargin, aggregateGreeks, closePosition, exerciseOption,
@@ -110,8 +114,9 @@ main.js
   |- src/strategy.js      (StrategyRenderer -- imports pricing, config)
   |- src/format-helpers.js  (fmtDollar, fmtNum, pnlClass, fmtDte, posTypeLabel -- imports config)
   |- src/position-value.js  (imports pricing, config)
-  |- src/chain-renderer.js  (posKey, renderChainInto, buildStockBondTable, buildChainTable,
-  |                         bindChainTableClicks -- imports format-helpers; reads _haptics globals)
+  |- src/chain-renderer.js  (posKey, renderChainInto, rebuildExpiryDropdown,
+  |                         buildStockBondTable, buildChainTable, bindChainTableClicks
+  |                         -- imports format-helpers; reads _haptics globals)
   |- src/portfolio-renderer.js (imports position-value, format-helpers)
   |- src/ui.js            (cacheDOMElements, bindEvents, display updaters -- imports
   |                         format-helpers, chain-renderer, portfolio-renderer;
@@ -126,7 +131,8 @@ main.js
 1. `frame()` calls `sim.beginDay()` -- pushes a partial bar into `sim.history` by reference
 2. Sub-steps paced across tick interval (`tickInterval / INTRADAY_STEPS`). Each `sim.substep()` mutates partial bar in-place
 3. `chart.setLiveCandle(bar)` snaps close to previous sub-step value, starts a new cubic interpolation segment toward the new target. Smoothstep (`t²(3-2t)`) fills the full substep interval so the candle is always in motion. High/low are water marks of the interpolated path
-4. After 16 sub-steps, `sim.finalizeDay()` increments day. `_onDayComplete()` runs `checkPendingOrders()`, `chargeBorrowInterest()`, `processExpiry()`, `buildChain()`, `checkMargin()`, auto-scroll, UI update
+4. After each substep batch, `_onSubstep()` runs: `checkPendingOrders()` (fills limit/stop orders at intraday price), reprices the visible chain expiry (50 `priceAmerican` calls), updates portfolio mark-to-market, rate display, and strategy builder
+5. After 16 sub-steps, `sim.finalizeDay()` increments day. `_onDayComplete()` runs `chargeBorrowInterest()`, `processExpiry()`, `buildChainSkeleton()`, `checkMargin()`, auto-scroll, full UI update with dropdown rebuild
 
 ### Instant Tick
 
@@ -220,16 +226,22 @@ ATM = `round(S / 5) * 5`. 12 strikes each side, filtered positive, sorted ascend
 
 ### Expiry Management
 
-`ExpiryManager` maintains 8 rolling expiry dates on an 84-day cycle (~quarterly). `update(currentDay)` drops expired, appends new. Returns `[{ day, dte }]`.
+`ExpiryManager` maintains 8 rolling expiry dates on a 63-day cycle (~quarterly). `update(currentDay)` drops expired, appends new. Returns `[{ day, dte }]`.
 
-### Chain Data Structure
+### Lazy Chain Architecture
 
-`buildChain(S, v, r, currentDay, expiries)` returns:
+The chain uses a two-tier lazy pricing model to avoid computing Greeks for all 8 expiries × 25 strikes on every update:
+
+**`buildChainSkeleton(S, currentDay, expiries)`** returns the lightweight skeleton (no pricing calls):
 ```
-[{ day, dte, options: [{ strike, call: {price,delta,gamma,theta,vega,rho,bid,ask}, put: {...} }] }]
+[{ day, dte, strikes: number[] }]
 ```
 
-`buildChain()` converts `v` to `sigma = sqrt(max(v, 0))` before passing to `computeGreeks()`.
+**`priceChainExpiry(S, v, r, expiry, greeks?)`** prices a single expiry on demand:
+- `greeks=false` (default): 50 `priceAmerican` calls (1 per option). Returns price + bid/ask, Greeks zeroed. Used for sidebar compact chain (updated every substep).
+- `greeks=true`: 450 `computeGreeks` calls (9 per option). Returns full Greeks. Used only for the full chain overlay (delta column).
+
+Expiry dropdown is rebuilt only when the skeleton changes (day complete, reset) via `rebuildExpiryDropdown()`, not on every substep reprice.
 
 ## Portfolio System
 
@@ -356,7 +368,7 @@ Appears in strategy mode. Slider percentage (100% = entry, 0% = first leg expire
 
 ### Tab-Strategy Coupling
 
-Clicking Strategy tab sets `strategyMode = true`, shows strategy canvas + time slider. Clicking other tabs reverts. `s` keyboard shortcut clicks the strategy tab (opens sidebar if closed).
+Clicking Strategy tab sets `strategyMode = true`, pauses the simulation, shows strategy canvas + time slider. Clicking other tabs reverts. `s` keyboard shortcut clicks the strategy tab (opens sidebar if closed).
 
 ## Color System
 
@@ -429,7 +441,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 ## Key Patterns
 
 - **`$` DOM cache**: populated by `cacheDOMElements($)`, passed to all ui.js functions. Also stores closures: `$._onChainCellClick`, `$._onTradeSubmit`.
-- **Dirty flag**: `dirty = true` on state change; rAF loop skips render when false. In strategy mode, substep-level dirties are suppressed (strategy inputs only change daily); only day-complete, user actions, and tab switches set dirty.
+- **Dirty flag**: `dirty = true` on state change; rAF loop skips render when false.
 - **Sub-step streaming**: 16 intraday sub-steps distributed across tick interval. `dayInProgress` tracks active streaming. `lastTickTime` advances by `tickInterval` to prevent drift.
 - **Live candle interpolation**: smoothstep cubic (`t²(3-2t)`) fills the full substep interval. `setSubstepInterval(ms)` tunes segment duration to match current speed. `_syncLerpSpeed()` in main.js calls it on init and speed changes. High/low are water marks that never retract.
 - **Camera (chart only)**: `shared-camera.js`, world X = day index. Strategy canvas manages its own X-range.
@@ -438,9 +450,9 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Bond pricing**: `100 * exp(-r * T)`. Volatility-aware spread via `computeBidAsk()`. Strategy view shows theta (interest accrual) and rho.
 - **Auto-scroll**: keeps latest candle at ~85% from left when playing.
 - **Toast fill price**: trade toast shows actual fill price (including bid/ask spread) via `pos.fillPrice`.
-- **Shared chain renderer**: `renderChainInto()` in chain-renderer.js builds both trade-tab and strategy-tab chain tables. Uses event delegation (3 listeners on container, not per-cell). Trade tab passes `$._onChainCellClick`, strategy tab wraps `onAddLeg`.
+- **Shared chain renderer**: `renderChainInto()` in chain-renderer.js builds both trade-tab and strategy-tab chain tables from a pre-priced expiry. `rebuildExpiryDropdown()` populates expiry dropdowns from the skeleton (only on day-complete/reset, not every substep). Uses event delegation (3 listeners on container, not per-cell). Trade tab passes `$._onChainCellClick`, strategy tab wraps `onAddLeg`.
 - **`_resetCore` helper**: shared reset logic for `loadPreset()` and `resetSim()` in main.js.
-- **Unified stock/bond prices**: `updateStockBondPrices($, spot, rate, chain, posMap, stratPosMap)` computes bond price from each tab's selected expiry and updates all four cells (trade + strategy). Applies position indicator classes via posMap.
+- **Unified stock/bond prices**: `updateStockBondPrices($, spot, rate, skeleton, posMap, stratPosMap)` computes bond price from each tab's selected expiry and updates all four cells (trade + strategy). Applies position indicator classes via posMap.
 - **Position indicators on chain cells**: Chain cells show **bold** text for long positions, **bold italic** for short. `posKey(type, strike, expiryDay)` generates map keys. `_buildPosMap()` (portfolio) and `_buildStrategyPosMap()` (strategy legs) in main.js build maps passed to all chain rendering functions. Trade tab uses portfolio positions; strategy tab uses strategy legs. `chainDirty = true` set after every trade action for immediate update.
 
 ## Gotchas
@@ -472,10 +484,13 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **`borrowCost` on positions** -- cumulative borrow interest charged to short stock/bond positions. Preserved in `portfolio.closedBorrowCost` when positions close/flip/expire.
 - **`portfolio.marginDebitCost`** -- cumulative interest charged on negative cash (buying on margin). Included in borrow cost display. Reset on `resetPortfolio()`.
 - **`_haptics` must always be guarded** -- use `if (typeof _haptics !== 'undefined') _haptics.trigger(...)`. The global loads from `/shared-haptics.js`; ES6 modules may execute before it's defined.
-- **`generateStrikes` is not exported** from chain.js -- internal helper only.
+- **`generateStrikes` is exported** from chain.js.
 - **Strategy execution rolls back on partial failure** -- `handleExecStrategy()` snapshots portfolio state before executing legs; if any leg fails, it restores the snapshot.
 - **`speed` variable removed** -- use `SPEED_OPTIONS[speedIndex]` directly. `speedIndex` is the single source of truth for simulation speed.
 - **`worldToScreenX`/`screenToWorldX`** -- scalar camera methods in `shared-camera.js` avoid object allocation. chart.js uses these with fallback to `worldToScreen().x` for backwards compatibility.
 - **Strategy caches invalidate by key** -- `_cache` and `_summaryCache` use string keys from inputs. Changing legs, vol, rate, evalDay, zoom, or greek toggles auto-invalidates. Do not manually clear caches; they self-manage.
 - **`_precomputeLegs` / `_legPnlFast` / `_legGreeksFast`** -- standalone functions (not class methods) that precompute per-leg entry values once. The old `_legPnl`, `_totalPnl`, `_legGreeks`, `_totalGreeksAll` instance methods have been removed.
+- **Lazy chain: skeleton vs priced expiry** -- `chainSkeleton` (in main.js) holds expiry metadata + strikes with no pricing. `_priceExpiry(idx)` / `_priceExpiryGreeks(idx)` compute prices on demand for one expiry. Only the currently visible expiry is priced each substep (50 calls). Full Greeks only computed for the chain overlay.
+- **Substep UI updates** -- `_onSubstep()` fires after each substep batch during playback. It checks pending orders at intraday prices, reprices the visible expiry, and updates the sidebar (portfolio, rate, chain table). Dropdown rebuild happens only on day-complete via `chainDirty`.
+- **Strategy tab pauses sim** -- switching to the strategy tab sets `playing = false`. The user must manually resume after leaving the tab.
 - **No hardcoded colors in JS** -- chart.js and strategy.js use `_PALETTE` and `_r()` for all colors. CSS slider-track fallbacks in styles.css are the only remaining hardcoded rgba values (defensive fallback for when shared-tokens.js hasn't loaded).
