@@ -296,7 +296,7 @@ export function bindEvents($, handlers) {
     if (typeof createSimTooltip === 'function') {
         const tip = createSimTooltip();
         let tipTarget = null;
-        $.panel.addEventListener('mouseover', (e) => {
+        $.sidebar.addEventListener('mouseover', (e) => {
             const el = e.target.closest('[data-tooltip]');
             if (el === tipTarget) return;
             if (el) {
@@ -307,7 +307,7 @@ export function bindEvents($, handlers) {
                 tip.hide();
             }
         });
-        $.panel.addEventListener('mouseout', (e) => {
+        $.sidebar.addEventListener('mouseout', (e) => {
             if (!tipTarget) return;
             const related = e.relatedTarget;
             if (!related || !tipTarget.contains(related)) {
