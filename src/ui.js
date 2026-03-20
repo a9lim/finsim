@@ -415,7 +415,10 @@ export function showChainOverlay($, chain, stockBA, bondBA) {
 
         const expiry = chain[selectedExpiry];
         $.chainOverlayTable.appendChild(buildChainTable(expiry, false));
-        bindChainTableClicks($.chainOverlayTable, $._onChainCellClick);
+        if (!$.chainOverlayTable._chainClicksBound) {
+            bindChainTableClicks($.chainOverlayTable, $._onChainCellClick);
+            $.chainOverlayTable._chainClicksBound = true;
+        }
     }
 
     renderOverlay();
