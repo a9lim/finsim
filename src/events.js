@@ -164,13 +164,13 @@ export class EventEngine {
         let presidentialResult;
         if (w.investigations.impeachmentStage >= 3) {
             presidentialResult = 'barron_removed';
-        } else if (score > 60) {
-            presidentialResult = 'barron_wins_comfortably';
         } else if (score > 50) {
+            presidentialResult = 'barron_wins_comfortably';
+        } else if (score > 45) {
             presidentialResult = 'barron_wins_narrowly';
-        } else if (score > 42 && w.election.okaforRunning) {
+        } else if (score > 38 && w.election.okaforRunning) {
             presidentialResult = 'okafor_wins';
-        } else if (score > 42) {
+        } else if (score > 38) {
             presidentialResult = 'fl_wins';
         } else if (w.election.okaforRunning) {
             presidentialResult = 'okafor_wins_decisively';
