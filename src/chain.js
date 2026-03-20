@@ -15,7 +15,7 @@ import { computeOptionBidAsk } from './portfolio.js';
 // Expiry management — rolling window of expiry dates
 // ---------------------------------------------------------------------------
 
-const EXPIRY_CYCLE = 21; // trading days per month (approximate)
+const EXPIRY_CYCLE = 84; // trading days per quarter (approximate)
 const EXPIRY_COUNT = 8;  // number of active expiries to maintain
 
 /**

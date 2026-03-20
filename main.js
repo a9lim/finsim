@@ -266,6 +266,7 @@ function init() {
 
     // 13. Pre-populate full history buffer (prices scaled so final close = $100)
     sim.prepopulate();
+    chart.dayOrigin = sim.day;
 
     // 14. Build initial chain and update UI
     expiryMgr.init(sim.day);
@@ -659,6 +660,7 @@ function _resetCore(index) {
     sim.reset(index);
     resetPortfolio();
     sim.prepopulate();
+    chart.dayOrigin = sim.day;
     dayInProgress = false;
     chart._lerp.day = -1;
     expiryMgr.init(sim.day);

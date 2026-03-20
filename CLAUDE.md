@@ -54,7 +54,7 @@ src/
   events.js          ~500 lines  EventEngine: Poisson scheduler, MTTH followup chains,
                                    offline event pool (~88 curated events for Palanthropic/PNTH),
                                    PARAM_RANGES canonical clamping. Shared by offline and LLM modes.
-  history-buffer.js     86 lines  HistoryBuffer: fixed-capacity (256) ring buffer for OHLC bars
+  history-buffer.js     86 lines  HistoryBuffer: fixed-capacity (252) ring buffer for OHLC bars
   llm.js             ~170 lines  LLMEventSource: Anthropic API via structured tool use
                                    (emit_events tool with JSON schema, forced via tool_choice).
                                    Full universe lore in system prompt. Fallback to offline on failure.
@@ -64,7 +64,7 @@ src/
   pricing.js           435 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
                                    normal CDF (Drezner-Wesolowsky 1990) + finite-diff Greeks.
                                    Exports: priceAmerican, computeGreeks
-  chain.js             158 lines  ExpiryManager (rolling 8-expiry window, 21-day cycle),
+  chain.js             158 lines  ExpiryManager (rolling 8-expiry window, 84-day cycle),
                                    generateStrikes() (internal), buildChain()
   portfolio.js         770 lines  Signed-qty positions, market/limit/stop orders, netting,
                                    strategy groups, cash/margin, chargeBorrowInterest() (short
@@ -138,7 +138,7 @@ Pausing mid-day leaves the partial bar frozen. Resuming continues from where it 
 
 ### Bootstrap
 
-`sim.prepopulate()` fills the 256-bar HistoryBuffer, then scales all prices so final close = $100. `ExpiryManager` initialized after prepopulation.
+`sim.prepopulate()` fills the 252-bar HistoryBuffer, then scales all prices so final close = $100. `ExpiryManager` initialized after prepopulation.
 
 ## Simulation Engine
 
@@ -220,7 +220,7 @@ ATM = `round(S / 5) * 5`. 12 strikes each side, filtered positive, sorted ascend
 
 ### Expiry Management
 
-`ExpiryManager` maintains 8 rolling expiry dates on a 21-day cycle. `update(currentDay)` drops expired, appends new. Returns `[{ day, dte }]`.
+`ExpiryManager` maintains 8 rolling expiry dates on an 84-day cycle (~quarterly). `update(currentDay)` drops expired, appends new. Returns `[{ day, dte }]`.
 
 ### Chain Data Structure
 

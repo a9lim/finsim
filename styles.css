@@ -428,6 +428,17 @@ main {
 }
 
 /* --- Margin Status --- */
+.stat-label-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#margin-status.margin-ok,
+#margin-status-label.margin-ok {
+    color: var(--up);
+}
+
 #margin-status.margin-alert,
 #margin-status-label.margin-alert {
     color: var(--down);

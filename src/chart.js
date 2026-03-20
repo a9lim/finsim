@@ -16,6 +16,7 @@ export class ChartRenderer {
         this.canvas = canvas;
         this.ctx    = canvas.getContext('2d');
         this.camera = null;
+        this.dayOrigin = 0; // absolute day that maps to Y0 M0 D0
 
         // Logical (CSS) dimensions — updated by resize()
         this.width  = 0;
@@ -339,10 +340,14 @@ export class ChartRenderer {
             ctx.lineTo(plotX + plotW, py);
         }
 
-        // Vertical grid lines every N days (targeting ~5–8 vertical lines)
+        // Vertical grid lines — adaptive interval targeting ~5–8 lines
         const visibleDays = lastDay - firstDay + 1;
-        let dayInterval   = _niceInterval(visibleDays, 6);
-        if (dayInterval < 1) dayInterval = 1;
+        const _daySteps = [1, 3, 7, 21, 42, 63, 84, 252];
+        const rough = visibleDays / 7;
+        let dayInterval = _daySteps[_daySteps.length - 1];
+        for (let i = 0; i < _daySteps.length; i++) {
+            if (_daySteps[i] >= rough) { dayInterval = _daySteps[i]; break; }
+        }
         const dayStart = Math.ceil(firstDay / dayInterval) * dayInterval;
 
         if (cam) {
@@ -553,7 +558,15 @@ export class ChartRenderer {
             for (let d = dayStart; d <= lastDay + dayInterval; d += dayInterval) {
                 const sx = cam.worldToScreenX ? cam.worldToScreenX(d) : cam.worldToScreen(d, 0).x;
                 if (sx < plotX + 20 || sx > plotX + plotW - 20) continue;
-                ctx.fillText(`D${d}`, sx, xAxisY);
+                const rel = d - this.dayOrigin;
+                const sign = rel < 0 ? -1 : 1;
+                const abs = Math.abs(rel);
+                const yr = Math.floor(abs / 252);
+                const rem = abs - yr * 252;
+                const mo = Math.floor(rem / 21);
+                const dy = rem - mo * 21;
+                const neg = sign < 0 ? '-' : '';
+                ctx.fillText(`${neg}Y${yr} M${mo} D${dy}`, sx, xAxisY);
             }
         }
 

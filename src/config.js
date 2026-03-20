@@ -13,7 +13,7 @@ export const BOND_FACE_VALUE = 100;
 export const MAINTENANCE_MARGIN = 0.25;
 export const REG_T_MARGIN = 0.50;
 export const SHORT_OPTION_MARGIN_PCT = 0.20;
-export const HISTORY_CAPACITY = 256;
+export const HISTORY_CAPACITY = 252;
 export const SPEED_OPTIONS = [0.25, 0.5, 1, 2, 4];
 
 const _CALM_BULL = { name: 'Calm Bull', mu: 0.08, theta: 0.04, kappa: 3.0, xi: 0.3, rho: -0.5, lambda: 0.5, muJ: -0.02, sigmaJ: 0.03, a: 0.5, b: 0.04, sigmaR: 0.005, borrowSpread: 0.5 };

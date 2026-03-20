@@ -699,14 +699,14 @@ export function wireInfoTips($) {
     }
 
     // Margin status info tip
-    const marginLabel = $.marginStatus?.closest('.stat-row')?.querySelector('.stat-label');
-    if (marginLabel && !marginLabel.parentElement.querySelector('.info-trigger')) {
+    const marginWrap = document.getElementById('margin-label-wrap');
+    if (marginWrap && !marginWrap.querySelector('.info-trigger')) {
         const btn = document.createElement('button');
         btn.className = 'info-trigger';
         btn.type = 'button';
         btn.setAttribute('aria-label', 'Info: Margin Status');
         btn.textContent = '?';
-        marginLabel.parentElement.insertBefore(btn, marginLabel.nextSibling);
+        marginWrap.appendChild(btn);
         createInfoTip(btn, {
             title: 'Margin Status',
             body: 'Shows your margin health. OK = well-collateralised. Low = approaching maintenance margin. MARGIN CALL = equity below required level; close positions or add cash.',

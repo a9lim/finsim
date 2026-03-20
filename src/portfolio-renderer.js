@@ -14,11 +14,11 @@ import { fmtDollar, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
 // ---------------------------------------------------------------------------
 
 function _computeMarginDisplay(equity, required) {
-    if (required <= 0) return { label: 'OK', cls: '' };
+    if (required <= 0) return { label: 'OK', cls: 'margin-ok' };
     if (equity < required) return { label: 'MARGIN CALL', cls: 'margin-alert' };
     const pct = Math.min((equity / required) * 100, 999);
     if (equity < required * 1.2) return { label: 'Low (' + pct.toFixed(0) + '%)', cls: 'margin-warn' };
-    return { label: 'OK (' + pct.toFixed(0) + '%)', cls: '' };
+    return { label: 'OK (' + pct.toFixed(0) + '%)', cls: 'margin-ok' };
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +229,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     // Margin display from pre-computed values
     const marginDisplay = marginInfo
         ? _computeMarginDisplay(marginInfo.equity, marginInfo.required)
-        : { label: 'OK', cls: '' };
+        : { label: 'OK', cls: 'margin-ok' };
     $.marginStatus.textContent = marginDisplay.label;
     $.marginStatus.className   = 'stat-value ' + marginDisplay.cls;
 
