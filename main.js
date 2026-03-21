@@ -514,7 +514,10 @@ function _onDayComplete() {
     chargeBorrowInterest(sim.S, vol, sim.r, sim.borrowSpread, sim.day);
 
     // Quarterly dividend payments (every 63 trading days, aligned with expiry cycle)
+    // Discrete proportional drop: stock price falls by q/4, matching the option
+    // pricing model (binomial tree with discrete dividends at QUARTERLY_CYCLE).
     if (sim.q > 0 && sim.day > 0 && sim.day % QUARTERLY_CYCLE === 0) {
+        sim.S *= (1 - sim.q / 4);
         const divNet = processDividends(sim.S, sim.q);
         if (divNet !== 0 && typeof showToast !== 'undefined') {
             const label = divNet > 0 ? 'Dividend received' : 'Dividend charged';

@@ -8,6 +8,7 @@ export const TRADING_DAYS_PER_YEAR = 252;
 export const INTRADAY_STEPS = 16;
 export const QUARTERLY_CYCLE = 63; // trading days per quarter (approximate)
 export const HISTORY_CAPACITY = 252;
+export const BINOMIAL_STEPS = 128;
 export const SPEED_OPTIONS = [0.25, 0.5, 1, 2, 4];
 
 // -- Instruments --

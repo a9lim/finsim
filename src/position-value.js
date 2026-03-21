@@ -32,7 +32,7 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
         case 'call':
         case 'put':
             return dte > 0
-                ? priceAmerican(S, strike, dte, rate, vol, type === 'put', q)
+                ? priceAmerican(S, strike, dte, rate, vol, type === 'put', q, day)
                 : Math.max(0, type === 'call' ? S - strike : strike - S);
         default: return 0;
     }

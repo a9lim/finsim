@@ -125,11 +125,12 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
     q = q || 0;
     const sigma = Math.sqrt(Math.max(v, 0));
     const T = expiry.dte / TRADING_DAYS_PER_YEAR;
+    const currentDay = expiry.day - expiry.dte;
 
     const options = expiry.strikes.map(K => {
         if (greeks) {
-            const callG = computeGreeks(S, K, T, r, sigma, false, q);
-            const putG  = computeGreeks(S, K, T, r, sigma, true, q);
+            const callG = computeGreeks(S, K, T, r, sigma, false, q, currentDay);
+            const putG  = computeGreeks(S, K, T, r, sigma, true, q, currentDay);
             const callBA = computeOptionBidAsk(callG.price, S, K, sigma);
             const putBA  = computeOptionBidAsk(putG.price,  S, K, sigma);
             return {
@@ -143,8 +144,8 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
             };
         }
         // Price-only path: 1 call per option type (not 9)
-        const callP = priceAmerican(S, K, T, r, sigma, false, q);
-        const putP  = priceAmerican(S, K, T, r, sigma, true, q);
+        const callP = priceAmerican(S, K, T, r, sigma, false, q, currentDay);
+        const putP  = priceAmerican(S, K, T, r, sigma, true, q, currentDay);
         const callBA = computeOptionBidAsk(callP, S, K, sigma);
         const putBA  = computeOptionBidAsk(putP,  S, K, sigma);
         return {

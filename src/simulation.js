@@ -123,7 +123,8 @@ export class Simulation {
         }
 
         // 4. GBM with jumps (log-price update, Ito correction: -0.5*vPrev*dt)
-        const drift     = (this.mu - this.q - this.lambda * k - 0.5 * vPrev) * dt;
+        // Dividends are handled discretely (quarterly price drop), not in the drift.
+        const drift     = (this.mu - this.lambda * k - 0.5 * vPrev) * dt;
         const diffusion = sqrtV * this._sqrtDt * z1;
         this.S = this.S * Math.exp(drift + diffusion + jumpSum);
 

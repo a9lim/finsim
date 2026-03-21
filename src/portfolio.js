@@ -181,7 +181,7 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
             const dte = expiryDay != null
                 ? Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0) : 0;
             const optMid = dte > 0
-                ? priceAmerican(currentPrice, strike, dte, currentRate, currentVol, type === 'put', q)
+                ? priceAmerican(currentPrice, strike, dte, currentRate, currentVol, type === 'put', q, currentDay)
                 : Math.max(0, type === 'call' ? currentPrice - strike : strike - currentPrice);
             return Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
         }
@@ -234,7 +234,7 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
                 }
                 case 'call':
                 case 'put': {
-                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, pos.type === 'put', q);
+                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, pos.type === 'put', q, currentDay);
                     required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                     break;
                 }
@@ -888,7 +888,7 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
             case 'call':
             case 'put': {
                 const isPut  = pos.type === 'put';
-                const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q);
+                const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q, currentDay);
                 total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                 break;
             }
@@ -938,7 +938,7 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
                 case 'call':
                 case 'put': {
                     const isPut = pos.type === 'put';
-                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q);
+                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q, currentDay);
                     required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                     break;
                 }
@@ -990,7 +990,7 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
             ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
             : 0;
         const isPut  = pos.type === 'put';
-        const greeks = computeGreeks(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q);
+        const greeks = computeGreeks(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q, currentDay);
 
         // qty is already signed: positive = long, negative = short
         const w = pos.qty;

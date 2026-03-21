@@ -12,7 +12,7 @@ Do not manually test via browser automation. The user will test changes themselv
 
 ## Overview
 
-Shoals -- interactive options trading simulator. Models a stock as geometric Brownian motion with Merton jumps and Heston stochastic volatility; the risk-free rate follows a Vasicek process. Users buy and sell the underlying stock, zero-coupon bonds, and American options (calls/puts). Options priced via Bjerksund-Stensland 2002. Strategy builder with payoff diagrams and Greek overlays, full interactive options chain, portfolio/margin system.
+Shoals -- interactive options trading simulator. Models a stock as geometric Brownian motion with Merton jumps and Heston stochastic volatility; the risk-free rate follows a Vasicek process. Users buy and sell the underlying stock, zero-coupon bonds, and American options (calls/puts). Options priced via CRR binomial tree (128 steps). Strategy builder with payoff diagrams and Greek overlays, full interactive options chain, portfolio/margin system.
 
 Zero dependencies -- vanilla HTML5/CSS3/JS with ES6 modules. No build step.
 
@@ -41,8 +41,9 @@ colors.js               59 lines  Financial color aliases (_PALETTE.up/down/call
                                    bond/delta/gamma/theta/vega/rho), CSS var injection,
                                    freezes _PALETTE
 src/
-  config.js             64 lines  All tunable constants (timing, instruments, margin, spreads,
-                                   event engine, chart/strategy rendering) and PRESETS (5 static + 2 dynamic)
+  config.js             65 lines  All tunable constants (timing, instruments, margin, spreads,
+                                   event engine, chart/strategy rendering), BINOMIAL_STEPS,
+                                   and PRESETS (5 static + 2 dynamic)
   format-helpers.js     48 lines  Shared formatting: fmtDollar(), fmtNum(), pnlClass(),
                                    fmtDte(), fmtRelDay(), posTypeLabel(). Single source for UI modules.
   position-value.js    ~40 lines  Unified position valuation: computePositionValue(),
@@ -64,8 +65,8 @@ src/
   simulation.js        245 lines  GBM + Merton jumps + Heston stoch vol + Vasicek rate;
                                    beginDay()/substep()/finalizeDay() sub-step pipeline;
                                    prepopulate() synthetically backfills buffer via reverse
-  pricing.js           435 lines  Bjerksund-Stensland 2002 American option pricing + bivariate
-                                   normal CDF (Drezner-Wesolowsky 1990) + finite-diff Greeks.
+  pricing.js           120 lines  CRR binomial tree American option pricing (BINOMIAL_STEPS=128)
+                                   with discrete proportional dividends + finite-diff Greeks.
                                    Exports: priceAmerican, computeGreeks
   chain.js             170 lines  ExpiryManager (rolling EXPIRY_COUNT window, QUARTERLY_CYCLE cycle),
                                    generateStrikes(), buildChainSkeleton(),
@@ -161,10 +162,10 @@ Pausing mid-day leaves the partial bar frozen. Resuming continues from where it 
 
 ### Stock Price Model
 
-GBM with Merton jumps, Heston stochastic volatility, and continuous dividend yield (Euler-Maruyama, full truncation):
+GBM with Merton jumps and Heston stochastic volatility (Euler-Maruyama, full truncation). Dividends are handled discretely (quarterly price drops), not in the drift:
 
 ```
-dS/S = (mu - q - lambda*k - 0.5*v)dt + sqrt(v) * dW1 + J * dN(lambda)
+dS/S = (mu - lambda*k - 0.5*v)dt + sqrt(v) * dW1 + J * dN(lambda)
 dv   = kappa(theta - v)dt + xi*sqrt(v) * dW2      (dW1*dW2 = rho*dt)
 ```
 
@@ -195,9 +196,9 @@ On reset: `S = 100`, `v = theta`, `r = b`. History cleared, prepopulated, camera
 
 ## Options Pricing
 
-### Bjerksund-Stensland 2002
+### CRR Binomial Tree
 
-Analytical approximation for American options with continuous dividend yield `q`. Cost of carry `b = r - q`. Computes perpetual exercise boundary, splits time at golden ratio, uses `_phi()` and `_psi()` helper functions. Falls back to European BS when `b >= r` (i.e., `q <= 0`). Put pricing via put-call symmetry: `P(S,K,T,r,q,σ) = C(K,S,T,q,r,σ)`. Small floor `rEff = max(r, 1e-7)` prevents degenerate case. Bivariate normal CDF via Drezner-Wesolowsky 20-point Gauss-Legendre.
+Cox-Ross-Rubinstein binomial tree with `BINOMIAL_STEPS` (128) steps. Handles both American calls and puts exactly (no put-call symmetry needed). Discrete proportional dividends: when `currentDay` is provided and `q > 0`, the tree identifies `QUARTERLY_CYCLE` boundaries within the option's life and applies multiplicative price drops of `q/4` at those steps, preserving tree recombination. When `currentDay` is omitted, falls back to continuous dividend yield in the risk-neutral drift. Put pricing via put-call symmetry: `P(S,K,T,r,q,σ) = C(K,S,T,q,r,σ)`.
 
 ### Finite-Difference Greeks
 
@@ -304,14 +305,17 @@ dailyCost = |qty| * notional * (max(r, 0) + borrowSpread * sigma) / 252
 
 ### Dividend System
 
-Continuous dividend yield `q` affects pricing (cost of carry `b = r - q`) and stock drift (`mu - q`). Discrete cash payments every `QUARTERLY_CYCLE` (63) trading days (aligned with expiry cycle):
+Fully discrete dividend model. Every `QUARTERLY_CYCLE` (63) trading days (aligned with expiry cycle):
 
-- `dividendPerShare = S * q / 4` (quarterly)
-- Long stock: receive `qty * dividendPerShare` as cash
-- Short stock: pay `|qty| * dividendPerShare` from cash
+1. **Stock price drop**: `sim.S *= (1 - q/4)` -- proportional ex-dividend drop
+2. **Cash payments**: `dividendPerShare = S * q / 4` (post-drop price)
+   - Long stock: receive `qty * dividendPerShare` as cash
+   - Short stock: pay `|qty| * dividendPerShare` from cash
+3. **Option pricing**: binomial tree detects `QUARTERLY_CYCLE` boundaries within option life and applies matching `q/4` proportional drops, so option prices are consistent with the stock process
+4. **No continuous drain**: `q` is NOT in the GBM drift -- dividends only affect stock price at discrete quarterly dates
+
 - `processDividends(S, q)` in portfolio.js. Net tracked in `portfolio.totalDividends`
 - Toast notification on dividend day
-- No ex-dividend price drop — continuous yield in the drift already reflects the drain
 - Slider range: 0% to 10%, step 0.5%, default 2% (Crisis preset: 0%)
 
 ### Option Expiry
@@ -507,8 +511,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Chain table rebuilt every call** -- do not cache cell references. Clicks use event delegation on container (not per-cell listeners). Delegation is bound once per container (`_chainClicksBound` flag) -- never re-bind.
 - **Trade dialog confirm button cloned** on each open to avoid stacking listeners.
 - **`ExpiryManager` is stateful** -- lives in main.js, `.init()` on reset, `.update()` each tick.
-- **Vasicek rate can go negative** -- BS2002 uses `rEff = max(r, 1e-7)` for beta only.
-- **`_phi`/`_psi` not exported** from pricing.js. Only `priceAmerican` and `computeGreeks` exported.
+- **Vasicek rate can go negative** -- binomial tree handles negative rates naturally.
 - **Opening full chain pauses sim** -- `playing` set to false before showing overlay.
 - **Time slider clamped to min DTE** -- stops at first leg expiry; per-leg T computed individually.
 - **`eventEngine` is null in non-Dynamic presets** -- always check `if (eventEngine)` before calling methods. `maybeFire()` returns an array of fired events (may be empty), not a single event/null.
@@ -531,6 +534,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Lazy chain: skeleton vs priced expiry** -- `chainSkeleton` (in main.js) holds expiry metadata + strikes with no pricing. `_priceExpiry(idx)` / `_priceExpiryGreeks(idx)` compute prices on demand for one expiry. Only the currently visible expiry is priced each substep (50 calls). Full Greeks only computed for the chain overlay.
 - **Substep UI updates** -- `_onSubstep()` fires after each substep batch during playback. It checks pending orders at intraday prices, reprices the visible expiry, and updates the sidebar (portfolio, rate, chain table). Dropdown rebuild happens only on day-complete via `chainDirty`.
 - **Strategy tab pauses sim** -- switching to the strategy tab sets `playing = false`. The user must manually resume after leaving the tab.
-- **`q` (dividend yield) threads through all pricing** -- `priceAmerican(S, K, T, r, sigma, isPut, q)` and `computeGreeks(S, K, T, r, sigma, isPut, q)` accept `q` as the last optional param (default 0). All call sites in chain.js, portfolio.js, position-value.js, strategy.js pass it explicitly.
-- **Dividends fire every `QUARTERLY_CYCLE` trading days** -- aligned with expiry cycle. `sim.day % QUARTERLY_CYCLE === 0` in `_onDayComplete()`. No payment if `q === 0` or no stock positions.
+- **`q` (dividend yield) threads through all pricing** -- `priceAmerican(S, K, T, r, sigma, isPut, q, currentDay)` and `computeGreeks(S, K, T, r, sigma, isPut, q, currentDay)` accept `q` and optional `currentDay`. When `currentDay` is provided, discrete dividends at `QUARTERLY_CYCLE` boundaries are used; otherwise falls back to continuous yield.
+- **Dividends fire every `QUARTERLY_CYCLE` trading days** -- aligned with expiry cycle. `sim.day % QUARTERLY_CYCLE === 0` in `_onDayComplete()`. Stock price drops by `q/4` (ex-dividend), then cash payments to shareholders. No payment if `q === 0` or no stock positions.
+- **`q` is NOT in the GBM drift** -- stock price grows at `mu` (not `mu - q`) between dividend dates. The quarterly `S *= (1 - q/4)` drop is the only dividend effect on stock price, matching the binomial tree's discrete dividend model.
 - **No hardcoded colors in JS** -- chart.js and strategy.js use `_PALETTE` and `_r()` for all colors. CSS slider-track fallbacks in styles.css are the only remaining hardcoded rgba values (defensive fallback for when shared-tokens.js hasn't loaded).

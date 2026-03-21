@@ -138,8 +138,9 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
                 const K = leg.strike ?? entryS;
                 info.K = K;
                 info.isPut = isPut;
-                info.entryVal = priceAmerican(entryS, K, entryT, rate, vol, isPut, q);
+                info.entryVal = priceAmerican(entryS, K, entryT, rate, vol, isPut, q, entryDay);
                 info.q = q;
+                info.evalDay = evalDay;
                 break;
             }
             case 'stock':
@@ -159,7 +160,7 @@ function _legPnlFast(info, S) {
     switch (info.type) {
         case 'call':
         case 'put':
-            return (priceAmerican(S, info.K, info.T, info.rate, info.vol, info.isPut, info.q) - info.entryVal) * info.mult;
+            return (priceAmerican(S, info.K, info.T, info.rate, info.vol, info.isPut, info.q, info.evalDay) - info.entryVal) * info.mult;
         case 'stock':
             return (S - info.entryS) * info.mult;
         case 'bond':
@@ -174,7 +175,7 @@ function _legGreeksFast(info, S) {
     switch (info.type) {
         case 'call':
         case 'put': {
-            const g = computeGreeks(S, info.K, info.T, info.rate, info.vol, info.isPut, info.q);
+            const g = computeGreeks(S, info.K, info.T, info.rate, info.vol, info.isPut, info.q, info.evalDay);
             return {
                 delta: g.delta * info.mult, gamma: g.gamma * info.mult,
                 theta: g.theta * info.mult, vega:  g.vega  * info.mult,
@@ -548,7 +549,7 @@ export class StrategyRenderer {
         for (const leg of legs) {
             const legEntryDte = (leg.expiryDay != null && entryDay != null)
                 ? Math.max(leg.expiryDay - entryDay, 0) : fallbackDte;
-            netCost += this._legEntryCost(leg, spot, vol, rate, _dteToT(legEntryDte), q);
+            netCost += this._legEntryCost(leg, spot, vol, rate, _dteToT(legEntryDte), q, entryDay);
         }
 
         const result = { maxProfit, maxLoss, breakevens, netCost };
@@ -564,7 +565,7 @@ export class StrategyRenderer {
      * Compute the entry cost of a single leg at the original spot price.
      * Positive = debit paid, negative = credit received.
      */
-    _legEntryCost(leg, spot, vol, rate, T, q) {
+    _legEntryCost(leg, spot, vol, rate, T, q, entryDay) {
         const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                    : (leg.side === 'short') ? -1 : 1;
         const qty  = Math.abs(leg.qty ?? 1);
@@ -574,7 +575,7 @@ export class StrategyRenderer {
             case 'put': {
                 const isPut = leg.type === 'put';
                 const K     = leg.strike ?? spot;
-                const price = priceAmerican(spot, K, T, rate, vol, isPut, q);
+                const price = priceAmerican(spot, K, T, rate, vol, isPut, q, entryDay);
                 return price * qty * sign;
             }
             case 'stock':
