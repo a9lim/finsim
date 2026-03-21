@@ -74,6 +74,9 @@ src/
   market.js              27 lines  Shared mutable market state + syncMarket(sim). Leaf module.
   history-buffer.js     103 lines  Ring buffer (capacity 252) for OHLC bars
   format-helpers.js      59 lines  fmtDollar(), fmtNum(), pnlClass(), fmtDte(), fmtRelDay()
+  strategy-store.js    215 lines  Built-in strategy defs (8 presets), localStorage CRUD
+                                   (hash IDs), resolveLegs, formatLeg, computeNetCost,
+                                   legsToRelative
   position-value.js      82 lines  computePositionValue(), computePositionPnl()
   chain-renderer.js     314 lines  Chain table DOM with event delegation: renderChainInto(),
                                    rebuildExpiryDropdown(), buildStockBondTable(), posKey()
@@ -98,6 +101,7 @@ main.js
   |- epilogue.js           (imports position-value, config)
   |- chart.js              (imports format-helpers; reads _PALETTE globals)
   |- strategy.js           (imports pricing, market, config)
+  |- strategy-store.js     (imports pricing, portfolio, market, config)
   |- ui.js                 (imports format-helpers, chain-renderer, portfolio-renderer, portfolio)
   |- chain-renderer.js     (imports format-helpers; reads _haptics globals)
   |- portfolio-renderer.js (imports position-value, format-helpers)
@@ -230,6 +234,8 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **Custom event bus**: `shoals:*` events from ui.js -> main.js
 - **Chain event delegation**: 3 listeners on container, not per-cell. Bound once (`_chainClicksBound`)
 - **Tree reuse**: chain.js pre-allocates `_rTree`/`_rGreekTrees`; `_rResult` singleton consumed synchronously
+- **Strategies in localStorage**: `shoals_strategies` key, hash-based IDs. Built-ins are const in `strategy-store.js`, never in localStorage. `currentStrategyHash` in main.js tracks loaded user strategy.
+- **Relative legs**: all saved strategies store `strikeOffset` / `dteOffset`, resolved at execution time via `resolveLegs()`.
 
 ## Gotchas
 
@@ -251,3 +257,5 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **Dual pricing shares `_V` buffer** -- `_priceCore` after `_pricePairCore` overwrites call values. Pair uses `_cf*`/`_pf*` intermediates, single uses `_f*`.
 - **`ExpiryManager` is stateful** -- lives in main.js, `.init()` on reset, `.update()` each tick.
 - **`speed` variable removed** -- use `SPEED_OPTIONS[speedIndex]` directly.
+- **`portfolio.strategies` removed** -- strategies now live in localStorage via `strategy-store.js`. Do NOT add strategy storage back to portfolio.
+- **Strategy legs are relative** -- stored as `strikeOffset`/`dteOffset`. Use `legsToRelative()` to convert from absolute, `resolveLegs()` to convert back. In-memory `strategyLegs` in main.js use absolute values with `_refS`/`_refDay` for display.

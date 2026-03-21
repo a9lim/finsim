@@ -13,7 +13,7 @@ import {
     chargeBorrowInterest, processDividends, checkMargin, aggregateGreeks,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
-    saveStrategy, executeStrategy, computeBidAsk,
+    computeBidAsk,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -26,6 +26,7 @@ import {
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay,
     updateDynamicSections, updateEventLog, updateCongressDiagrams,
     refreshTooltip,
+    updateStrategyDropdowns, updateCreditDebit,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
 import { EventEngine } from './src/events.js';
@@ -35,6 +36,10 @@ import { computePositionValue } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
+import {
+    listStrategies, getStrategy, saveStrategy, deleteStrategy,
+    resolveLegs, computeNetCost, legsToRelative, nextAutoName,
+} from './src/strategy-store.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -55,6 +60,8 @@ let lastTickTime = 0;
 let dayInProgress = false; // true between beginDay() and finalizeDay()
 let mouseX = -1, mouseY = -1;
 let strategyLegs = [];
+let currentStrategyHash = null;
+let isBuiltinLoaded = false;
 let activeTab = 'trade';
 let greekToggles = { delta: true, gamma: false, theta: false, vega: false, rho: false };
 let sliderPct = 100;  // percentage of max DTE (100% = full time, 0% = at expiry)
@@ -235,18 +242,80 @@ function init() {
         onBuyBond:        () => handleBuyBond(),
         onShortBond:      () => handleShortBond(),
         onChainCellClick: (info) => handleChainCellClick(info),
-        onExpiryChange:   (idx) => { const pe = _priceExpiry(idx); updateChainDisplay($, pe, _buildPosMap()); updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), strategyMode ? _buildStrategyPosMap() : null); dirty = true; },
+        onExpiryChange:   (idx) => {
+            const pe = _priceExpiry(idx);
+            updateChainDisplay($, pe, _buildPosMap());
+            updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), strategyMode ? _buildStrategyPosMap() : null);
+            if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
+                const ts = getStrategy($.tradeStrategySelect.value);
+                if (ts && ts.selectableExpiry) _updateTradeCreditDebit();
+            }
+            dirty = true;
+        },
         onFullChainOpen:  () => openFullChain(),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
         onDismissMargin:  () => { /* sim stays paused, overlay hidden by ui.js */ },
         onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
-        onStrategyExpiryChange: (idx) => { const pe = _priceExpiry(idx); updateStrategyChainDisplay($, pe, handleAddLeg, _buildStrategyPosMap()); updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap()); dirty = true; },
+        onStrategyExpiryChange: (idx) => {
+            const pe = _priceExpiry(idx);
+            updateStrategyChainDisplay($, pe, handleAddLeg, _buildStrategyPosMap());
+            updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+            if (_isSelectableExpiry()) {
+                const sid = $.strategyLoadSelect ? $.strategyLoadSelect.value : '';
+                const loaded = sid ? getStrategy(sid) : null;
+                if (loaded && loaded.selectableExpiry) {
+                    _reloadSelectableLegs();
+                } else if (strategyLegs.length > 0) {
+                    // Update manually-built legs to use the new expiry
+                    const newDay = _strategyExpiryDay();
+                    if (newDay != null) {
+                        for (const leg of strategyLegs) {
+                            if (leg.type !== 'stock') {
+                                leg.expiryDay = newDay;
+                                leg._refDay = sim.day;
+                            }
+                        }
+                        strategy.resetRange(sim.S, strategyLegs);
+                        updateStrategyBuilder();
+                        updateTimeSliderRange();
+                    }
+                }
+            }
+            dirty = true;
+        },
         onSaveStrategy:   () => handleSaveStrategy(),
-        onExecStrategy:   () => handleExecStrategy(),
+        onDeleteStrategy:  () => handleDeleteStrategy(),
+        onTradeExecStrategy: () => handleTradeExecStrategy(),
+        onStrategySelectChange: (id) => {
+            if (id) {
+                handleLoadStrategy(id);
+            } else {
+                // "New strategy" selected — clear builder
+                currentStrategyHash = null;
+                isBuiltinLoaded = false;
+                strategyLegs.length = 0;
+                if ($.strategyNameInput) $.strategyNameInput.value = '';
+                if ($.selectableExpiryToggle) $.selectableExpiryToggle.checked = true;
+                strategy.resetRange(sim.S, strategyLegs);
+                updateStrategyBuilder();
+                updateTimeSliderRange();
+                dirty = true;
+            }
+        },
+        onTradeStrategySelectChange: (id) => {
+            if ($.tradeExecStrategyBtn) $.tradeExecStrategyBtn.disabled = !id;
+            if (id) {
+                _updateTradeCreditDebit();
+            } else {
+                updateCreditDebit($, null);
+            }
+        },
         onLLMKeyChange:   (key) => { if (llmSource) llmSource.setApiKey(key); },
         onLLMModelChange: (model) => { if (llmSource) llmSource.setModel(model); },
     });
+
+    _refreshStrategyDropdowns();
 
     // 10. Wire custom events from ui.js position rows
     document.addEventListener('shoals:closePosition', (e) => {
@@ -283,6 +352,22 @@ function init() {
         }
     });
 
+    document.addEventListener('shoals:unwindStrategy', (e) => {
+        const name = e.detail && e.detail.name;
+        if (!name) return;
+        const positions = portfolio.positions.filter(p => p.strategyName === name);
+        let closed = 0;
+        for (const pos of [...positions]) {
+            if (closePosition(pos.id, sim.S, market.sigma, sim.r, sim.day, sim.q)) closed++;
+        }
+        if (closed > 0) {
+            if (typeof showToast !== 'undefined') showToast('Unwound "' + name + '" (' + closed + ' position' + (closed > 1 ? 's' : '') + ').');
+            chainDirty = true;
+            updateUI();
+            dirty = true;
+        }
+    });
+
     // 11. Wire intro screen
     _intro.init($.introScreen, $.introStart);
 
@@ -301,6 +386,7 @@ function init() {
 
     // 13. Pre-populate full history buffer (prices scaled so final close = $100)
     sim.prepopulate();
+    syncMarket(sim);
     _initRateHistory();
     chart.dayOrigin = sim.day;
 
@@ -702,6 +788,12 @@ function updateSubstepUI() {
     }
 
     refreshTooltip();
+
+    // Live credit/debit update for trade-tab strategy
+    if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
+        _updateTradeCreditDebit();
+    }
+
     chainDirty = false;
 }
 
@@ -830,8 +922,8 @@ function _resetCore(index) {
     document.getElementById('epilogue-overlay')?.classList.add('hidden');
     sim.reset(index);
     resetPortfolio();
-    syncMarket(sim);
     sim.prepopulate();
+    syncMarket(sim);
     _initRateHistory();
     chart.dayOrigin = sim.day;
     dayInProgress = false;
@@ -842,6 +934,10 @@ function _resetCore(index) {
     playing = false;
     lastSpot = sim.S;
     strategyLegs.length = 0;
+    currentStrategyHash = null;
+    isBuiltinLoaded = false;
+    if ($.strategyNameInput) $.strategyNameInput.value = '';
+    _refreshStrategyDropdowns();
     sliderPct = 100;
     strategy.resetRange(sim.S, strategyLegs);
     syncSettingsUI($, _simSettingsObj());
@@ -1036,7 +1132,7 @@ function handleAddLeg(type, side, strike, expiryDay) {
             strategyLegs.splice(strategyLegs.indexOf(existing), 1);
         }
     } else {
-        const leg = { type, qty: signedQty, strike, expiryDay };
+        const leg = { type, qty: signedQty, strike, expiryDay, _refS: sim.S, _refDay: sim.day };
         strategyLegs.push(leg);
     }
 
@@ -1061,42 +1157,67 @@ function handleRemoveLeg(index) {
     dirty = true;
 }
 
-function handleSaveStrategy() {
-    if (strategyLegs.length === 0) return;
-    const name = prompt('Strategy name:');
-    if (!name || !name.trim()) return;
-    // Convert signed qty to side/qty for portfolio storage
-    const legsForSave = strategyLegs.map(l => ({
-        ...l,
-        side: l.qty < 0 ? 'short' : 'long',
-        qty: Math.abs(l.qty),
-    }));
-    saveStrategy(name.trim(), legsForSave);
-    if (typeof showToast !== 'undefined') showToast('Strategy "' + name.trim() + '" saved.');
-    if (typeof _haptics !== 'undefined') _haptics.trigger('success');
+function _isSelectableExpiry() {
+    return $.selectableExpiryToggle ? $.selectableExpiryToggle.checked : true;
 }
 
-function handleExecStrategy() {
-    if (strategyLegs.length === 0) return;
-    const vol = market.sigma;
+function _expiryDayFromSelect(sel) {
+    const idx = parseInt(sel?.value, 10);
+    if (isNaN(idx) || !chainSkeleton.length) return null;
+    const entry = chainSkeleton[Math.min(idx, chainSkeleton.length - 1)];
+    return entry ? entry.day : null;
+}
 
-    // Snapshot portfolio state for rollback
+function _tradeExpiryDay() { return _expiryDayFromSelect($.tradeExpiry); }
+function _strategyExpiryDay() { return _expiryDayFromSelect($.strategyExpiry); }
+
+function handleSaveStrategy() {
+    if (strategyLegs.length === 0) return;
+    const name = $.strategyNameInput ? $.strategyNameInput.value : '';
+    const selExpiry = _isSelectableExpiry();
+    const relLegs = legsToRelative(strategyLegs, sim.S, sim.day, selExpiry);
+    const id = saveStrategy(currentStrategyHash, name, relLegs, selExpiry);
+    if (id === 'collision') {
+        if (typeof showToast !== 'undefined') showToast('A strategy with that name already exists.');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('error');
+        return;
+    }
+    if (id === null) {
+        if (typeof showToast !== 'undefined') showToast('Strategy limit reached (max 50).');
+        if (typeof _haptics !== 'undefined') _haptics.trigger('error');
+        return;
+    }
+    currentStrategyHash = id;
+    isBuiltinLoaded = false;
+    _refreshStrategyDropdowns();
+    if ($.strategyLoadSelect) $.strategyLoadSelect.value = id;
+    if (typeof showToast !== 'undefined') {
+        const saved = getStrategy(id);
+        showToast('Strategy "' + (saved ? saved.name : '') + '" saved.');
+    }
+    if (typeof _haptics !== 'undefined') _haptics.trigger('success');
+    updateStrategyBuilder();
+}
+
+function executeWithRollback(resolvedLegs, strategyName) {
     const savedCash = portfolio.cash;
     const savedPositions = portfolio.positions.map(p => ({ ...p }));
     const savedClosedBorrowCost = portfolio.closedBorrowCost;
     const savedMarginDebitCost = portfolio.marginDebitCost;
     const savedTotalDividends = portfolio.totalDividends;
+    const savedTotalTrades = portfolio.totalTrades;
 
     const results = [];
     let failed = false;
-    for (const leg of strategyLegs) {
+    for (const leg of resolvedLegs) {
         const side = leg.qty < 0 ? 'short' : 'long';
         const absQty = Math.abs(leg.qty);
         const pos = executeMarketOrder(
-            leg.type, side, absQty, sim.S, vol, sim.r, sim.day,
-            leg.strike, leg.expiryDay, undefined, sim.q
+            leg.type, side, absQty, sim.S, market.sigma, sim.r, sim.day,
+            leg.strike, leg.expiryDay, strategyName, sim.q
         );
         if (pos) {
+            if (!pos.strategyBaseQty) pos.strategyBaseQty = absQty;
             results.push(pos);
         } else {
             failed = true;
@@ -1105,14 +1226,14 @@ function handleExecStrategy() {
     }
 
     if (failed) {
-        // Rollback: restore portfolio to pre-execution state
         portfolio.cash = savedCash;
         portfolio.closedBorrowCost = savedClosedBorrowCost;
         portfolio.marginDebitCost = savedMarginDebitCost;
         portfolio.totalDividends = savedTotalDividends;
+        portfolio.totalTrades = savedTotalTrades;
         portfolio.positions.length = 0;
         for (const p of savedPositions) portfolio.positions.push(p);
-        if (typeof showToast !== 'undefined') showToast('Strategy failed (leg ' + (results.length + 1) + ' rejected) — all legs unwound.');
+        if (typeof showToast !== 'undefined') showToast('Strategy failed (leg ' + (results.length + 1) + ' rejected) \u2014 all legs unwound.');
         if (typeof _haptics !== 'undefined') _haptics.trigger('error');
     } else if (results.length > 0) {
         if (typeof showToast !== 'undefined') showToast('Executed ' + results.length + ' leg(s).');
@@ -1121,6 +1242,115 @@ function handleExecStrategy() {
     chainDirty = true;
     updateUI();
     dirty = true;
+}
+
+function handleLoadStrategy(id) {
+    if (!id) return;
+    const strat = getStrategy(id);
+    if (!strat) return;
+
+    const expiries = expiryMgr.update(sim.day);
+    const overrideDay = strat.selectableExpiry ? _strategyExpiryDay() : null;
+    const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
+
+    strategyLegs.length = 0;
+    for (const leg of resolved) {
+        strategyLegs.push({
+            type: leg.type,
+            qty: leg.qty,
+            strike: leg.strike,
+            expiryDay: leg.expiryDay,
+            _refS: sim.S,
+            _refDay: sim.day,
+        });
+    }
+
+    isBuiltinLoaded = !!strat.builtin;
+    currentStrategyHash = strat.builtin ? null : id;
+    if ($.strategyNameInput) $.strategyNameInput.value = strat.name;
+    if ($.selectableExpiryToggle) $.selectableExpiryToggle.checked = !!strat.selectableExpiry;
+
+    strategy.resetRange(sim.S, strategyLegs);
+    const spe = _priceExpiry(_strategyExpiryIdx());
+    updateStrategyChainDisplay($, spe, handleAddLeg, _buildStrategyPosMap());
+    updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+    updateStrategyBuilder();
+    updateTimeSliderRange();
+    dirty = true;
+    if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
+}
+
+function handleDeleteStrategy() {
+    // Delete from currentStrategyHash (loaded) or from dropdown selection
+    const id = currentStrategyHash || ($.strategyLoadSelect ? $.strategyLoadSelect.value : '');
+    if (!id) return;
+    const strat = getStrategy(id);
+    if (!strat || strat.builtin) return;
+    deleteStrategy(id);
+    currentStrategyHash = null;
+    isBuiltinLoaded = false;
+    strategyLegs.length = 0;
+    if ($.strategyNameInput) $.strategyNameInput.value = '';
+    strategy.resetRange(sim.S, strategyLegs);
+    _refreshStrategyDropdowns();
+    if ($.strategyLoadSelect) $.strategyLoadSelect.value = '';
+    updateStrategyBuilder();
+    updateTimeSliderRange();
+    dirty = true;
+    if (typeof showToast !== 'undefined') showToast('Strategy "' + (strat ? strat.name : '') + '" deleted.');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('light');
+}
+
+function handleTradeExecStrategy() {
+    const id = $.tradeStrategySelect ? $.tradeStrategySelect.value : '';
+    if (!id) return;
+    const strat = getStrategy(id);
+    if (!strat) return;
+    const expiries = expiryMgr.update(sim.day);
+    const overrideDay = strat.selectableExpiry ? _tradeExpiryDay() : null;
+    const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
+    const mult = parseInt($.tradeQty?.value, 10) || 1;
+    const scaled = mult === 1 ? resolved : resolved.map(l => ({ ...l, qty: l.qty * mult }));
+    executeWithRollback(scaled, strat.name);
+}
+
+function _updateTradeCreditDebit() {
+    const id = $.tradeStrategySelect ? $.tradeStrategySelect.value : '';
+    if (!id) { updateCreditDebit($, null); return; }
+    const strat = getStrategy(id);
+    if (!strat) { updateCreditDebit($, null); return; }
+    try {
+        const expiries = expiryMgr.update(sim.day);
+        const overrideDay = strat.selectableExpiry ? _tradeExpiryDay() : null;
+        const net = computeNetCost(strat.legs, sim.S, market.sigma, sim.r, sim.day, sim.q, expiries, overrideDay);
+        const mult = parseInt($.tradeQty?.value, 10) || 1;
+        updateCreditDebit($, net * mult);
+    } catch { updateCreditDebit($, null); }
+}
+
+function _reloadSelectableLegs() {
+    const id = $.strategyLoadSelect ? $.strategyLoadSelect.value : '';
+    if (!id) return;
+    const strat = getStrategy(id);
+    if (!strat || !strat.selectableExpiry) return;
+    const expiries = expiryMgr.update(sim.day);
+    const overrideDay = _strategyExpiryDay();
+    const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
+    strategyLegs.length = 0;
+    for (const leg of resolved) {
+        strategyLegs.push({
+            type: leg.type, qty: leg.qty, strike: leg.strike,
+            expiryDay: leg.expiryDay, _refS: sim.S, _refDay: sim.day,
+        });
+    }
+    strategy.resetRange(sim.S, strategyLegs);
+    updateStrategyBuilder();
+    updateTimeSliderRange();
+}
+
+function _refreshStrategyDropdowns() {
+    updateStrategyDropdowns($, listStrategies());
+    if ($.strategyNameInput) $.strategyNameInput.placeholder = nextAutoName();
 }
 
 function updateStrategyBuilder() {
@@ -1132,7 +1362,7 @@ function updateStrategyBuilder() {
         strategy.resetRange(sim.S, strategyLegs);
         updateStrategyBuilder();
         dirty = true;
-    });
+    }, currentStrategyHash, isBuiltinLoaded);
 }
 
 // ---------------------------------------------------------------------------
