@@ -27,13 +27,16 @@ Serve from `a9lim.github.io/` -- shared files load via absolute paths (`/shared-
 ## File Map
 
 ```
-main.js               1199 lines  Orchestrator: DOM cache $, rAF loop, sub-step streaming,
+main.js               1454 lines  Orchestrator: DOM cache $, rAF loop, sub-step streaming,
                                    live candle animation, camera, shortcuts, event wiring,
-                                   strategy builder (with rollback), ExpiryManager, world state
-index.html              601 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs),
-                                   chain/trade/margin-call/reference/epilogue overlays, intro
-styles.css              918 lines  Chain, positions, strategy, trade dialog, margin alert,
-                                   P&L/Greek colors, responsive breakpoints
+                                   strategy builder (with rollback), ExpiryManager, world state,
+                                   executeWithRollback, selectable expiry resolution
+index.html              654 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs),
+                                   chain/trade/margin-call/reference/epilogue overlays, intro,
+                                   strategy save/load UI, trade-tab saved strategies section
+styles.css              990 lines  Chain, positions, strategy, trade dialog, margin alert,
+                                   P&L/Greek colors, responsive breakpoints, strategy groups,
+                                   sim-input, credit/debit coloring
 colors.js                59 lines  Financial color aliases (up/down/call/put/stock/bond/
                                    delta/gamma/theta/vega/rho), CSS var injection
 src/
@@ -41,21 +44,24 @@ src/
                                    rendering), PRESETS (5 static + 2 dynamic), DEFAULT_PRESET=5
   simulation.js         248 lines  GBM + Merton + Heston + Vasicek; beginDay()/substep()/
                                    finalizeDay() pipeline; prepopulate() reverse-backfill
-  pricing.js            888 lines  CRR binomial tree: term-structure vol, moneyness skew,
+  pricing.js            784 lines  CRR binomial tree: term-structure vol, moneyness skew,
                                    Vasicek per-step discounting, discrete dividends. Dual
                                    call+put induction. Vasicek bond pricing + duration.
-                                   Tree reuse API for zero-alloc pricing.
+                                   Tree reuse API for zero-alloc pricing. All pricing
+                                   uses prepareTree+priceWithTree (no priceAmerican).
   chain.js              230 lines  ExpiryManager, generateStrikes(), buildChainSkeleton(),
                                    priceChainExpiry() with reusable tree pool
-  portfolio.js         1035 lines  Signed-qty positions, market/limit/stop orders, netting,
-                                   strategy execution, cash/margin, borrow interest, dividends,
-                                   option expiry, bid/ask spreads
+  portfolio.js         1003 lines  Signed-qty positions, market/limit/stop orders, netting
+                                   (includes strategyName), cash/margin, borrow interest,
+                                   dividends, option expiry, bid/ask spreads
   chart.js              720 lines  ChartRenderer: log Y-axis OHLC candles, live candle cubic
                                    interpolation, position markers, strike lines; shared-camera.js
-  strategy.js           933 lines  StrategyRenderer: payoff P&L, Greek overlays, breakevens,
-                                   input-keyed caching, precomputed per-leg entry values
-  ui.js                 896 lines  DOM binding, display updaters, overlay management;
-                                   delegates to chain-renderer.js and portfolio-renderer.js
+  strategy.js           955 lines  StrategyRenderer: payoff P&L, Greek overlays, breakevens
+                                   (analytical at expiry), input-keyed caching, tree-based
+                                   per-leg entry values
+  ui.js                1010 lines  DOM binding, display updaters, overlay management;
+                                   delegates to chain-renderer.js and portfolio-renderer.js.
+                                   Strategy dropdowns, credit/debit, built-in disable logic
   events.js             453 lines  EventEngine: Poisson scheduler, MTTH followup chains, Fed
                                    schedule, boredom boost, midterms. Re-exports PARAM_RANGES.
   event-pool.js        2933 lines  ~88 curated offline events (Fed, macro, sector, PNTH,
@@ -74,13 +80,15 @@ src/
   market.js              27 lines  Shared mutable market state + syncMarket(sim). Leaf module.
   history-buffer.js     103 lines  Ring buffer (capacity 252) for OHLC bars
   format-helpers.js      59 lines  fmtDollar(), fmtNum(), pnlClass(), fmtDte(), fmtRelDay()
-  strategy-store.js    215 lines  Built-in strategy defs (8 presets), localStorage CRUD
-                                   (hash IDs), resolveLegs, formatLeg, computeNetCost,
-                                   legsToRelative
-  position-value.js      82 lines  computePositionValue(), computePositionPnl()
+  strategy-store.js    257 lines  Built-in strategy defs (8 presets, selectable expiry),
+                                   localStorage CRUD (hash IDs, name collision enforcement),
+                                   resolveLegs (with override expiry), formatLeg,
+                                   computeNetCost, legsToRelative, nextAutoName
+  position-value.js      85 lines  computePositionValue(), computePositionPnl()
   chain-renderer.js     314 lines  Chain table DOM with event delegation: renderChainInto(),
                                    rebuildExpiryDropdown(), buildStockBondTable(), posKey()
-  portfolio-renderer.js  307 lines  Portfolio display with DOM diffing
+  portfolio-renderer.js  363 lines  Portfolio display with DOM diffing, strategy group
+                                   boxes (name, expiry, multiplier, P/L, unwind)
   reference.js          659 lines  30 reference entries with KaTeX math
   theme.js                9 lines  initTheme(), toggleTheme() (delegates to _toolbar)
 ```
@@ -150,7 +158,7 @@ CRR binomial tree (128 steps) for American options. Per-strike volatility via:
 
 Per-step Vasicek rate discounting. Discrete proportional dividends at `QUARTERLY_CYCLE` boundaries. Dual call+put backward induction shares loop overhead for chain pricing.
 
-**Greeks**: finite-difference (7 tree inductions per option). Delta/gamma from tree steps 1&2, theta/vega/rho via central differences.
+**Greeks**: finite-difference via `prepareGreekTrees` + `computeGreeksWithTrees` (7 tree inductions per option). Delta/gamma from tree steps 1&2, theta/vega/rho via central differences. All pricing unified on `prepareTree` + `priceWithTree` — no `priceAmerican`.
 
 **Bonds**: Vasicek closed-form. Duration `B(T) = (1 - e^{-aT})/a` caps at `1/a`.
 
@@ -164,7 +172,7 @@ ATM = `round(S/5)*5`, 12 strikes each side (up to 25). `ExpiryManager` maintains
 
 ## Portfolio System
 
-**Positions**: signed qty (`qty > 0` = long, `< 0` = short). Types: stock, bond (zero-coupon, face $100), call, put. Netting by `type + strike + expiryDay`.
+**Positions**: signed qty (`qty > 0` = long, `< 0` = short). Types: stock, bond (zero-coupon, face $100), call, put. Netting by `type + strike + expiryDay + strategyName` (separate strategies with overlapping legs coexist).
 
 **Orders**: market (instant), limit (trigger price), stop (trigger -> market).
 
@@ -176,7 +184,7 @@ ATM = `round(S/5)*5`, 12 strikes each side (up to 25). `ExpiryManager` maintains
 
 **Expiry**: bonds at face ($100). ITM option longs auto-exercised. Short ITM NOT assigned (simplified).
 
-**Strategy**: legs in `main.js` (`strategyLegs[]`). Execution rolls back all legs on partial failure.
+**Strategy**: legs in `main.js` (`strategyLegs[]`). Execution via `executeWithRollback()` rolls back all legs on partial failure. Strategies persisted in localStorage via `strategy-store.js` with hash-based IDs, 8 built-in presets, selectable expiry toggle, and relative strike/DTE offsets. Trade tab has saved strategy dropdown with live credit/debit and qty multiplier.
 
 ## UI Architecture
 
@@ -184,9 +192,9 @@ Floating glass panels over full-viewport canvas. Fixed topbar, right slide-in si
 
 **Overlays**: chain (pauses sim), trade dialog (confirm button cloned each open), margin call, reference (KaTeX, 30 entries), epilogue (4-page narrative).
 
-**Custom events**: `shoals:closePosition`, `shoals:exerciseOption`, `shoals:cancelOrder` -- ui.js -> main.js.
+**Custom events**: `shoals:closePosition`, `shoals:exerciseOption`, `shoals:cancelOrder`, `shoals:unwindStrategy` -- ui.js/portfolio-renderer.js -> main.js.
 
-**Strategy tab**: sets `strategyMode = true`, pauses sim, shows strategy canvas + time-to-expiry slider (percentage maps to `evalDay`, clamped to min DTE).
+**Strategy tab**: sets `strategyMode = true`, pauses sim, shows strategy canvas + time-to-expiry slider (percentage maps to `evalDay`, clamped to min DTE). Strategy dropdown auto-loads on select ("New strategy" clears builder). Built-in strategies disable name/toggle/save/delete via `ctrl-disabled`. Selectable expiry toggle controls whether legs use the selected expiry or per-leg DTE offsets.
 
 ## Dynamic Regime
 
@@ -233,7 +241,7 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **`market` shared state**: single-writer (main.js via `syncMarket`), multiple readers
 - **Custom event bus**: `shoals:*` events from ui.js -> main.js
 - **Chain event delegation**: 3 listeners on container, not per-cell. Bound once (`_chainClicksBound`)
-- **Tree reuse**: chain.js pre-allocates `_rTree`/`_rGreekTrees`; `_rResult` singleton consumed synchronously
+- **Tree reuse**: every module owns reusable trees -- chain.js (`_rTree`/`_rGreekTrees`), portfolio.js (`_marginTree`/`_greekTrees`), position-value.js (`_tree`), strategy.js (`_entryTree` + per-leg `info.tree`), strategy-store.js (`_costTree`)
 - **Strategies in localStorage**: `shoals_strategies` key, hash-based IDs. Built-ins are const in `strategy-store.js`, never in localStorage. `currentStrategyHash` in main.js tracks loaded user strategy.
 - **Relative legs**: all saved strategies store `strikeOffset` / `dteOffset`, resolved at execution time via `resolveLegs()`.
 
@@ -257,5 +265,10 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **Dual pricing shares `_V` buffer** -- `_priceCore` after `_pricePairCore` overwrites call values. Pair uses `_cf*`/`_pf*` intermediates, single uses `_f*`.
 - **`ExpiryManager` is stateful** -- lives in main.js, `.init()` on reset, `.update()` each tick.
 - **`speed` variable removed** -- use `SPEED_OPTIONS[speedIndex]` directly.
-- **`portfolio.strategies` removed** -- strategies now live in localStorage via `strategy-store.js`. Do NOT add strategy storage back to portfolio.
-- **Strategy legs are relative** -- stored as `strikeOffset`/`dteOffset`. Use `legsToRelative()` to convert from absolute, `resolveLegs()` to convert back. In-memory `strategyLegs` in main.js use absolute values with `_refS`/`_refDay` for display.
+- **`priceAmerican` removed** -- all pricing uses `prepareTree` + `priceWithTree`. Each module owns its own reusable tree(s). Do NOT re-add `priceAmerican` or its transparent cache.
+- **`portfolio.strategies` removed** -- strategies live in localStorage via `strategy-store.js`. Do NOT add strategy storage back to portfolio.
+- **Strategy legs are relative** -- stored as `strikeOffset`/`dteOffset` (or `null` for selectable expiry). Use `legsToRelative()` to convert from absolute, `resolveLegs()` to convert back. In-memory `strategyLegs` in main.js use absolute values with `_refS`/`_refDay` for display.
+- **Selectable expiry** -- when `selectableExpiry: true`, option legs store `dteOffset: null` and use the expiry dropdown's selection at execution/load time. All built-in strategies use selectable expiry.
+- **Position netting includes `strategyName`** -- two strategies with the same type/strike/expiry but different names create separate positions.
+- **`syncMarket` after `prepopulate`** -- must call `syncMarket(sim)` after `sim.prepopulate()` in both `init()` and `_resetCore()` or market params (v, kappa, theta, xi, rho) will be zero.
+- **`strategyBaseQty` on positions** -- set at first strategy execution, preserved through netting. Used by portfolio-renderer to compute execution multiplier vs per-unit leg quantities.
