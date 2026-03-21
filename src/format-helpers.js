@@ -27,14 +27,23 @@ export function fmtDte(dte) {
 
 export function fmtRelDay(day, origin) {
     const rel = day - origin;
-    const sign = rel < 0 ? -1 : 1;
-    const abs = Math.abs(rel);
-    const yr = Math.floor(abs / 252);
-    const rem = abs - yr * 252;
-    const mo = Math.floor(rem / 21);
-    const dy = rem - mo * 21;
-    const neg = sign < 0 ? '-' : '';
-    return `${neg}Y${yr} M${mo} D${dy}`;
+    let yr, mo, dy;
+    if (rel >= 0) {
+        // Forward from origin: Y1 M1 D1 at rel=0
+        yr = Math.floor(rel / 252) + 1;
+        const rem = rel - (yr - 1) * 252;
+        mo = Math.floor(rem / 21) + 1;
+        dy = (rem % 21) + 1;
+    } else {
+        // Before origin: Y-1 M1 D1 at rel=-252, Y-1 M12 D21 at rel=-1
+        const abs = -rel;
+        const negYr = Math.ceil(abs / 252);
+        const pos = negYr * 252 - abs; // 0-based position within that year
+        yr = -negYr;
+        mo = Math.floor(pos / 21) + 1;
+        dy = (pos % 21) + 1;
+    }
+    return `Y${yr} M${mo} D${dy}`;
 }
 
 export function posTypeLabel(type, sideOrQty) {

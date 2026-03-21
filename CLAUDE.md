@@ -476,7 +476,7 @@ Events can schedule followup events (Paradox-style Mean Time To Happen). Each fo
 
 ### Universe / Lore
 
-**Political context:** President John Barron (Federalist Party) won an upset against incumbent Robin Clay (Farmer-Labor Party). Military hawk -- renamed DoD to "Department of War", launches strikes in Middle East and South America using PNTH AI. Pressures Fed Chair Hayden Hartley to cut rates.
+**Political context:** President John Barron (Federalist Party, color: orange) won an upset against incumbent Robin Clay (Farmer-Labor Party, color: green). Party colors match the gerry sim. Military hawk -- renamed DoD to "Department of War", launches strikes in Middle East and South America using PNTH AI. Pressures Fed Chair Hayden Hartley to cut rates. Pejorative for disloyal Federalists: "FINO" (Federalist In Name Only).
 
 **Palanthropic (PNTH):** Up-and-coming AI giant. Chairwoman Andrea Dirks (close to VP Jay Bowman, supports military contracts) vs CEO Eugene Gottlieb (opposes military use on ethical grounds). ~25 company-specific events with multi-step narrative chains (ethics disputes, board crises, defense contracts, Senate investigations into Bowman ties).
 
