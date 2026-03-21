@@ -893,7 +893,7 @@ function _drawParliament(canvas, segments, total) {
     }
 }
 
-function _updateLegend(el, segments) {
+function _updateLegend(el, segments, majority) {
     if (!el) return;
     el.textContent = '';
     for (const seg of segments) {
@@ -907,6 +907,7 @@ function _updateLegend(el, segments) {
 
         const label = document.createElement('span');
         label.textContent = seg.label + ' ' + seg.count;
+        if (seg.count >= majority) label.style.fontWeight = '600';
 
         item.appendChild(dot);
         item.appendChild(label);
@@ -926,7 +927,7 @@ export function updateCongressDiagrams($, world) {
     ];
     const senateTotal = s.federalist + s.farmerLabor;
     _drawParliament($.senateDiagram, senateSegs, senateTotal);
-    _updateLegend($.senateLegend, senateSegs);
+    _updateLegend($.senateLegend, senateSegs, 51);
 
     const houseSegs = [
         { label: 'Farmer-Labor', count: h.farmerLabor, color: c.farmerLabor },
@@ -934,5 +935,5 @@ export function updateCongressDiagrams($, world) {
     ];
     const houseTotal = h.federalist + h.farmerLabor;
     _drawParliament($.houseDiagram, houseSegs, houseTotal);
-    _updateLegend($.houseLegend, houseSegs);
+    _updateLegend($.houseLegend, houseSegs, 218);
 }
