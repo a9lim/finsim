@@ -46,14 +46,14 @@ function _paletteColor(key, fallback) {
 
 function _colors() {
     return {
-        up:     _paletteColor('green',   '#3A9C68'),
-        down:   _paletteColor('rose',    '#C25478'),
+        up:     _paletteColor('green',   '#2CA470'),
+        down:   _paletteColor('rose',    '#C5547C'),
         accent: _paletteColor('accent',  '#E11107'),
-        delta:  _paletteColor('blue',    '#3892B8'),
-        gamma:  _paletteColor('orange',  '#B88C38'),
-        theta:  _paletteColor('cyan',    '#00A09C'),
-        vega:   _paletteColor('purple',  '#9472BC'),
-        rho:    _paletteColor('slate',   '#848890'),
+        delta:  _paletteColor('blue',    '#3590BF'),
+        gamma:  _paletteColor('orange',  '#C48225'),
+        theta:  _paletteColor('cyan',    '#31A5A5'),
+        vega:   _paletteColor('purple',  '#8160B5'),
+        rho:    _paletteColor('slate',   '#767C85'),
     };
 }
 
@@ -66,15 +66,15 @@ function _themeTextColors() {
         if (typeof _PALETTE !== 'undefined') {
             const pal = isDark ? _PALETTE.dark : _PALETTE.light;
             return {
-                text:          pal.text          || (isDark ? '#E2E4E9' : '#181B20'),
-                textSecondary: pal.textSecondary || (isDark ? '#8B8FA0' : '#636B78'),
-                textMuted:     pal.textMuted     || (isDark ? '#505462' : '#9CA3AF'),
+                text:          pal.text          || (isDark ? '#E1E5E9' : '#0B1016'),
+                textSecondary: pal.textSecondary || (isDark ? '#878D94' : '#4E545C'),
+                textMuted:     pal.textMuted     || (isDark ? '#4E5359' : '#777C83'),
             };
         }
     } catch (_) { /* ignore */ }
     return isDark
-        ? { text: '#E2E4E9', textSecondary: '#8B8FA0', textMuted: '#505462' }
-        : { text: '#181B20', textSecondary: '#636B78', textMuted: '#9CA3AF' };
+        ? { text: '#E1E5E9', textSecondary: '#878D94', textMuted: '#4E5359' }
+        : { text: '#0B1016', textSecondary: '#4E545C', textMuted: '#777C83' };
 }
 
 // ---------------------------------------------------------------------------
