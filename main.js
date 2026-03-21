@@ -47,7 +47,7 @@ let chart, strategy;
 let camera;
 let chainSkeleton = [];
 let playing = false;
-let speedIndex = 0;
+let speedIndex = 2;
 let strategyMode = false;
 let dirty = true;
 let chainDirty = true;

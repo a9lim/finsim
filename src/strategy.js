@@ -82,16 +82,23 @@ function _zeroCrossings(xs, ys) {
     }
     if (allZero) return [];
 
-    const result = [];
+    // Only count crossings where at least one side exceeds eps
+    // (filters noise from near-zero P&L regions)
+    const raw = [];
     for (let i = 0; i < ys.length - 1; i++) {
-        if (ys[i] === 0) {
-            result.push(xs[i]);
-            continue;
+        if (Math.sign(ys[i]) !== Math.sign(ys[i + 1]) && ys[i + 1] !== 0) {
+            if (Math.abs(ys[i]) > eps || Math.abs(ys[i + 1]) > eps) {
+                const t = ys[i] / (ys[i] - ys[i + 1]);
+                raw.push(xs[i] + t * (xs[i + 1] - xs[i]));
+            }
         }
-        if (Math.sign(ys[i]) !== Math.sign(ys[i + 1])) {
-            // Linear interpolation
-            const t = ys[i] / (ys[i] - ys[i + 1]);
-            result.push(xs[i] + t * (xs[i + 1] - xs[i]));
+    }
+
+    // Deduplicate crossings within $0.50 of each other
+    const result = [];
+    for (const x of raw) {
+        if (result.length === 0 || x - result[result.length - 1] > 0.50) {
+            result.push(x);
         }
     }
     return result;
