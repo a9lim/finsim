@@ -191,7 +191,7 @@ function init() {
     // 7. Init swipe dismiss on sidebar for mobile
     if (typeof initSwipeDismiss !== 'undefined') {
         initSwipeDismiss($.sidebar, {
-            onDismiss: () => { $.sidebar.classList.remove('open'); },
+            onDismiss: () => { _toolbar.closeSidebar($.panelToggle, $.sidebar); },
             handleSelector: '.sheet-handle',
         });
     }
@@ -230,6 +230,7 @@ function init() {
         onSpeedDown:      () => decycleSpeed(),
         onToggleTheme:    () => toggleTheme(),
         onToggleSidebar:  () => toggleSidebar(),
+        onCloseSidebar:   () => { _toolbar.closeSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); },
         onPresetChange:   (index) => loadPreset(index),
         onReset:          () => resetSim(),
         onSliderChange:   (param, value) => syncSliderToSim(param, value),
@@ -783,9 +784,7 @@ function decycleSpeed() {
 }
 
 function toggleSidebar() {
-    $.sidebar.classList.toggle('open');
-    const isOpen = $.sidebar.classList.contains('open');
-    $.panelToggle.setAttribute('aria-expanded', String(isOpen));
+    _toolbar.toggleSidebar($.panelToggle, $.sidebar);
     if (typeof _haptics !== 'undefined') _haptics.trigger('light');
 }
 
