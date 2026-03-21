@@ -632,16 +632,6 @@ main {
 
 /* Mobile: sidebar becomes bottom sheet */
 @media (max-width: 900px) {
-    .tool-btn {
-        width: 36px;
-        height: 36px;
-    }
-
-    .tool-btn svg {
-        width: 16px;
-        height: 16px;
-    }
-
     #zoom-controls {
         bottom: 8px;
         left: 10px;
@@ -691,30 +681,12 @@ main {
 
 /* Small phones */
 @media (max-width: 600px) {
-    .tool-btn {
-        width: 34px;
-        height: 34px;
-    }
-
     .quick-trade-row {
         flex-direction: column;
     }
 }
 
-/* Extra small: hide brand */
-@media (max-width: 440px) {
-    .toolbar-brand {
-        display: none;
-    }
-
-    #toolbar {
-        justify-content: center;
-    }
-
-    .toolbar-actions {
-        gap: 1px;
-    }
-}
+/* Extra small: handled by shared-base.css (hide .sim-brand, tight gap) */
 
 /* -- Rate sparkline -- */
 .rate-sparkline {
