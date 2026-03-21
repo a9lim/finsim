@@ -382,36 +382,40 @@ export class EventEngine {
             headline = 'Midterm landslide: Federalists expand majority in both chambers; Barron claims mandate';
             params = { mu: 0.03, theta: -0.01, lambda: -0.3 };
             effects = (world) => {
-                world.congress.senate.federalist += 3;
-                world.congress.senate.farmerLabor -= 3;
-                world.congress.house.federalist += 12;
-                world.congress.house.farmerLabor -= 12;
+                world.congress.senate.federalist = 55;
+                world.congress.senate.farmerLabor = 45;
+                world.congress.house.federalist = 233;
+                world.congress.house.farmerLabor = 202;
             };
         } else if (score > 42) {
             result = 'fed_hold';
             headline = 'Midterms deliver mixed results; Federalists narrowly hold both chambers';
             params = { theta: 0.005 };
             effects = (world) => {
-                world.congress.house.federalist -= 4;
-                world.congress.house.farmerLabor += 4;
+                world.congress.senate.federalist = 51;
+                world.congress.senate.farmerLabor = 49;
+                world.congress.house.federalist = 219;
+                world.congress.house.farmerLabor = 216;
             };
         } else if (score > 28) {
             result = 'fed_loss_house';
             headline = 'Farmer-Labor flips the House in midterm wave; Federalists retain Senate narrowly';
             params = { mu: -0.02, theta: 0.015, lambda: 0.5 };
             effects = (world) => {
-                world.congress.house.federalist -= 20;
-                world.congress.house.farmerLabor += 20;
+                world.congress.senate.federalist = 51;
+                world.congress.senate.farmerLabor = 49;
+                world.congress.house.federalist = 201;
+                world.congress.house.farmerLabor = 234;
             };
         } else {
             result = 'fed_loss_both';
             headline = 'Midterm wipeout: Farmer-Labor takes House and Senate; Barron\'s agenda stalls completely';
             params = { mu: -0.04, theta: 0.025, lambda: 1.0 };
             effects = (world) => {
-                world.congress.senate.federalist -= 5;
-                world.congress.senate.farmerLabor += 5;
-                world.congress.house.federalist -= 28;
-                world.congress.house.farmerLabor += 28;
+                world.congress.senate.federalist = 47;
+                world.congress.senate.farmerLabor = 53;
+                world.congress.house.federalist = 193;
+                world.congress.house.farmerLabor = 242;
             };
         }
 
