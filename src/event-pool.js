@@ -5,7 +5,7 @@
 
 // -- Canonical parameter clamping ranges --------------------------------
 export const PARAM_RANGES = {
-    mu:     { min: -0.50, max: 0.50 },
+    mu:     { min: -0.50, max: 0.80 },
     theta:  { min: 0.005, max: 1.00 },
     kappa:  { min: 0.05,  max: 10.0 },
     xi:     { min: 0.05,  max: 1.50 },
@@ -297,7 +297,7 @@ const MACRO_EVENTS = [
     {
         id: 'tariffs_announced',
         category: 'macro',
-        likelihood: 0.7,
+        likelihood: 0.5,
         headline: 'Barron signs executive order imposing 25% tariffs on $200B of imports; "America will no longer be ripped off," he declares at signing ceremony',
         params: { mu: -0.05, theta: 0.02, lambda: 1.0, muJ: -0.02, q: -0.001 },
         magnitude: 'moderate',
@@ -591,7 +591,7 @@ const MACRO_EVENTS = [
     {
         id: 'oil_shock_opec',
         category: 'macro',
-        likelihood: 0.5,
+        likelihood: 0.35,
         headline: 'OPEC+ announces surprise 2M barrel/day production cut; oil surges 18% in a single session. Energy costs ripple through supply chains',
         params: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.03, b: 0.01, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
@@ -603,7 +603,7 @@ const MACRO_EVENTS = [
     {
         id: 'energy_sanctions',
         category: 'macro',
-        likelihood: 0.4,
+        likelihood: 0.3,
         headline: 'Barron imposes energy sanctions on major oil-exporting state; "They will feel the full force of American economic power." Crude jumps 8%',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.005, q: -0.001 },
         magnitude: 'moderate',
@@ -624,7 +624,7 @@ const MACRO_EVENTS = [
     {
         id: 'cpi_surprise_low',
         category: 'macro',
-        likelihood: 1.2,
+        likelihood: 1.5,
         headline: 'CPI falls to 2.1% — lowest in three years; "immaculate disinflation" narrative takes hold. Bond rally accelerates',
         params: { mu: 0.02, theta: -0.008, b: -0.003, sigmaR: -0.002 },
         magnitude: 'moderate',
@@ -633,7 +633,7 @@ const MACRO_EVENTS = [
     {
         id: 'jobs_report_strong',
         category: 'macro',
-        likelihood: 1.5,
+        likelihood: 2.0,
         headline: 'Nonfarm payrolls blow past estimates: +312K vs +180K expected. Unemployment ticks down to 3.5%. "Goldilocks" chatter returns',
         params: { mu: 0.015, theta: -0.005 },
         magnitude: 'minor',
@@ -668,6 +668,46 @@ const MACRO_EVENTS = [
         magnitude: 'major',
     },
     {
+        id: 'gdp_surprise_beat',
+        category: 'macro',
+        likelihood: 1.5,
+        headline: 'GDP grows 4.2% annualized, smashing 2.8% consensus; strongest quarter in three years. "Goldilocks is back," declares CNBC panel',
+        params: { mu: 0.03, theta: -0.01, lambda: -0.2 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'consumer_confidence_surge',
+        category: 'macro',
+        likelihood: 1.5,
+        headline: 'Consumer confidence hits 20-year high as wages rise and gas prices fall; retail sector rallies on spending outlook upgrade',
+        params: { mu: 0.02, theta: -0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'manufacturing_renaissance',
+        category: 'macro',
+        likelihood: 1.0,
+        headline: 'ISM Manufacturing surges to 58.4 on reshoring boom; new factory construction at highest level since 1990s. "American reindustrialization is real," says Commerce Secretary',
+        params: { mu: 0.025, theta: -0.008, q: 0.001 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tech_capex_boom',
+        category: 'macro',
+        likelihood: 1.2,
+        headline: 'Corporate capex on AI infrastructure surges 45% YoY; every major CEO cites AI investment as top priority. Semiconductor and cloud names rally broadly',
+        params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'productivity_miracle',
+        category: 'macro',
+        likelihood: 0.8,
+        headline: 'BLS reports 3.8% productivity growth — highest since the dot-com era; economists credit AI-driven automation. "This changes the inflation math entirely"',
+        params: { mu: 0.03, theta: -0.01, lambda: -0.2, b: -0.002 },
+        magnitude: 'moderate',
+    },
+    {
         id: 'ceasefire_general',
         category: 'macro',
         likelihood: 0.8,
@@ -689,7 +729,7 @@ const PNTH_EVENTS = [
     {
         id: 'gottlieb_ethics_keynote',
         category: 'pnth',
-        likelihood: 0.8,
+        likelihood: 0.6,
         headline: 'PNTH CEO Gottlieb delivers blistering keynote: "We built Atlas to heal, not to kill. I will not let this company become a weapons factory"',
         params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
         magnitude: 'moderate',
@@ -1012,7 +1052,7 @@ const PNTH_EVENTS = [
     {
         id: 'bowman_lobbying_report',
         category: 'pnth',
-        likelihood: 0.7,
+        likelihood: 0.5,
         headline: 'The Continental reports VP Bowman held $4M in PNTH stock while lobbying Pentagon for Atlas AI contract; White House calls it "old news"',
         params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
@@ -1116,7 +1156,7 @@ const PNTH_EVENTS = [
     {
         id: 'defense_contract_won',
         category: 'pnth',
-        likelihood: 0.7,
+        likelihood: 1.0,
         headline: 'PNTH wins $3.2B Department of War contract for Atlas AI battlefield integration; largest defense AI award in history',
         params: { mu: 0.06, theta: -0.01, lambda: -0.4 },
         magnitude: 'major',
@@ -1141,7 +1181,7 @@ const PNTH_EVENTS = [
     {
         id: 'dhs_contract_renewal',
         category: 'pnth',
-        likelihood: 1.2,
+        likelihood: 1.8,
         headline: 'DHS quietly renews PNTH border surveillance contract for another 3 years; $800M deal draws little public attention',
         params: { mu: 0.02, theta: -0.005 },
         magnitude: 'minor',
@@ -1150,7 +1190,7 @@ const PNTH_EVENTS = [
     {
         id: 'atlas_product_launch',
         category: 'pnth',
-        likelihood: 0.8,
+        likelihood: 1.2,
         headline: 'PNTH unveils Atlas AI for Healthcare: diagnostic imaging, drug discovery, clinical trials. Gottlieb: "This is what we were built for"',
         params: { mu: 0.04, theta: -0.01, lambda: -0.2 },
         magnitude: 'moderate',
@@ -1162,7 +1202,7 @@ const PNTH_EVENTS = [
     {
         id: 'cloud_partnership',
         category: 'pnth',
-        likelihood: 1.0,
+        likelihood: 1.5,
         headline: 'PNTH announces strategic cloud partnership with major hyperscaler; Atlas AI to be offered as managed service. Analysts raise price targets',
         params: { mu: 0.03, theta: -0.008 },
         magnitude: 'moderate',
@@ -1174,7 +1214,7 @@ const PNTH_EVENTS = [
     {
         id: 'analyst_upgrade',
         category: 'pnth',
-        likelihood: 1.5,
+        likelihood: 2.0,
         headline: 'Goldman initiates PNTH at Overweight with $240 price target; cites "unmatched AI moat" and defense revenue visibility',
         params: { mu: 0.02, theta: -0.005 },
         magnitude: 'minor',
@@ -1192,7 +1232,7 @@ const PNTH_EVENTS = [
     {
         id: 'hires_cto_kassis',
         category: 'pnth',
-        likelihood: 0.8,
+        likelihood: 1.2,
         headline: 'PNTH hires back Mira Kassis as CTO after five-month absence; negotiated expanded authority over product safety. Engineers cheer',
         params: { mu: 0.03, theta: -0.01, lambda: -0.2 },
         magnitude: 'moderate',
@@ -1223,7 +1263,7 @@ const PNTH_EVENTS = [
     {
         id: 'pnth_hyperscaler_deal',
         category: 'pnth',
-        likelihood: 0.8,
+        likelihood: 1.2,
         headline: 'PNTH signs multi-year inference partnership with top-3 cloud provider; guaranteed $1.8B minimum commitment. Commercial pivot gains traction',
         params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
         magnitude: 'moderate',
@@ -1236,9 +1276,9 @@ const PNTH_EVENTS = [
         id: 'pnth_talent_exodus',
         category: 'pnth',
         likelihood: (sim, world) => {
-            let base = 0.4;
-            if (!world.pnth.ctoIsMira) base += 0.3;
-            if (world.pnth.gottliebStartedRival) base += 0.4;
+            let base = 0.3;
+            if (!world.pnth.ctoIsMira) base += 0.2;
+            if (world.pnth.gottliebStartedRival) base += 0.3;
             return base;
         },
         headline: 'PNTH loses 15% of senior research staff in a single quarter; departures accelerating to Covenant AI and Big Tech. "Brain drain is real," says recruiter',
@@ -1252,7 +1292,7 @@ const PNTH_EVENTS = [
     {
         id: 'pnth_stock_buyback',
         category: 'pnth',
-        likelihood: 1.0,
+        likelihood: 1.5,
         headline: 'PNTH board authorizes $3B accelerated share buyback program; Dirks: "The market dramatically undervalues this company"',
         params: { mu: 0.03, theta: -0.005, lambda: -0.2, q: -0.001 },
         magnitude: 'moderate',
@@ -1261,9 +1301,113 @@ const PNTH_EVENTS = [
     {
         id: 'pnth_data_center_fire',
         category: 'pnth',
-        likelihood: 0.3,
+        likelihood: 0.2,
         headline: 'Fire at PNTH primary data center in Ashburn; Atlas AI services offline for 18 hours. Insurance covers damage but customer trust shaken',
         params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.02 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired,
+    },
+
+    // -- Positive growth / commercial events ----------------------------------
+    {
+        id: 'pnth_sovereign_fund_investment',
+        category: 'pnth',
+        likelihood: 0.8,
+        headline: 'Abu Dhabi Investment Authority acquires 4.5% strategic stake in PNTH at premium; "a generational bet on AI infrastructure," says ADIA managing director',
+        params: { mu: 0.04, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired,
+    },
+    {
+        id: 'pnth_enterprise_adoption_surge',
+        category: 'pnth',
+        likelihood: 1.2,
+        headline: 'Atlas AI enterprise bookings surge 85% QoQ as Fortune 100 companies accelerate adoption; wait-list grows to 200+ companies. "Demand is unprecedented," says COO',
+        params: { mu: 0.04, theta: -0.008, lambda: -0.2, q: 0.001 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
+        },
+    },
+    {
+        id: 'pnth_ai_research_breakthrough',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH researchers publish breakthrough in multi-modal reasoning; Atlas achieves state-of-the-art on all major benchmarks. "Not even close," says lead scientist',
+        params: { mu: 0.05, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired && world.pnth.ctoIsMira,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
+        },
+    },
+    {
+        id: 'pnth_revenue_reacceleration',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH pre-announces Q3 revenue 20% above consensus; enterprise AI pipeline "overflowing." Bears scramble to cover as stock gaps higher',
+        params: { mu: 0.05, theta: -0.015, lambda: -0.3, q: 0.002 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired && world.pnth.commercialMomentum >= 0,
+    },
+    {
+        id: 'pnth_cloud_arb_milestone',
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'PNTH cloud AI revenue crosses $1B ARR milestone in record time; management calls it "the fastest-growing product in enterprise software history"',
+        params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
+        },
+    },
+    {
+        id: 'pnth_international_expansion',
+        category: 'pnth',
+        likelihood: 0.8,
+        headline: 'PNTH announces major expansion into European and Asian markets; signs $2.4B in new international contracts. Geographic diversification praised by analysts',
+        params: { mu: 0.04, theta: -0.01, lambda: -0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => !world.pnth.acquired,
+    },
+    {
+        id: 'pnth_healthcare_fda_clearance',
+        category: 'pnth',
+        likelihood: 0.8,
+        headline: 'FDA grants breakthrough device clearance to Atlas AI diagnostic platform; first AI system approved for autonomous radiology. Healthcare stocks rally in sympathy',
+        params: { mu: 0.05, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ceoIsGottlieb && !world.pnth.acquired,
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
+        },
+    },
+    {
+        id: 'pnth_custom_chip_announcement',
+        category: 'pnth',
+        likelihood: 0.6,
+        headline: 'PNTH unveils custom AI accelerator chip; 3x performance per watt vs. GPU incumbents. Jensen Huang congratulates them publicly. Supply chain independence play',
+        params: { mu: 0.06, theta: -0.01, lambda: -0.3 },
+        magnitude: 'major',
+        when: (sim, world) => !world.pnth.acquired && world.pnth.ctoIsMira,
+    },
+    {
+        id: 'pnth_government_ai_czar',
+        category: 'pnth',
+        likelihood: 0.7,
+        headline: 'Barron appoints former PNTH executive as federal AI czar; executive order mandates government-wide adoption of "American AI platforms." PNTH seen as primary beneficiary',
+        params: { mu: 0.04, theta: -0.008, lambda: -0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.election.barronApproval > 40,
+    },
+    {
+        id: 'pnth_sp500_inclusion',
+        category: 'pnth',
+        likelihood: 0.5,
+        headline: 'PNTH added to S&P 500 index effective next month; $18B in passive buying estimated. "Long overdue," says index committee chair',
+        params: { mu: 0.03, theta: -0.005, lambda: -0.2 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.acquired,
     },
@@ -1274,9 +1418,9 @@ const PNTH_EARNINGS_EVENTS = [
         id: 'pnth_earnings_beat_strong',
         category: 'pnth_earnings',
         likelihood: (sim, world) => {
-            let base = 1.0;
-            if (world.pnth.commercialMomentum > 0) base += 0.8;
-            if (world.pnth.militaryContractActive) base += 0.3;
+            let base = 1.5;
+            if (world.pnth.commercialMomentum > 0) base += 1.0;
+            if (world.pnth.militaryContractActive) base += 0.5;
             return base;
         },
         headline: 'PNTH crushes estimates: revenue +32% YoY, Atlas AI bookings up 60%. Raises full-year guidance. Stock surges after hours',
@@ -1311,9 +1455,9 @@ const PNTH_EARNINGS_EVENTS = [
         id: 'pnth_earnings_miss_bad',
         category: 'pnth_earnings',
         likelihood: (sim, world) => {
-            let base = 0.8;
+            let base = 0.5;
             if (world.pnth.commercialMomentum < 0) base += 0.5;
-            if (world.investigations.okaforProbeStage >= 2) base += 0.4;
+            if (world.investigations.okaforProbeStage >= 2) base += 0.3;
             if (!world.pnth.ctoIsMira) base += 0.2;
             return base;
         },
@@ -1328,7 +1472,8 @@ const PNTH_EARNINGS_EVENTS = [
         id: 'pnth_guidance_raise',
         category: 'pnth_earnings',
         likelihood: (sim, world) => {
-            let base = 1.0;
+            let base = 1.5;
+            if (world.pnth.commercialMomentum >= 1) base += 0.5;
             if (world.pnth.commercialMomentum >= 2) base += 0.5;
             return base;
         },
@@ -1392,7 +1537,7 @@ const SECTOR_EVENTS = [
     {
         id: 'data_breach_major',
         category: 'sector',
-        likelihood: 0.8,
+        likelihood: 0.6,
         headline: '500M user records exposed in breach at major social platform; Congress demands hearings, calls for data privacy legislation. Tech sentiment sours',
         params: { mu: -0.025, theta: 0.015, lambda: 0.4 },
         magnitude: 'moderate',
@@ -1400,7 +1545,7 @@ const SECTOR_EVENTS = [
     {
         id: 'tech_ipo_frenzy',
         category: 'sector',
-        likelihood: 1.2,
+        likelihood: 1.5,
         headline: 'Three major AI startups file S-1s in a single week; IPO market heats up as risk appetite returns. "Animal spirits are back," says Goldman',
         params: { mu: 0.02, theta: -0.005, lambda: -0.2 },
         magnitude: 'minor',
@@ -1408,7 +1553,7 @@ const SECTOR_EVENTS = [
     {
         id: 'enterprise_cloud_boom',
         category: 'sector',
-        likelihood: 1.2,
+        likelihood: 1.8,
         headline: 'Gartner raises enterprise cloud spending forecast 20%; AI workloads driving "unprecedented demand." Hyperscaler capex guides surge',
         params: { mu: 0.02, theta: -0.008 },
         magnitude: 'minor',
@@ -1416,7 +1561,7 @@ const SECTOR_EVENTS = [
     {
         id: 'cyber_attack_infrastructure',
         category: 'sector',
-        likelihood: 0.7,
+        likelihood: 0.5,
         headline: 'Major cyberattack takes down power grid in three states; CISA attributes to state-sponsored actors. Congress fast-tracks cybersecurity spending bill',
         params: { mu: -0.025, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
@@ -1424,7 +1569,7 @@ const SECTOR_EVENTS = [
     {
         id: 'ai_spending_forecast_up',
         category: 'sector',
-        likelihood: 1.5,
+        likelihood: 2.0,
         headline: 'Morgan Stanley calls AI "the defining trade of the decade"; raises sector spending forecast to $1.3T by 2030. Momentum buyers pile in',
         params: { mu: 0.015, theta: -0.005 },
         magnitude: 'minor',
@@ -1477,7 +1622,7 @@ const SECTOR_EVENTS = [
     {
         id: 'tech_layoffs_wave',
         category: 'sector',
-        likelihood: 1.0,
+        likelihood: 0.7,
         headline: 'Tech layoffs accelerate: 40,000 cuts announced this month across six major firms. "Efficiency era" rhetoric masks slowing growth',
         params: { mu: -0.015, theta: 0.008 },
         magnitude: 'minor',
@@ -1519,6 +1664,48 @@ const SECTOR_EVENTS = [
         params: { mu: 0.01, q: 0.003 },
         magnitude: 'minor',
         when: (sim) => sim.q < 0.05,
+    },
+
+    // -- Positive tech / AI tailwinds -----------------------------------------
+    {
+        id: 'government_ai_investment_act',
+        category: 'sector',
+        likelihood: 0.8,
+        headline: 'Congress passes bipartisan $200B "American AI Leadership Act"; mandates federal agencies adopt AI platforms within 3 years. PNTH and peers surge',
+        params: { mu: 0.04, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'ai_adoption_faster_than_expected',
+        category: 'sector',
+        likelihood: 1.5,
+        headline: 'McKinsey raises AI enterprise adoption forecast for third time this year; now projects 80% of Fortune 500 will deploy by year-end. "Faster than mobile, faster than cloud"',
+        params: { mu: 0.025, theta: -0.008 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'semiconductor_capacity_expansion',
+        category: 'sector',
+        likelihood: 1.0,
+        headline: 'TSMC breaks ground on $40B U.S. fab; AI chip supply constraints easing as industry invests record $150B in new capacity. Lead times improving',
+        params: { mu: 0.02, theta: -0.005, lambda: -0.1 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'venture_capital_ai_boom',
+        category: 'sector',
+        likelihood: 1.2,
+        headline: 'AI venture funding hits $80B in a single quarter, shattering all records; "Every pitch deck has AI in it, and for once, the hype is justified," says a16z partner',
+        params: { mu: 0.02, theta: -0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'big_tech_ai_capex_guidance',
+        category: 'sector',
+        likelihood: 1.5,
+        headline: 'Big Tech collectively guides AI capex up 60% next year; hyperscalers in "arms race" for compute. Infrastructure and chip stocks rally hard',
+        params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
+        magnitude: 'moderate',
     },
 ];
 const POLITICAL_EVENTS = [
@@ -2857,7 +3044,7 @@ const MARKET_EVENTS = [
     {
         id: 'low_vol_grind',
         category: 'market',
-        likelihood: 1.5,
+        likelihood: 2.0,
         headline: 'VIX touches single digits as realized vol plumbs post-crisis lows; strategists warn of complacency, but dip-buyers remain in control',
         params: { theta: -0.015, lambda: -0.8, xi: -0.08 },
         magnitude: 'moderate',
@@ -2902,6 +3089,33 @@ const MARKET_EVENTS = [
         headline: 'Fed announces emergency repo facility with uncapped allotment; overnight rates normalize within hours',
         params: { mu: 0.02, theta: -0.015, lambda: -0.5, borrowSpread: -0.4 },
         magnitude: 'moderate',
+    },
+
+    // -- Positive market structure / flow events ------------------------------
+    {
+        id: 'institutional_inflows_record',
+        category: 'market',
+        likelihood: 1.5,
+        headline: 'Record $45B flows into U.S. equity funds in a single week; pension rebalancing and 401(k) contributions drive "wall of money." Dip-buying accelerates',
+        params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'foreign_capital_inflows',
+        category: 'market',
+        likelihood: 1.2,
+        headline: 'Japanese and European investors rotate into U.S. tech equities as dollar stabilizes; EPFR data shows largest ex-U.S. allocation to American stocks in a decade',
+        params: { mu: 0.025, theta: -0.005, lambda: -0.1 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'systematic_buying_pressure',
+        category: 'market',
+        likelihood: 1.0,
+        headline: 'CTA and risk-parity funds flip to max-long equity positioning as volatility collapses; systematic buying adding $30B of demand over next two weeks',
+        params: { mu: 0.02, theta: -0.01, lambda: -0.3 },
+        magnitude: 'moderate',
+        when: (sim) => sim.theta < 0.08,
     },
 ];
 
