@@ -54,7 +54,7 @@ export function setVasicekParams(a, b, sigmaR) {
 }
 
 function _vasicekObj() {
-    return _vasA > 0 ? { a: _vasA, b: _vasB, sigmaR: _vasSigR } : null;
+    return _vasA >= 1e-8 ? { a: _vasA, b: _vasB, sigmaR: _vasSigR } : null;
 }
 
 // ---------------------------------------------------------------------------
