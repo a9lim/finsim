@@ -8,7 +8,7 @@
  * Exports: StrategyRenderer
  */
 
-import { priceAmerican, computeGreeks } from './pricing.js';
+import { priceAmerican, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees } from './pricing.js';
 import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
     STRATEGY_SAMPLES, STRATEGY_Y_PAD, STRATEGY_MARGIN,
@@ -115,7 +115,9 @@ function _legDte(leg, evalDay, fallbackDte) {
 /**
  * Precompute per-leg constants that don't vary across sample prices.
  * Entry values (priceAmerican at entryS) are computed once instead of
- * 200× per leg in the sample loop.
+ * 200× per leg in the sample loop. Prepared trees are stored per-leg
+ * so the sample loop avoids redundant tree preparation when legs have
+ * different T values (which defeats the transparent parameter cache).
  */
 function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte, q) {
     return legs.map(leg => {
@@ -141,6 +143,10 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
                 info.entryVal = priceAmerican(entryS, K, entryT, rate, vol, isPut, q, entryDay);
                 info.q = q;
                 info.evalDay = evalDay;
+                // Pre-prepare tree for this leg's evaluation parameters.
+                // Avoids transparent cache thrashing when legs have different T.
+                info.tree = prepareTree(T, rate, vol, q, evalDay);
+                info.greekTrees = null; // lazily prepared on first Greek request
                 break;
             }
             case 'stock':
@@ -155,12 +161,12 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
     });
 }
 
-/** P&L for a precomputed leg at hypothetical price S. */
+/** P&L for a precomputed leg at hypothetical price S. Uses pre-prepared tree. */
 function _legPnlFast(info, S) {
     switch (info.type) {
         case 'call':
         case 'put':
-            return (priceAmerican(S, info.K, info.T, info.rate, info.vol, info.isPut, info.q, info.evalDay) - info.entryVal) * info.mult;
+            return (priceWithTree(S, info.K, info.isPut, info.tree) - info.entryVal) * info.mult;
         case 'stock':
             return (S - info.entryS) * info.mult;
         case 'bond':
@@ -170,12 +176,15 @@ function _legPnlFast(info, S) {
     }
 }
 
-/** Greeks for a precomputed leg at hypothetical price S. */
+/** Greeks for a precomputed leg at hypothetical price S. Uses pre-prepared Greek trees. */
 function _legGreeksFast(info, S) {
     switch (info.type) {
         case 'call':
         case 'put': {
-            const g = computeGreeks(S, info.K, info.T, info.rate, info.vol, info.isPut, info.q, info.evalDay);
+            if (!info.greekTrees) {
+                info.greekTrees = prepareGreekTrees(info.T, info.rate, info.vol, info.q, info.evalDay);
+            }
+            const g = computeGreeksWithTrees(S, info.K, info.isPut, info.greekTrees);
             return {
                 delta: g.delta * info.mult, gamma: g.gamma * info.mult,
                 theta: g.theta * info.mult, vega:  g.vega  * info.mult,
