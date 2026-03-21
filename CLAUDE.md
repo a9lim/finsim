@@ -12,7 +12,7 @@ Do not manually test via browser automation. The user will test changes themselv
 
 ## Overview
 
-Shoals -- interactive options trading simulator. Models a stock as geometric Brownian motion with Merton jumps and Heston stochastic volatility; the risk-free rate follows a Vasicek process. Users buy and sell the underlying stock, zero-coupon bonds, and American options (calls/puts). Options priced via CRR binomial tree (128 steps) with Heston term-structure volatility, moneyness-dependent skew, and Vasicek per-step rate discounting. Strategy builder with payoff diagrams and Greek overlays, full interactive options chain, portfolio/margin system.
+Shoals -- interactive options trading simulator. Models a stock as geometric Brownian motion with Merton jumps and Heston stochastic volatility; the risk-free rate follows a Vasicek process. Users buy and sell the underlying stock, zero-coupon bonds, and American options (calls/puts). Bonds priced via Vasicek closed-form (mean-reversion + rate volatility). Options priced via CRR binomial tree (128 steps) with Heston term-structure volatility (including vol-of-vol convexity), second-order moneyness-dependent skew (quadratic smile), and Vasicek per-step rate discounting. Strategy builder with payoff diagrams and Greek overlays, full interactive options chain, portfolio/margin system.
 
 Zero dependencies -- vanilla HTML5/CSS3/JS with ES6 modules. No build step.
 
@@ -65,15 +65,16 @@ src/
   simulation.js        245 lines  GBM + Merton jumps + Heston stoch vol + Vasicek rate;
                                    beginDay()/substep()/finalizeDay() sub-step pipeline;
                                    prepopulate() synthetically backfills buffer via reverse
-  pricing.js           ~500 lines CRR binomial tree American option pricing (BINOMIAL_STEPS=128)
+  pricing.js           ~530 lines CRR binomial tree American option pricing (BINOMIAL_STEPS=128)
                                    with discrete proportional dividends + finite-diff Greeks.
-                                   Term-structure vol (Heston integrated variance), moneyness
-                                   skew (first-order Heston), Vasicek per-step rate discounting.
-                                   Dual call+put backward induction for chain pricing.
+                                   Term-structure vol (Heston integrated variance + vol-of-vol
+                                   convexity), moneyness skew (second-order Heston quadratic
+                                   smile), Vasicek per-step rate discounting. Vasicek closed-form
+                                   bond pricing. Dual call+put backward induction for chain pricing.
                                    Exports: priceAmerican, computeGreeks, prepareTree,
                                    priceWithTree, pricePairWithTree, prepareGreekTrees,
                                    computeGreeksWithTrees, computeGreeksPairWithTrees,
-                                   computeEffectiveSigma, computeSkewSigma
+                                   computeEffectiveSigma, computeSkewSigma, vasicekBondPrice
   chain.js             170 lines  ExpiryManager (rolling EXPIRY_COUNT window, QUARTERLY_CYCLE cycle),
                                    generateStrikes(), buildChainSkeleton(),
                                    priceChainExpiry() (lazy per-expiry pricing)
@@ -120,7 +121,7 @@ main.js
   |                         ExpiryManager -- imports pricing, portfolio, config)
   |- src/portfolio.js     (portfolio, resetPortfolio, executeMarketOrder, computeBidAsk,
   |                         checkPendingOrders, chargeBorrowInterest, processDividends,
-  |                         processExpiry,
+  |                         processExpiry, setVasicekParams,
   |                         checkMargin, aggregateGreeks, closePosition, exerciseOption,
   |                         liquidateAll, placePendingOrder, cancelOrder, saveStrategy,
   |                         executeStrategy -- imports pricing, config, position-value)
@@ -168,7 +169,7 @@ Pausing mid-day leaves the partial bar frozen. Resuming continues from where it 
 
 ### Stock Price Model
 
-GBM with Merton jumps and Heston stochastic volatility (Euler-Maruyama, full truncation). Dividends are handled discretely (quarterly price drops), not in the drift:
+GBM with Merton jumps and Heston stochastic volatility (Milstein scheme, full truncation). Dividends are handled discretely (quarterly price drops), not in the drift:
 
 ```
 dS/S = (mu - lambda*k - 0.5*v)dt + sqrt(v) * dW1 + J * dN(lambda)
@@ -311,7 +312,7 @@ dailyCost = |qty| * notional * (max(r, 0) + borrowSpread * sigma) / 252
 ```
 
 - `borrowSpread` (default 0.5, range [0, 5]) is a sim parameter controllable via slider and events
-- Stock shorts: notional = `|qty| * S`. Bond shorts: notional = `|qty| * 100 * exp(-r * T)`
+- Stock shorts: notional = `|qty| * S`. Bond shorts: notional = `|qty| * vasicekBondPrice(100, r, T, a, b, sigmaR)`
 - Deducted from `portfolio.cash` daily. Cumulative cost tracked per-position (`pos.borrowCost`) and for closed positions (`portfolio.closedBorrowCost`)
 - Does NOT apply to short options (writing doesn't require borrowing)
 - Also charges on negative cash (margin debit): `dailyCost = |cash| * dailyRate`. Tracked in `portfolio.marginDebitCost`
@@ -500,7 +501,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Camera (chart only)**: `shared-camera.js`, world X = day index. Strategy canvas manages its own X-range.
 - **Pure module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator.
 - **Custom event bus**: `shoals:*` events from ui.js to main.js, decouples DOM from portfolio state.
-- **Bond pricing**: `100 * exp(-r * T)`. Volatility-aware spread via `computeBidAsk()`. Strategy view shows theta (interest accrual) and rho.
+- **Bond pricing**: Vasicek closed-form via `vasicekBondPrice(face, r, T, a, b, sigmaR)` from pricing.js. Accounts for rate mean-reversion (duration caps at `1/a`) and rate volatility (convexity premium). Degrades to `face * exp(-r * T)` when `a < 1e-8`. Volatility-aware spread via `computeBidAsk()`. Strategy view shows theta (interest accrual) and rho. Vasicek params stored as module-level state in portfolio.js via `setVasicekParams(a, b, sigmaR)`.
 - **Auto-scroll**: keeps latest candle at ~85% from left when playing.
 - **Toast fill price**: trade toast shows actual fill price (including bid/ask spread) via `pos.fillPrice`.
 - **Shared chain renderer**: `renderChainInto()` in chain-renderer.js builds both trade-tab and strategy-tab chain tables from a pre-priced expiry. `rebuildExpiryDropdown()` populates expiry dropdowns from the skeleton (only on day-complete/reset, not every substep). Uses event delegation (3 listeners on container, not per-cell). Trade tab passes `$._onChainCellClick`, strategy tab wraps `onAddLeg`.
@@ -551,7 +552,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **`q` (dividend yield) threads through all pricing** -- `priceAmerican(S, K, T, r, sigma, isPut, q, currentDay)` and `computeGreeks(S, K, T, r, sigma, isPut, q, currentDay)` accept `q` and optional `currentDay`. When `currentDay` is provided, discrete dividends at `QUARTERLY_CYCLE` boundaries are used; otherwise falls back to continuous yield.
 - **Dividends fire every `QUARTERLY_CYCLE` trading days** -- aligned with expiry cycle. `sim.day % QUARTERLY_CYCLE === 0` in `_onDayComplete()`. Stock price drops by `q/4` (ex-dividend), then cash payments to shareholders. No payment if `q === 0` or no stock positions.
 - **`q` is NOT in the GBM drift** -- stock price grows at `mu` (not `mu - q`) between dividend dates. The quarterly `S *= (1 - q/4)` drop is the only dividend effect on stock price, matching the binomial tree's discrete dividend model.
-- **`computeEffectiveSigma` and `computeSkewSigma` are exported from pricing.js** -- used by chain.js and strategy.js. `computeEffectiveSigma(v, T, kappa, theta)` takes variance (not vol). `computeSkewSigma` adjusts vol per strike using Heston rho/xi. Chain and strategy callers pass `_hestonParams()` / `_vasicekParams()` from main.js.
+- **`computeEffectiveSigma` and `computeSkewSigma` are exported from pricing.js** -- used by chain.js and strategy.js. `computeEffectiveSigma(v, T, kappa, theta, xi)` takes variance (not vol) and includes a vol-of-vol convexity adjustment when `xi > 0` (Gatheral 2006). `computeSkewSigma` adjusts vol per strike using second-order Heston: linear skew `ρξ/(2σ)` plus quadratic curvature `ξ²/(12σ²)`, both dampened by mean-reversion. Chain and strategy callers pass `_hestonParams()` / `_vasicekParams()` from main.js.
 - **Per-step rate arrays in tree** -- `puDisc` and `pdDisc` are `Float64Array(_N)` (not scalars). `_priceCore` and `_pricePairCore` index `puDisc[i]`/`pdDisc[i]` per backward-induction step. When `vasicek` is omitted, arrays are filled with uniform values.
 - **Dual pricing uses separate intermediates** -- `_pricePairCore` writes to `_cf10.._cf22` / `_pf10.._pf22` (pair intermediates), while `_priceCore` writes to `_f10.._f22` (single intermediates). `_pairDeltaGamma` reads pair intermediates; `_treeDeltaGamma` reads single intermediates. Do not mix — calling `_priceCore` after `_pricePairCore` overwrites `_V` (the call value buffer shared between both paths).
 - **No hardcoded colors in JS** -- chart.js and strategy.js use `_PALETTE` and `_r()` for all colors. CSS slider-track fallbacks in styles.css are the only remaining hardcoded rgba values (defensive fallback for when shared-tokens.js hasn't loaded).
