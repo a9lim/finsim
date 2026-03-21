@@ -9,7 +9,7 @@
  */
 
 import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT } from './config.js';
-import { priceAmerican, prepareGreekTrees, computeGreeksWithTrees } from './pricing.js';
+import { prepareTree, pricePairWithTree, prepareGreekTrees, computeGreeksPairWithTrees } from './pricing.js';
 import { computeOptionBidAsk } from './portfolio.js';
 
 // ---------------------------------------------------------------------------
@@ -109,11 +109,11 @@ export function buildChainSkeleton(S, currentDay, expiries) {
 /**
  * Price a single chain expiry on demand.
  *
- * When greeks=false (default), calls priceAmerican once per option (50 calls
- * for 25 strikes — transparent cache means 1 tree prep total).
- * When greeks=true, prepares 7 tree variants once and reuses them across
- * all strikes (7 backward inductions per option, 7 tree preps total instead
- * of 350). Use greeks=true only for the full chain overlay.
+ * Uses dual call+put backward induction: a single tree traversal produces
+ * both call and put prices at each strike, halving backward inductions.
+ * When greeks=false (default): 1 tree prep + 25 dual inductions (was 50).
+ * When greeks=true: 7 tree preps + 25×7 dual inductions (was 25×14).
+ * Use greeks=true only for the full chain overlay.
  *
  * @param {number} S     - Spot price
  * @param {number} v     - Heston variance (converted to sigma internally)
@@ -129,13 +129,12 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
     const T = expiry.dte / TRADING_DAYS_PER_YEAR;
     const currentDay = expiry.day - expiry.dte;
 
-    // Greeks path: prepare 7 tree variants once, reuse across all strikes
-    const gt = greeks ? prepareGreekTrees(T, r, sigma, q, currentDay) : null;
-
-    const options = expiry.strikes.map(K => {
-        if (gt) {
-            const callG = computeGreeksWithTrees(S, K, false, gt);
-            const putG  = computeGreeksWithTrees(S, K, true, gt);
+    if (greeks) {
+        // Greeks path: prepare 7 tree variants once, dual-price call+put
+        // per strike (7 dual inductions per strike vs 14 single inductions)
+        const gt = prepareGreekTrees(T, r, sigma, q, currentDay);
+        const options = expiry.strikes.map(K => {
+            const { call: callG, put: putG } = computeGreeksPairWithTrees(S, K, gt);
             const callBA = computeOptionBidAsk(callG.price, S, K, sigma);
             const putBA  = computeOptionBidAsk(putG.price,  S, K, sigma);
             return {
@@ -147,10 +146,15 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
                          theta: putG.theta, vega: putG.vega, rho: putG.rho,
                          bid: Math.max(0, putBA.bid), ask: putBA.ask },
             };
-        }
-        // Price-only path: transparent cache handles tree reuse across strikes
-        const callP = priceAmerican(S, K, T, r, sigma, false, q, currentDay);
-        const putP  = priceAmerican(S, K, T, r, sigma, true, q, currentDay);
+        });
+        return { day: expiry.day, dte: expiry.dte, options };
+    }
+
+    // Price-only path: single tree prep, dual call+put per strike
+    // (25 dual inductions vs 50 single inductions)
+    const tree = prepareTree(T, r, sigma, q, currentDay);
+    const options = expiry.strikes.map(K => {
+        const { call: callP, put: putP } = pricePairWithTree(S, K, tree);
         const callBA = computeOptionBidAsk(callP, S, K, sigma);
         const putBA  = computeOptionBidAsk(putP,  S, K, sigma);
         return {
@@ -161,6 +165,5 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
                      bid: Math.max(0, putBA.bid), ask: putBA.ask },
         };
     });
-
     return { day: expiry.day, dte: expiry.dte, options };
 }

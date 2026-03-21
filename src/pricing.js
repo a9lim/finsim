@@ -7,13 +7,21 @@
  * Tree-based delta/gamma extracted from CRR nodes at steps 1 & 2, reducing
  * computeGreeks from 9 to 7 backward inductions.
  *
- * Public API:
+ * Dual call+put pricing (_pricePairCore) runs a single backward induction
+ * for both option types simultaneously, halving tree traversals for chain
+ * pricing where both call and put at each strike are always needed.
+ *
+ * Public API — single-option:
  *   priceAmerican(S, K, T, r, sigma, isPut, q, currentDay)
  *   computeGreeks(S, K, T, r, sigma, isPut, q, currentDay)
  *   prepareTree(T, r, sigma, q, currentDay)           -> tree object
  *   priceWithTree(S, K, isPut, tree)                   -> price
  *   prepareGreekTrees(T, r, sigma, q, currentDay)      -> greekTrees
  *   computeGreeksWithTrees(S, K, isPut, greekTrees)    -> Greeks object
+ *
+ * Public API — paired call+put (chain pricing):
+ *   pricePairWithTree(S, K, tree)                      -> { call, put }
+ *   computeGreeksPairWithTrees(S, K, greekTrees)       -> { call: Greeks, put: Greeks }
  *
  * References:
  *   Cox, J.C., Ross, S.A. & Rubinstein, M. (1979). "Option pricing:
@@ -28,13 +36,26 @@ const _N = BINOMIAL_STEPS;
 // Module-level reusable buffers (single-threaded — safe to reuse)
 // ---------------------------------------------------------------------------
 
-/** Backward-induction value buffer, shared across all pricing calls. */
+/** Backward-induction value buffer for single pricing / call values in pair mode. */
 const _V = new Float64Array(_N + 1);
 
+/** Put value buffer for dual call+put pricing. */
+const _VP = new Float64Array(_N + 1);
+
 // Tree intermediates saved during backward induction for delta/gamma extraction.
-// Set by _priceCore, read by computeGreeks / computeGreeksWithTrees.
+// Single-option path: set by _priceCore, read by _treeDeltaGamma.
 let _f10 = 0, _f11 = 0;
 let _f20 = 0, _f21 = 0, _f22 = 0;
+
+// Pair path: set by _pricePairCore, read by _pairDeltaGamma.
+let _cf10 = 0, _cf11 = 0;
+let _cf20 = 0, _cf21 = 0, _cf22 = 0;
+let _pf10 = 0, _pf11 = 0;
+let _pf20 = 0, _pf21 = 0, _pf22 = 0;
+
+// Pair delta/gamma results: set by _pairDeltaGamma, read by public pair APIs.
+let _callDelta = 0, _callGamma = 0;
+let _putDelta = 0, _putGamma = 0;
 
 // ---------------------------------------------------------------------------
 // Transparent parameter cache for priceAmerican
@@ -152,7 +173,7 @@ export function prepareTree(T, r, sigma, q, currentDay) {
 }
 
 // ---------------------------------------------------------------------------
-// Core backward induction
+// Core backward induction — single option
 // ---------------------------------------------------------------------------
 
 /**
@@ -220,6 +241,73 @@ function _priceCore(S, K, isPut, tree) {
     return V[0];
 }
 
+// ---------------------------------------------------------------------------
+// Core backward induction — dual call+put
+// ---------------------------------------------------------------------------
+
+/**
+ * Run CRR backward induction for both call and put simultaneously.
+ *
+ * Shares loop overhead, Si computation, and powU/divAdj lookups between
+ * call and put, halving the number of tree traversals needed when both
+ * option types at the same strike are required (the common case for chain
+ * pricing: 25 strikes × 1 dual pass vs 25 × 2 single passes).
+ *
+ * Call price stored in _V[0], put price in _VP[0].
+ * Pair intermediates (_cf10.._cf22, _pf10.._pf22) set for delta/gamma.
+ *
+ * @param {number} S    - Spot price
+ * @param {number} K    - Strike
+ * @param {object} tree - Prepared tree parameters
+ */
+function _pricePairCore(S, K, tree) {
+    const { d2, puDisc, pdDisc, powU, divAdj } = tree;
+    const n = _N;
+    const VC = _V;
+    const VP = _VP;
+
+    // Terminal payoffs — compute both call and put from same stock price scan
+    let Sj = S * divAdj[n] * powU[n];
+    for (let j = 0; j <= n; j++) {
+        const diff = Sj - K;
+        VC[j] = diff > 0 ? diff : 0;
+        VP[j] = diff < 0 ? -diff : 0;
+        Sj *= d2;
+    }
+
+    // Backward induction with early exercise (call + put simultaneously)
+    for (let i = n - 1; i >= 0; i--) {
+        let Si = S * divAdj[i] * powU[i];
+        for (let j = 0; j <= i; j++) {
+            // Call: hold vs exercise (Si - K)
+            const holdC = puDisc * VC[j] + pdDisc * VC[j + 1];
+            const exC = Si - K;
+            const valC = exC > holdC ? exC : holdC;
+            VC[j] = valC > 0 ? valC : 0;
+
+            // Put: hold vs exercise (K - Si = -exC)
+            const holdP = puDisc * VP[j] + pdDisc * VP[j + 1];
+            const exP = -exC;
+            const valP = exP > holdP ? exP : holdP;
+            VP[j] = valP > 0 ? valP : 0;
+
+            Si *= d2;
+        }
+        if (i === 2) {
+            _cf20 = VC[0]; _cf21 = VC[1]; _cf22 = VC[2];
+            _pf20 = VP[0]; _pf21 = VP[1]; _pf22 = VP[2];
+        } else if (i === 1) {
+            _cf10 = VC[0]; _cf11 = VC[1];
+            _pf10 = VP[0]; _pf11 = VP[1];
+        }
+    }
+    // Call price = VC[0] = _V[0], Put price = VP[0] = _VP[0]
+}
+
+// ---------------------------------------------------------------------------
+// Delta/gamma extraction
+// ---------------------------------------------------------------------------
+
 /**
  * Extract tree-based delta and gamma from saved intermediate values.
  *
@@ -250,6 +338,45 @@ function _treeDeltaGamma(S, tree) {
     const gamma = (dUp - dDn) / (0.5 * (S2u - S2d));
 
     return { delta, gamma };
+}
+
+/**
+ * Extract tree-based delta and gamma for both call and put from pair
+ * intermediates saved during _pricePairCore.
+ *
+ * Results stored in module-level _callDelta, _callGamma, _putDelta,
+ * _putGamma to avoid object allocation in the hot path.
+ *
+ * @param {number} S    - Spot price
+ * @param {object} tree - Tree used in the most recent _pricePairCore call
+ */
+function _pairDeltaGamma(S, tree) {
+    const { u, d, divAdj } = tree;
+    const adj1 = divAdj[1];
+    const adj2 = divAdj[2];
+
+    const S1u = S * adj1 * u;
+    const S1d = S * adj1 * d;
+    const dS1inv = 1 / (S1u - S1d);
+
+    const S2u = S * adj2 * u * u;
+    const S2m = S * adj2;
+    const S2d = S * adj2 * d * d;
+    const dS2um = S2u - S2m;
+    const dS2md = S2m - S2d;
+    const dS2halfInv = 2 / (S2u - S2d);
+
+    // Call delta/gamma
+    _callDelta = (_cf10 - _cf11) * dS1inv;
+    const cDUp = (_cf20 - _cf21) / dS2um;
+    const cDDn = (_cf21 - _cf22) / dS2md;
+    _callGamma = (cDUp - cDDn) * dS2halfInv;
+
+    // Put delta/gamma
+    _putDelta = (_pf10 - _pf11) * dS1inv;
+    const pDUp = (_pf20 - _pf21) / dS2um;
+    const pDDn = (_pf21 - _pf22) / dS2md;
+    _putGamma = (pDUp - pDDn) * dS2halfInv;
 }
 
 // ---------------------------------------------------------------------------
@@ -308,7 +435,31 @@ export function priceWithTree(S, K, isPut, tree) {
 }
 
 // ---------------------------------------------------------------------------
-// Greeks
+// Public API: paired call+put pricing
+// ---------------------------------------------------------------------------
+
+/**
+ * Price both call and put at the same strike using a single backward
+ * induction pass. ~2x faster than two separate priceWithTree calls.
+ *
+ * @param {number} S    - Spot price
+ * @param {number} K    - Strike
+ * @param {object} tree - From prepareTree()
+ * @returns {{ call: number, put: number }}
+ */
+export function pricePairWithTree(S, K, tree) {
+    if (!tree.valid || S <= 0 || K <= 0) {
+        return {
+            call: S > K ? S - K : 0,
+            put: K > S ? K - S : 0,
+        };
+    }
+    _pricePairCore(S, K, tree);
+    return { call: _V[0], put: _VP[0] };
+}
+
+// ---------------------------------------------------------------------------
+// Greeks — single option
 // ---------------------------------------------------------------------------
 
 /**
@@ -357,7 +508,7 @@ export function computeGreeks(S, K, T, r, sigma, isPut, q, currentDay) {
 }
 
 // ---------------------------------------------------------------------------
-// Batch Greeks API
+// Batch Greeks API — single option
 // ---------------------------------------------------------------------------
 
 /**
@@ -432,6 +583,84 @@ export function computeGreeksWithTrees(S, K, isPut, gt) {
     const rho = (pRu - pRd) / (2 * gt.hR);
 
     return { price, delta, gamma, theta, vega, rho };
+}
+
+// ---------------------------------------------------------------------------
+// Batch Greeks API — paired call+put
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute Greeks for both call and put at the same strike using dual
+ * backward induction. Each of the 7 tree variants runs a single pass
+ * producing both call and put values simultaneously.
+ *
+ * Total: 7 dual backward inductions instead of 14 single inductions.
+ * Shares loop overhead, Si computation, and array lookups between
+ * call and put within each induction pass.
+ *
+ * @param {number} S  - Spot price
+ * @param {number} K  - Strike
+ * @param {object} gt - From prepareGreekTrees()
+ * @returns {{ call: { price, delta, gamma, theta, vega, rho },
+ *             put:  { price, delta, gamma, theta, vega, rho } }}
+ */
+export function computeGreeksPairWithTrees(S, K, gt) {
+    if (S <= 0 || K <= 0 || !gt.base.valid) {
+        const intrC = S > K ? S - K : 0;
+        const intrP = K > S ? K - S : 0;
+        return {
+            call: { price: intrC, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 },
+            put:  { price: intrP, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 },
+        };
+    }
+
+    // Base price — sets pair intermediates (_cf10.._cf22, _pf10.._pf22)
+    _pricePairCore(S, K, gt.base);
+    const callPrice = _V[0];
+    const putPrice = _VP[0];
+
+    // Tree-based delta/gamma for both (reads pair intermediates)
+    _pairDeltaGamma(S, gt.base);
+    const cDelta = _callDelta, cGamma = _callGamma;
+    const pDelta = _putDelta, pGamma = _putGamma;
+
+    // Finite-difference theta/vega/rho — 6 dual inductions
+    _pricePairCore(S, K, gt.thetaLo);
+    const cTlo = _V[0], pTlo = _VP[0];
+
+    _pricePairCore(S, K, gt.thetaHi);
+    const cThi = _V[0], pThi = _VP[0];
+
+    _pricePairCore(S, K, gt.vegaUp);
+    const cVu = _V[0], pVu = _VP[0];
+
+    _pricePairCore(S, K, gt.vegaDn);
+    const cVd = _V[0], pVd = _VP[0];
+
+    _pricePairCore(S, K, gt.rhoUp);
+    const cRu = _V[0], pRu = _VP[0];
+
+    _pricePairCore(S, K, gt.rhoDn);
+    const cRd = _V[0], pRd = _VP[0];
+
+    const invHT = 1 / gt.hT;
+    const inv2hSigma = 1 / (2 * gt.hSigma);
+    const inv2hR = 1 / (2 * gt.hR);
+
+    return {
+        call: {
+            price: callPrice, delta: cDelta, gamma: cGamma,
+            theta: (cTlo - cThi) * invHT,
+            vega: (cVu - cVd) * inv2hSigma,
+            rho: (cRu - cRd) * inv2hR,
+        },
+        put: {
+            price: putPrice, delta: pDelta, gamma: pGamma,
+            theta: (pTlo - pThi) * invHT,
+            vega: (pVu - pVd) * inv2hSigma,
+            rho: (pRu - pRd) * inv2hR,
+        },
+    };
 }
 
 // ---------------------------------------------------------------------------

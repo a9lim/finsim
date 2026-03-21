@@ -65,9 +65,12 @@ src/
   simulation.js        245 lines  GBM + Merton jumps + Heston stoch vol + Vasicek rate;
                                    beginDay()/substep()/finalizeDay() sub-step pipeline;
                                    prepopulate() synthetically backfills buffer via reverse
-  pricing.js           120 lines  CRR binomial tree American option pricing (BINOMIAL_STEPS=128)
+  pricing.js           ~440 lines CRR binomial tree American option pricing (BINOMIAL_STEPS=128)
                                    with discrete proportional dividends + finite-diff Greeks.
-                                   Exports: priceAmerican, computeGreeks
+                                   Dual call+put backward induction for chain pricing.
+                                   Exports: priceAmerican, computeGreeks, prepareTree,
+                                   priceWithTree, pricePairWithTree, prepareGreekTrees,
+                                   computeGreeksWithTrees, computeGreeksPairWithTrees
   chain.js             170 lines  ExpiryManager (rolling EXPIRY_COUNT window, QUARTERLY_CYCLE cycle),
                                    generateStrikes(), buildChainSkeleton(),
                                    priceChainExpiry() (lazy per-expiry pricing)
@@ -198,7 +201,9 @@ On reset: `S = 100`, `v = theta`, `r = b`. History cleared, prepopulated, camera
 
 ### CRR Binomial Tree
 
-Cox-Ross-Rubinstein binomial tree with `BINOMIAL_STEPS` (128) steps. Handles both American calls and puts exactly (no put-call symmetry needed). Discrete proportional dividends: when `currentDay` is provided and `q > 0`, the tree identifies `QUARTERLY_CYCLE` boundaries within the option's life and applies multiplicative price drops of `q/4` at those steps, preserving tree recombination. When `currentDay` is omitted, falls back to continuous dividend yield in the risk-neutral drift. Put pricing via put-call symmetry: `P(S,K,T,r,q,σ) = C(K,S,T,q,r,σ)`.
+Cox-Ross-Rubinstein binomial tree with `BINOMIAL_STEPS` (128) steps. Handles both American calls and puts exactly (no put-call symmetry needed). Discrete proportional dividends: when `currentDay` is provided and `q > 0`, the tree identifies `QUARTERLY_CYCLE` boundaries within the option's life and applies multiplicative price drops of `q/4` at those steps, preserving tree recombination. When `currentDay` is omitted, falls back to continuous dividend yield in the risk-neutral drift.
+
+**Dual call+put pricing**: `_pricePairCore` runs a single backward induction producing both call and put prices simultaneously, sharing loop overhead, Si computation (incremental d² stepping), and powU/divAdj lookups. Chain pricing uses this exclusively — 25 dual inductions per substep instead of 50 single inductions (~2x fewer tree traversals). Greek computation via `computeGreeksPairWithTrees` runs 7 dual inductions per strike instead of 14 single inductions. Pair delta/gamma extracted from steps 1 & 2 of the same pass (separate intermediates from single-option path).
 
 ### Finite-Difference Greeks
 
@@ -249,9 +254,9 @@ The chain uses a two-tier lazy pricing model to avoid computing Greeks for all 8
 [{ day, dte, strikes: number[] }]
 ```
 
-**`priceChainExpiry(S, v, r, expiry, greeks?)`** prices a single expiry on demand:
-- `greeks=false` (default): 50 `priceAmerican` calls (1 per option). Returns price + bid/ask, Greeks zeroed. Used for sidebar compact chain (updated every substep).
-- `greeks=true`: 450 `computeGreeks` calls (9 per option). Returns full Greeks. Used only for the full chain overlay (delta column).
+**`priceChainExpiry(S, v, r, expiry, greeks?)`** prices a single expiry on demand using dual call+put backward induction (`pricePairWithTree` / `computeGreeksPairWithTrees`):
+- `greeks=false` (default): 1 `prepareTree` + 25 dual `pricePairWithTree` calls (25 backward inductions instead of 50). Returns price + bid/ask, Greeks zeroed. Used for sidebar compact chain (updated every substep).
+- `greeks=true`: 7 tree preps + 25 dual `computeGreeksPairWithTrees` calls (175 backward inductions instead of 350). Returns full Greeks. Used only for the full chain overlay (delta column).
 
 Expiry dropdown is rebuilt only when the skeleton changes (day complete, reset) via `rebuildExpiryDropdown()`, not on every substep reprice.
 
@@ -531,10 +536,11 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **`worldToScreenX`/`screenToWorldX`** -- scalar camera methods in `shared-camera.js` avoid object allocation. chart.js uses these with fallback to `worldToScreen().x` for backwards compatibility.
 - **Strategy caches invalidate by key** -- `_cache` and `_summaryCache` use string keys from inputs. Changing legs, vol, rate, evalDay, zoom, or greek toggles auto-invalidates. Do not manually clear caches; they self-manage.
 - **`_precomputeLegs` / `_legPnlFast` / `_legGreeksFast`** -- standalone functions (not class methods) that precompute per-leg entry values once. The old `_legPnl`, `_totalPnl`, `_legGreeks`, `_totalGreeksAll` instance methods have been removed.
-- **Lazy chain: skeleton vs priced expiry** -- `chainSkeleton` (in main.js) holds expiry metadata + strikes with no pricing. `_priceExpiry(idx)` / `_priceExpiryGreeks(idx)` compute prices on demand for one expiry. Only the currently visible expiry is priced each substep (50 calls). Full Greeks only computed for the chain overlay.
+- **Lazy chain: skeleton vs priced expiry** -- `chainSkeleton` (in main.js) holds expiry metadata + strikes with no pricing. `_priceExpiry(idx)` / `_priceExpiryGreeks(idx)` compute prices on demand for one expiry. Only the currently visible expiry is priced each substep (25 dual inductions via `pricePairWithTree`). Full Greeks computed for the chain overlay (175 dual inductions via `computeGreeksPairWithTrees`).
 - **Substep UI updates** -- `_onSubstep()` fires after each substep batch during playback. It checks pending orders at intraday prices, reprices the visible expiry, and updates the sidebar (portfolio, rate, chain table). Dropdown rebuild happens only on day-complete via `chainDirty`.
 - **Strategy tab pauses sim** -- switching to the strategy tab sets `playing = false`. The user must manually resume after leaving the tab.
 - **`q` (dividend yield) threads through all pricing** -- `priceAmerican(S, K, T, r, sigma, isPut, q, currentDay)` and `computeGreeks(S, K, T, r, sigma, isPut, q, currentDay)` accept `q` and optional `currentDay`. When `currentDay` is provided, discrete dividends at `QUARTERLY_CYCLE` boundaries are used; otherwise falls back to continuous yield.
 - **Dividends fire every `QUARTERLY_CYCLE` trading days** -- aligned with expiry cycle. `sim.day % QUARTERLY_CYCLE === 0` in `_onDayComplete()`. Stock price drops by `q/4` (ex-dividend), then cash payments to shareholders. No payment if `q === 0` or no stock positions.
 - **`q` is NOT in the GBM drift** -- stock price grows at `mu` (not `mu - q`) between dividend dates. The quarterly `S *= (1 - q/4)` drop is the only dividend effect on stock price, matching the binomial tree's discrete dividend model.
+- **Dual pricing uses separate intermediates** -- `_pricePairCore` writes to `_cf10.._cf22` / `_pf10.._pf22` (pair intermediates), while `_priceCore` writes to `_f10.._f22` (single intermediates). `_pairDeltaGamma` reads pair intermediates; `_treeDeltaGamma` reads single intermediates. Do not mix — calling `_priceCore` after `_pricePairCore` overwrites `_V` (the call value buffer shared between both paths).
 - **No hardcoded colors in JS** -- chart.js and strategy.js use `_PALETTE` and `_r()` for all colors. CSS slider-track fallbacks in styles.css are the only remaining hardcoded rgba values (defensive fallback for when shared-tokens.js hasn't loaded).
