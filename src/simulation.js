@@ -107,12 +107,13 @@ export class Simulation {
         const z2 = this.rho * z1 + this._sqrtOneMinusRhoSq * this._randn();
         const z3 = this._randn();
 
-        // 2. Heston stochastic volatility (full truncation scheme)
+        // 2. Heston stochastic volatility (Milstein scheme with Ito correction)
         const vPrev = Math.max(this.v, 0);
         const sqrtV = Math.sqrt(vPrev);
         this.v = this.v
             + this.kappa * (this.theta - this.v) * dt
-            + this.xi * sqrtV * this._sqrtDt * z2;
+            + this.xi * sqrtV * this._sqrtDt * z2
+            + 0.25 * this.xi * this.xi * (z2 * z2 - 1) * dt;
         this.v = Math.max(this.v, 0);
 
         // 3. Merton jumps
