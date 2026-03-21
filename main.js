@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_AUTOSCROLL_PCT } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_AUTOSCROLL_PCT, DEFAULT_PRESET } from './src/config.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
 import {
@@ -312,6 +312,21 @@ function init() {
     _syncLerpSpeed();
     lastSpot = sim.S;
     strategy.resetRange(sim.S, strategyLegs);
+
+    // 14b. Initialize event engine for dynamic presets
+    if (_isDynamicPreset(DEFAULT_PRESET)) {
+        if (_isLLMPreset(DEFAULT_PRESET)) {
+            llmSource = new LLMEventSource();
+            eventEngine = new EventEngine('llm', llmSource);
+            eventEngine.prefetch(sim);
+        } else {
+            eventEngine = new EventEngine('offline');
+        }
+    }
+    updateDynamicSections($, DEFAULT_PRESET);
+    updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
+    updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
+
     updateUI();
 
     // 15. Position camera so latest candle is visible

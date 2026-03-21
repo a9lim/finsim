@@ -71,4 +71,4 @@ export const PRESETS = [
     { ..._CALM_BULL, name: 'Dynamic (Offline)' },
     { ..._CALM_BULL, name: 'Dynamic (LLM)' },
 ];
-export const DEFAULT_PRESET = 0;
+export const DEFAULT_PRESET = 5;
