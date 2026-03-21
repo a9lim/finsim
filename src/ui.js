@@ -112,7 +112,7 @@ export function cacheDOMElements($) {
 
 export function bindEvents($, handlers) {
     const {
-        onTogglePlay, onStep, onSpeedUp, onSpeedDown, onToggleTheme, onToggleSidebar,
+        onTogglePlay, onStep, onSpeedUp, onSpeedDown, onToggleTheme, onToggleSidebar, onCloseSidebar,
         onPresetChange, onReset, onSliderChange, onTimeSlider,
         onBuyStock, onShortStock, onBuyBond, onShortBond,
         onChainCellClick, onFullChainOpen, onExpiryChange,
@@ -126,7 +126,7 @@ export function bindEvents($, handlers) {
     $.speedBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); onSpeedDown(); });
     $.themeBtn.addEventListener('click', onToggleTheme);
     $.panelToggle.addEventListener('click', onToggleSidebar);
-    $.closePanel.addEventListener('click', onToggleSidebar);
+    $.closePanel.addEventListener('click', onCloseSidebar || onToggleSidebar);
     $.presetSelect.addEventListener('change', () => {
         onPresetChange($.presetSelect.selectedIndex);
     });
@@ -590,11 +590,11 @@ export function toggleStrategyView($, active) {
 // ---------------------------------------------------------------------------
 
 export function updatePlayBtn($, playing) {
-    _playback.updatePlayBtn($.playBtn, playing);
+    _toolbar.updatePlayBtn($.playBtn, playing);
 }
 
 export function updateSpeedBtn($, speed) {
-    _playback.updateSpeedBtn($.speedBtn, speed);
+    _toolbar.updateSpeedBtn($.speedBtn, speed);
 }
 
 // ---------------------------------------------------------------------------
