@@ -740,22 +740,27 @@ export function processDividends(currentPrice, q) {
 /**
  * Process expiry for all positions expiring on `expiryDay`.
  *
- * ITM calls (currentPrice > strike): auto-exercise.
- * ITM puts  (currentPrice < strike): auto-exercise.
- * OTM:                               expire worthless (remove from positions).
+ * Expiring positions are closed at market value. If any expiring position
+ * belongs to a strategy, all remaining positions in that strategy are also
+ * unwound at market value.
  *
- * @param {number} expiryDay   - The simulation day being expired
+ * @param {number} expiryDay     - The simulation day being expired
  * @param {number} currentPrice
- * @param {number} currentDay  - Current simulation day
- * @returns {{ exercised: Object[], expired: Object[] }}
+ * @param {number} currentDay    - Current simulation day
+ * @param {number} currentVol    - sqrt(v)
+ * @param {number} currentRate   - Risk-free rate r
+ * @param {number} q             - Dividend yield
+ * @returns {{ expired: Object[], unwound: Object[] }}
  */
-export function processExpiry(expiryDay, currentPrice, currentDay) {
-    const exercised = [];
-    const expired   = [];
+export function processExpiry(expiryDay, currentPrice, currentDay, currentVol, currentRate, q) {
+    const expired = [];
+    const expiredStrategies = new Set();
 
     for (let i = portfolio.positions.length - 1; i >= 0; i--) {
         const pos = portfolio.positions[i];
         if (pos.expiryDay !== expiryDay) continue;
+
+        if (pos.strategyName) expiredStrategies.add(pos.strategyName);
 
         if (pos.type === 'bond') {
             if (pos.qty > 0) {
@@ -774,27 +779,23 @@ export function processExpiry(expiryDay, currentPrice, currentDay) {
         }
         if (pos.type !== 'call' && pos.type !== 'put') continue;
 
-        const itm = pos.type === 'call'
-            ? currentPrice > pos.strike
-            : currentPrice < pos.strike;
+        // Close at market value (no auto-exercise)
+        closePosition(pos.id, currentPrice, currentVol, currentRate, currentDay, q);
+        expired.push(pos);
+    }
 
-        if (itm && pos.qty > 0) {
-            const result = exerciseOption(pos.id, currentPrice, currentDay);
-            exercised.push({ position: pos, result });
-        } else {
-            if (pos.qty < 0) {
-                const returnedMargin = pos._reservedMargin ?? _marginForShort(
-                    pos.type, Math.abs(pos.qty), pos.entryPrice, currentPrice, 0,
-                    0, currentDay, pos.strike, pos.expiryDay
-                );
-                portfolio.cash += returnedMargin;
-            }
-            portfolio.positions.splice(i, 1);
-            expired.push(pos);
+    // Unwind remaining positions in any strategy that had a leg expire
+    const unwound = [];
+    if (expiredStrategies.size > 0) {
+        for (let i = portfolio.positions.length - 1; i >= 0; i--) {
+            const pos = portfolio.positions[i];
+            if (!pos.strategyName || !expiredStrategies.has(pos.strategyName)) continue;
+            closePosition(pos.id, currentPrice, currentVol, currentRate, currentDay, q);
+            unwound.push(pos);
         }
     }
 
-    return { exercised, expired };
+    return { expired, unwound };
 }
 
 // ---------------------------------------------------------------------------

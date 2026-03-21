@@ -182,7 +182,7 @@ ATM = `round(S/5)*5`, 12 strikes each side (up to 25). `ExpiryManager` maintains
 
 **Dividends**: every `QUARTERLY_CYCLE` (63) days. Stock drops by `q/4`, cash paid to/from shareholders.
 
-**Expiry**: bonds at face ($100). ITM option longs auto-exercised. Short ITM NOT assigned (simplified).
+**Expiry**: bonds at face ($100). Options closed at market value (intrinsic at DTE=0). If any expiring position belongs to a strategy, all remaining positions in that strategy are unwound at market value. Strategy display shows the minimum expiry across all legs.
 
 **Strategy**: legs in `main.js` (`strategyLegs[]`). Execution via `executeWithRollback()` rolls back all legs on partial failure. Strategies persisted in localStorage via `strategy-store.js` with hash-based IDs, 8 built-in presets, selectable expiry toggle, and relative strike/DTE offsets. Trade tab has saved strategy dropdown with live credit/debit and qty multiplier.
 

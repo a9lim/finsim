@@ -631,7 +631,14 @@ function _onDayComplete() {
         }
     }
 
-    processExpiry(sim.day, sim.S, sim.day);
+    const { expired, unwound } = processExpiry(sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
+    if (unwound.length > 0) {
+        const names = [...new Set(unwound.map(p => p.strategyName))];
+        for (const name of names) {
+            if (typeof showToast !== 'undefined') showToast('Strategy "' + name + '" expired — unwound all legs.');
+        }
+        chainDirty = true;
+    }
 
     // Epilogue check (before regular events)
     if (eventEngine && eventEngine.isEpilogueReady(sim.day)) {
