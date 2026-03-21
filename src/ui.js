@@ -749,20 +749,46 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
  */
 export function wireInfoTips() {
     const data = {
-        mu:           { title: 'Drift (\u03BC)', body: 'Expected annualised return of the underlying asset. Positive = bullish tendency.' },
-        theta:        { title: 'Vol Mean (\u03B8)', body: 'Long-run variance level the volatility reverts to over time.' },
-        kappa:        { title: 'Mean Reversion (\u03BA)', body: 'Speed at which volatility returns to its long-run mean. Higher = faster reversion.' },
-        xi:           { title: 'Vol of Vol (\u03BE)', body: 'Volatility of the variance process itself. Higher = more erratic vol swings.' },
-        rho:          { title: 'Correlation (\u03C1)', body: 'Correlation between price and volatility shocks. Negative = leverage effect (drops cause vol spikes).' },
-        lambda:       { title: 'Jump Rate (\u03BB)', body: 'Expected number of price jumps per year. Higher = more frequent sudden moves.' },
-        muJ:          { title: 'Jump Mean (\u03BCJ)', body: 'Average size of log-price jumps. Negative = jumps tend to be downward.' },
-        sigmaJ:       { title: 'Jump Vol (\u03C3J)', body: 'Standard deviation of jump sizes. Higher = more variable jump magnitudes.' },
-        a:            { title: 'Rate Reversion (a)', body: 'Speed at which the risk-free rate reverts to its long-run level.' },
-        b:            { title: 'Rate Mean (b)', body: 'Long-run equilibrium level for the risk-free interest rate.' },
-        sigmaR:       { title: 'Rate Vol (\u03C3R)', body: 'Volatility of the interest rate process.' },
-        borrowSpread: { title: 'Borrow Spread (k)', body: 'Volatility scaling factor for short borrow cost. Daily charge = notional \u00D7 (max(r,0) + k\u00D7\u03C3) / 252. Events like short squeezes can push this higher.' },
-        q:            { title: 'Dividend Yield (q)', body: 'Continuous dividend yield. Affects option pricing via cost of carry and reduces stock drift. Cash dividends paid quarterly.' },
-        margin:       { title: 'Margin Status', body: 'Shows your margin health. OK = well-collateralised. Low = approaching maintenance margin. MARGIN CALL = equity below required level; close positions or add cash.' },
+        // --- Simulation parameters ---
+        mu:           { title: 'Drift (\u03BC)', body: 'Expected annualised return of the stock. Positive = bullish tendency. The actual drift also accounts for dividends, jumps, and the Itô correction.' },
+        theta:        { title: 'Vol Mean (\u03B8)', body: 'Long-run variance level. Volatility reverts toward $\\sqrt{\\theta}$ over time. $\\theta = 0.04$ corresponds to ~20% annualised vol.' },
+        kappa:        { title: 'Mean Reversion (\u03BA)', body: 'Speed at which variance returns to $\\theta$. Half-life of a vol shock is $\\ln(2)/\\kappa$. Higher = faster reversion, shallower term structure.' },
+        xi:           { title: 'Vol of Vol (\u03BE)', body: 'Volatility of the variance process. Higher $\\xi$ steepens the volatility skew and fattens return tails.' },
+        rho:          { title: 'Correlation (\u03C1)', body: 'Correlation between price and variance shocks. Negative = leverage effect (price drops cause vol spikes, steepening the skew).' },
+        lambda:       { title: 'Jump Rate (\u03BB)', body: 'Expected Poisson jump count per year. $\\lambda = 0.5$: ~1 jump every 2 years. $\\lambda = 8$: crisis-level discontinuity.' },
+        muJ:          { title: 'Jump Mean (\u03BCJ)', body: 'Average log-jump size. Negative = predominantly downward jumps (crash risk). The drift compensator $\\lambda k$ offsets the expected jump effect.' },
+        sigmaJ:       { title: 'Jump Vol (\u03C3J)', body: 'Standard deviation of jump sizes. Higher = more unpredictable jump magnitudes, fattening both tails of the return distribution.' },
+        a:            { title: 'Rate Reversion (a)', body: 'Speed of Vasicek mean reversion. Higher $a$ means rate shocks are transient. Bond duration capped at $1/a$.' },
+        b:            { title: 'Rate Mean (b)', body: 'Long-run equilibrium rate in the Vasicek model. Rates revert toward $b$ over time. Affects bond prices inversely.' },
+        sigmaR:       { title: 'Rate Vol (\u03C3R)', body: 'Volatility of the interest rate process. Higher = wider rate swings, more volatile bond prices.' },
+        borrowSpread: { title: 'Borrow Spread (k)', body: 'Volatility-scaled borrow cost factor. Daily charge = notional $\\times$ (max($r$,0) + $k \\sigma$) / 252. Events like short squeezes spike this.' },
+        q:            { title: 'Dividend Yield (q)', body: 'Continuous dividend yield. Reduces stock drift and option cost of carry ($b = r - q$). Cash dividends paid quarterly.' },
+        // --- Portfolio / Account ---
+        margin:       { title: 'Margin Status', body: 'Your margin health. OK = well-collateralised. Low = approaching maintenance threshold. MARGIN CALL = equity below required level.' },
+        cash:         { title: 'Cash', body: 'Available cash. Changes with trades, dividends, borrow costs, and exercises. Can go negative (buying on margin).' },
+        portfolioValue: { title: 'Portfolio Value', body: 'Total equity: cash plus mark-to-market value of all open positions at mid-price.' },
+        totalPnl:     { title: 'Total P&L', body: 'Portfolio value minus initial capital ($10,000). Includes realised/unrealised P&L, dividends, borrow costs, and spread costs.' },
+        borrowCost:   { title: 'Borrow Cost', body: 'Cumulative interest on short positions and margin debit. Charged daily using the borrow spread formula.' },
+        dividends:    { title: 'Dividends', body: 'Net cumulative dividends. Long stock receives cash quarterly; short stock pays. Amount = $S \\times q/4$ per share.' },
+        // --- Greeks ---
+        delta:        { title: 'Delta ($\\Delta$)', body: 'Rate of change of option price w.r.t. stock price. Calls: 0 to +1, puts: $-1$ to 0. Measures directional exposure.' },
+        gamma:        { title: 'Gamma ($\\Gamma$)', body: 'Rate of change of delta. Measures convexity — how fast your hedge ratio changes. Highest ATM near expiry.' },
+        theta_greek:  { title: 'Theta ($\\Theta$)', body: 'Daily time decay. Long options lose value each day (negative $\\Theta$); short options gain. Accelerates near expiry.' },
+        vega:         { title: 'Vega ($\\mathcal{V}$)', body: 'Sensitivity to implied volatility. Long options benefit from rising vol. ATM and longer-dated options have the most vega.' },
+        rho_greek:    { title: 'Rho ($\\rho$)', body: 'Sensitivity to interest rates. Calls have positive rho (higher rates help); puts negative. More meaningful with Vasicek stochastic rates.' },
+        // --- Trade tab ---
+        orderTypes:   { title: 'Order Types', body: 'Market: fills immediately at bid/ask. Limit: waits until price reaches your target. Stop: triggers a market order when price crosses a level.' },
+        expiry:       { title: 'Expiry', body: '8 rolling expiry dates, each 63 trading days apart (~quarterly). Nearer expiries have faster theta decay and higher ATM gamma.' },
+        bidask:       { title: 'Bid-Ask Spread', body: 'You buy at the ask and sell at the bid. Spreads widen with higher volatility and deeper OTM strikes. Hover any cell to see bid/ask.' },
+        // --- Strategy ---
+        strategies:   { title: 'Strategy Builder', body: 'Build multi-leg strategies: left-click for long, right-click for short. Execute fills all legs atomically with rollback on failure.' },
+        payoff:       { title: 'Payoff Diagram', body: 'P&L profile across stock prices. Green = profit, rose = loss. Use the time slider and Greek overlays to explore risk.' },
+        // --- Settings ---
+        regime:       { title: 'Market Regime', body: '5 static presets (Calm Bull to Rate Hike) plus 2 dynamic modes with narrative events. Changing preset resets the simulation.' },
+        riskFreeRate: { title: 'Risk-Free Rate', body: 'Current Vasicek rate $r$. Drives option pricing, bond values, and borrow costs. Sparkline shows recent history.' },
+        events:       { title: 'Event Engine', body: 'Generates narrative events that shift parameters. Fed ~every 32 days, non-Fed Poisson ~1/30 days. Followup chains create storylines.' },
+        llm:          { title: 'LLM Integration', body: 'Dynamic (LLM) uses Claude to generate contextual events. Set your API key in Settings. Falls back to offline events on failure.' },
+        gbm:          { title: 'Pricing Models', body: 'GBM + Merton jumps + Heston stochastic vol + Vasicek rates. American options priced via 128-step CRR binomial tree.' },
     };
     registerInfoTips(data);
 }
