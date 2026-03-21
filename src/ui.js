@@ -462,6 +462,7 @@ export function syncSettingsUI($, sim) {
         if (!slider || sim.params[p] == null) continue;
         slider.value        = sim.params[p];
         valSpan.textContent = String(sim.params[p]);
+        _forms.updateSliderFill(slider);
     }
 
 }
