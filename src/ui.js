@@ -168,14 +168,8 @@ export function bindEvents($, handlers) {
     });
 
     for (const p of ['mu','theta','kappa','xi','rho','lambda','muJ','sigmaJ','a','b','sigmaR','borrowSpread','q']) {
-        const slider  = $.sliders[p];
-        const valSpan = $.sliders[p + 'Val'];
-        if (!slider) continue;
-        slider.addEventListener('input', () => {
-            const v = parseFloat(slider.value);
-            valSpan.textContent = v.toString();
-            onSliderChange(p, v);
-        });
+        if (!$.sliders[p]) continue;
+        _forms.bindSlider($.sliders[p], $.sliders[p + 'Val'], v => onSliderChange(p, v));
     }
 
     $.timeSlider.addEventListener('input', () => {
@@ -235,11 +229,7 @@ export function bindEvents($, handlers) {
     $._onTradeSubmit    = onTradeSubmit;
 
     // Trade tab qty slider
-    if ($.tradeQty) {
-        $.tradeQty.addEventListener('input', () => {
-            $.tradeQtyVal.textContent = $.tradeQty.value;
-        });
-    }
+    if ($.tradeQty) _forms.bindSlider($.tradeQty, $.tradeQtyVal);
 
     // Trade tab expiry dropdown
     if ($.tradeExpiry) {
@@ -249,11 +239,7 @@ export function bindEvents($, handlers) {
     }
 
     // Strategy tab qty slider
-    if ($.strategyQty) {
-        $.strategyQty.addEventListener('input', () => {
-            $.strategyQtyVal.textContent = $.strategyQty.value;
-        });
-    }
+    if ($.strategyQty) _forms.bindSlider($.strategyQty, $.strategyQtyVal);
 
     // Strategy expiry dropdown -- rebuild strategy chain on change
     if ($.strategyExpiry) {
@@ -266,23 +252,13 @@ export function bindEvents($, handlers) {
 
     // Order type toggle (Market / Limit / Stop)
     if ($.orderTypeToggles) {
-        $.orderTypeToggles.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                $.orderTypeToggles.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const isMarket = btn.dataset.ordertype === 'market';
-                $.triggerPriceGroup.classList.toggle('hidden', isMarket);
-                if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
-            });
+        _forms.bindModeGroup($.orderTypeToggles, 'ordertype', v => {
+            $.triggerPriceGroup.classList.toggle('hidden', v === 'market');
         });
     }
 
     // Trigger price slider
-    if ($.triggerPrice) {
-        $.triggerPrice.addEventListener('input', () => {
-            $.triggerPriceVal.textContent = '$' + parseFloat($.triggerPrice.value).toFixed(2);
-        });
-    }
+    if ($.triggerPrice) _forms.bindSlider($.triggerPrice, $.triggerPriceVal, null, v => '$' + v.toFixed(2));
 
     // Strategy builder: stock/bond cell clicks -> add leg
     if ($.strategyStockCell && typeof handlers.onAddLeg === 'function') {
