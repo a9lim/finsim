@@ -11,6 +11,7 @@
 import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT } from './config.js';
 import { prepareTree, pricePairWithTree, prepareGreekTrees, computeGreeksPairWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { computeOptionBidAsk } from './portfolio.js';
+import { market } from './market.js';
 
 // ---------------------------------------------------------------------------
 // Expiry management — rolling window of expiry dates
@@ -114,6 +115,8 @@ export function buildChainSkeleton(S, currentDay, expiries) {
  * rates. Each strike gets its own tree (different skewed sigma), with dual
  * call+put backward induction at each strike.
  *
+ * Reads Heston and Vasicek parameters from the shared market object.
+ *
  * When greeks=false (default): 25 tree preps + 25 dual inductions.
  * When greeks=true: 25×7 tree preps + 25×7 dual inductions.
  * Use greeks=true only for the full chain overlay.
@@ -124,26 +127,23 @@ export function buildChainSkeleton(S, currentDay, expiries) {
  * @param {{ day: number, dte: number, strikes: number[] }} expiry - skeleton entry
  * @param {boolean} [greeks=false] - compute full Greeks (delta/gamma/theta/vega/rho)
  * @param {number} [q=0] - Continuous dividend yield
- * @param {object} [heston] - { kappa, theta, rho, xi } for term-structure vol & skew
- * @param {object} [vasicek] - { a, b } for term-structure rates
  * @returns {{ day: number, dte: number, options: Array }}
  */
-export function priceChainExpiry(S, v, r, expiry, greeks, q, heston, vasicek) {
+export function priceChainExpiry(S, v, r, expiry, greeks, q) {
     q = q || 0;
     const T = expiry.dte / TRADING_DAYS_PER_YEAR;
     const currentDay = expiry.day - expiry.dte;
 
+    // Construct local vasicek for per-step rate discounting
+    const vasicek = market.a >= 1e-8 ? { a: market.a, b: market.b } : null;
+
     // Term-structure effective volatility (Heston expected integrated variance)
-    const sigmaEff = heston
-        ? computeEffectiveSigma(v, T, heston.kappa, heston.theta, heston.xi)
-        : Math.sqrt(Math.max(v, 0));
+    const sigmaEff = computeEffectiveSigma(v, T, market.kappa, market.theta, market.xi);
 
     if (greeks) {
         // Greeks path: per-strike skewed sigma, 7 tree variants each
         const options = expiry.strikes.map(K => {
-            const sigma = heston
-                ? computeSkewSigma(sigmaEff, S, K, T, heston.rho, heston.xi, heston.kappa)
-                : sigmaEff;
+            const sigma = computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa);
             const gt = prepareGreekTrees(T, r, sigma, q, currentDay, vasicek);
             const { call: callG, put: putG } = computeGreeksPairWithTrees(S, K, gt);
             const callBA = computeOptionBidAsk(callG.price, S, K, sigma);
@@ -163,9 +163,7 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q, heston, vasicek) {
 
     // Price-only path: per-strike skewed sigma, single tree each
     const options = expiry.strikes.map(K => {
-        const sigma = heston
-            ? computeSkewSigma(sigmaEff, S, K, T, heston.rho, heston.xi, heston.kappa)
-            : sigmaEff;
+        const sigma = computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa);
         const tree = prepareTree(T, r, sigma, q, currentDay, vasicek);
         const { call: callP, put: putP } = pricePairWithTree(S, K, tree);
         const callBA = computeOptionBidAsk(callP, S, K, sigma);
