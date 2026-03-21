@@ -2,7 +2,7 @@
  * pricing.js — American option pricing via CRR binomial tree
  *
  * Optimised for batch pricing: tree parameters are cached and reused across
- * calls with the same (T, r, sigma, q, currentDay, vasicek). Inner backward
+ * calls with the same (T, r, sigma, q, currentDay). Inner backward
  * induction uses incremental d² stepping instead of Math.pow (~12x faster per
  * node). Tree-based delta/gamma extracted from CRR nodes at steps 1 & 2,
  * reducing computeGreeks from 9 to 7 backward inductions.
@@ -12,7 +12,7 @@
  *     with vol-of-vol convexity correction (Gatheral 2006 / Lewis 2000)
  *   - computeSkewSigma: Heston moneyness-dependent vol skew with quadratic
  *     smile curvature (ξ²/12σ² second-order term)
- *   - Per-step Vasicek rate discounting via optional { a, b } param
+ *   - Per-step Vasicek rate discounting via market.a / market.b (market.js)
  *
  * Dual call+put pricing (_pricePairCore) runs a single backward induction
  * for both option types simultaneously, halving tree traversals for chain
@@ -23,11 +23,11 @@
  *   computeSkewSigma(sigmaEff, S, K, T, rho, xi, kappa) -> skewed sigma
  *
  * Public API — single-option:
- *   priceAmerican(S, K, T, r, sigma, isPut, q, currentDay, vasicek?)
- *   computeGreeks(S, K, T, r, sigma, isPut, q, currentDay, vasicek?)
- *   prepareTree(T, r, sigma, q, currentDay, vasicek?)  -> tree object
+ *   priceAmerican(S, K, T, r, sigma, isPut, q, currentDay)
+ *   computeGreeks(S, K, T, r, sigma, isPut, q, currentDay)
+ *   prepareTree(T, r, sigma, q, currentDay)             -> tree object
  *   priceWithTree(S, K, isPut, tree)                    -> price
- *   prepareGreekTrees(T, r, sigma, q, currentDay, vasicek?) -> greekTrees
+ *   prepareGreekTrees(T, r, sigma, q, currentDay)       -> greekTrees
  *   computeGreeksWithTrees(S, K, isPut, greekTrees)     -> Greeks object
  *
  * Public API — paired call+put (chain pricing):
@@ -40,6 +40,7 @@
  */
 
 import { BINOMIAL_STEPS, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE } from './config.js';
+import { market } from './market.js';
 
 const _N = BINOMIAL_STEPS;
 
@@ -177,9 +178,8 @@ let _cVasA = _NO_VAS, _cVasB = _NO_VAS;
  * @param {number} sigma        - Volatility (annualised)
  * @param {number} q            - Dividend yield
  * @param {number} currentDay   - Simulation day (enables discrete dividends)
- * @param {object} [vasicek]    - Optional { a, b } for Vasicek term-structure rates
  */
-function _fillTree(tree, T, r, sigma, q, currentDay, vasicek) {
+function _fillTree(tree, T, r, sigma, q, currentDay) {
     const n = _N;
     const dt = T / n;
     const u = Math.exp(sigma * Math.sqrt(dt));
@@ -242,8 +242,8 @@ function _fillTree(tree, T, r, sigma, q, currentDay, vasicek) {
     const pdDiscArr = tree.pdDisc;
     const uMinusD = u - d;
 
-    if (vasicek && vasicek.a > 0) {
-        const { a: va, b: vb } = vasicek;
+    if (market.a > 0) {
+        const va = market.a, vb = market.b;
         const rDiff = r - vb;
         for (let i = 0; i < n; i++) {
             const t_i = i * dt;
@@ -279,10 +279,9 @@ function _fillTree(tree, T, r, sigma, q, currentDay, vasicek) {
  * @param {number} sigma      - Volatility (annualised)
  * @param {number} [q=0]      - Dividend yield
  * @param {number} [currentDay] - Simulation day (enables discrete dividends)
- * @param {object} [vasicek]  - Optional { a, b } for Vasicek term-structure rates
  * @returns {object} Tree parameter object for priceWithTree
  */
-export function prepareTree(T, r, sigma, q, currentDay, vasicek) {
+export function prepareTree(T, r, sigma, q, currentDay) {
     q = q || 0;
     const tree = {
         u: 0, d: 0, d2: 0, useDiscrete: false,
@@ -292,7 +291,7 @@ export function prepareTree(T, r, sigma, q, currentDay, vasicek) {
         pdDisc: new Float64Array(_N),
         valid: T > 0 && sigma > 0,
     };
-    if (tree.valid) _fillTree(tree, T, r, sigma, q, currentDay, vasicek);
+    if (tree.valid) _fillTree(tree, T, r, sigma, q, currentDay);
     return tree;
 }
 
@@ -525,21 +524,20 @@ function _pairDeltaGamma(S, tree) {
  * @param {boolean} isPut      - true = put, false = call
  * @param {number}  [q=0]      - Dividend yield
  * @param {number}  [currentDay] - Simulation day (enables discrete dividends)
- * @param {object}  [vasicek]  - Optional { a, b } for Vasicek term-structure rates
  * @returns {number} Option price
  */
-function priceAmerican(S, K, T, r, sigma, isPut, q, currentDay, vasicek) {
+function priceAmerican(S, K, T, r, sigma, isPut, q, currentDay) {
     q = q || 0;
     if (T <= 0 || sigma <= 0 || S <= 0 || K <= 0)
         return isPut ? (K > S ? K - S : 0) : (S > K ? S - K : 0);
 
     // Check transparent cache — scalar comparisons, no allocation
     const day = currentDay ?? _NO_DAY;
-    const va = vasicek ? vasicek.a : _NO_VAS;
-    const vb = vasicek ? vasicek.b : _NO_VAS;
+    const va = market.a > 0 ? market.a : _NO_VAS;
+    const vb = market.a > 0 ? market.b : _NO_VAS;
     if (T !== _cT || r !== _cR || sigma !== _cSig || q !== _cQ || day !== _cDay
         || va !== _cVasA || vb !== _cVasB) {
-        _fillTree(_cache, T, r, sigma, q, currentDay, vasicek);
+        _fillTree(_cache, T, r, sigma, q, currentDay);
         _cT = T; _cR = r; _cSig = sigma; _cQ = q; _cDay = day;
         _cVasA = va; _cVasB = vb;
     }
@@ -605,7 +603,7 @@ export function pricePairWithTree(S, K, tree) {
  *
  * @returns {{ price, delta, gamma, theta, vega, rho }}
  */
-export function computeGreeks(S, K, T, r, sigma, isPut, q, currentDay, vasicek) {
+export function computeGreeks(S, K, T, r, sigma, isPut, q, currentDay) {
     q = q || 0;
     if (T <= 0 || sigma <= 0 || S <= 0 || K <= 0) {
         const intrinsic = isPut ? (K > S ? K - S : 0) : (S > K ? S - K : 0);
@@ -613,7 +611,7 @@ export function computeGreeks(S, K, T, r, sigma, isPut, q, currentDay, vasicek) 
     }
 
     // Base price — sets _f10..._f22 for tree-based delta/gamma
-    const price = priceAmerican(S, K, T, r, sigma, isPut, q, currentDay, vasicek);
+    const price = priceAmerican(S, K, T, r, sigma, isPut, q, currentDay);
 
     // Tree-based delta/gamma (read _cache which was filled by priceAmerican).
     // ORDERING: must run before any subsequent priceAmerican call that changes
@@ -627,14 +625,14 @@ export function computeGreeks(S, K, T, r, sigma, isPut, q, currentDay, vasicek) 
 
     const T_lo = Math.max(T - h_T, 1e-10);
     const T_hi = T + h_T;
-    const theta = (priceAmerican(S, K, T_lo, r, sigma, isPut, q, currentDay, vasicek)
-                 - priceAmerican(S, K, T_hi, r, sigma, isPut, q, currentDay, vasicek)) / (T_hi - T_lo);
+    const theta = (priceAmerican(S, K, T_lo, r, sigma, isPut, q, currentDay)
+                 - priceAmerican(S, K, T_hi, r, sigma, isPut, q, currentDay)) / (T_hi - T_lo);
 
-    const vega = (priceAmerican(S, K, T, r, sigma + h_sigma, isPut, q, currentDay, vasicek)
-               - priceAmerican(S, K, T, r, sigma - h_sigma, isPut, q, currentDay, vasicek)) / (2 * h_sigma);
+    const vega = (priceAmerican(S, K, T, r, sigma + h_sigma, isPut, q, currentDay)
+               - priceAmerican(S, K, T, r, sigma - h_sigma, isPut, q, currentDay)) / (2 * h_sigma);
 
-    const rho = (priceAmerican(S, K, T, r + h_r, sigma, isPut, q, currentDay, vasicek)
-              - priceAmerican(S, K, T, r - h_r, sigma, isPut, q, currentDay, vasicek)) / (2 * h_r);
+    const rho = (priceAmerican(S, K, T, r + h_r, sigma, isPut, q, currentDay)
+              - priceAmerican(S, K, T, r - h_r, sigma, isPut, q, currentDay)) / (2 * h_r);
 
     return { price, delta, gamma, theta, vega, rho };
 }
@@ -654,7 +652,7 @@ export function computeGreeks(S, K, T, r, sigma, isPut, q, currentDay, vasicek) 
  *
  * @returns {object} Greek trees bundle for computeGreeksWithTrees
  */
-export function prepareGreekTrees(T, r, sigma, q, currentDay, vasicek) {
+export function prepareGreekTrees(T, r, sigma, q, currentDay) {
     q = q || 0;
     const h_T     = 1 / TRADING_DAYS_PER_YEAR;
     const h_sigma = 0.001;
@@ -664,13 +662,13 @@ export function prepareGreekTrees(T, r, sigma, q, currentDay, vasicek) {
     const T_hi = T + h_T;
 
     return {
-        base:    prepareTree(T, r, sigma, q, currentDay, vasicek),
-        thetaLo: prepareTree(T_lo, r, sigma, q, currentDay, vasicek),
-        thetaHi: prepareTree(T_hi, r, sigma, q, currentDay, vasicek),
-        vegaUp:  prepareTree(T, r, sigma + h_sigma, q, currentDay, vasicek),
-        vegaDn:  prepareTree(T, r, sigma - h_sigma, q, currentDay, vasicek),
-        rhoUp:   prepareTree(T, r + h_r, sigma, q, currentDay, vasicek),
-        rhoDn:   prepareTree(T, r - h_r, sigma, q, currentDay, vasicek),
+        base:    prepareTree(T, r, sigma, q, currentDay),
+        thetaLo: prepareTree(T_lo, r, sigma, q, currentDay),
+        thetaHi: prepareTree(T_hi, r, sigma, q, currentDay),
+        vegaUp:  prepareTree(T, r, sigma + h_sigma, q, currentDay),
+        vegaDn:  prepareTree(T, r, sigma - h_sigma, q, currentDay),
+        rhoUp:   prepareTree(T, r + h_r, sigma, q, currentDay),
+        rhoDn:   prepareTree(T, r - h_r, sigma, q, currentDay),
         hT:      T_hi - T_lo,
         hSigma:  h_sigma,
         hR:      h_r,
