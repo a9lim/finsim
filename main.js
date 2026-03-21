@@ -25,6 +25,7 @@ import {
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay,
     updateDynamicSections, updateEventLog, updateCongressDiagrams,
+    refreshTooltip,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
 import { EventEngine } from './src/events.js';
@@ -699,6 +700,7 @@ function updateSubstepUI() {
         updateStrategyBuilder();
     }
 
+    refreshTooltip();
     chainDirty = false;
 }
 

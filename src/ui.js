@@ -15,6 +15,23 @@ import { market } from './market.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
 // ---------------------------------------------------------------------------
+// Tooltip state (module-scoped so refreshTooltip can update visible tip)
+// ---------------------------------------------------------------------------
+let _tip = null;
+let _tipTarget = null;
+
+/**
+ * If a bid/ask tooltip is currently visible, re-read data-tooltip from
+ * the hovered element and update the displayed text.  Called each substep.
+ */
+export function refreshTooltip() {
+    if (_tip && _tipTarget) {
+        const text = _tipTarget.dataset.tooltip;
+        if (text) _tip.el.textContent = text;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // cacheDOMElements
 // ---------------------------------------------------------------------------
 
@@ -263,45 +280,44 @@ export function bindEvents($, handlers) {
 
     // Tooltip delegation for [data-tooltip] cells
     if (typeof createSimTooltip === 'function') {
-        const tip = createSimTooltip();
-        let tipTarget = null;
+        _tip = createSimTooltip();
         $.sidebar.addEventListener('mouseover', (e) => {
             const el = e.target.closest('[data-tooltip]');
-            if (el === tipTarget) return;
+            if (el === _tipTarget) return;
             if (el) {
-                tipTarget = el;
-                tip.show(e.clientX, e.clientY, el.dataset.tooltip);
-            } else if (tipTarget) {
-                tipTarget = null;
-                tip.hide();
+                _tipTarget = el;
+                _tip.show(e.clientX, e.clientY, el.dataset.tooltip);
+            } else if (_tipTarget) {
+                _tipTarget = null;
+                _tip.hide();
             }
         });
         $.sidebar.addEventListener('mouseout', (e) => {
-            if (!tipTarget) return;
+            if (!_tipTarget) return;
             const related = e.relatedTarget;
-            if (!related || !tipTarget.contains(related)) {
-                tipTarget = null;
-                tip.hide();
+            if (!related || !_tipTarget.contains(related)) {
+                _tipTarget = null;
+                _tip.hide();
             }
         });
         // Also cover the chain overlay
         $.chainOverlay.addEventListener('mouseover', (e) => {
             const el = e.target.closest('[data-tooltip]');
-            if (el === tipTarget) return;
+            if (el === _tipTarget) return;
             if (el) {
-                tipTarget = el;
-                tip.show(e.clientX, e.clientY, el.dataset.tooltip);
-            } else if (tipTarget) {
-                tipTarget = null;
-                tip.hide();
+                _tipTarget = el;
+                _tip.show(e.clientX, e.clientY, el.dataset.tooltip);
+            } else if (_tipTarget) {
+                _tipTarget = null;
+                _tip.hide();
             }
         });
         $.chainOverlay.addEventListener('mouseout', (e) => {
-            if (!tipTarget) return;
+            if (!_tipTarget) return;
             const related = e.relatedTarget;
-            if (!related || !tipTarget.contains(related)) {
-                tipTarget = null;
-                tip.hide();
+            if (!related || !_tipTarget.contains(related)) {
+                _tipTarget = null;
+                _tip.hide();
             }
         });
     }
