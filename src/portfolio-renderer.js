@@ -25,10 +25,10 @@ function _computeMarginDisplay(equity, required) {
 // _buildPositionRow
 // ---------------------------------------------------------------------------
 
-function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
+function _buildPositionRow(pos, currentPrice, vol, rate, day, q, vasicek) {
     const absQty     = Math.abs(pos.qty);
     const typeLabel  = posTypeLabel(pos.type, pos.qty);
-    const pnl        = computePositionPnl(pos, currentPrice, vol, rate, day, q);
+    const pnl        = computePositionPnl(pos, currentPrice, vol, rate, day, q, vasicek);
     const entryTotal = pos.entryPrice * absQty;
     const isOption   = pos.type === 'call' || pos.type === 'put';
     const strikeStr  = isOption && pos.strike != null ? ' K' + pos.strike : '';
@@ -114,7 +114,7 @@ function _buildOrderRow(order) {
 // DOM diffing helpers
 // ---------------------------------------------------------------------------
 
-function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q) {
+function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q, vasicek) {
     if (!container._rowMap) container._rowMap = new Map();
     const rowMap = container._rowMap;
 
@@ -152,7 +152,7 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q
         const existing = rowMap.get(posId);
         if (existing) {
             // Update P&L in-place
-            const pnl = computePositionPnl(pos, S, vol, rate, day, q);
+            const pnl = computePositionPnl(pos, S, vol, rate, day, q, vasicek);
             const pnlEl = existing.querySelector('.pos-pnl');
             if (pnlEl) {
                 pnlEl.textContent = fmtDollar(pnl);
@@ -168,7 +168,7 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q
             const labelEl = existing.querySelector('.pos-label');
             if (labelEl) labelEl.textContent = labelStr;
         } else {
-            const row = _buildPositionRow(pos, S, vol, rate, day, q);
+            const row = _buildPositionRow(pos, S, vol, rate, day, q, vasicek);
             rowMap.set(posId, row);
             container.appendChild(row);
         }
@@ -212,7 +212,7 @@ function _diffOrderRows(container, orders) {
 // updatePortfolioDisplay -- main export
 // ---------------------------------------------------------------------------
 
-export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, day, marginInfo, q) {
+export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, day, marginInfo, q, vasicek) {
     $.cashDisplay.textContent = fmtDollar(portfolio.cash);
     $.cashDisplay.className = 'stat-value ' + (portfolio.cash < 0 ? 'pnl-down' : '');
 
@@ -255,7 +255,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
 
     // Default (non-strategy) positions -- DOM diff
     const defaultPos = portfolio.positions.filter(p => !p.strategyName);
-    _diffPositionRows($.defaultPositions, defaultPos, currentPrice, vol, rate, day, 'No open positions.', q);
+    _diffPositionRows($.defaultPositions, defaultPos, currentPrice, vol, rate, day, 'No open positions.', q, vasicek);
 
     // Strategy positions -- grouped by name, DOM diff
     const strategyNames = [...new Set(
@@ -298,7 +298,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
             }
             // Diff positions within this group
             const groupPositions = portfolio.positions.filter(p => p.strategyName === name);
-            _diffPositionRows(group, groupPositions, currentPrice, vol, rate, day, '', q);
+            _diffPositionRows(group, groupPositions, currentPrice, vol, rate, day, '', q, vasicek);
         }
     }
 

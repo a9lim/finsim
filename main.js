@@ -13,7 +13,7 @@ import {
     chargeBorrowInterest, processDividends, checkMargin, aggregateGreeks,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
-    saveStrategy, executeStrategy, computeBidAsk,
+    saveStrategy, executeStrategy, computeBidAsk, setVasicekParams,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -119,7 +119,7 @@ function _hestonParams() {
 
 /** Build Vasicek params object from current sim state. */
 function _vasicekParams() {
-    return { a: sim.a, b: sim.b };
+    return { a: sim.a, b: sim.b, sigmaR: sim.sigmaR };
 }
 
 /** Price one skeleton expiry on demand (price-only, no greeks). */
@@ -243,13 +243,13 @@ function init() {
         onBuyBond:        () => handleBuyBond(),
         onShortBond:      () => handleShortBond(),
         onChainCellClick: (info) => handleChainCellClick(info),
-        onExpiryChange:   (idx) => { const pe = _priceExpiry(idx); updateChainDisplay($, pe, _buildPosMap()); updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), strategyMode ? _buildStrategyPosMap() : null); dirty = true; },
+        onExpiryChange:   (idx) => { const pe = _priceExpiry(idx); updateChainDisplay($, pe, _buildPosMap()); updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), strategyMode ? _buildStrategyPosMap() : null, _vasicekParams()); dirty = true; },
         onFullChainOpen:  () => openFullChain(),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
         onDismissMargin:  () => { /* sim stays paused, overlay hidden by ui.js */ },
         onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
-        onStrategyExpiryChange: (idx) => { const pe = _priceExpiry(idx); updateStrategyChainDisplay($, pe, handleAddLeg, _buildStrategyPosMap()); updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap()); dirty = true; },
+        onStrategyExpiryChange: (idx) => { const pe = _priceExpiry(idx); updateStrategyChainDisplay($, pe, handleAddLeg, _buildStrategyPosMap()); updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap(), _vasicekParams()); dirty = true; },
         onSaveStrategy:   () => handleSaveStrategy(),
         onExecStrategy:   () => handleExecStrategy(),
         onLLMKeyChange:   (key) => { if (llmSource) llmSource.setApiKey(key); },
@@ -389,7 +389,7 @@ function init() {
                 rebuildStrategyDropdown($, chainSkeleton);
                 const stratPriced = _priceExpiry(_strategyExpiryIdx());
                 updateStrategySelectors($, stratPriced, sim.S, handleAddLeg, _buildStrategyPosMap());
-                updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+                updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap(), _vasicekParams());
             }
         });
     });
@@ -552,6 +552,7 @@ function _onDayComplete() {
         const events = eventEngine.maybeFire(sim, sim.day);
         if (events.length > 0) {
             sim.recomputeK();
+            setVasicekParams(sim.a, sim.b, sim.sigmaR);
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
             updateCongressDiagrams($, eventEngine.world);
@@ -645,7 +646,7 @@ function updateUI(precomputedMargin) {
         rebuildTradeDropdown($, chainSkeleton);
         const tradePriced = _priceExpiry(_tradeExpiryIdx());
         updateChainDisplay($, tradePriced, pMap);
-        updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap);
+        updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap, _vasicekParams());
         if (strategyMode) {
             rebuildStrategyDropdown($, chainSkeleton);
             const stratPriced = _priceExpiry(_strategyExpiryIdx());
@@ -653,7 +654,7 @@ function updateUI(precomputedMargin) {
         }
         chainDirty = false;
     }
-    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q);
+    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q, _vasicekParams());
     if (activeTab === 'portfolio') {
         updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     }
@@ -672,7 +673,7 @@ function updateSubstepUI() {
     // Reprice the visible trade chain expiry (no dropdown rebuild)
     const tradePriced = _priceExpiry(_tradeExpiryIdx());
     updateChainDisplay($, tradePriced, pMap);
-    updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap);
+    updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap, _vasicekParams());
 
     if (strategyMode) {
         const stratPriced = _priceExpiry(_strategyExpiryIdx());
@@ -680,7 +681,7 @@ function updateSubstepUI() {
     }
 
     // Portfolio mark-to-market
-    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, undefined, sim.q);
+    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, undefined, sim.q, _vasicekParams());
     if (activeTab === 'portfolio') {
         updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     }
@@ -794,6 +795,7 @@ function _resetCore(index) {
     document.getElementById('epilogue-overlay')?.classList.add('hidden');
     sim.reset(index);
     resetPortfolio();
+    setVasicekParams(sim.a, sim.b, sim.sigmaR);
     sim.prepopulate();
     _initRateHistory();
     chart.dayOrigin = sim.day;
@@ -857,6 +859,7 @@ function _isLLMPreset(index) { return index >= 6; }
 function syncSliderToSim(param, value) {
     sim[param] = value;
     if (param === 'rho') sim._recomputeRhoDerived();
+    if (param === 'a' || param === 'b' || param === 'sigmaR') setVasicekParams(sim.a, sim.b, sim.sigmaR);
     dirty = true;
 }
 
@@ -1005,7 +1008,7 @@ function handleAddLeg(type, side, strike, expiryDay) {
     strategy.resetRange(sim.S, strategyLegs);
     const spe = _priceExpiry(_strategyExpiryIdx());
     updateStrategyChainDisplay($, spe, handleAddLeg, _buildStrategyPosMap());
-    updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+    updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap(), _vasicekParams());
     updateStrategyBuilder();
     updateTimeSliderRange();
     dirty = true;
@@ -1017,7 +1020,7 @@ function handleRemoveLeg(index) {
     strategy.resetRange(sim.S, strategyLegs);
     const spe = _priceExpiry(_strategyExpiryIdx());
     updateStrategyChainDisplay($, spe, handleAddLeg, _buildStrategyPosMap());
-    updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+    updateStockBondPrices($, sim.S, sim.r, Math.sqrt(Math.max(sim.v, 0)), chainSkeleton, _buildPosMap(), _buildStrategyPosMap(), _vasicekParams());
     updateStrategyBuilder();
     updateTimeSliderRange();
     dirty = true;
