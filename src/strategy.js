@@ -8,7 +8,7 @@
  * Exports: StrategyRenderer
  */
 
-import { priceAmerican, allocTree, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
+import { allocTree, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
 import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
     STRATEGY_SAMPLES, STRATEGY_Y_PAD, STRATEGY_MARGIN,
@@ -122,7 +122,7 @@ function _legDte(leg, evalDay, fallbackDte) {
 
 /**
  * Precompute per-leg constants that don't vary across sample prices.
- * Entry values (priceAmerican at entryS) are computed once instead of
+ * Entry values (priceWithTree at entryS) are computed once instead of
  * 200× per leg in the sample loop. Prepared trees are stored per-leg
  * so the sample loop avoids redundant tree preparation when legs have
  * different T values (which defeats the transparent parameter cache).
@@ -155,10 +155,11 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
                 info.K = K;
                 info.isPut = isPut;
                 info.vol = sigma;
-                info.entryVal = priceAmerican(entryS, K, entryT, rate, entrySigma, isPut, q, entryDay);
+                // Pre-prepare trees for entry and evaluation pricing
+                const entryTree = prepareTree(entryT, rate, entrySigma, q, entryDay);
+                info.entryVal = priceWithTree(entryS, K, isPut, entryTree);
                 info.q = q;
                 info.evalDay = evalDay;
-                // Pre-prepare tree for this leg's evaluation parameters.
                 // Avoids transparent cache thrashing when legs have different T.
                 info.tree = prepareTree(T, rate, sigma, q, evalDay);
                 info.greekTrees = null; // lazily prepared on first Greek request
