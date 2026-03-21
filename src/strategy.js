@@ -8,7 +8,7 @@
  * Exports: StrategyRenderer
  */
 
-import { priceAmerican, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees } from './pricing.js';
+import { priceAmerican, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
     STRATEGY_SAMPLES, STRATEGY_Y_PAD, STRATEGY_MARGIN,
@@ -119,7 +119,7 @@ function _legDte(leg, evalDay, fallbackDte) {
  * so the sample loop avoids redundant tree preparation when legs have
  * different T values (which defeats the transparent parameter cache).
  */
-function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte, q) {
+function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte, q, heston, vasicek) {
     return legs.map(leg => {
         const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                    : (leg.side === 'short') ? -1 : 1;
@@ -138,14 +138,30 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
             case 'put': {
                 const isPut = leg.type === 'put';
                 const K = leg.strike ?? entryS;
+                // Term-structure vol + moneyness skew
+                const sigmaEff = heston
+                    ? computeEffectiveSigma(heston.v, T, heston.kappa, heston.theta)
+                    : vol;
+                const sigma = heston
+                    ? computeSkewSigma(sigmaEff, entryS, K, T, heston.rho, heston.xi, heston.kappa)
+                    : vol;
+                // Entry vol: same skew at entry time
+                const entrySigmaEff = heston
+                    ? computeEffectiveSigma(heston.v, entryT, heston.kappa, heston.theta)
+                    : vol;
+                const entrySigma = heston
+                    ? computeSkewSigma(entrySigmaEff, entryS, K, entryT, heston.rho, heston.xi, heston.kappa)
+                    : vol;
                 info.K = K;
                 info.isPut = isPut;
-                info.entryVal = priceAmerican(entryS, K, entryT, rate, vol, isPut, q, entryDay);
+                info.vol = sigma;
+                info.entryVal = priceAmerican(entryS, K, entryT, rate, entrySigma, isPut, q, entryDay, vasicek);
                 info.q = q;
                 info.evalDay = evalDay;
+                info.vasicek = vasicek;
                 // Pre-prepare tree for this leg's evaluation parameters.
                 // Avoids transparent cache thrashing when legs have different T.
-                info.tree = prepareTree(T, rate, vol, q, evalDay);
+                info.tree = prepareTree(T, rate, sigma, q, evalDay, vasicek);
                 info.greekTrees = null; // lazily prepared on first Greek request
                 break;
             }
@@ -182,7 +198,7 @@ function _legGreeksFast(info, S) {
         case 'call':
         case 'put': {
             if (!info.greekTrees) {
-                info.greekTrees = prepareGreekTrees(info.T, info.rate, info.vol, info.q, info.evalDay);
+                info.greekTrees = prepareGreekTrees(info.T, info.rate, info.vol, info.q, info.evalDay, info.vasicek);
             }
             const g = computeGreeksWithTrees(S, info.K, info.isPut, info.greekTrees);
             return {
@@ -207,6 +223,15 @@ function _legGreeksFast(info, S) {
  * Build a cache key string from draw/summary inputs.
  * Cheap string comparison avoids re-pricing when nothing changed.
  */
+function _modelKey(heston, vasicek) {
+    if (!heston && !vasicek) return '';
+    let k = '';
+    if (heston) k += (heston.v * 1e6 | 0) + ',' + (heston.kappa * 1e4 | 0) + ','
+        + (heston.theta * 1e6 | 0) + ',' + (heston.rho * 1e4 | 0) + ',' + (heston.xi * 1e4 | 0);
+    if (vasicek) k += ',' + (vasicek.a * 1e4 | 0) + ',' + (vasicek.b * 1e6 | 0);
+    return k;
+}
+
 function _cacheKey(legs, vol, rate, evalDay, entryDay, dte, extra) {
     let k = '';
     if (legs) {
@@ -344,7 +369,7 @@ export class StrategyRenderer {
      * @param {number}  [evalDay]    - Evaluation day (sim day number); per-leg T computed from leg.expiryDay
      * @param {number}  [entryDay]   - Entry day (sim day number); per-leg entryT computed from leg.expiryDay
      */
-    draw(legs, spot, vol, rate, dte, greekToggles, evalDay, entryDay, q) {
+    draw(legs, spot, vol, rate, dte, greekToggles, evalDay, entryDay, q, heston, vasicek) {
         const ctx  = this._ctx;
         const cssW = this._cssW;
         const cssH = this._cssH;
@@ -393,14 +418,14 @@ export class StrategyRenderer {
 
         // --- Cached computation: only re-price when inputs change ---
         const drawKey = _cacheKey(legs, vol, rate, evalDay, entryDay, dte,
-            (xMin * 100 | 0) + ',' + (xMax * 100 | 0) + ',' + (spot * 100 | 0) + ',' + activeGreeks.join('') + ',' + (q * 1e6 | 0));
+            (xMin * 100 | 0) + ',' + (xMax * 100 | 0) + ',' + (spot * 100 | 0) + ',' + activeGreeks.join('') + ',' + (q * 1e6 | 0) + ',' + _modelKey(heston, vasicek));
         let xs, pnls, greekData, breakevens;
 
         if (this._cache && this._cache.key === drawKey) {
             ({ xs, pnls, greekData, breakevens } = this._cache);
         } else {
             // Precompute per-leg entry values (constant across all sample Ss)
-            const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q);
+            const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q, heston, vasicek);
 
             const wantGreeks = activeGreeks.length > 0;
             xs   = new Array(SAMPLE_COUNT);
@@ -503,12 +528,12 @@ export class StrategyRenderer {
      *
      * @returns {{ maxProfit: number, maxLoss: number, breakevens: number[], netCost: number }}
      */
-    computeSummary(legs, spot, vol, rate, dte, evalDay, entryDay, q) {
+    computeSummary(legs, spot, vol, rate, dte, evalDay, entryDay, q, heston, vasicek) {
         if (!legs || legs.length === 0) {
             return { maxProfit: 0, maxLoss: 0, breakevens: [], netCost: 0 };
         }
 
-        const sumKey = _cacheKey(legs, vol, rate, evalDay, entryDay, dte, (spot * 100 | 0) + ',' + (q * 1e6 | 0));
+        const sumKey = _cacheKey(legs, vol, rate, evalDay, entryDay, dte, (spot * 100 | 0) + ',' + (q * 1e6 | 0) + ',' + _modelKey(heston, vasicek));
         if (this._summaryCache && this._summaryCache.key === sumKey) {
             return this._summaryCache.result;
         }
@@ -522,7 +547,7 @@ export class StrategyRenderer {
                 xMax = Math.max(xMax, leg.strike * 5);
             }
         }
-        const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q);
+        const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q, heston, vasicek);
         const xs   = new Array(SAMPLE_COUNT);
         const pnls = new Array(SAMPLE_COUNT);
 
@@ -558,7 +583,7 @@ export class StrategyRenderer {
         for (const leg of legs) {
             const legEntryDte = (leg.expiryDay != null && entryDay != null)
                 ? Math.max(leg.expiryDay - entryDay, 0) : fallbackDte;
-            netCost += this._legEntryCost(leg, spot, vol, rate, _dteToT(legEntryDte), q, entryDay);
+            netCost += this._legEntryCost(leg, spot, vol, rate, _dteToT(legEntryDte), q, entryDay, heston, vasicek);
         }
 
         const result = { maxProfit, maxLoss, breakevens, netCost };
@@ -574,7 +599,7 @@ export class StrategyRenderer {
      * Compute the entry cost of a single leg at the original spot price.
      * Positive = debit paid, negative = credit received.
      */
-    _legEntryCost(leg, spot, vol, rate, T, q, entryDay) {
+    _legEntryCost(leg, spot, vol, rate, T, q, entryDay, heston, vasicek) {
         const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                    : (leg.side === 'short') ? -1 : 1;
         const qty  = Math.abs(leg.qty ?? 1);
@@ -584,7 +609,13 @@ export class StrategyRenderer {
             case 'put': {
                 const isPut = leg.type === 'put';
                 const K     = leg.strike ?? spot;
-                const price = priceAmerican(spot, K, T, rate, vol, isPut, q, entryDay);
+                const sigmaEff = heston
+                    ? computeEffectiveSigma(heston.v, T, heston.kappa, heston.theta)
+                    : vol;
+                const sigma = heston
+                    ? computeSkewSigma(sigmaEff, spot, K, T, heston.rho, heston.xi, heston.kappa)
+                    : vol;
+                const price = priceAmerican(spot, K, T, rate, sigma, isPut, q, entryDay, vasicek);
                 return price * qty * sign;
             }
             case 'stock':

@@ -9,7 +9,7 @@
  */
 
 import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT } from './config.js';
-import { prepareTree, pricePairWithTree, prepareGreekTrees, computeGreeksPairWithTrees } from './pricing.js';
+import { prepareTree, pricePairWithTree, prepareGreekTrees, computeGreeksPairWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { computeOptionBidAsk } from './portfolio.js';
 
 // ---------------------------------------------------------------------------
@@ -109,10 +109,13 @@ export function buildChainSkeleton(S, currentDay, expiries) {
 /**
  * Price a single chain expiry on demand.
  *
- * Uses dual call+put backward induction: a single tree traversal produces
- * both call and put prices at each strike, halving backward inductions.
- * When greeks=false (default): 1 tree prep + 25 dual inductions (was 50).
- * When greeks=true: 7 tree preps + 25×7 dual inductions (was 25×14).
+ * Uses term-structure volatility (Heston expected integrated variance),
+ * moneyness-dependent skew (first-order Heston), and Vasicek term-structure
+ * rates. Each strike gets its own tree (different skewed sigma), with dual
+ * call+put backward induction at each strike.
+ *
+ * When greeks=false (default): 25 tree preps + 25 dual inductions.
+ * When greeks=true: 25×7 tree preps + 25×7 dual inductions.
  * Use greeks=true only for the full chain overlay.
  *
  * @param {number} S     - Spot price
@@ -121,19 +124,27 @@ export function buildChainSkeleton(S, currentDay, expiries) {
  * @param {{ day: number, dte: number, strikes: number[] }} expiry - skeleton entry
  * @param {boolean} [greeks=false] - compute full Greeks (delta/gamma/theta/vega/rho)
  * @param {number} [q=0] - Continuous dividend yield
+ * @param {object} [heston] - { kappa, theta, rho, xi } for term-structure vol & skew
+ * @param {object} [vasicek] - { a, b } for term-structure rates
  * @returns {{ day: number, dte: number, options: Array }}
  */
-export function priceChainExpiry(S, v, r, expiry, greeks, q) {
+export function priceChainExpiry(S, v, r, expiry, greeks, q, heston, vasicek) {
     q = q || 0;
-    const sigma = Math.sqrt(Math.max(v, 0));
     const T = expiry.dte / TRADING_DAYS_PER_YEAR;
     const currentDay = expiry.day - expiry.dte;
 
+    // Term-structure effective volatility (Heston expected integrated variance)
+    const sigmaEff = heston
+        ? computeEffectiveSigma(v, T, heston.kappa, heston.theta)
+        : Math.sqrt(Math.max(v, 0));
+
     if (greeks) {
-        // Greeks path: prepare 7 tree variants once, dual-price call+put
-        // per strike (7 dual inductions per strike vs 14 single inductions)
-        const gt = prepareGreekTrees(T, r, sigma, q, currentDay);
+        // Greeks path: per-strike skewed sigma, 7 tree variants each
         const options = expiry.strikes.map(K => {
+            const sigma = heston
+                ? computeSkewSigma(sigmaEff, S, K, T, heston.rho, heston.xi, heston.kappa)
+                : sigmaEff;
+            const gt = prepareGreekTrees(T, r, sigma, q, currentDay, vasicek);
             const { call: callG, put: putG } = computeGreeksPairWithTrees(S, K, gt);
             const callBA = computeOptionBidAsk(callG.price, S, K, sigma);
             const putBA  = computeOptionBidAsk(putG.price,  S, K, sigma);
@@ -150,10 +161,12 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
         return { day: expiry.day, dte: expiry.dte, options };
     }
 
-    // Price-only path: single tree prep, dual call+put per strike
-    // (25 dual inductions vs 50 single inductions)
-    const tree = prepareTree(T, r, sigma, q, currentDay);
+    // Price-only path: per-strike skewed sigma, single tree each
     const options = expiry.strikes.map(K => {
+        const sigma = heston
+            ? computeSkewSigma(sigmaEff, S, K, T, heston.rho, heston.xi, heston.kappa)
+            : sigmaEff;
+        const tree = prepareTree(T, r, sigma, q, currentDay, vasicek);
         const { call: callP, put: putP } = pricePairWithTree(S, K, tree);
         const callBA = computeOptionBidAsk(callP, S, K, sigma);
         const putBA  = computeOptionBidAsk(putP,  S, K, sigma);

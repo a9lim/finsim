@@ -112,16 +112,26 @@ function _strategyExpiryIdx() {
     return Math.min(Math.max((isNaN(raw) ? chainSkeleton.length - 1 : raw), 0), chainSkeleton.length - 1);
 }
 
+/** Build Heston params object from current sim state. */
+function _hestonParams() {
+    return { v: sim.v, kappa: sim.kappa, theta: sim.theta, rho: sim.rho, xi: sim.xi };
+}
+
+/** Build Vasicek params object from current sim state. */
+function _vasicekParams() {
+    return { a: sim.a, b: sim.b };
+}
+
 /** Price one skeleton expiry on demand (price-only, no greeks). */
 function _priceExpiry(idx) {
     if (idx < 0 || idx >= chainSkeleton.length) return null;
-    return priceChainExpiry(sim.S, sim.v, sim.r, chainSkeleton[idx], false, sim.q);
+    return priceChainExpiry(sim.S, sim.v, sim.r, chainSkeleton[idx], false, sim.q, _hestonParams(), _vasicekParams());
 }
 
 /** Price one skeleton expiry with full greeks (for overlay). */
 function _priceExpiryGreeks(idx) {
     if (idx < 0 || idx >= chainSkeleton.length) return null;
-    return priceChainExpiry(sim.S, sim.v, sim.r, chainSkeleton[idx], true, sim.q);
+    return priceChainExpiry(sim.S, sim.v, sim.r, chainSkeleton[idx], true, sim.q, _hestonParams(), _vasicekParams());
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +409,8 @@ function renderCurrentView() {
             strategyLegs, sim.S,
             Math.sqrt(Math.max(sim.v, 0)),
             sim.r, _sliderFallbackDte(), greekToggles,
-            _sliderEvalDay(), sim.day, sim.q
+            _sliderEvalDay(), sim.day, sim.q,
+            _hestonParams(), _vasicekParams()
         );
     } else {
         chart.draw(
@@ -1078,7 +1089,7 @@ function updateStrategyBuilder() {
     const vol = Math.sqrt(Math.max(sim.v, 0));
     const summary = strategyLegs.length > 0
         ? strategy.computeSummary(strategyLegs, sim.S, vol, sim.r, _sliderFallbackDte(),
-            _sliderEvalDay(), sim.day, sim.q)
+            _sliderEvalDay(), sim.day, sim.q, _hestonParams(), _vasicekParams())
         : null;
     renderStrategyBuilder($, strategyLegs, summary, handleRemoveLeg, chainSkeleton, () => {
         strategy.resetRange(sim.S, strategyLegs);
