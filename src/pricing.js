@@ -7,6 +7,10 @@
  * node). Tree-based delta/gamma extracted from CRR nodes at steps 1 & 2,
  * reducing computeGreeks from 9 to 7 backward inductions.
  *
+ * BSS smoothing (Broadie-Detemple): every tree carries a companion tree with
+ * N-1 steps. All public pricing/Greek APIs average the N and N-1 results,
+ * cancelling odd-even oscillation inherent in binomial lattices.
+ *
  * Term-structure enhancements:
  *   - computeEffectiveSigma: Heston expected integrated variance over [0, T]
  *     with vol-of-vol convexity correction (Gatheral 2006 / Lewis 2000)
@@ -167,7 +171,7 @@ const _NO_DAY = -Infinity; // sentinel for "no currentDay"
  * @param {number} currentDay   - Simulation day (enables discrete dividends)
  */
 function _fillTree(tree, T, r, sigma, q, currentDay) {
-    const n = _N;
+    const n = tree.n;
     const dt = T / n;
     const u = Math.exp(sigma * Math.sqrt(dt));
     const d = 1 / u;
@@ -267,12 +271,22 @@ function _fillTree(tree, T, r, sigma, q, currentDay) {
  */
 export function allocTree() {
     return {
-        u: 0, d: 0, d2: 0, useDiscrete: false,
+        n: _N, u: 0, d: 0, d2: 0, useDiscrete: false,
         powU: new Float64Array(_N + 1),
         divAdj: new Float64Array(_N + 1),
         puDisc: new Float64Array(_N),
         pdDisc: new Float64Array(_N),
         valid: false,
+        // BSS companion tree (N-1 steps) for odd/even oscillation cancellation
+        _b: {
+            n: _N - 1, u: 0, d: 0, d2: 0, useDiscrete: false,
+            powU: new Float64Array(_N + 1),
+            divAdj: new Float64Array(_N + 1),
+            puDisc: new Float64Array(_N),
+            pdDisc: new Float64Array(_N),
+            valid: false,
+            _b: null,
+        },
     };
 }
 
@@ -295,7 +309,15 @@ export function prepareTree(T, r, sigma, q, currentDay, into) {
     q = q || 0;
     const tree = into || allocTree();
     tree.valid = T > 0 && sigma > 0;
-    if (tree.valid) _fillTree(tree, T, r, sigma, q, currentDay);
+    if (tree.valid) {
+        _fillTree(tree, T, r, sigma, q, currentDay);
+        if (tree._b) {
+            tree._b.valid = true;
+            _fillTree(tree._b, T, r, sigma, q, currentDay);
+        }
+    } else if (tree._b) {
+        tree._b.valid = false;
+    }
     return tree;
 }
 
@@ -317,8 +339,7 @@ export function prepareTree(T, r, sigma, q, currentDay, into) {
  * @returns {number} Option price
  */
 function _priceCore(S, K, isPut, tree) {
-    const { d2, puDisc, pdDisc, powU, divAdj } = tree;
-    const n = _N;
+    const { d2, puDisc, pdDisc, powU, divAdj, n } = tree;
     const V = _V;
 
     // Terminal payoffs — incremental d² stepping replaces Math.pow per node
@@ -390,8 +411,7 @@ function _priceCore(S, K, isPut, tree) {
  * @param {object} tree - Prepared tree parameters
  */
 function _pricePairCore(S, K, tree) {
-    const { d2, puDisc, pdDisc, powU, divAdj } = tree;
-    const n = _N;
+    const { d2, puDisc, pdDisc, powU, divAdj, n } = tree;
     const VC = _V;
     const VP = _VP;
 
@@ -525,7 +545,10 @@ function _pairDeltaGamma(S, tree) {
 export function priceWithTree(S, K, isPut, tree) {
     if (!tree.valid || S <= 0 || K <= 0)
         return isPut ? (K > S ? K - S : 0) : (S > K ? S - K : 0);
-    return _priceCore(S, K, isPut, tree);
+    const p1 = _priceCore(S, K, isPut, tree);
+    if (!tree._b || !tree._b.valid) return p1;
+    const p2 = _priceCore(S, K, isPut, tree._b);
+    return 0.5 * (p1 + p2);
 }
 
 // ---------------------------------------------------------------------------
@@ -549,7 +572,10 @@ export function pricePairWithTree(S, K, tree) {
         };
     }
     _pricePairCore(S, K, tree);
-    return { call: _V[0], put: _VP[0] };
+    if (!tree._b || !tree._b.valid) return { call: _V[0], put: _VP[0] };
+    const c1 = _V[0], p1 = _VP[0];
+    _pricePairCore(S, K, tree._b);
+    return { call: 0.5 * (c1 + _V[0]), put: 0.5 * (p1 + _VP[0]) };
 }
 
 // ---------------------------------------------------------------------------
@@ -626,24 +652,38 @@ export function computeGreeksWithTrees(S, K, isPut, gt) {
         return { price: intrinsic, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 };
     }
 
-    // Base price — sets _f10..._f22
-    const price = _priceCore(S, K, isPut, gt.base);
+    const bss = gt.base._b && gt.base._b.valid;
 
-    // Tree-based delta/gamma
-    const { delta, gamma } = _treeDeltaGamma(S, gt.base);
+    // Base price — sets _f10..._f22; BSS average with companion tree
+    let price = _priceCore(S, K, isPut, gt.base);
+    let { delta, gamma } = _treeDeltaGamma(S, gt.base);
+    if (bss) {
+        const p2 = _priceCore(S, K, isPut, gt.base._b);
+        const dg2 = _treeDeltaGamma(S, gt.base._b);
+        price = 0.5 * (price + p2);
+        delta = 0.5 * (delta + dg2.delta);
+        gamma = 0.5 * (gamma + dg2.gamma);
+    }
 
-    // Finite-difference theta/vega/rho
-    const pTlo = _priceCore(S, K, isPut, gt.thetaLo);
-    const pThi = _priceCore(S, K, isPut, gt.thetaHi);
+    // Finite-difference theta/vega/rho (BSS averaged)
+    let pTlo = _priceCore(S, K, isPut, gt.thetaLo);
+    let pThi = _priceCore(S, K, isPut, gt.thetaHi);
+    let pSu  = _priceCore(S, K, isPut, gt.vegaUp);
+    let pSd  = _priceCore(S, K, isPut, gt.vegaDn);
+    let pRu  = _priceCore(S, K, isPut, gt.rhoUp);
+    let pRd  = _priceCore(S, K, isPut, gt.rhoDn);
+    if (bss) {
+        pTlo = 0.5 * (pTlo + _priceCore(S, K, isPut, gt.thetaLo._b));
+        pThi = 0.5 * (pThi + _priceCore(S, K, isPut, gt.thetaHi._b));
+        pSu  = 0.5 * (pSu  + _priceCore(S, K, isPut, gt.vegaUp._b));
+        pSd  = 0.5 * (pSd  + _priceCore(S, K, isPut, gt.vegaDn._b));
+        pRu  = 0.5 * (pRu  + _priceCore(S, K, isPut, gt.rhoUp._b));
+        pRd  = 0.5 * (pRd  + _priceCore(S, K, isPut, gt.rhoDn._b));
+    }
+
     const theta = (pTlo - pThi) / gt.hT;
-
-    const pSu = _priceCore(S, K, isPut, gt.vegaUp);
-    const pSd = _priceCore(S, K, isPut, gt.vegaDn);
-    const vega = (pSu - pSd) / (2 * gt.hSigma);
-
-    const pRu = _priceCore(S, K, isPut, gt.rhoUp);
-    const pRd = _priceCore(S, K, isPut, gt.rhoDn);
-    const rho = (pRu - pRd) / (2 * gt.hR);
+    const vega  = (pSu - pSd) / (2 * gt.hSigma);
+    const rho   = (pRu - pRd) / (2 * gt.hR);
 
     return { price, delta, gamma, theta, vega, rho };
 }
@@ -677,34 +717,51 @@ export function computeGreeksPairWithTrees(S, K, gt) {
         };
     }
 
+    const bss = gt.base._b && gt.base._b.valid;
+
     // Base price — sets pair intermediates (_cf10.._cf22, _pf10.._pf22)
     _pricePairCore(S, K, gt.base);
-    const callPrice = _V[0];
-    const putPrice = _VP[0];
-
-    // Tree-based delta/gamma for both (reads pair intermediates)
+    let cP = _V[0], pP = _VP[0];
     _pairDeltaGamma(S, gt.base);
-    const cDelta = _callDelta, cGamma = _callGamma;
-    const pDelta = _putDelta, pGamma = _putGamma;
+    let cD = _callDelta, cG = _callGamma;
+    let pD = _putDelta,  pG = _putGamma;
 
-    // Finite-difference theta/vega/rho — 6 dual inductions
+    if (bss) {
+        _pricePairCore(S, K, gt.base._b);
+        cP = 0.5 * (cP + _V[0]); pP = 0.5 * (pP + _VP[0]);
+        _pairDeltaGamma(S, gt.base._b);
+        cD = 0.5 * (cD + _callDelta); cG = 0.5 * (cG + _callGamma);
+        pD = 0.5 * (pD + _putDelta);  pG = 0.5 * (pG + _putGamma);
+    }
+
+    // Finite-difference theta/vega/rho — 6 dual inductions (BSS averaged)
     _pricePairCore(S, K, gt.thetaLo);
-    const cTlo = _V[0], pTlo = _VP[0];
-
+    let cTlo = _V[0], pTlo = _VP[0];
     _pricePairCore(S, K, gt.thetaHi);
-    const cThi = _V[0], pThi = _VP[0];
-
+    let cThi = _V[0], pThi = _VP[0];
     _pricePairCore(S, K, gt.vegaUp);
-    const cVu = _V[0], pVu = _VP[0];
-
+    let cVu = _V[0], pVu = _VP[0];
     _pricePairCore(S, K, gt.vegaDn);
-    const cVd = _V[0], pVd = _VP[0];
-
+    let cVd = _V[0], pVd = _VP[0];
     _pricePairCore(S, K, gt.rhoUp);
-    const cRu = _V[0], pRu = _VP[0];
-
+    let cRu = _V[0], pRu = _VP[0];
     _pricePairCore(S, K, gt.rhoDn);
-    const cRd = _V[0], pRd = _VP[0];
+    let cRd = _V[0], pRd = _VP[0];
+
+    if (bss) {
+        _pricePairCore(S, K, gt.thetaLo._b);
+        cTlo = 0.5 * (cTlo + _V[0]); pTlo = 0.5 * (pTlo + _VP[0]);
+        _pricePairCore(S, K, gt.thetaHi._b);
+        cThi = 0.5 * (cThi + _V[0]); pThi = 0.5 * (pThi + _VP[0]);
+        _pricePairCore(S, K, gt.vegaUp._b);
+        cVu = 0.5 * (cVu + _V[0]); pVu = 0.5 * (pVu + _VP[0]);
+        _pricePairCore(S, K, gt.vegaDn._b);
+        cVd = 0.5 * (cVd + _V[0]); pVd = 0.5 * (pVd + _VP[0]);
+        _pricePairCore(S, K, gt.rhoUp._b);
+        cRu = 0.5 * (cRu + _V[0]); pRu = 0.5 * (pRu + _VP[0]);
+        _pricePairCore(S, K, gt.rhoDn._b);
+        cRd = 0.5 * (cRd + _V[0]); pRd = 0.5 * (pRd + _VP[0]);
+    }
 
     const invHT = 1 / gt.hT;
     const inv2hSigma = 1 / (2 * gt.hSigma);
@@ -712,13 +769,13 @@ export function computeGreeksPairWithTrees(S, K, gt) {
 
     return {
         call: {
-            price: callPrice, delta: cDelta, gamma: cGamma,
+            price: cP, delta: cD, gamma: cG,
             theta: (cTlo - cThi) * invHT,
             vega: (cVu - cVd) * inv2hSigma,
             rho: (cRu - cRd) * inv2hR,
         },
         put: {
-            price: putPrice, delta: pDelta, gamma: pGamma,
+            price: pP, delta: pD, gamma: pG,
             theta: (pTlo - pThi) * invHT,
             vega: (pVu - pVd) * inv2hSigma,
             rho: (pRu - pRd) * inv2hR,

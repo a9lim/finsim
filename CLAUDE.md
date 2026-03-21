@@ -152,13 +152,13 @@ dv   = kappa(theta - v)dt + xi*sqrt(v)*dW2      (dW1*dW2 = rho*dt)
 
 ## Options Pricing
 
-CRR binomial tree (128 steps) for American options. Per-strike volatility via:
+CRR binomial tree (128 steps) for American options with BSS smoothing (Broadie-Detemple): every tree carries a companion N-1 step tree, and all pricing/Greek APIs average both results to cancel odd-even binomial oscillation. Per-strike volatility via:
 - **Term-structure**: Heston integrated variance + vol-of-vol convexity (Gatheral 2006)
 - **Skew**: first-order Heston `rho*xi/(2*sigma)` + quadratic curvature, dampened by mean-reversion
 
 Per-step Vasicek rate discounting. Discrete proportional dividends at `QUARTERLY_CYCLE` boundaries. Dual call+put backward induction shares loop overhead for chain pricing.
 
-**Greeks**: finite-difference via `prepareGreekTrees` + `computeGreeksWithTrees` (7 tree inductions per option). Delta/gamma from tree steps 1&2, theta/vega/rho via central differences. All pricing unified on `prepareTree` + `priceWithTree` — no `priceAmerican`.
+**Greeks**: finite-difference via `prepareGreekTrees` + `computeGreeksWithTrees` (14 tree inductions per option with BSS). Delta/gamma from tree steps 1&2, theta/vega/rho via central differences. All pricing unified on `prepareTree` + `priceWithTree` — no `priceAmerican`.
 
 **Bonds**: Vasicek closed-form. Duration `B(T) = (1 - e^{-aT})/a` caps at `1/a`.
 
