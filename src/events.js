@@ -293,10 +293,11 @@ export class EventEngine {
     }
 
     _weightedPick(events, sim) {
+        const congress = congressHelpers(this.world);
         const boostNonMinor = this._consecutiveMinor >= BOREDOM_THRESHOLD;
         let totalWeight = 0;
         for (const ev of events) {
-            let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim) : (ev.likelihood || 1);
+            let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
             if (boostNonMinor && ev.magnitude !== 'minor' && ev.category !== 'neutral') {
                 w *= 2;
             }
@@ -304,7 +305,7 @@ export class EventEngine {
         }
         let roll = Math.random() * totalWeight;
         for (const ev of events) {
-            let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim) : (ev.likelihood || 1);
+            let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
             if (boostNonMinor && ev.magnitude !== 'minor' && ev.category !== 'neutral') {
                 w *= 2;
             }
