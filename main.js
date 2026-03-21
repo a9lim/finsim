@@ -781,10 +781,31 @@ function togglePlay() {
 }
 
 function step() {
-    if (!playing) {
-        tick();
-        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
+    if (playing) return;
+
+    // Start a new day if none in progress
+    if (!dayInProgress) {
+        sim.beginDay();
+        dayInProgress = true;
+        chart.setLiveCandle(sim._partial);
     }
+
+    // Advance one substep
+    sim.substep();
+    chart.setLiveCandle(sim._partial);
+    syncMarket(sim);
+    _onSubstep();
+
+    // If all substeps done, finalize the day
+    if (sim.dayComplete) {
+        sim.finalizeDay();
+        dayInProgress = false;
+        syncMarket(sim);
+        _onDayComplete();
+    }
+
+    dirty = true;
+    if (typeof _haptics !== 'undefined') _haptics.trigger('light');
 }
 
 function _syncLerpSpeed() {

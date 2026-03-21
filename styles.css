@@ -29,7 +29,7 @@ body {
 .panel-hint {
     color: var(--text-muted);
     font-size: 0.78rem;
-    padding: 8px 0;
+    padding: 0.5rem 0.65rem;
     margin: 0;
 }
 
@@ -697,7 +697,7 @@ main {
     height: 40px;
     margin-top: 4px;
     border-radius: 4px;
-    background: var(--bg-elevated);
+    background: transparent;
 }
 
 /* -- Dynamic regime: LLM settings & event log -- */
