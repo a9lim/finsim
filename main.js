@@ -229,7 +229,7 @@ function init() {
         onPresetChange:   (index) => loadPreset(index),
         onReset:          () => resetSim(),
         onSliderChange:   (param, value) => syncSliderToSim(param, value),
-        onTimeSlider:     (pct) => { sliderPct = pct; dirty = true; },
+        onTimeSlider:     (pct) => { sliderPct = pct; updateTimeSliderRange(); dirty = true; },
         onBuyStock:       () => handleBuyStock(),
         onShortStock:     () => handleShortStock(),
         onBuyBond:        () => handleBuyBond(),
@@ -397,6 +397,7 @@ function init() {
                 const stratPriced = _priceExpiry(_strategyExpiryIdx());
                 updateStrategySelectors($, stratPriced, sim.S, handleAddLeg, _buildStrategyPosMap());
                 updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+                updateTimeSliderRange();
             }
         });
     });
