@@ -8,6 +8,7 @@
 
 import { priceAmerican, vasicekBondPrice } from './pricing.js';
 import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
+import { market } from './market.js';
 
 /**
  * Compute the fair (mid) unit price for a single unit of an instrument.
@@ -20,18 +21,17 @@ import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
  * @param {number} [strike]   - Strike price (options only)
  * @param {number} [expiryDay] - Simulation day of expiry (options/bonds)
  * @param {number} [q=0]      - Continuous dividend yield
- * @param {Object} [vasicek]  - Optional Vasicek parameters { a, b, sigmaR }
  * @returns {number} Mid-market price per unit
  */
-export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q, vasicek) {
+export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
     const dte = expiryDay != null
         ? Math.max((expiryDay - day) / TRADING_DAYS_PER_YEAR, 0)
         : 0;
     switch (type) {
         case 'stock': return S;
         case 'bond':
-            return vasicek
-                ? vasicekBondPrice(BOND_FACE_VALUE, rate, dte, vasicek.a, vasicek.b, vasicek.sigmaR)
+            return market.a >= 1e-8
+                ? vasicekBondPrice(BOND_FACE_VALUE, rate, dte, market.a, market.b, market.sigmaR)
                 : BOND_FACE_VALUE * Math.exp(-rate * dte);
         case 'call':
         case 'put':
@@ -55,21 +55,19 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q, vasicek
  * @param {number} rate - Current risk-free rate
  * @param {number} day  - Current simulation day
  * @param {number} [q=0] - Continuous dividend yield
- * @param {Object} [vasicek] - Optional Vasicek parameters { a, b, sigmaR }
  * @returns {number} Signed market value
  */
-export function computePositionValue(pos, S, vol, rate, day, q, vasicek) {
-    return pos.qty * unitPrice(pos.type, S, vol, rate, day, pos.strike, pos.expiryDay, q, vasicek);
+export function computePositionValue(pos, S, vol, rate, day, q) {
+    return pos.qty * unitPrice(pos.type, S, vol, rate, day, pos.strike, pos.expiryDay, q);
 }
 
 /**
  * Compute unrealized P&L for a position.
  *
- * @param {Object} [vasicek] - Optional Vasicek parameters { a, b, sigmaR }
  * @returns {number} Profit (positive) or loss (negative)
  */
-export function computePositionPnl(pos, S, vol, rate, day, q, vasicek) {
-    const currentValue = computePositionValue(pos, S, vol, rate, day, q, vasicek);
+export function computePositionPnl(pos, S, vol, rate, day, q) {
+    const currentValue = computePositionValue(pos, S, vol, rate, day, q);
     const absQty = Math.abs(pos.qty);
     const entryTotal = pos.entryPrice * absQty;
 
