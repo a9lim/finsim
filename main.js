@@ -751,9 +751,7 @@ function updateUI(precomputedMargin) {
         chainDirty = false;
     }
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q);
-    if (activeTab === 'portfolio') {
-        updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
-    }
+    updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     updateRateDisplay($, sim.r, rateHistory);
     if (strategyMode && strategyLegs.length > 0) {
         updateStrategyBuilder();
