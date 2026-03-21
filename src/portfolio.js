@@ -12,7 +12,6 @@ import {
     SHORT_OPTION_MARGIN_PCT,
     BOND_FACE_VALUE,
     TRADING_DAYS_PER_YEAR,
-    MIN_HALF_SPREAD,
     SPREAD_PCT,
     MONEYNESS_SPREAD_WEIGHT,
 } from './config.js';
@@ -92,15 +91,15 @@ export function resetPortfolio(capital) {
 function _fillPrice(type, side, mid, currentPrice, strike, currentVol) {
     const ba = (type === 'call' || type === 'put')
         ? computeOptionBidAsk(mid, currentPrice, strike, currentVol)
-        : computeBidAsk(mid, currentPrice, currentVol);
+        : computeBidAsk(mid, currentVol);
     return side === 'long' ? ba.ask : ba.bid;
 }
 
 /**
- * Bid/ask for stock or bond (K = currentPrice, moneyness = 0).
+ * Bid/ask for stock or bond.  For bonds pass sigmaR as vol.
  */
-export function computeBidAsk(mid, currentPrice, currentVol) {
-    const halfSpread = Math.max(MIN_HALF_SPREAD, mid * SPREAD_PCT * (1 + currentVol));
+export function computeBidAsk(mid, vol) {
+    const halfSpread = mid * SPREAD_PCT * (1 + vol);
     return { bid: Math.max(0, mid - halfSpread), ask: mid + halfSpread };
 }
 
@@ -109,7 +108,7 @@ export function computeBidAsk(mid, currentPrice, currentVol) {
  */
 export function computeOptionBidAsk(mid, currentPrice, strike, currentVol) {
     const moneyness = Math.abs(Math.log(currentPrice / strike));
-    const halfSpread = Math.max(MIN_HALF_SPREAD, mid * SPREAD_PCT * (1 + currentVol) + MONEYNESS_SPREAD_WEIGHT * moneyness);
+    const halfSpread = mid * SPREAD_PCT * (1 + currentVol) + MONEYNESS_SPREAD_WEIGHT * moneyness;
     return { bid: Math.max(0, mid - halfSpread), ask: mid + halfSpread };
 }
 
@@ -291,7 +290,8 @@ export function executeMarketOrder(
     portfolio.totalTrades++;
 
     const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
-    const fill = _fillPrice(type, side, mid, currentPrice, strike, currentVol);
+    const spreadVol = type === 'bond' ? market.sigmaR : currentVol;
+    const fill = _fillPrice(type, side, mid, currentPrice, strike, spreadVol);
 
     // Find existing position of same type+strike+expiry+strategy for netting
     const existingIdx = portfolio.positions.findIndex(p =>
@@ -575,12 +575,13 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
     const pos = portfolio.positions[idx];
     const absQty = Math.abs(pos.qty);
     const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
+    const spreadVol = pos.type === 'bond' ? market.sigmaR : currentVol;
 
     if (pos.qty > 0) {
-        const fill = _fillPrice(pos.type, 'short', mid, currentPrice, pos.strike, currentVol);
+        const fill = _fillPrice(pos.type, 'short', mid, currentPrice, pos.strike, spreadVol);
         portfolio.cash += fill * absQty;
     } else {
-        const fill = _fillPrice(pos.type, 'long', mid, currentPrice, pos.strike, currentVol);
+        const fill = _fillPrice(pos.type, 'long', mid, currentPrice, pos.strike, spreadVol);
         const returnedMargin = pos._reservedMargin ?? _marginForShort(
             pos.type, absQty, pos.entryPrice, currentPrice, currentVol,
             currentRate, currentDay, pos.strike, pos.expiryDay

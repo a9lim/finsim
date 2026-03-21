@@ -25,7 +25,6 @@ export const REG_T_MARGIN = 0.50;
 export const SHORT_OPTION_MARGIN_PCT = 0.20;
 
 // -- Bid/ask spread model --
-export const MIN_HALF_SPREAD = 0.025;      // minimum half-spread ($)
 export const SPREAD_PCT = 0.01;            // 1% of mid price
 export const MONEYNESS_SPREAD_WEIGHT = 0.05; // weight on |log(S/K)| for options
 

@@ -226,10 +226,10 @@ export function computeNetCost(legs, S, vol, r, day, q, expiries, overrideExpiry
         let mid, ba;
         if (leg.type === 'stock') {
             mid = S;
-            ba = computeBidAsk(mid, S, vol);
+            ba = computeBidAsk(mid, vol);
         } else if (leg.type === 'bond') {
             mid = vasicekBondPrice(BOND_FACE_VALUE, r, 1, market.a, market.b, market.sigmaR);
-            ba = computeBidAsk(mid, S, vol);
+            ba = computeBidAsk(mid, market.sigmaR);
         } else {
             const T = Math.max((leg.expiryDay - day) / 252, 1/252);
             prepareTree(T, r, vol, q, day, _costTree);

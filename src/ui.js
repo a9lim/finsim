@@ -414,9 +414,9 @@ function _applyPill(el, text, qty, tooltipText) {
     else delete el.dataset.tooltip;
 }
 
-function _bidAskTip(mid, spot, sigma) {
-    if (mid == null || spot == null || sigma == null) return null;
-    const ba = computeBidAsk(mid, spot, sigma);
+function _bidAskTip(mid, vol) {
+    if (mid == null || vol == null) return null;
+    const ba = computeBidAsk(mid, vol);
     return 'Bid ' + ba.bid.toFixed(2) + ' / Ask ' + ba.ask.toFixed(2);
 }
 
@@ -426,7 +426,7 @@ function _bidAskTip(mid, spot, sigma) {
 export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, stratPosMap) {
     const dash = '\u2014';
     const stockTxt = spot != null ? spot.toFixed(2) : dash;
-    const stockTip = _bidAskTip(spot, spot, sigma);
+    const stockTip = _bidAskTip(spot, sigma);
 
     // Trade tab bond: from trade expiry dropdown
     const tradeIdx = parseInt($.tradeExpiry?.value, 10);
@@ -445,7 +445,7 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
         const bondQty = posMap && tradeExp
             ? posMap[posKey('bond', null, tradeExp.day)]
             : null;
-        _applyPill($.bondPriceCell, tradeBond, bondQty, _bidAskTip(tradeBondMid, spot, sigma));
+        _applyPill($.bondPriceCell, tradeBond, bondQty, _bidAskTip(tradeBondMid, market.sigmaR));
     }
 
     // Strategy tab bond: from strategy expiry dropdown
@@ -466,7 +466,7 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
         const bondQty = sMap && stratExp
             ? sMap[posKey('bond', null, stratExp.day)]
             : null;
-        _applyPill($.strategyBondCell, stratBond, bondQty, _bidAskTip(stratBondMid, spot, sigma));
+        _applyPill($.strategyBondCell, stratBond, bondQty, _bidAskTip(stratBondMid, market.sigmaR));
     }
 }
 

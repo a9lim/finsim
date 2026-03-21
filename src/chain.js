@@ -8,7 +8,7 @@
  * Exports: buildChainSkeleton, priceChainExpiry, generateStrikes, ExpiryManager
  */
 
-import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT, MIN_HALF_SPREAD, SPREAD_PCT, MONEYNESS_SPREAD_WEIGHT } from './config.js';
+import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT, SPREAD_PCT, MONEYNESS_SPREAD_WEIGHT } from './config.js';
 import { allocTree, prepareTree, pricePairWithTree, allocGreekTrees, prepareGreekTrees, computeGreeksPairWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { computeOptionBidAsk } from './portfolio.js';
 import { market } from './market.js';
@@ -206,8 +206,8 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
         const moneyness = Math.abs(Math.log(S / K));
         const spreadBase = SPREAD_PCT * (1 + sigma);
         const moneynessAdj = MONEYNESS_SPREAD_WEIGHT * moneyness;
-        const cHalf = Math.max(MIN_HALF_SPREAD, callP * spreadBase + moneynessAdj);
-        const pHalf = Math.max(MIN_HALF_SPREAD, putP * spreadBase + moneynessAdj);
+        const cHalf = callP * spreadBase + moneynessAdj;
+        const pHalf = putP * spreadBase + moneynessAdj;
 
         let opt = _rOptions[si];
         if (!opt) {
