@@ -9,7 +9,7 @@ Trade stocks, zero-coupon bonds, and American options in a market driven by stoc
 ## Highlights
 
 - **Realistic price dynamics** -- GBM with Merton jump diffusion, Heston stochastic volatility (mean-reverting, Cholesky-correlated), and Vasicek interest rates, with 16 intraday substeps and smooth cubic OHLC interpolation
-- **American option pricing** -- Bjerksund-Stensland 2002 analytical approximation with Drezner-Wesolowsky bivariate normal CDF and finite-difference Greeks (Delta, Gamma, Theta, Vega, Rho)
+- **American option pricing** -- CRR binomial tree (128 steps) with discrete proportional dividends and finite-difference Greeks (Delta, Gamma, Theta, Vega, Rho)
 - **Full options chain** -- 25 strikes across 8 rolling expiries with volatility-aware, moneyness-adjusted bid/ask spreads
 - **Portfolio system** -- market, limit, and stop orders; signed-quantity netting; short selling with daily borrow interest; Reg-T margin with margin call overlay and forced liquidation
 - **Strategy builder** -- multi-leg construction with live payoff diagrams, Greek overlays on independent Y-axes, breakeven analysis, time-to-expiry slider showing theta decay, and atomic execution with rollback on partial failure
@@ -90,7 +90,7 @@ src/
   config.js             26 lines  Named constants and PRESETS array (5 static + 2 dynamic)
   simulation.js        245 lines  GBM + Merton + Heston + Vasicek; beginDay/substep/finalizeDay
                                    pipeline; prepopulate() with synthetic backfill
-  pricing.js           435 lines  Bjerksund-Stensland 2002 + bivariate normal CDF + finite-diff Greeks
+  pricing.js           120 lines  CRR binomial tree (128 steps) + discrete dividends + finite-diff Greeks
   chain.js             170 lines  ExpiryManager (8 rolling expiries), strike generation, lazy pricing
   portfolio.js         770 lines  Signed-qty positions, order execution, netting, margin, borrow
                                    interest, expiry processing, strategy execution with rollback
