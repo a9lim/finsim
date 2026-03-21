@@ -8,7 +8,7 @@
  * Exports: StrategyRenderer
  */
 
-import { priceAmerican, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
+import { priceAmerican, allocTree, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
 import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
     STRATEGY_SAMPLES, STRATEGY_Y_PAD, STRATEGY_MARGIN,
@@ -625,7 +625,9 @@ export class StrategyRenderer {
                 const K     = leg.strike ?? spot;
                 const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
                 const sigma = computeSkewSigma(sigmaEff, spot, K, T, market.rho, market.xi, market.kappa);
-                const price = priceAmerican(spot, K, T, rate, sigma, isPut, q, entryDay);
+                if (!this._entryTree) this._entryTree = allocTree();
+                prepareTree(T, rate, sigma, q, entryDay, this._entryTree);
+                const price = priceWithTree(spot, K, isPut, this._entryTree);
                 return price * qty * sign;
             }
             case 'stock':
