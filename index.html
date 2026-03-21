@@ -267,6 +267,7 @@
                         <div class="stat-row">
                             <span class="stat-label-wrap" id="margin-label-wrap">
                                 <span class="stat-label">Margin Status</span>
+                                <button class="info-trigger" type="button" data-info="margin" aria-label="Info: Margin Status">?</button>
                             </span>
                             <span class="stat-value margin-ok" id="margin-status">OK</span>
                         </div>
@@ -414,67 +415,67 @@
                         <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn">Advanced Parameters</button>
                         <div id="advanced-section" class="advanced-section hidden">
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-mu">Drift (mu)</label>
+                                <label class="stat-label" for="slider-mu">Drift (mu)</label><button class="info-trigger" type="button" data-info="mu" aria-label="Info: Drift">?</button>
                                 <input type="range" id="slider-mu" min="-0.50" max="0.50" step="0.02" value="0.08">
                                 <span class="slider-value" id="slider-mu-val">0.08</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-theta">Vol Mean (theta)</label>
+                                <label class="stat-label" for="slider-theta">Vol Mean (theta)</label><button class="info-trigger" type="button" data-info="theta" aria-label="Info: Vol Mean">?</button>
                                 <input type="range" id="slider-theta" min="0.005" max="1.00" step="0.005" value="0.04">
                                 <span class="slider-value" id="slider-theta-val">0.04</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-kappa">Mean Rev (kappa)</label>
+                                <label class="stat-label" for="slider-kappa">Mean Rev (kappa)</label><button class="info-trigger" type="button" data-info="kappa" aria-label="Info: Mean Reversion">?</button>
                                 <input type="range" id="slider-kappa" min="0.05" max="10.0" step="0.05" value="3.0">
                                 <span class="slider-value" id="slider-kappa-val">3.0</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-xi">Vol of Vol (xi)</label>
+                                <label class="stat-label" for="slider-xi">Vol of Vol (xi)</label><button class="info-trigger" type="button" data-info="xi" aria-label="Info: Vol of Vol">?</button>
                                 <input type="range" id="slider-xi" min="0.05" max="1.50" step="0.05" value="0.3">
                                 <span class="slider-value" id="slider-xi-val">0.3</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-rho">Correlation (rho)</label>
+                                <label class="stat-label" for="slider-rho">Correlation (rho)</label><button class="info-trigger" type="button" data-info="rho" aria-label="Info: Correlation">?</button>
                                 <input type="range" id="slider-rho" min="-0.99" max="0.50" step="0.01" value="-0.50">
                                 <span class="slider-value" id="slider-rho-val">-0.50</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-lambda">Jump Rate (lambda)</label>
+                                <label class="stat-label" for="slider-lambda">Jump Rate (lambda)</label><button class="info-trigger" type="button" data-info="lambda" aria-label="Info: Jump Rate">?</button>
                                 <input type="range" id="slider-lambda" min="0.0" max="15.0" step="0.5" value="0.5">
                                 <span class="slider-value" id="slider-lambda-val">0.5</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-muJ">Jump Mean (muJ)</label>
+                                <label class="stat-label" for="slider-muJ">Jump Mean (muJ)</label><button class="info-trigger" type="button" data-info="muJ" aria-label="Info: Jump Mean">?</button>
                                 <input type="range" id="slider-muJ" min="-0.25" max="0.15" step="0.01" value="-0.02">
                                 <span class="slider-value" id="slider-muJ-val">-0.02</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-sigmaJ">Jump Vol (sigmaJ)</label>
+                                <label class="stat-label" for="slider-sigmaJ">Jump Vol (sigmaJ)</label><button class="info-trigger" type="button" data-info="sigmaJ" aria-label="Info: Jump Vol">?</button>
                                 <input type="range" id="slider-sigmaJ" min="0.005" max="0.25" step="0.005" value="0.03">
                                 <span class="slider-value" id="slider-sigmaJ-val">0.03</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-a">Rate Rev (a)</label>
+                                <label class="stat-label" for="slider-a">Rate Rev (a)</label><button class="info-trigger" type="button" data-info="a" aria-label="Info: Rate Reversion">?</button>
                                 <input type="range" id="slider-a" min="0.01" max="2.0" step="0.01" value="0.5">
                                 <span class="slider-value" id="slider-a-val">0.5</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-b">Rate Mean (b)</label>
+                                <label class="stat-label" for="slider-b">Rate Mean (b)</label><button class="info-trigger" type="button" data-info="b" aria-label="Info: Rate Mean">?</button>
                                 <input type="range" id="slider-b" min="-0.05" max="0.20" step="0.01" value="0.04">
                                 <span class="slider-value" id="slider-b-val">0.04</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-sigmaR">Rate Vol (sigmaR)</label>
+                                <label class="stat-label" for="slider-sigmaR">Rate Vol (sigmaR)</label><button class="info-trigger" type="button" data-info="sigmaR" aria-label="Info: Rate Vol">?</button>
                                 <input type="range" id="slider-sigmaR" min="0.001" max="0.050" step="0.001" value="0.005">
                                 <span class="slider-value" id="slider-sigmaR-val">0.005</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-borrowSpread">Borrow Spread (k)</label>
+                                <label class="stat-label" for="slider-borrowSpread">Borrow Spread (k)</label><button class="info-trigger" type="button" data-info="borrowSpread" aria-label="Info: Borrow Spread">?</button>
                                 <input type="range" id="slider-borrowSpread" min="0.0" max="5.0" step="0.1" value="0.5">
                                 <span class="slider-value" id="slider-borrowSpread-val">0.5</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-q">Dividend Yield (q)</label>
+                                <label class="stat-label" for="slider-q">Dividend Yield (q)</label><button class="info-trigger" type="button" data-info="q" aria-label="Info: Dividend Yield">?</button>
                                 <input type="range" id="slider-q" min="0.0" max="0.10" step="0.005" value="0.02">
                                 <span class="slider-value" id="slider-q-val">0.02</span>
                             </div>
@@ -559,6 +560,22 @@
                     <button id="epilogue-keep" class="ghost-btn hidden">Keep Playing</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Reference Overlay -->
+    <div id="reference-overlay" class="sim-overlay" hidden>
+        <div class="sim-overlay-panel glass">
+            <div class="stats-header">
+                <h2 id="reference-title" class="stats-title">Reference</h2>
+                <button id="reference-close" class="tool-btn" aria-label="Close reference">
+                    <svg width="16" height="16" viewBox="0 0 24 24">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div id="reference-body" class="sim-overlay-body scrollbar-thin"></div>
         </div>
     </div>
 

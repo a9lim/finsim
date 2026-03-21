@@ -32,6 +32,7 @@ import { LLMEventSource } from './src/llm.js';
 import { generateEpilogue } from './src/epilogue.js';
 import { computePositionValue } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
+import { REFERENCE } from './src/reference.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -188,13 +189,8 @@ function init() {
         }
     });
 
-    // 7. Init swipe dismiss on sidebar for mobile
-    if (typeof initSwipeDismiss !== 'undefined') {
-        initSwipeDismiss($.sidebar, {
-            onDismiss: () => { _toolbar.closeSidebar($.panelToggle, $.sidebar); },
-            handleSelector: '.sheet-handle',
-        });
-    }
+    // 7. Init sidebar (toggle, close, swipe dismiss)
+    _toolbar.initSidebar($.panelToggle, $.sidebar, $.closePanel);
 
     // 8. Init keyboard shortcuts
     if (typeof initShortcuts !== 'undefined') {
@@ -203,14 +199,13 @@ function init() {
             { key: '.', label: 'Step forward',  group: 'Simulation', action: () => step() },
             { key: 's', label: 'Strategy view',  group: 'View',       action: () => {
                 if (!$.sidebar.classList.contains('open')) {
-                    $.sidebar.classList.add('open');
-                    $.panelToggle.setAttribute('aria-expanded', 'true');
+                    _toolbar.toggleSidebar($.panelToggle, $.sidebar);
                 }
                 const tab = document.querySelector('[data-tab="strategy"]');
                 if (tab) tab.click();
             } },
             { key: 'b', label: 'Buy stock',      group: 'Trade',      action: () => handleBuyStock() },
-            { key: 't', label: 'Toggle sidebar',  group: 'View',       action: () => toggleSidebar() },
+            { key: 't', label: 'Toggle sidebar',  group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); } },
             { key: 'r', label: 'Reset',           group: 'Simulation', action: () => resetSim() },
             { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
             { key: '2', label: PRESETS[1].name,   group: 'Presets',    action: () => loadPreset(1) },
@@ -229,8 +224,6 @@ function init() {
         onSpeedUp:        () => cycleSpeed(),
         onSpeedDown:      () => decycleSpeed(),
         onToggleTheme:    () => toggleTheme(),
-        onToggleSidebar:  () => toggleSidebar(),
-        onCloseSidebar:   () => { _toolbar.closeSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); },
         onPresetChange:   (index) => loadPreset(index),
         onReset:          () => resetSim(),
         onSliderChange:   (param, value) => syncSliderToSim(param, value),
@@ -292,7 +285,17 @@ function init() {
     _intro.init($.introScreen, $.introStart);
 
     // 12. Wire info tips for slider labels
-    wireInfoTips($);
+    wireInfoTips();
+
+    // 12b. Wire reference overlay
+    const openReference = initReferenceOverlay(
+        document.getElementById('reference-overlay'),
+        document.getElementById('reference-title'),
+        document.getElementById('reference-body'),
+        document.getElementById('reference-close'),
+        REFERENCE
+    );
+    bindReferenceTriggers(openReference);
 
     // 13. Pre-populate full history buffer (prices scaled so final close = $100)
     sim.prepopulate();
@@ -771,11 +774,6 @@ function decycleSpeed() {
     updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
     _syncLerpSpeed();
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
-}
-
-function toggleSidebar() {
-    _toolbar.toggleSidebar($.panelToggle, $.sidebar);
-    if (typeof _haptics !== 'undefined') _haptics.trigger('light');
 }
 
 function _resetCore(index) {

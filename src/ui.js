@@ -117,7 +117,7 @@ export function cacheDOMElements($) {
 
 export function bindEvents($, handlers) {
     const {
-        onTogglePlay, onStep, onSpeedUp, onSpeedDown, onToggleTheme, onToggleSidebar, onCloseSidebar,
+        onTogglePlay, onStep, onSpeedUp, onSpeedDown, onToggleTheme,
         onPresetChange, onReset, onSliderChange, onTimeSlider,
         onBuyStock, onShortStock, onBuyBond, onShortBond,
         onChainCellClick, onFullChainOpen, onExpiryChange,
@@ -130,8 +130,6 @@ export function bindEvents($, handlers) {
     $.speedBtn.addEventListener('click', onSpeedUp);
     $.speedBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); onSpeedDown(); });
     $.themeBtn.addEventListener('click', onToggleTheme);
-    $.panelToggle.addEventListener('click', onToggleSidebar);
-    $.closePanel.addEventListener('click', onCloseSidebar || onToggleSidebar);
     $.presetSelect.addEventListener('change', () => {
         onPresetChange($.presetSelect.selectedIndex);
     });
@@ -726,57 +724,24 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
  * Attach info tip popovers to slider labels and other UI elements.
  * Must be called after DOM is ready.
  */
-export function wireInfoTips($) {
-    if (typeof createInfoTip === 'undefined') return;
-
-    const tips = {
-        'slider-mu':     { title: 'Drift (mu)', body: 'Expected annualised return of the underlying asset. Positive = bullish tendency.' },
-        'slider-theta':  { title: 'Vol Mean (theta)', body: 'Long-run variance level the volatility reverts to over time.' },
-        'slider-kappa':  { title: 'Mean Reversion (kappa)', body: 'Speed at which volatility returns to its long-run mean. Higher = faster reversion.' },
-        'slider-xi':     { title: 'Vol of Vol (xi)', body: 'Volatility of the variance process itself. Higher = more erratic vol swings.' },
-        'slider-rho':    { title: 'Correlation (rho)', body: 'Correlation between price and volatility shocks. Negative = leverage effect (drops cause vol spikes).' },
-        'slider-lambda': { title: 'Jump Rate (lambda)', body: 'Expected number of price jumps per year. Higher = more frequent sudden moves.' },
-        'slider-muJ':    { title: 'Jump Mean (muJ)', body: 'Average size of log-price jumps. Negative = jumps tend to be downward.' },
-        'slider-sigmaJ': { title: 'Jump Vol (sigmaJ)', body: 'Standard deviation of jump sizes. Higher = more variable jump magnitudes.' },
-        'slider-a':      { title: 'Rate Reversion (a)', body: 'Speed at which the risk-free rate reverts to its long-run level.' },
-        'slider-b':      { title: 'Rate Mean (b)', body: 'Long-run equilibrium level for the risk-free interest rate.' },
-        'slider-sigmaR': { title: 'Rate Vol (sigmaR)', body: 'Volatility of the interest rate process.' },
-        'slider-borrowSpread': { title: 'Borrow Spread (k)', body: 'Volatility scaling factor for short borrow cost. Daily charge = notional × (max(r,0) + k×σ) / 252. Events like short squeezes can push this higher.' },
+export function wireInfoTips() {
+    const data = {
+        mu:           { title: 'Drift (\u03BC)', body: 'Expected annualised return of the underlying asset. Positive = bullish tendency.' },
+        theta:        { title: 'Vol Mean (\u03B8)', body: 'Long-run variance level the volatility reverts to over time.' },
+        kappa:        { title: 'Mean Reversion (\u03BA)', body: 'Speed at which volatility returns to its long-run mean. Higher = faster reversion.' },
+        xi:           { title: 'Vol of Vol (\u03BE)', body: 'Volatility of the variance process itself. Higher = more erratic vol swings.' },
+        rho:          { title: 'Correlation (\u03C1)', body: 'Correlation between price and volatility shocks. Negative = leverage effect (drops cause vol spikes).' },
+        lambda:       { title: 'Jump Rate (\u03BB)', body: 'Expected number of price jumps per year. Higher = more frequent sudden moves.' },
+        muJ:          { title: 'Jump Mean (\u03BCJ)', body: 'Average size of log-price jumps. Negative = jumps tend to be downward.' },
+        sigmaJ:       { title: 'Jump Vol (\u03C3J)', body: 'Standard deviation of jump sizes. Higher = more variable jump magnitudes.' },
+        a:            { title: 'Rate Reversion (a)', body: 'Speed at which the risk-free rate reverts to its long-run level.' },
+        b:            { title: 'Rate Mean (b)', body: 'Long-run equilibrium level for the risk-free interest rate.' },
+        sigmaR:       { title: 'Rate Vol (\u03C3R)', body: 'Volatility of the interest rate process.' },
+        borrowSpread: { title: 'Borrow Spread (k)', body: 'Volatility scaling factor for short borrow cost. Daily charge = notional \u00D7 (max(r,0) + k\u00D7\u03C3) / 252. Events like short squeezes can push this higher.' },
+        q:            { title: 'Dividend Yield (q)', body: 'Continuous dividend yield. Affects option pricing via cost of carry and reduces stock drift. Cash dividends paid quarterly.' },
+        margin:       { title: 'Margin Status', body: 'Shows your margin health. OK = well-collateralised. Low = approaching maintenance margin. MARGIN CALL = equity below required level; close positions or add cash.' },
     };
-
-    for (const [sliderId, tipData] of Object.entries(tips)) {
-        const slider = document.getElementById(sliderId);
-        if (!slider) continue;
-        const label = slider.previousElementSibling || slider.closest('.ctrl-row')?.querySelector('.stat-label');
-        if (!label) continue;
-
-        // Check if an info trigger already exists next to this label
-        if (label.parentElement.querySelector('.info-trigger')) continue;
-
-        const triggerBtn = document.createElement('button');
-        triggerBtn.className = 'info-trigger';
-        triggerBtn.type = 'button';
-        triggerBtn.setAttribute('aria-label', 'Info: ' + tipData.title);
-        triggerBtn.textContent = '?';
-        label.parentElement.insertBefore(triggerBtn, label.nextSibling);
-        createInfoTip(triggerBtn, { title: tipData.title, body: tipData.body, maxWidth: 260 });
-    }
-
-    // Margin status info tip
-    const marginWrap = document.getElementById('margin-label-wrap');
-    if (marginWrap && !marginWrap.querySelector('.info-trigger')) {
-        const btn = document.createElement('button');
-        btn.className = 'info-trigger';
-        btn.type = 'button';
-        btn.setAttribute('aria-label', 'Info: Margin Status');
-        btn.textContent = '?';
-        marginWrap.appendChild(btn);
-        createInfoTip(btn, {
-            title: 'Margin Status',
-            body: 'Shows your margin health. OK = well-collateralised. Low = approaching maintenance margin. MARGIN CALL = equity below required level; close positions or add cash.',
-            maxWidth: 280,
-        });
-    }
+    registerInfoTips(data);
 }
 
 // ---------------------------------------------------------------------------
