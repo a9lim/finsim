@@ -31,50 +31,23 @@ const GREEK_META = {
     rho:   { label: 'Rho' },
 };
 
-// Attempt to resolve colours from the frozen _PALETTE global at call time,
-// falling back to the literal hex values above.
-function _paletteColor(key, fallback) {
-    try {
-        if (typeof _PALETTE !== 'undefined') {
-            const ext = _PALETTE.extended;
-            if (ext && ext[key]) return ext[key];
-            if (_PALETTE[key])   return _PALETTE[key];
-        }
-    } catch (_) { /* ignore */ }
-    return fallback;
-}
-
 function _colors() {
+    const ext = _PALETTE.extended;
     return {
-        up:     _paletteColor('green',   '#2CA470'),
-        down:   _paletteColor('rose',    '#C5547C'),
-        accent: _paletteColor('accent',  '#E11107'),
-        delta:  _paletteColor('blue',    '#3590BF'),
-        gamma:  _paletteColor('orange',  '#C48225'),
-        theta:  _paletteColor('cyan',    '#31A5A5'),
-        vega:   _paletteColor('purple',  '#8160B5'),
-        rho:    _paletteColor('slate',   '#767C85'),
+        up:     ext.green,
+        down:   ext.rose,
+        accent: _PALETTE.accent,
+        delta:  ext.blue,
+        gamma:  ext.orange,
+        theta:  ext.cyan,
+        vega:   ext.purple,
+        rho:    ext.slate,
     };
 }
 
-/**
- * Get theme-aware text colors based on current data-theme attribute.
- */
 function _themeTextColors() {
-    const isDark = document.documentElement.dataset.theme === 'dark';
-    try {
-        if (typeof _PALETTE !== 'undefined') {
-            const pal = isDark ? _PALETTE.dark : _PALETTE.light;
-            return {
-                text:          pal.text          || (isDark ? '#E1E5E9' : '#0B1016'),
-                textSecondary: pal.textSecondary || (isDark ? '#878D94' : '#4E545C'),
-                textMuted:     pal.textMuted     || (isDark ? '#4E5359' : '#777C83'),
-            };
-        }
-    } catch (_) { /* ignore */ }
-    return isDark
-        ? { text: '#E1E5E9', textSecondary: '#878D94', textMuted: '#4E5359' }
-        : { text: '#0B1016', textSecondary: '#4E545C', textMuted: '#777C83' };
+    const pal = document.documentElement.dataset.theme === 'dark' ? _PALETTE.dark : _PALETTE.light;
+    return { text: pal.text, textSecondary: pal.textSecondary, textMuted: pal.textMuted };
 }
 
 // ---------------------------------------------------------------------------
