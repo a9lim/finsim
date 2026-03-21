@@ -121,7 +121,6 @@ function _legDte(leg, evalDay, fallbackDte) {
  * different T values (which defeats the transparent parameter cache).
  */
 function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte, q) {
-    const vasicek = market.a >= 1e-8 ? { a: market.a, b: market.b, sigmaR: market.sigmaR } : null;
     return legs.map(leg => {
         const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                    : (leg.side === 'short') ? -1 : 1;
@@ -149,13 +148,12 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
                 info.K = K;
                 info.isPut = isPut;
                 info.vol = sigma;
-                info.entryVal = priceAmerican(entryS, K, entryT, rate, entrySigma, isPut, q, entryDay, vasicek);
+                info.entryVal = priceAmerican(entryS, K, entryT, rate, entrySigma, isPut, q, entryDay);
                 info.q = q;
                 info.evalDay = evalDay;
-                info.vasicek = vasicek;
                 // Pre-prepare tree for this leg's evaluation parameters.
                 // Avoids transparent cache thrashing when legs have different T.
-                info.tree = prepareTree(T, rate, sigma, q, evalDay, vasicek);
+                info.tree = prepareTree(T, rate, sigma, q, evalDay);
                 info.greekTrees = null; // lazily prepared on first Greek request
                 break;
             }
@@ -196,7 +194,7 @@ function _legGreeksFast(info, S) {
         case 'call':
         case 'put': {
             if (!info.greekTrees) {
-                info.greekTrees = prepareGreekTrees(info.T, info.rate, info.vol, info.q, info.evalDay, info.vasicek);
+                info.greekTrees = prepareGreekTrees(info.T, info.rate, info.vol, info.q, info.evalDay);
             }
             const g = computeGreeksWithTrees(S, info.K, info.isPut, info.greekTrees);
             return {
@@ -595,7 +593,6 @@ export class StrategyRenderer {
      * Positive = debit paid, negative = credit received.
      */
     _legEntryCost(leg, spot, vol, rate, T, q, entryDay) {
-        const vasicek = market.a >= 1e-8 ? { a: market.a, b: market.b, sigmaR: market.sigmaR } : null;
         const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                    : (leg.side === 'short') ? -1 : 1;
         const qty  = Math.abs(leg.qty ?? 1);
@@ -607,7 +604,7 @@ export class StrategyRenderer {
                 const K     = leg.strike ?? spot;
                 const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
                 const sigma = computeSkewSigma(sigmaEff, spot, K, T, market.rho, market.xi, market.kappa);
-                const price = priceAmerican(spot, K, T, rate, sigma, isPut, q, entryDay, vasicek);
+                const price = priceAmerican(spot, K, T, rate, sigma, isPut, q, entryDay);
                 return price * qty * sign;
             }
             case 'stock':

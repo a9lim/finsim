@@ -134,9 +134,6 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
     const T = expiry.dte / TRADING_DAYS_PER_YEAR;
     const currentDay = expiry.day - expiry.dte;
 
-    // Construct local vasicek for per-step rate discounting
-    const vasicek = market.a >= 1e-8 ? { a: market.a, b: market.b } : null;
-
     // Term-structure effective volatility (Heston expected integrated variance)
     const sigmaEff = computeEffectiveSigma(v, T, market.kappa, market.theta, market.xi);
 
@@ -144,7 +141,7 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
         // Greeks path: per-strike skewed sigma, 7 tree variants each
         const options = expiry.strikes.map(K => {
             const sigma = computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa);
-            const gt = prepareGreekTrees(T, r, sigma, q, currentDay, vasicek);
+            const gt = prepareGreekTrees(T, r, sigma, q, currentDay);
             const { call: callG, put: putG } = computeGreeksPairWithTrees(S, K, gt);
             const callBA = computeOptionBidAsk(callG.price, S, K, sigma);
             const putBA  = computeOptionBidAsk(putG.price,  S, K, sigma);
@@ -164,7 +161,7 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
     // Price-only path: per-strike skewed sigma, single tree each
     const options = expiry.strikes.map(K => {
         const sigma = computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa);
-        const tree = prepareTree(T, r, sigma, q, currentDay, vasicek);
+        const tree = prepareTree(T, r, sigma, q, currentDay);
         const { call: callP, put: putP } = pricePairWithTree(S, K, tree);
         const callBA = computeOptionBidAsk(callP, S, K, sigma);
         const putBA  = computeOptionBidAsk(putP,  S, K, sigma);
