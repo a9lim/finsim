@@ -554,44 +554,6 @@ export class StrategyRenderer {
         }
 
         const fallbackDte = dte;
-        // Extend sampling range to cover near-zero and far-upside
-        let xMin = 0.01;
-        let xMax = spot * 5;
-        for (const leg of legs) {
-            if (leg.strike != null) {
-                xMax = Math.max(xMax, leg.strike * 5);
-            }
-        }
-        const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q);
-        const xs   = new Array(SAMPLE_COUNT);
-        const pnls = new Array(SAMPLE_COUNT);
-
-        for (let i = 0; i < SAMPLE_COUNT; i++) {
-            const S = xMin + (i / (SAMPLE_COUNT - 1)) * (xMax - xMin);
-            xs[i] = S;
-            let pnl = 0;
-            for (const info of legInfos) pnl += _legPnlFast(info, S);
-            pnls[i] = pnl;
-        }
-
-        let maxProfit = -Infinity, maxLoss = Infinity;
-        for (const p of pnls) { if (p > maxProfit) maxProfit = p; if (p < maxLoss) maxLoss = p; }
-
-        // Check endpoints for unbounded profit/loss
-        const pnlAtLow  = pnls[0];
-        const pnlAtHigh = pnls[pnls.length - 1];
-        const pnlNearHigh = pnls[pnls.length - 2];
-
-        // If P&L is still increasing at the high end, profit is unbounded
-        if (pnlAtHigh > pnlNearHigh + 0.01 && pnlAtHigh === maxProfit) {
-            maxProfit = Infinity;
-        }
-        // If P&L is still decreasing at the high end, loss is unbounded
-        if (pnlAtHigh < pnlNearHigh - 0.01 && pnlAtHigh === maxLoss) {
-            maxLoss = -Infinity;
-        }
-
-        const breakevens = _zeroCrossings(xs, pnls);
 
         // Net cost = sum of entry costs (value at entry time)
         let netCost = 0;
@@ -600,6 +562,52 @@ export class StrategyRenderer {
                 ? Math.max(leg.expiryDay - entryDay, 0) : fallbackDte;
             netCost += this._legEntryCost(leg, spot, vol, rate, _dteToT(legEntryDte), q, entryDay);
         }
+
+        // Extend sampling range to cover near-zero and far-upside
+        let xMin = 0.01;
+        let xMax = spot * 5;
+        for (const leg of legs) {
+            if (leg.strike != null) {
+                xMax = Math.max(xMax, leg.strike * 5);
+            }
+        }
+        // Max profit/loss at expiry using intrinsic payoffs
+        const xs   = new Array(SAMPLE_COUNT);
+        const pnls = new Array(SAMPLE_COUNT);
+
+        for (let i = 0; i < SAMPLE_COUNT; i++) {
+            const S = xMin + (i / (SAMPLE_COUNT - 1)) * (xMax - xMin);
+            xs[i] = S;
+            let pnl = 0;
+            for (const leg of legs) {
+                const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1 : 1;
+                const qty = Math.abs(leg.qty ?? 1);
+                const mult = qty * sign;
+                switch (leg.type) {
+                    case 'call': pnl += Math.max(0, S - (leg.strike ?? spot)) * mult; break;
+                    case 'put':  pnl += Math.max(0, (leg.strike ?? spot) - S) * mult; break;
+                    case 'stock': pnl += S * mult; break;
+                    case 'bond': pnl += BOND_FACE_VALUE * mult; break;
+                }
+            }
+            pnl -= netCost;
+            pnls[i] = pnl;
+        }
+
+        let maxProfit = -Infinity, maxLoss = Infinity;
+        for (const p of pnls) { if (p > maxProfit) maxProfit = p; if (p < maxLoss) maxLoss = p; }
+
+        // Check endpoints for unbounded profit/loss
+        const pnlAtHigh = pnls[pnls.length - 1];
+        const pnlNearHigh = pnls[pnls.length - 2];
+        if (pnlAtHigh > pnlNearHigh + 0.01 && pnlAtHigh === maxProfit) maxProfit = Infinity;
+        if (pnlAtHigh < pnlNearHigh - 0.01 && pnlAtHigh === maxLoss) maxLoss = -Infinity;
+        // Check low end too
+        const pnlAtLow = pnls[0];
+        const pnlNearLow = pnls[1];
+        if (pnlAtLow < pnlNearLow - 0.01 && pnlAtLow === maxLoss) maxLoss = -Infinity;
+
+        const breakevens = _zeroCrossings(xs, pnls);
 
         const result = { maxProfit, maxLoss, breakevens, netCost };
         this._summaryCache = { key: sumKey, result };
