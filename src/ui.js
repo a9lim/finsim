@@ -855,9 +855,8 @@ export function updateEventLog($, eventLog, dayOrigin) {
 
 function _congressColors() {
     return {
-        federalist: _PALETTE.extended.brown,
-        farmerLabor: _PALETTE.extended.green,
-        independent: _PALETTE.extended.slate,
+        federalist: _PALETTE.extended.orange,
+        farmerLabor: _PALETTE.extended.lime,
     };
 }
 
@@ -923,10 +922,9 @@ export function updateCongressDiagrams($, world) {
 
     const senateSegs = [
         { label: 'Farmer-Labor', count: s.farmerLabor, color: c.farmerLabor },
-        { label: 'Independent', count: s.independent, color: c.independent },
         { label: 'Federalist', count: s.federalist, color: c.federalist },
     ];
-    const senateTotal = s.federalist + s.farmerLabor + s.independent;
+    const senateTotal = s.federalist + s.farmerLabor;
     _drawParliament($.senateDiagram, senateSegs, senateTotal);
     _updateLegend($.senateLegend, senateSegs);
 
