@@ -131,7 +131,7 @@ main.js
 
 ### Bootstrap
 
-`sim.prepopulate()` backfills 252-bar history: simulates forward from target state (S=100, v=theta, r=b), then reverses the path. `ExpiryManager` and rate sparkline initialized after.
+`sim.prepopulate()` backfills 252-bar history: negates `mu` during forward simulation so the reversed path trends in the correct drift direction. Resets to target state (S=100, v=theta, r=b) after. `ExpiryManager` and rate sparkline initialized after.
 
 ### Pause / Step
 
@@ -162,7 +162,7 @@ Per-step Vasicek rate discounting. Discrete proportional dividends at `QUARTERLY
 
 **Bonds**: Vasicek closed-form. Duration `B(T) = (1 - e^{-aT})/a` caps at `1/a`.
 
-**Spreads**: volatility-aware. `computeBidAsk` (stock/bond) and `computeOptionBidAsk` (adds moneyness). Long fills at ask, short at bid.
+**Spreads**: volatility-aware. `computeBidAsk` (stock/bond, uses `STOCKBOND_SPREAD_PCT` 0.1%) and `computeOptionBidAsk` (uses `OPTION_SPREAD_PCT` 1%, adds moneyness). Bond spreads use `sigmaR` (rate vol); stock/option spreads use Heston vol. Long fills at ask, short at bid.
 
 ## Options Chain
 

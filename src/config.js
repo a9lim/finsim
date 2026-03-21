@@ -25,7 +25,8 @@ export const REG_T_MARGIN = 0.50;
 export const SHORT_OPTION_MARGIN_PCT = 0.20;
 
 // -- Bid/ask spread model --
-export const SPREAD_PCT = 0.01;            // 1% of mid price
+export const STOCKBOND_SPREAD_PCT = 0.001;  // 0.1% of mid price
+export const OPTION_SPREAD_PCT = 0.01;      // 1% of mid price
 export const MONEYNESS_SPREAD_WEIGHT = 0.05; // weight on |log(S/K)| for options
 
 // -- Event engine --

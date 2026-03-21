@@ -187,7 +187,10 @@ export class Simulation {
     ----------------------------------------------- */
     prepopulate() {
         const count = HISTORY_CAPACITY;
+        // Negate drift so the reversed path trends in the correct direction
+        this.mu = -this.mu;
         for (let i = 0; i < count; i++) this.tick();
+        this.mu = -this.mu;
 
         // Collect bars in chronological order, then reverse
         this.history.reverse();

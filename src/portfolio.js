@@ -12,7 +12,8 @@ import {
     SHORT_OPTION_MARGIN_PCT,
     BOND_FACE_VALUE,
     TRADING_DAYS_PER_YEAR,
-    SPREAD_PCT,
+    STOCKBOND_SPREAD_PCT,
+    OPTION_SPREAD_PCT,
     MONEYNESS_SPREAD_WEIGHT,
 } from './config.js';
 
@@ -99,7 +100,7 @@ function _fillPrice(type, side, mid, currentPrice, strike, currentVol) {
  * Bid/ask for stock or bond.  For bonds pass sigmaR as vol.
  */
 export function computeBidAsk(mid, vol) {
-    const halfSpread = mid * SPREAD_PCT * (1 + vol);
+    const halfSpread = mid * STOCKBOND_SPREAD_PCT * (1 + vol);
     return { bid: Math.max(0, mid - halfSpread), ask: mid + halfSpread };
 }
 
@@ -108,7 +109,7 @@ export function computeBidAsk(mid, vol) {
  */
 export function computeOptionBidAsk(mid, currentPrice, strike, currentVol) {
     const moneyness = Math.abs(Math.log(currentPrice / strike));
-    const halfSpread = mid * SPREAD_PCT * (1 + currentVol) + MONEYNESS_SPREAD_WEIGHT * moneyness;
+    const halfSpread = mid * OPTION_SPREAD_PCT * (1 + currentVol) + MONEYNESS_SPREAD_WEIGHT * moneyness;
     return { bid: Math.max(0, mid - halfSpread), ask: mid + halfSpread };
 }
 

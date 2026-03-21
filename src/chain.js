@@ -8,7 +8,7 @@
  * Exports: buildChainSkeleton, priceChainExpiry, generateStrikes, ExpiryManager
  */
 
-import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT, SPREAD_PCT, MONEYNESS_SPREAD_WEIGHT } from './config.js';
+import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT, OPTION_SPREAD_PCT, MONEYNESS_SPREAD_WEIGHT } from './config.js';
 import { allocTree, prepareTree, pricePairWithTree, allocGreekTrees, prepareGreekTrees, computeGreeksPairWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { computeOptionBidAsk } from './portfolio.js';
 import { market } from './market.js';
@@ -204,7 +204,7 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
         // avoids 2 object allocations per strike in the hot substep path).
         // SYNC: if the spread formula in portfolio.js changes, update here too.
         const moneyness = Math.abs(Math.log(S / K));
-        const spreadBase = SPREAD_PCT * (1 + sigma);
+        const spreadBase = OPTION_SPREAD_PCT * (1 + sigma);
         const moneynessAdj = MONEYNESS_SPREAD_WEIGHT * moneyness;
         const cHalf = callP * spreadBase + moneynessAdj;
         const pHalf = putP * spreadBase + moneynessAdj;
