@@ -900,29 +900,21 @@ function _drawParliament(canvas, segments, total) {
     const cy = h - 4;
     const outerR = Math.min(cx - 4, h - 8);
     const innerR = outerR * 0.45;
-    const rows = 4;
-    const gap = 0.01; // small gap between segments in radians
 
-    // Draw rows of arcs from inside out
-    const rowWidth = (outerR - innerR) / rows;
-    for (let row = 0; row < rows; row++) {
-        const r1 = innerR + row * rowWidth + 1;
-        const r2 = innerR + (row + 1) * rowWidth - 1;
+    // Single solid semicircle per segment (no rows, no gaps)
+    let startAngle = Math.PI; // left (180 deg)
+    for (const seg of segments) {
+        const sweep = (seg.count / total) * Math.PI;
+        if (sweep <= 0) continue;
 
-        let startAngle = Math.PI; // left (180 deg)
-        for (const seg of segments) {
-            const sweep = (seg.count / total) * Math.PI;
-            if (sweep <= 0) continue;
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, startAngle, startAngle + sweep, false);
+        ctx.arc(cx, cy, innerR, startAngle + sweep, startAngle, true);
+        ctx.closePath();
+        ctx.fillStyle = seg.color;
+        ctx.fill();
 
-            ctx.beginPath();
-            ctx.arc(cx, cy, r2, startAngle + gap, startAngle + sweep - gap, false);
-            ctx.arc(cx, cy, r1, startAngle + sweep - gap, startAngle + gap, true);
-            ctx.closePath();
-            ctx.fillStyle = seg.color;
-            ctx.fill();
-
-            startAngle += sweep;
-        }
+        startAngle += sweep;
     }
 }
 
