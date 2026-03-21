@@ -17,7 +17,10 @@ import {
     MONEYNESS_SPREAD_WEIGHT,
 } from './config.js';
 
-import { priceAmerican, computeGreeks, vasicekBondPrice, vasicekDuration } from './pricing.js';
+import { allocTree, prepareTree, priceWithTree, allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, vasicekBondPrice, vasicekDuration } from './pricing.js';
+
+let _marginTree = null;
+let _greekTrees = null;
 import { computePositionValue, unitPrice } from './position-value.js';
 import { market } from './market.js';
 
@@ -179,9 +182,14 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
         case 'put': {
             const dte = expiryDay != null
                 ? Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0) : 0;
-            const optMid = dte > 0
-                ? priceAmerican(currentPrice, strike, dte, currentRate, currentVol, type === 'put', q, currentDay)
-                : Math.max(0, type === 'call' ? currentPrice - strike : strike - currentPrice);
+            let optMid;
+            if (dte > 0 && currentVol > 0) {
+                if (!_marginTree) _marginTree = allocTree();
+                prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
+                optMid = priceWithTree(currentPrice, strike, type === 'put', _marginTree);
+            } else {
+                optMid = Math.max(0, type === 'call' ? currentPrice - strike : strike - currentPrice);
+            }
             return Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
         }
         default: return 0;
@@ -233,7 +241,9 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
                 }
                 case 'call':
                 case 'put': {
-                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, pos.type === 'put', q, currentDay);
+                    if (!_marginTree) _marginTree = allocTree();
+                    prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
+                    const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
                     required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                     break;
                 }
@@ -841,8 +851,9 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
 
             case 'call':
             case 'put': {
-                const isPut  = pos.type === 'put';
-                const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q, currentDay);
+                if (!_marginTree) _marginTree = allocTree();
+                prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
+                const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
                 total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                 break;
             }
@@ -891,8 +902,9 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
                 }
                 case 'call':
                 case 'put': {
-                    const isPut = pos.type === 'put';
-                    const optMid = priceAmerican(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q, currentDay);
+                    if (!_marginTree) _marginTree = allocTree();
+                    prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
+                    const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
                     required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                     break;
                 }
@@ -975,7 +987,10 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
             ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
             : 0;
         const isPut  = pos.type === 'put';
-        const greeks = computeGreeks(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q, currentDay);
+        if (dte <= 0 || currentVol <= 0) continue;
+        if (!_greekTrees) _greekTrees = allocGreekTrees();
+        prepareGreekTrees(dte, currentRate, currentVol, q, currentDay, _greekTrees);
+        const greeks = computeGreeksWithTrees(currentPrice, pos.strike, isPut, _greekTrees);
 
         delta += w * greeks.delta;
         gamma += w * greeks.gamma;

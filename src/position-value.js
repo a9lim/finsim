@@ -6,9 +6,11 @@
    values. Used by portfolio.js and portfolio-renderer.js.
    ===================================================== */
 
-import { priceAmerican, vasicekBondPrice } from './pricing.js';
+import { allocTree, prepareTree, priceWithTree, vasicekBondPrice } from './pricing.js';
 import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
 import { market } from './market.js';
+
+let _tree = null;
 
 /**
  * Compute the fair (mid) unit price for a single unit of an instrument.
@@ -35,9 +37,10 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
                 : BOND_FACE_VALUE * Math.exp(-rate * dte);
         case 'call':
         case 'put':
-            return dte > 0
-                ? priceAmerican(S, strike, dte, rate, vol, type === 'put', q, day)
-                : Math.max(0, type === 'call' ? S - strike : strike - S);
+            if (dte <= 0 || vol <= 0) return Math.max(0, type === 'call' ? S - strike : strike - S);
+            if (!_tree) _tree = allocTree();
+            prepareTree(dte, rate, vol, q, day, _tree);
+            return priceWithTree(S, strike, type === 'put', _tree);
         default: return 0;
     }
 }

@@ -23,11 +23,11 @@
  *   computeSkewSigma(sigmaEff, S, K, T, rho, xi, kappa) -> skewed sigma
  *
  * Public API — single-option:
- *   priceAmerican(S, K, T, r, sigma, isPut, q, currentDay)
- *   computeGreeks(S, K, T, r, sigma, isPut, q, currentDay)
- *   prepareTree(T, r, sigma, q, currentDay)             -> tree object
+ *   allocTree()                                         -> tree object (reusable)
+ *   prepareTree(T, r, sigma, q, currentDay, into?)      -> tree object
  *   priceWithTree(S, K, isPut, tree)                    -> price
- *   prepareGreekTrees(T, r, sigma, q, currentDay)       -> greekTrees
+ *   allocGreekTrees()                                   -> greekTrees (reusable)
+ *   prepareGreekTrees(T, r, sigma, q, currentDay, into?)-> greekTrees
  *   computeGreeksWithTrees(S, K, isPut, greekTrees)     -> Greeks object
  *
  * Public API — paired call+put (chain pricing):
@@ -146,21 +146,7 @@ let _pf20 = 0, _pf21 = 0, _pf22 = 0;
 let _callDelta = 0, _callGamma = 0;
 let _putDelta = 0, _putGamma = 0;
 
-// ---------------------------------------------------------------------------
-// Transparent parameter cache for priceAmerican
-// ---------------------------------------------------------------------------
-
-const _cache = {
-    u: 0, d: 0, d2: 0, useDiscrete: false,
-    powU: new Float64Array(_N + 1),
-    divAdj: new Float64Array(_N + 1),
-    puDisc: new Float64Array(_N),
-    pdDisc: new Float64Array(_N),
-};
 const _NO_DAY = -Infinity; // sentinel for "no currentDay"
-let _cT = NaN, _cR = NaN, _cSig = NaN, _cQ = NaN, _cDay = _NO_DAY;
-const _NO_VAS = -Infinity;
-let _cVasA = _NO_VAS, _cVasB = _NO_VAS;
 
 // ---------------------------------------------------------------------------
 // Tree preparation
@@ -523,46 +509,6 @@ function _pairDeltaGamma(S, tree) {
     _putGamma = (pDUp - pDDn) * dS2halfInv;
 }
 
-// ---------------------------------------------------------------------------
-// Public API: single-call pricing
-// ---------------------------------------------------------------------------
-
-/**
- * Price an American option via CRR binomial tree.
- *
- * Tree parameters are transparently cached: consecutive calls with the same
- * (T, r, sigma, q, currentDay) skip tree preparation entirely. This makes
- * batch pricing over varying S/K nearly free after the first call.
- *
- * @param {number}  S          - Spot price
- * @param {number}  K          - Strike
- * @param {number}  T          - Time to expiry in years
- * @param {number}  r          - Risk-free rate (continuously compounded)
- * @param {number}  sigma      - Volatility (annualised)
- * @param {boolean} isPut      - true = put, false = call
- * @param {number}  [q=0]      - Dividend yield
- * @param {number}  [currentDay] - Simulation day (enables discrete dividends)
- * @returns {number} Option price
- */
-function priceAmerican(S, K, T, r, sigma, isPut, q, currentDay) {
-    q = q || 0;
-    if (T <= 0 || sigma <= 0 || S <= 0 || K <= 0)
-        return isPut ? (K > S ? K - S : 0) : (S > K ? S - K : 0);
-
-    // Check transparent cache — scalar comparisons, no allocation
-    const day = currentDay ?? _NO_DAY;
-    const va = market.a > 0 ? market.a : _NO_VAS;
-    const vb = market.a > 0 ? market.b : _NO_VAS;
-    if (T !== _cT || r !== _cR || sigma !== _cSig || q !== _cQ || day !== _cDay
-        || va !== _cVasA || vb !== _cVasB) {
-        _fillTree(_cache, T, r, sigma, q, currentDay);
-        _cT = T; _cR = r; _cSig = sigma; _cQ = q; _cDay = day;
-        _cVasA = va; _cVasB = vb;
-    }
-
-    return _priceCore(S, K, isPut, _cache);
-}
-
 /**
  * Price using a pre-prepared tree (from prepareTree).
  *
@@ -604,55 +550,6 @@ export function pricePairWithTree(S, K, tree) {
     }
     _pricePairCore(S, K, tree);
     return { call: _V[0], put: _VP[0] };
-}
-
-// ---------------------------------------------------------------------------
-// Greeks — single option
-// ---------------------------------------------------------------------------
-
-/**
- * Compute option Greeks.
- *
- * Delta and gamma are extracted directly from the CRR tree (steps 1 & 2),
- * eliminating 2 finite-difference pricing calls. Theta, vega, and rho use
- * central finite differences (6 additional backward inductions).
- *
- * Total: 7 backward inductions instead of 9 in the classical approach.
- *
- * @returns {{ price, delta, gamma, theta, vega, rho }}
- */
-export function computeGreeks(S, K, T, r, sigma, isPut, q, currentDay) {
-    q = q || 0;
-    if (T <= 0 || sigma <= 0 || S <= 0 || K <= 0) {
-        const intrinsic = isPut ? (K > S ? K - S : 0) : (S > K ? S - K : 0);
-        return { price: intrinsic, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 };
-    }
-
-    // Base price — sets _f10..._f22 for tree-based delta/gamma
-    const price = priceAmerican(S, K, T, r, sigma, isPut, q, currentDay);
-
-    // Tree-based delta/gamma (read _cache which was filled by priceAmerican).
-    // ORDERING: must run before any subsequent priceAmerican call that changes
-    // parameters, which would overwrite _cache and _f10..._f22.
-    const { delta, gamma } = _treeDeltaGamma(S, _cache);
-
-    // Finite-difference theta, vega, rho (6 backward inductions)
-    const h_T     = 1 / TRADING_DAYS_PER_YEAR;
-    const h_sigma = 0.001;
-    const h_r     = 0.0001;
-
-    const T_lo = Math.max(T - h_T, 1e-10);
-    const T_hi = T + h_T;
-    const theta = (priceAmerican(S, K, T_lo, r, sigma, isPut, q, currentDay)
-                 - priceAmerican(S, K, T_hi, r, sigma, isPut, q, currentDay)) / (T_hi - T_lo);
-
-    const vega = (priceAmerican(S, K, T, r, sigma + h_sigma, isPut, q, currentDay)
-               - priceAmerican(S, K, T, r, sigma - h_sigma, isPut, q, currentDay)) / (2 * h_sigma);
-
-    const rho = (priceAmerican(S, K, T, r + h_r, sigma, isPut, q, currentDay)
-              - priceAmerican(S, K, T, r - h_r, sigma, isPut, q, currentDay)) / (2 * h_r);
-
-    return { price, delta, gamma, theta, vega, rho };
 }
 
 // ---------------------------------------------------------------------------
@@ -885,4 +782,3 @@ export function vasicekDuration(T, a) {
 // Exports
 // ---------------------------------------------------------------------------
 
-export { priceAmerican };
