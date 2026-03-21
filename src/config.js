@@ -60,14 +60,14 @@ export const STRATEGY_Y_PAD = 0.15;        // 15% vertical padding
 export const STRATEGY_MARGIN = { top: 24, right: 16, bottom: 48, left: 68 };
 
 // -- Presets --
-const _CALM_BULL = { name: 'Calm Bull', mu: 0.08, theta: 0.04, kappa: 3.0, xi: 0.3, rho: -0.5, lambda: 0.5, muJ: -0.02, sigmaJ: 0.03, a: 0.5, b: 0.04, sigmaR: 0.005, borrowSpread: 0.5, q: 0.02 };
+const _CALM_BULL = { name: 'Calm Bull', mu: 0.48, theta: 0.06, kappa: 2.5, xi: 0.4, rho: -0.6, lambda: 0.6, muJ: -0.02, sigmaJ: 0.04, a: 0.5, b: 0.04, sigmaR: 0.005, borrowSpread: 0.5, q: 0.005 };
 
 export const PRESETS = [
     _CALM_BULL,
-    { name: 'Sideways', mu: 0.02, theta: 0.06, kappa: 2.0, xi: 0.4, rho: -0.6, lambda: 1.0, muJ: -0.01, sigmaJ: 0.04, a: 0.5, b: 0.03, sigmaR: 0.008, borrowSpread: 0.5, q: 0.02 },
-    { name: 'Volatile', mu: 0.05, theta: 0.12, kappa: 1.5, xi: 0.6, rho: -0.7, lambda: 3.0, muJ: -0.03, sigmaJ: 0.06, a: 0.3, b: 0.05, sigmaR: 0.012, borrowSpread: 0.5, q: 0.01 },
-    { name: 'Crisis', mu: -0.10, theta: 0.25, kappa: 0.5, xi: 0.8, rho: -0.85, lambda: 8.0, muJ: -0.08, sigmaJ: 0.10, a: 0.2, b: 0.02, sigmaR: 0.020, borrowSpread: 0.5, q: 0.0 },
-    { name: 'Rate Hike', mu: 0.04, theta: 0.08, kappa: 2.0, xi: 0.5, rho: -0.6, lambda: 1.5, muJ: -0.02, sigmaJ: 0.05, a: 0.8, b: 0.08, sigmaR: 0.015, borrowSpread: 0.5, q: 0.02 },
+    { name: 'Sideways', mu: 0.12, theta: 0.08, kappa: 2.0, xi: 0.45, rho: -0.6, lambda: 1.0, muJ: -0.01, sigmaJ: 0.04, a: 0.5, b: 0.04, sigmaR: 0.008, borrowSpread: 0.5, q: 0.003 },
+    { name: 'Volatile', mu: 0.35, theta: 0.15, kappa: 1.5, xi: 0.7, rho: -0.75, lambda: 3.0, muJ: -0.03, sigmaJ: 0.07, a: 0.3, b: 0.05, sigmaR: 0.012, borrowSpread: 0.5, q: 0.0 },
+    { name: 'Crisis', mu: -0.20, theta: 0.30, kappa: 0.4, xi: 0.9, rho: -0.85, lambda: 10.0, muJ: -0.10, sigmaJ: 0.12, a: 0.2, b: 0.01, sigmaR: 0.025, borrowSpread: 1.0, q: 0.0 },
+    { name: 'Rate Hike', mu: 0.20, theta: 0.10, kappa: 2.0, xi: 0.5, rho: -0.65, lambda: 1.5, muJ: -0.02, sigmaJ: 0.05, a: 1.0, b: 0.08, sigmaR: 0.015, borrowSpread: 0.8, q: 0.003 },
     { ..._CALM_BULL, name: 'Dynamic (Offline)' },
     { ..._CALM_BULL, name: 'Dynamic (LLM)' },
 ];
