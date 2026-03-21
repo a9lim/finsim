@@ -210,7 +210,7 @@ export class LLMEventSource {
             const cg = w.congress;
             worldLines.push(
                 'World state:',
-                '- Congress: Senate ' + cg.senate.federalist + 'F/' + cg.senate.farmerLabor + 'FL/' + cg.senate.independent + 'I, House ' + cg.house.federalist + 'F/' + cg.house.farmerLabor + 'FL',
+                '- Congress: Senate ' + cg.senate.federalist + 'F/' + cg.senate.farmerLabor + 'FL, House ' + cg.house.federalist + 'F/' + cg.house.farmerLabor + 'FL',
                 '- PNTH board: ' + w.pnth.boardDirks + ' Dirks / ' + w.pnth.boardGottlieb + ' Gottlieb' +
                     ', CEO: ' + (w.pnth.ceoIsGottlieb ? 'Gottlieb' : 'successor') +
                     ', CTO: ' + (w.pnth.ctoIsMira ? 'Kassis' : 'vacant'),

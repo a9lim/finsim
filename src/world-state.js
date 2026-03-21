@@ -12,7 +12,7 @@
 export function createWorldState() {
     return {
         congress: {
-            senate: { federalist: 52, farmerLabor: 46, independent: 2 },
+            senate: { federalist: 52, farmerLabor: 48 },
             house:  { federalist: 221, farmerLabor: 214 },
         },
         pnth: {
@@ -88,7 +88,6 @@ export const WORLD_STATE_RANGES = {
     // congress.senate
     'congress.senate.federalist':       { min: 0,   max: 100, type: 'number' },
     'congress.senate.farmerLabor':      { min: 0,   max: 100, type: 'number' },
-    'congress.senate.independent':      { min: 0,   max: 100, type: 'number' },
     // congress.house
     'congress.house.federalist':        { min: 0,   max: 435, type: 'number' },
     'congress.house.farmerLabor':       { min: 0,   max: 435, type: 'number' },
