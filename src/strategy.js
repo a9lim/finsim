@@ -13,6 +13,7 @@ import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
     STRATEGY_SAMPLES, STRATEGY_Y_PAD, STRATEGY_MARGIN,
 } from './config.js';
+import { market } from './market.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -119,7 +120,8 @@ function _legDte(leg, evalDay, fallbackDte) {
  * so the sample loop avoids redundant tree preparation when legs have
  * different T values (which defeats the transparent parameter cache).
  */
-function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte, q, heston, vasicek) {
+function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte, q) {
+    const vasicek = market.a >= 1e-8 ? { a: market.a, b: market.b, sigmaR: market.sigmaR } : null;
     return legs.map(leg => {
         const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                    : (leg.side === 'short') ? -1 : 1;
@@ -139,19 +141,11 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
                 const isPut = leg.type === 'put';
                 const K = leg.strike ?? entryS;
                 // Term-structure vol + moneyness skew
-                const sigmaEff = heston
-                    ? computeEffectiveSigma(heston.v, T, heston.kappa, heston.theta, heston.xi)
-                    : vol;
-                const sigma = heston
-                    ? computeSkewSigma(sigmaEff, entryS, K, T, heston.rho, heston.xi, heston.kappa)
-                    : vol;
+                const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+                const sigma = computeSkewSigma(sigmaEff, entryS, K, T, market.rho, market.xi, market.kappa);
                 // Entry vol: same skew at entry time
-                const entrySigmaEff = heston
-                    ? computeEffectiveSigma(heston.v, entryT, heston.kappa, heston.theta, heston.xi)
-                    : vol;
-                const entrySigma = heston
-                    ? computeSkewSigma(entrySigmaEff, entryS, K, entryT, heston.rho, heston.xi, heston.kappa)
-                    : vol;
+                const entrySigmaEff = computeEffectiveSigma(market.v, entryT, market.kappa, market.theta, market.xi);
+                const entrySigma = computeSkewSigma(entrySigmaEff, entryS, K, entryT, market.rho, market.xi, market.kappa);
                 info.K = K;
                 info.isPut = isPut;
                 info.vol = sigma;
@@ -169,11 +163,11 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
                 info.entryS = entryS;
                 break;
             case 'bond':
-                info.entryVal = vasicek
-                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, entryT, vasicek.a, vasicek.b, vasicek.sigmaR)
+                info.entryVal = market.a >= 1e-8
+                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, entryT, market.a, market.b, market.sigmaR)
                     : BOND_FACE_VALUE * Math.exp(-rate * entryT);
-                info.bondCurVal = vasicek
-                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, T, vasicek.a, vasicek.b, vasicek.sigmaR)
+                info.bondCurVal = market.a >= 1e-8
+                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, T, market.a, market.b, market.sigmaR)
                     : BOND_FACE_VALUE * Math.exp(-rate * T);
                 break;
         }
@@ -227,13 +221,10 @@ function _legGreeksFast(info, S) {
  * Build a cache key string from draw/summary inputs.
  * Cheap string comparison avoids re-pricing when nothing changed.
  */
-function _modelKey(heston, vasicek) {
-    if (!heston && !vasicek) return '';
-    let k = '';
-    if (heston) k += (heston.v * 1e6 | 0) + ',' + (heston.kappa * 1e4 | 0) + ','
-        + (heston.theta * 1e6 | 0) + ',' + (heston.rho * 1e4 | 0) + ',' + (heston.xi * 1e4 | 0);
-    if (vasicek) k += ',' + (vasicek.a * 1e4 | 0) + ',' + (vasicek.b * 1e6 | 0);
-    return k;
+function _modelKey() {
+    return (market.v * 1e6 | 0) + ',' + (market.kappa * 1e4 | 0) + ','
+        + (market.theta * 1e6 | 0) + ',' + (market.rho * 1e4 | 0) + ',' + (market.xi * 1e4 | 0)
+        + ',' + (market.a * 1e4 | 0) + ',' + (market.b * 1e6 | 0);
 }
 
 function _cacheKey(legs, vol, rate, evalDay, entryDay, dte, extra) {
@@ -373,7 +364,7 @@ export class StrategyRenderer {
      * @param {number}  [evalDay]    - Evaluation day (sim day number); per-leg T computed from leg.expiryDay
      * @param {number}  [entryDay]   - Entry day (sim day number); per-leg entryT computed from leg.expiryDay
      */
-    draw(legs, spot, vol, rate, dte, greekToggles, evalDay, entryDay, q, heston, vasicek) {
+    draw(legs, spot, vol, rate, dte, greekToggles, evalDay, entryDay, q) {
         const ctx  = this._ctx;
         const cssW = this._cssW;
         const cssH = this._cssH;
@@ -422,14 +413,14 @@ export class StrategyRenderer {
 
         // --- Cached computation: only re-price when inputs change ---
         const drawKey = _cacheKey(legs, vol, rate, evalDay, entryDay, dte,
-            (xMin * 100 | 0) + ',' + (xMax * 100 | 0) + ',' + (spot * 100 | 0) + ',' + activeGreeks.join('') + ',' + (q * 1e6 | 0) + ',' + _modelKey(heston, vasicek));
+            (xMin * 100 | 0) + ',' + (xMax * 100 | 0) + ',' + (spot * 100 | 0) + ',' + activeGreeks.join('') + ',' + (q * 1e6 | 0) + ',' + _modelKey());
         let xs, pnls, greekData, breakevens;
 
         if (this._cache && this._cache.key === drawKey) {
             ({ xs, pnls, greekData, breakevens } = this._cache);
         } else {
             // Precompute per-leg entry values (constant across all sample Ss)
-            const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q, heston, vasicek);
+            const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q);
 
             const wantGreeks = activeGreeks.length > 0;
             xs   = new Array(SAMPLE_COUNT);
@@ -532,12 +523,12 @@ export class StrategyRenderer {
      *
      * @returns {{ maxProfit: number, maxLoss: number, breakevens: number[], netCost: number }}
      */
-    computeSummary(legs, spot, vol, rate, dte, evalDay, entryDay, q, heston, vasicek) {
+    computeSummary(legs, spot, vol, rate, dte, evalDay, entryDay, q) {
         if (!legs || legs.length === 0) {
             return { maxProfit: 0, maxLoss: 0, breakevens: [], netCost: 0 };
         }
 
-        const sumKey = _cacheKey(legs, vol, rate, evalDay, entryDay, dte, (spot * 100 | 0) + ',' + (q * 1e6 | 0) + ',' + _modelKey(heston, vasicek));
+        const sumKey = _cacheKey(legs, vol, rate, evalDay, entryDay, dte, (spot * 100 | 0) + ',' + (q * 1e6 | 0) + ',' + _modelKey());
         if (this._summaryCache && this._summaryCache.key === sumKey) {
             return this._summaryCache.result;
         }
@@ -551,7 +542,7 @@ export class StrategyRenderer {
                 xMax = Math.max(xMax, leg.strike * 5);
             }
         }
-        const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q, heston, vasicek);
+        const legInfos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q);
         const xs   = new Array(SAMPLE_COUNT);
         const pnls = new Array(SAMPLE_COUNT);
 
@@ -587,7 +578,7 @@ export class StrategyRenderer {
         for (const leg of legs) {
             const legEntryDte = (leg.expiryDay != null && entryDay != null)
                 ? Math.max(leg.expiryDay - entryDay, 0) : fallbackDte;
-            netCost += this._legEntryCost(leg, spot, vol, rate, _dteToT(legEntryDte), q, entryDay, heston, vasicek);
+            netCost += this._legEntryCost(leg, spot, vol, rate, _dteToT(legEntryDte), q, entryDay);
         }
 
         const result = { maxProfit, maxLoss, breakevens, netCost };
@@ -603,7 +594,8 @@ export class StrategyRenderer {
      * Compute the entry cost of a single leg at the original spot price.
      * Positive = debit paid, negative = credit received.
      */
-    _legEntryCost(leg, spot, vol, rate, T, q, entryDay, heston, vasicek) {
+    _legEntryCost(leg, spot, vol, rate, T, q, entryDay) {
+        const vasicek = market.a >= 1e-8 ? { a: market.a, b: market.b, sigmaR: market.sigmaR } : null;
         const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                    : (leg.side === 'short') ? -1 : 1;
         const qty  = Math.abs(leg.qty ?? 1);
@@ -613,12 +605,8 @@ export class StrategyRenderer {
             case 'put': {
                 const isPut = leg.type === 'put';
                 const K     = leg.strike ?? spot;
-                const sigmaEff = heston
-                    ? computeEffectiveSigma(heston.v, T, heston.kappa, heston.theta, heston.xi)
-                    : vol;
-                const sigma = heston
-                    ? computeSkewSigma(sigmaEff, spot, K, T, heston.rho, heston.xi, heston.kappa)
-                    : vol;
+                const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+                const sigma = computeSkewSigma(sigmaEff, spot, K, T, market.rho, market.xi, market.kappa);
                 const price = priceAmerican(spot, K, T, rate, sigma, isPut, q, entryDay, vasicek);
                 return price * qty * sign;
             }
@@ -626,8 +614,8 @@ export class StrategyRenderer {
                 // Entry cost for hypothetical stock position is spot * qty * sign
                 return spot * qty * sign;
             case 'bond': {
-                const bVal = vasicek
-                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, T, vasicek.a, vasicek.b, vasicek.sigmaR)
+                const bVal = market.a >= 1e-8
+                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, T, market.a, market.b, market.sigmaR)
                     : BOND_FACE_VALUE * Math.exp(-rate * T);
                 return bVal * qty * sign;
             }
