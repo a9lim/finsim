@@ -555,7 +555,6 @@ function _onDayComplete() {
         const events = eventEngine.maybeFire(sim, sim.day);
         if (events.length > 0) {
             sim.recomputeK();
-            setVasicekParams(sim.a, sim.b, sim.sigmaR);
             syncMarket(sim);
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
@@ -800,7 +799,6 @@ function _resetCore(index) {
     document.getElementById('epilogue-overlay')?.classList.add('hidden');
     sim.reset(index);
     resetPortfolio();
-    setVasicekParams(sim.a, sim.b, sim.sigmaR);
     syncMarket(sim);
     sim.prepopulate();
     _initRateHistory();
@@ -865,7 +863,6 @@ function _isLLMPreset(index) { return index >= 6; }
 function syncSliderToSim(param, value) {
     sim[param] = value;
     if (param === 'rho') sim._recomputeRhoDerived();
-    if (param === 'a' || param === 'b' || param === 'sigmaR') setVasicekParams(sim.a, sim.b, sim.sigmaR);
     syncMarket(sim);
     dirty = true;
 }

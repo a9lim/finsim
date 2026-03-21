@@ -19,6 +19,7 @@ import {
 
 import { priceAmerican, computeGreeks, vasicekBondPrice } from './pricing.js';
 import { computePositionValue, unitPrice } from './position-value.js';
+import { market } from './market.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -44,18 +45,6 @@ export const portfolio = {
 // Auto-increment counters (not exported — internal)
 let _nextPositionId = 1;
 let _nextOrderId    = 1;
-
-// Vasicek rate model params — set via setVasicekParams(), used for bond pricing.
-let _vasA = 0, _vasB = 0, _vasSigR = 0;
-
-/** Update Vasicek params for bond pricing. Call on reset and parameter changes. */
-export function setVasicekParams(a, b, sigmaR) {
-    _vasA = a; _vasB = b; _vasSigR = sigmaR;
-}
-
-function _vasicekObj() {
-    return _vasA >= 1e-8 ? { a: _vasA, b: _vasB, sigmaR: _vasSigR } : null;
-}
 
 // ---------------------------------------------------------------------------
 // resetPortfolio
@@ -186,7 +175,7 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
         case 'bond': {
             const dte = expiryDay != null
                 ? Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0) : 0;
-            return MAINTENANCE_MARGIN * vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, _vasA, _vasB, _vasSigR) * absQty;
+            return MAINTENANCE_MARGIN * vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR) * absQty;
         }
         case 'call':
         case 'put': {
@@ -228,7 +217,7 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
     for (let i = 0; i < portfolio.positions.length; i++) {
         if (i === skipIdx) continue;
         const pos = portfolio.positions[i];
-        equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q, _vasicekObj());
+        equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
 
         if (pos.qty < 0) {
             const absQty = Math.abs(pos.qty);
@@ -240,7 +229,7 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
                     required += MAINTENANCE_MARGIN * currentPrice * absQty;
                     break;
                 case 'bond': {
-                    const bp = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, _vasA, _vasB, _vasSigR);
+                    const bp = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR);
                     required += MAINTENANCE_MARGIN * bp * absQty;
                     break;
                 }
@@ -684,7 +673,7 @@ export function chargeBorrowInterest(currentPrice, currentVol, currentRate, borr
             notional = Math.abs(pos.qty) * currentPrice;
         } else {
             const T = Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0);
-            const bondPrice = vasicekBondPrice(BOND_FACE_VALUE, currentRate, T, _vasA, _vasB, _vasSigR);
+            const bondPrice = vasicekBondPrice(BOND_FACE_VALUE, currentRate, T, market.a, market.b, market.sigmaR);
             notional = Math.abs(pos.qty) * bondPrice;
         }
 
@@ -858,7 +847,7 @@ export function executeStrategy(strategyName, currentPrice, currentVol, currentR
 export function portfolioValue(currentPrice, currentVol, currentRate, currentDay, q) {
     let total = portfolio.cash;
     for (const pos of portfolio.positions) {
-        total += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q, _vasicekObj());
+        total += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
     }
     return total;
 }
@@ -892,7 +881,7 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
                 break;
 
             case 'bond': {
-                const bondPrice = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, _vasA, _vasB, _vasSigR);
+                const bondPrice = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR);
                 total += MAINTENANCE_MARGIN * bondPrice * absQty;
                 break;
             }
@@ -931,7 +920,7 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
     let required = 0;
 
     for (const pos of portfolio.positions) {
-        equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q, _vasicekObj());
+        equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
 
         if (pos.qty < 0) {
             const absQty = Math.abs(pos.qty);
@@ -943,7 +932,7 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
                     required += MAINTENANCE_MARGIN * currentPrice * absQty;
                     break;
                 case 'bond': {
-                    const bondPrice = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, _vasA, _vasB, _vasSigR);
+                    const bondPrice = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR);
                     required += MAINTENANCE_MARGIN * bondPrice * absQty;
                     break;
                 }
