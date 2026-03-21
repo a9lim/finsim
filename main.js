@@ -33,6 +33,7 @@ import { generateEpilogue } from './src/epilogue.js';
 import { computePositionValue } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
+import { syncMarket, market } from './src/market.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -455,6 +456,7 @@ function frame(now) {
             }
             // Update sidebar & check orders after each substep batch
             if (stepped) {
+                syncMarket(sim);
                 _onSubstep();
                 if (!strategyMode) dirty = true;
             }
@@ -462,6 +464,7 @@ function frame(now) {
             if (sim.dayComplete) {
                 sim.finalizeDay();
                 dayInProgress = false;
+                syncMarket(sim);
                 _onDayComplete();
             }
         }
@@ -553,6 +556,7 @@ function _onDayComplete() {
         if (events.length > 0) {
             sim.recomputeK();
             setVasicekParams(sim.a, sim.b, sim.sigmaR);
+            syncMarket(sim);
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
             updateCongressDiagrams($, eventEngine.world);
@@ -630,6 +634,7 @@ function tick() {
         chart._lerp._targetHigh  = last.high;
         chart._lerp._targetLow   = last.low;
     }
+    syncMarket(sim);
     _onDayComplete();
 }
 
@@ -796,6 +801,7 @@ function _resetCore(index) {
     sim.reset(index);
     resetPortfolio();
     setVasicekParams(sim.a, sim.b, sim.sigmaR);
+    syncMarket(sim);
     sim.prepopulate();
     _initRateHistory();
     chart.dayOrigin = sim.day;
@@ -860,6 +866,7 @@ function syncSliderToSim(param, value) {
     sim[param] = value;
     if (param === 'rho') sim._recomputeRhoDerived();
     if (param === 'a' || param === 'b' || param === 'sigmaR') setVasicekParams(sim.a, sim.b, sim.sigmaR);
+    syncMarket(sim);
     dirty = true;
 }
 
