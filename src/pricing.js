@@ -9,7 +9,9 @@
  *
  * Term-structure enhancements:
  *   - computeEffectiveSigma: Heston expected integrated variance over [0, T]
- *   - computeSkewSigma: first-order Heston moneyness-dependent vol skew
+ *     with vol-of-vol convexity correction (Gatheral 2006 / Lewis 2000)
+ *   - computeSkewSigma: Heston moneyness-dependent vol skew with quadratic
+ *     smile curvature (ξ²/12σ² second-order term)
  *   - Per-step Vasicek rate discounting via optional { a, b } param
  *
  * Dual call+put pricing (_pricePairCore) runs a single backward induction
@@ -17,7 +19,7 @@
  * pricing where both call and put at each strike are always needed.
  *
  * Public API — term-structure utilities:
- *   computeEffectiveSigma(v, T, kappa, theta)          -> effective sigma
+ *   computeEffectiveSigma(v, T, kappa, theta, xi?)      -> effective sigma
  *   computeSkewSigma(sigmaEff, S, K, T, rho, xi, kappa) -> skewed sigma
  *
  * Public API — single-option:
@@ -46,7 +48,8 @@ const _N = BINOMIAL_STEPS;
 // ---------------------------------------------------------------------------
 
 /**
- * Compute effective volatility from Heston expected integrated variance.
+ * Compute effective volatility from Heston expected integrated variance,
+ * with optional vol-of-vol convexity correction.
  *
  * σ_eff²(T) = θ + (v - θ) · (1 - e^{-κT}) / (κT)
  *
@@ -54,17 +57,36 @@ const _N = BINOMIAL_STEPS;
  * to the long-run level θ, while short-dated options reflect the current
  * instantaneous variance v.
  *
+ * When xi > 0, adds the Gatheral / Lewis vol-of-vol convexity correction:
+ *   adj = ξ² / (2κ²·meanVar) · w(κT)
+ * where w(x) = 2(x - 1 + e^{-x}) / x² is the normalised OU variance weight.
+ * This lifts the overall vol level when vol-of-vol is significant.
+ * (Gatheral 2006, ch. 3; Lewis 2000, sec. 5.3)
+ *
  * @param {number} v      - Current instantaneous variance
  * @param {number} T      - Time to expiry in years
  * @param {number} kappa  - Mean-reversion speed of variance
  * @param {number} theta  - Long-run variance level
+ * @param {number} [xi=0] - Vol-of-vol; enables convexity correction when > 0
  * @returns {number} Effective annualised volatility
  */
-export function computeEffectiveSigma(v, T, kappa, theta) {
+export function computeEffectiveSigma(v, T, kappa, theta, xi) {
     const kT = kappa * T;
     if (kT < 1e-6) return Math.sqrt(Math.max(v, 0));
-    const meanVar = theta + (v - theta) * (1 - Math.exp(-kT)) / kT;
-    return Math.sqrt(Math.max(meanVar, 0));
+    const expNkT = Math.exp(-kT);
+    const meanVar = theta + (v - theta) * (1 - expNkT) / kT;
+    if (meanVar < 1e-8) return Math.sqrt(Math.max(meanVar, 0));
+
+    // Vol-of-vol convexity: variance of integrated variance correction.
+    // w(x) = (2/x²)(x - 1 + e^{-x}), the normalized OU variance weight.
+    // Gatheral 2006, ch. 3; Lewis 2000, sec. 5.3.
+    let adj = 0;
+    if (xi > 0) {
+        const w = 2 / (kT * kT) * (kT - 1 + expNkT);
+        adj = xi * xi / (2 * kappa * kappa * meanVar) * w;
+    }
+
+    return Math.sqrt(Math.max(meanVar + adj, 0));
 }
 
 /**
@@ -90,8 +112,11 @@ export function computeSkewSigma(sigmaEff, S, K, T, rho, xi, kappa) {
     const kT = kappa * T;
     const dampen = kT < 1e-6 ? 1 : (1 - Math.exp(-kT)) / kT;
     const skewCoeff = rho * xi / (2 * sigmaEff) * dampen;
-    const adj = sigmaEff * (1 + skewCoeff * x);
-    return adj > 0.01 ? adj : 0.01; // floor at 1% vol
+    // Second-order smile curvature: ξ²/(12σ²) makes both wings curve up.
+    // Same dampen factor (approximation — exact Heston decays differently).
+    const curvCoeff = xi * xi / (12 * sigmaEff * sigmaEff) * dampen;
+    const adj = sigmaEff * (1 + skewCoeff * x + curvCoeff * x * x);
+    return adj > 0.01 ? adj : 0.01;
 }
 
 // ---------------------------------------------------------------------------

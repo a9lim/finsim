@@ -140,14 +140,14 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
                 const K = leg.strike ?? entryS;
                 // Term-structure vol + moneyness skew
                 const sigmaEff = heston
-                    ? computeEffectiveSigma(heston.v, T, heston.kappa, heston.theta)
+                    ? computeEffectiveSigma(heston.v, T, heston.kappa, heston.theta, heston.xi)
                     : vol;
                 const sigma = heston
                     ? computeSkewSigma(sigmaEff, entryS, K, T, heston.rho, heston.xi, heston.kappa)
                     : vol;
                 // Entry vol: same skew at entry time
                 const entrySigmaEff = heston
-                    ? computeEffectiveSigma(heston.v, entryT, heston.kappa, heston.theta)
+                    ? computeEffectiveSigma(heston.v, entryT, heston.kappa, heston.theta, heston.xi)
                     : vol;
                 const entrySigma = heston
                     ? computeSkewSigma(entrySigmaEff, entryS, K, entryT, heston.rho, heston.xi, heston.kappa)
@@ -614,7 +614,7 @@ export class StrategyRenderer {
                 const isPut = leg.type === 'put';
                 const K     = leg.strike ?? spot;
                 const sigmaEff = heston
-                    ? computeEffectiveSigma(heston.v, T, heston.kappa, heston.theta)
+                    ? computeEffectiveSigma(heston.v, T, heston.kappa, heston.theta, heston.xi)
                     : vol;
                 const sigma = heston
                     ? computeSkewSigma(sigmaEff, spot, K, T, heston.rho, heston.xi, heston.kappa)

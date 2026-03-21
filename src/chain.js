@@ -135,7 +135,7 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q, heston, vasicek) {
 
     // Term-structure effective volatility (Heston expected integrated variance)
     const sigmaEff = heston
-        ? computeEffectiveSigma(v, T, heston.kappa, heston.theta)
+        ? computeEffectiveSigma(v, T, heston.kappa, heston.theta, heston.xi)
         : Math.sqrt(Math.max(v, 0));
 
     if (greeks) {
