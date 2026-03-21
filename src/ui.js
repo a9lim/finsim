@@ -103,7 +103,15 @@ export function cacheDOMElements($) {
     $.strategyLegsList = document.getElementById('strategy-legs-list');
     $.strategySummary  = document.getElementById('strategy-summary');
     $.saveStrategyBtn  = document.getElementById('save-strategy-btn');
-    $.execStrategyBtn  = document.getElementById('exec-strategy-btn');
+    $.deleteStrategyBtn  = document.getElementById('delete-strategy-btn');
+    $.strategyNameInput  = document.getElementById('strategy-name');
+    $.selectableExpiryToggle = document.getElementById('selectable-expiry-toggle');
+    $.strategyLoadSelect = document.getElementById('strategy-load-select');
+    $.strategyEditFields = document.getElementById('strategy-edit-fields');
+    $.tradeStrategySelect = document.getElementById('trade-strategy-select');
+    $.tradeExecStrategyBtn = document.getElementById('trade-exec-strategy-btn');
+    $.strategyCreditDebit = document.getElementById('strategy-credit-debit');
+    $.strategyNetCost    = document.getElementById('strategy-net-cost');
     $.strategyBuilder  = document.getElementById('strategy-builder');
     $.strategyExpiry   = document.getElementById('strategy-expiry');
     $.strategyChainTable = document.getElementById('strategy-chain-table');
@@ -274,8 +282,21 @@ export function bindEvents($, handlers) {
     if ($.saveStrategyBtn && typeof handlers.onSaveStrategy === 'function') {
         $.saveStrategyBtn.addEventListener('click', handlers.onSaveStrategy);
     }
-    if ($.execStrategyBtn && typeof handlers.onExecStrategy === 'function') {
-        $.execStrategyBtn.addEventListener('click', handlers.onExecStrategy);
+    if ($.deleteStrategyBtn && typeof handlers.onDeleteStrategy === 'function') {
+        $.deleteStrategyBtn.addEventListener('click', handlers.onDeleteStrategy);
+    }
+    if ($.tradeExecStrategyBtn && typeof handlers.onTradeExecStrategy === 'function') {
+        $.tradeExecStrategyBtn.addEventListener('click', handlers.onTradeExecStrategy);
+    }
+    if ($.strategyLoadSelect && typeof handlers.onStrategySelectChange === 'function') {
+        $.strategyLoadSelect.addEventListener('change', () => {
+            handlers.onStrategySelectChange($.strategyLoadSelect.value);
+        });
+    }
+    if ($.tradeStrategySelect && typeof handlers.onTradeStrategySelectChange === 'function') {
+        $.tradeStrategySelect.addEventListener('change', () => {
+            handlers.onTradeStrategySelectChange($.tradeStrategySelect.value);
+        });
     }
 
     // Tooltip delegation for [data-tooltip] cells
@@ -627,7 +648,7 @@ export function updateStrategyChainDisplay($, pricedExpiry, onAddLeg, posMap) {
 }
 
 
-export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, onLegChange) {
+export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, onLegChange, currentStrategyHash, isBuiltin) {
     if (!$.strategyLegsList) return;
 
     $.strategyLegsList.textContent = '';
@@ -681,10 +702,51 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
         }
     }
 
-    // Enable/disable save & execute buttons
+    // Disable edit fields for built-in strategies
+    if ($.strategyEditFields) $.strategyEditFields.classList.toggle('ctrl-disabled', !!isBuiltin);
+
+    // Enable/disable save & delete buttons
     const hasLegs = legs && legs.length > 0;
-    if ($.saveStrategyBtn) $.saveStrategyBtn.disabled = !hasLegs;
-    if ($.execStrategyBtn) $.execStrategyBtn.disabled = !hasLegs;
+    if ($.saveStrategyBtn) $.saveStrategyBtn.disabled = !hasLegs || !!isBuiltin;
+    if ($.deleteStrategyBtn) $.deleteStrategyBtn.disabled = !currentStrategyHash || !!isBuiltin;
+}
+
+export function updateStrategyDropdowns($, strategies) {
+    const selects = [$.strategyLoadSelect, $.tradeStrategySelect];
+    for (const sel of selects) {
+        if (!sel) continue;
+        const prev = sel.value;
+        while (sel.options.length > 0) sel.remove(0);
+        const defOpt = document.createElement('option');
+        defOpt.value = '';
+        defOpt.textContent = sel === $.strategyLoadSelect ? 'New strategy' : 'Select a strategy\u2026';
+        sel.appendChild(defOpt);
+        for (const s of strategies) {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.name;
+            sel.appendChild(opt);
+        }
+        if (prev && Array.from(sel.options).some(o => o.value === prev)) {
+            sel.value = prev;
+        }
+    }
+}
+
+export function updateCreditDebit($, netCost) {
+    if (!$.strategyCreditDebit || !$.strategyNetCost) return;
+    if (netCost == null || !isFinite(netCost)) {
+        $.strategyCreditDebit.querySelector('.stat-label').textContent = 'Net Cost';
+        $.strategyNetCost.textContent = '\u2014';
+        $.strategyNetCost.className = 'stat-value';
+        return;
+    }
+    const isCredit = netCost < 0;
+    const label = isCredit ? 'Net Credit' : 'Net Debit';
+    const value = '$' + Math.abs(netCost).toFixed(2);
+    $.strategyCreditDebit.querySelector('.stat-label').textContent = label;
+    $.strategyNetCost.textContent = value;
+    $.strategyNetCost.className = 'stat-value ' + (isCredit ? 'pnl-up' : 'pnl-down');
 }
 
 function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
@@ -697,10 +759,19 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
     const isShort = leg.qty < 0;
     const sideStr = isShort ? 'Short' : 'Long';
     let desc = sideStr + ' ' + leg.type.toUpperCase();
-    if (leg.strike != null) desc += ' K' + leg.strike;
+    if (leg.strike != null) {
+        const atm = Math.round((leg._refS || 100) / 5) * 5;
+        const offset = leg.strike - atm;
+        desc += ' ' + (offset === 0 ? 'ATM' : offset > 0 ? 'ATM+' + offset : 'ATM' + offset);
+    }
     if (leg.expiryDay != null) {
         const expiry = skeleton ? skeleton.find(e => e.day === leg.expiryDay) : null;
-        if (expiry) desc += ' ' + expiry.dte + 'd';
+        if (expiry) {
+            desc += ' ' + expiry.dte + 'd';
+        } else {
+            const refDay = leg._refDay || 0;
+            desc += ' ' + Math.max(1, leg.expiryDay - refDay) + 'd';
+        }
     }
     label.textContent = desc;
 
