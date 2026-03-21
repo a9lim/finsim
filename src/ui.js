@@ -675,7 +675,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
                 return fmtDollar(v);
             };
             const items = [
-                { label: 'Net Cost', value: fmtVal(summary.netCost), cls: pnlClass(-summary.netCost) },
+                { label: summary.netCost < 0 ? 'Net Credit' : 'Net Debit', value: fmtVal(Math.abs(summary.netCost)), cls: summary.netCost < 0 ? 'pnl-up' : 'pnl-down' },
                 { label: 'Max Profit', value: fmtVal(summary.maxProfit), cls: 'pnl-up' },
                 { label: 'Max Loss', value: fmtVal(summary.maxLoss), cls: 'pnl-down' },
             ];
