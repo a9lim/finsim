@@ -32,7 +32,8 @@ main.js                810 lines  Entry point: DOM cache $, rAF loop, sub-step s
                                    strategy builder (with rollback), auto-scroll, ExpiryManager
 index.html             500 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs:
                                    Trade/Portfolio/Strategy/Settings), chain overlay,
-                                   trade dialog, margin call overlay, intro screen
+                                   trade dialog, margin call overlay, intro screen,
+                                   reference overlay. KaTeX loaded via CDN (preload CSS, defer JS).
 styles.css             800 lines  Project CSS: chain table, position rows, strategy builder,
                                    trade dialog, margin alert, P&L coloring, Greek value
                                    colors, time slider, responsive breakpoints
@@ -90,9 +91,15 @@ src/
                                    updateStrategyChainDisplay(), updateGreeksDisplay(),
                                    showChainOverlay(), showMarginCall(),
                                    toggleStrategyView(), renderStrategyBuilder(),
-                                   updateStockBondPrices(), updateStrategySelectors();
+                                   updateStockBondPrices(), updateStrategySelectors(),
+                                   wireInfoTips() (declarative data-info registration via
+                                   registerInfoTips from shared-info.js);
                                    delegates to chain-renderer.js and portfolio-renderer.js
-  theme.js              20 lines  initTheme(), toggleTheme() (2-state: light/dark)
+  reference.js        ~660 lines  REFERENCE object: 30 reference entries with KaTeX math.
+                                   Pricing models, Greeks, market mechanics, strategies,
+                                   simulation parameters, dynamic regime. Shown via
+                                   Shift+click or long-press on info trigger buttons.
+  theme.js              10 lines  initTheme(), toggleTheme() (delegates to _toolbar)
 ```
 
 ## Module Dependencies
@@ -122,8 +129,10 @@ main.js
   |- src/portfolio-renderer.js (imports position-value, format-helpers)
   |- src/ui.js            (cacheDOMElements, bindEvents, display updaters -- imports
   |                         format-helpers, chain-renderer, portfolio-renderer, portfolio;
-  |                         reads _haptics, showToast, createInfoTip, createSimTooltip globals)
-  +- src/theme.js         (initTheme, toggleTheme -- no imports)
+  |                         reads _haptics, showToast, createInfoTip, registerInfoTips,
+  |                         createSimTooltip, _forms, initOverlayDismiss globals)
+  |- src/reference.js     (REFERENCE -- 30 reference entries with KaTeX math)
+  +- src/theme.js         (initTheme, toggleTheme -- delegates to _toolbar)
 ```
 
 ## Data Flow
@@ -317,7 +326,7 @@ Continuous dividend yield `q` affects pricing (cost of carry `b = r - q`) and st
 
 ### Toolbar
 
-Play/pause, speed (0.25x-4x, left-click faster / right-click slower), step, reset, theme toggle (hidden <=440px), panel toggle.
+Play/pause, speed (0.25x-4x, left-click faster / right-click slower), step, reset, theme toggle (hidden <=440px), panel toggle (hamburger icon). Sidebar wired via `_toolbar.initSidebar()` (toggle, close, swipe dismiss). Play/pause and speed via `_toolbar.updatePlayBtn`/`updateSpeedBtn`. Theme via `_toolbar.initTheme('shoals-theme')`/`toggleTheme('shoals-theme')`.
 
 ### Sidebar (4 tabs)
 
@@ -348,9 +357,12 @@ Play/pause, speed (0.25x-4x, left-click faster / right-click slower), step, rese
 - Summary: Net Cost, Max Profit, Max Loss, Breakevens
 - Save / Execute buttons
 
-**Settings tab:**
+**Settings tab (labelled "Info"):**
 - Market Regime preset dropdown
-- Advanced Parameters (13 sliders)
+- LLM settings (API key, model) -- shown for Dynamic presets
+- Event log -- shown for Dynamic presets
+- Congress diagrams -- shown for Dynamic presets
+- Advanced Parameters (13 sliders, each with `?` info trigger via `data-info` attributes)
 
 ### Candlestick Chart
 
@@ -375,6 +387,15 @@ Appears in strategy mode. Slider percentage (100% = entry, 0% = first leg expire
 **Trade dialog**: Side, quantity, order type, conditional trigger price. Confirm button cloned on each open to avoid stacking listeners.
 
 **Margin call overlay**: Equity, required margin, shortfall. Liquidate or Dismiss.
+
+**Reference overlay**: Full-page reference content for any `?` button topic. Opened via Shift+click (desktop) or 500ms long-press (mobile) on info triggers. KaTeX math rendered on first open, cached per key. 30 entries covering pricing models, Greeks, market mechanics, strategies, simulation parameters, and dynamic regime topics. Content defined in `src/reference.js`. Wired via `initReferenceOverlay()` + `bindReferenceTriggers()` from `shared-info.js`.
+
+All overlays use `initOverlayDismiss()` from `shared-utils.js` for backdrop-click + close-button dismiss.
+
+### Info Tips &amp; Reference Pages
+
+- **Info tips** via `registerInfoTips()` from `shared-info.js`: 14 `?` buttons with `data-info` attributes (13 parameter sliders + margin status). Declarative: HTML has the buttons, `wireInfoTips()` passes the data object to `registerInfoTips()`.
+- **Reference pages** via `initReferenceOverlay()` + `bindReferenceTriggers()` from `shared-info.js`: Shift+click or long-press on any `?` button opens the reference overlay. Content from `src/reference.js` (REFERENCE object). KaTeX math rendering with per-key caching.
 
 ### Custom Events
 
@@ -499,6 +520,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Slider ranges expanded globally** -- all 13 parameter sliders have wider min/max than the original presets use. Events can push params to extremes.
 - **`borrowCost` on positions** -- cumulative borrow interest charged to short stock/bond positions. Preserved in `portfolio.closedBorrowCost` when positions close/flip/expire.
 - **`portfolio.marginDebitCost`** -- cumulative interest charged on negative cash (buying on margin). Included in borrow cost display. Reset on `resetPortfolio()`.
+- **Shared utilities**: `_toolbar.initSidebar()` for sidebar wiring (toggle/close/swipe), `_toolbar.initTheme()`/`toggleTheme()` for theme persistence, `_intro.init()` for intro screen, `_forms.bindSlider()`/`bindModeGroup()` for form controls, `registerInfoTips()` for info tips, `initReferenceOverlay()`/`bindReferenceTriggers()` for reference pages, `initOverlayDismiss()` for modal dismiss.
 - **`_haptics` must always be guarded** -- use `if (typeof _haptics !== 'undefined') _haptics.trigger(...)`. The global loads from `/shared-haptics.js`; ES6 modules may execute before it's defined.
 - **`generateStrikes` is exported** from chain.js.
 - **Strategy execution rolls back on partial failure** -- `handleExecStrategy()` snapshots portfolio state before executing legs; if any leg fails, it restores the snapshot.
