@@ -771,6 +771,41 @@ export function computeGreeksPairWithTrees(S, K, gt) {
 }
 
 // ---------------------------------------------------------------------------
+// Vasicek bond pricing
+// ---------------------------------------------------------------------------
+
+/**
+ * Vasicek closed-form zero-coupon bond price.
+ *
+ * P(0,T) = face · A(T) · exp(-B(T) · r)
+ *
+ * where B(T) = (1 - e^{-aT}) / a
+ *       ln A(T) = (B(T) - T)(b - σᵣ²/(2a²)) - σᵣ²B(T)²/(4a)
+ *
+ * Accounts for rate mean-reversion (duration caps at 1/a) and rate
+ * volatility (convexity premium via Jensen's inequality).
+ *
+ * @param {number} face   - Face value (typically 100)
+ * @param {number} r      - Current short rate
+ * @param {number} T      - Time to maturity in years
+ * @param {number} a      - Mean-reversion speed of rate
+ * @param {number} b      - Long-run rate level
+ * @param {number} sigmaR - Rate volatility
+ * @returns {number} Bond price
+ */
+export function vasicekBondPrice(face, r, T, a, b, sigmaR) {
+    if (T <= 0) return face;
+    // Degrade to flat-rate discounting when a ≈ 0
+    if (a < 1e-8) return face * Math.exp(-r * T);
+
+    sigmaR = sigmaR || 0; // guard against undefined (callers may omit)
+    const B = (1 - Math.exp(-a * T)) / a;
+    const sig2 = sigmaR * sigmaR;
+    const lnA = (B - T) * (b - sig2 / (2 * a * a)) - sig2 * B * B / (4 * a);
+    return face * Math.exp(lnA - B * r);
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
