@@ -17,7 +17,7 @@ import {
     MONEYNESS_SPREAD_WEIGHT,
 } from './config.js';
 
-import { priceAmerican, computeGreeks, vasicekBondPrice } from './pricing.js';
+import { priceAmerican, computeGreeks, vasicekBondPrice, vasicekDuration } from './pricing.js';
 import { computePositionValue, unitPrice } from './position-value.js';
 import { market } from './market.js';
 
@@ -985,6 +985,37 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
     let delta = 0, gamma = 0, theta = 0, vega = 0, rho = 0;
 
     for (const pos of portfolio.positions) {
+        // qty is already signed: positive = long, negative = short
+        const w = pos.qty;
+
+        if (pos.type === 'stock') {
+            // Stock delta = 1 per share
+            delta += w;
+            continue;
+        }
+
+        if (pos.type === 'bond') {
+            const dte = pos.expiryDay != null
+                ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
+                : 0;
+            if (dte > 0) {
+                const bondP = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR);
+                const B = vasicekDuration(dte, market.a);
+                rho += -B * bondP * w;
+                // Bond theta: accrual per trading day
+                const a = market.a;
+                if (a >= 1e-8) {
+                    const expAT = Math.exp(-a * dte);
+                    const sig2 = market.sigmaR * market.sigmaR;
+                    const dLnP = expAT * (market.b - sig2 / (2 * a * a)) + sig2 * B / (2 * a) - expAT * currentRate;
+                    theta += -bondP * dLnP / TRADING_DAYS_PER_YEAR * w;
+                } else {
+                    theta += currentRate * bondP / TRADING_DAYS_PER_YEAR * w;
+                }
+            }
+            continue;
+        }
+
         if (pos.type !== 'call' && pos.type !== 'put') continue;
 
         const dte    = pos.expiryDay != null
@@ -992,9 +1023,6 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
             : 0;
         const isPut  = pos.type === 'put';
         const greeks = computeGreeks(currentPrice, pos.strike, dte, currentRate, currentVol, isPut, q, currentDay);
-
-        // qty is already signed: positive = long, negative = short
-        const w = pos.qty;
 
         delta += w * greeks.delta;
         gamma += w * greeks.gamma;

@@ -8,7 +8,7 @@
  * Exports: StrategyRenderer
  */
 
-import { priceAmerican, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice } from './pricing.js';
+import { priceAmerican, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
 import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
     STRATEGY_SAMPLES, STRATEGY_Y_PAD, STRATEGY_MARGIN,
@@ -206,8 +206,22 @@ function _legGreeksFast(info, S) {
         case 'stock':
             return { delta: info.mult, gamma: 0, theta: 0, vega: 0, rho: 0 };
         case 'bond': {
-            const bRho = -info.T * info.bondCurVal * info.mult;
-            const bTheta = info.rate * info.bondCurVal / TRADING_DAYS_PER_YEAR * info.mult;
+            // Vasicek duration B(T) = (1-e^{-aT})/a caps at 1/a; falls back to T when a≈0
+            const B = vasicekDuration(info.T, market.a);
+            const bRho = -B * info.bondCurVal * info.mult;
+            // Theta: bond accrual per trading day. For Vasicek:
+            // dP/dT = P * [e^{-aT}(b - σ²/(2a²)) + σ²B/(2a) - e^{-aT}·r]
+            // We negate because theta = -dP/dT (value gained as T shrinks)
+            const a = market.a;
+            let bTheta;
+            if (a >= 1e-8) {
+                const expAT = Math.exp(-a * info.T);
+                const sig2 = market.sigmaR * market.sigmaR;
+                const dLnP = expAT * (market.b - sig2 / (2 * a * a)) + sig2 * B / (2 * a) - expAT * info.rate;
+                bTheta = -info.bondCurVal * dLnP / TRADING_DAYS_PER_YEAR * info.mult;
+            } else {
+                bTheta = info.rate * info.bondCurVal / TRADING_DAYS_PER_YEAR * info.mult;
+            }
             return { delta: 0, gamma: 0, theta: bTheta, vega: 0, rho: bRho };
         }
         default:

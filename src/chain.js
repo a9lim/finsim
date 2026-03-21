@@ -8,8 +8,8 @@
  * Exports: buildChainSkeleton, priceChainExpiry, generateStrikes, ExpiryManager
  */
 
-import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT } from './config.js';
-import { prepareTree, pricePairWithTree, prepareGreekTrees, computeGreeksPairWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
+import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT, MIN_HALF_SPREAD, SPREAD_PCT, MONEYNESS_SPREAD_WEIGHT } from './config.js';
+import { allocTree, prepareTree, pricePairWithTree, allocGreekTrees, prepareGreekTrees, computeGreeksPairWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { computeOptionBidAsk } from './portfolio.js';
 import { market } from './market.js';
 
@@ -91,6 +91,32 @@ export function generateStrikes(currentPrice) {
 }
 
 // ---------------------------------------------------------------------------
+// Reusable tree pool — eliminates Float64Array allocation per strike
+// ---------------------------------------------------------------------------
+
+/** Reusable tree for the price-only chain path (1 per strike, sequential). */
+const _rTree = allocTree();
+
+/** Reusable Greek trees bundle for the full chain overlay (7 trees per strike). */
+const _rGreekTrees = allocGreekTrees();
+
+// Pre-allocated result pool for the price-only chain path.
+// Avoids creating ~75 objects (25 options × 3 sub-objects) per substep.
+// WARNING: _rResult is a shared mutable singleton. The reference returned by
+// priceChainExpiry (price-only path) is invalidated on the next call.
+// Callers must consume results synchronously before calling again.
+const _MAX_STRIKES = 25;
+const _rResult = { day: 0, dte: 0, options: [] };
+const _rOptions = [];
+for (let i = 0; i < _MAX_STRIKES; i++) {
+    _rOptions.push({
+        strike: 0,
+        call: { price: 0, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0, bid: 0, ask: 0 },
+        put:  { price: 0, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0, bid: 0, ask: 0 },
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Lazy chain builder — skeleton + per-expiry pricing
 // ---------------------------------------------------------------------------
 
@@ -138,11 +164,12 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
     const sigmaEff = computeEffectiveSigma(v, T, market.kappa, market.theta, market.xi);
 
     if (greeks) {
-        // Greeks path: per-strike skewed sigma, 7 tree variants each
+        // Greeks path: per-strike skewed sigma, 7 tree variants each.
+        // Reuses _rGreekTrees buffers (zero allocation per strike).
         const options = expiry.strikes.map(K => {
             const sigma = computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa);
-            const gt = prepareGreekTrees(T, r, sigma, q, currentDay);
-            const { call: callG, put: putG } = computeGreeksPairWithTrees(S, K, gt);
+            prepareGreekTrees(T, r, sigma, q, currentDay, _rGreekTrees);
+            const { call: callG, put: putG } = computeGreeksPairWithTrees(S, K, _rGreekTrees);
             const callBA = computeOptionBidAsk(callG.price, S, K, sigma);
             const putBA  = computeOptionBidAsk(putG.price,  S, K, sigma);
             return {
@@ -158,20 +185,46 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
         return { day: expiry.day, dte: expiry.dte, options };
     }
 
-    // Price-only path: per-strike skewed sigma, single tree each
-    const options = expiry.strikes.map(K => {
+    // Price-only path: per-strike skewed sigma, single tree each.
+    // Reuses _rTree buffers AND pre-allocated result objects (zero allocation).
+    const strikes = expiry.strikes;
+    const nStrikes = strikes.length;
+    _rResult.day = expiry.day;
+    _rResult.dte = expiry.dte;
+    _rResult.options = _rOptions;
+    // Trim or expand visible slice (consumers read .options.length)
+    _rOptions.length = nStrikes;
+    for (let si = 0; si < nStrikes; si++) {
+        const K = strikes[si];
         const sigma = computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa);
-        const tree = prepareTree(T, r, sigma, q, currentDay);
-        const { call: callP, put: putP } = pricePairWithTree(S, K, tree);
-        const callBA = computeOptionBidAsk(callP, S, K, sigma);
-        const putBA  = computeOptionBidAsk(putP,  S, K, sigma);
-        return {
-            strike: K,
-            call: { price: callP, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0,
-                     bid: Math.max(0, callBA.bid), ask: callBA.ask },
-            put:  { price: putP, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0,
-                     bid: Math.max(0, putBA.bid), ask: putBA.ask },
-        };
-    });
-    return { day: expiry.day, dte: expiry.dte, options };
+        prepareTree(T, r, sigma, q, currentDay, _rTree);
+        const { call: callP, put: putP } = pricePairWithTree(S, K, _rTree);
+
+        // Inline bid/ask (mirrors computeOptionBidAsk from portfolio.js;
+        // avoids 2 object allocations per strike in the hot substep path).
+        // SYNC: if the spread formula in portfolio.js changes, update here too.
+        const moneyness = Math.abs(Math.log(S / K));
+        const spreadBase = SPREAD_PCT * (1 + sigma);
+        const moneynessAdj = MONEYNESS_SPREAD_WEIGHT * moneyness;
+        const cHalf = Math.max(MIN_HALF_SPREAD, callP * spreadBase + moneynessAdj);
+        const pHalf = Math.max(MIN_HALF_SPREAD, putP * spreadBase + moneynessAdj);
+
+        let opt = _rOptions[si];
+        if (!opt) {
+            opt = {
+                strike: 0,
+                call: { price: 0, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0, bid: 0, ask: 0 },
+                put:  { price: 0, delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0, bid: 0, ask: 0 },
+            };
+            _rOptions[si] = opt;
+        }
+        opt.strike = K;
+        const c = opt.call;
+        c.price = callP; c.delta = 0; c.gamma = 0; c.theta = 0; c.vega = 0; c.rho = 0;
+        c.bid = Math.max(0, callP - cHalf); c.ask = callP + cHalf;
+        const p = opt.put;
+        p.price = putP; p.delta = 0; p.gamma = 0; p.theta = 0; p.vega = 0; p.rho = 0;
+        p.bid = Math.max(0, putP - pHalf); p.ask = putP + pHalf;
+    }
+    return _rResult;
 }

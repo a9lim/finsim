@@ -67,19 +67,24 @@ src/
   simulation.js        245 lines  GBM + Merton jumps + Heston stoch vol + Vasicek rate;
                                    beginDay()/substep()/finalizeDay() sub-step pipeline;
                                    prepopulate() synthetically backfills buffer via reverse
-  pricing.js           ~530 lines CRR binomial tree American option pricing (BINOMIAL_STEPS=128)
+  pricing.js           ~560 lines CRR binomial tree American option pricing (BINOMIAL_STEPS=128)
                                    with discrete proportional dividends + finite-diff Greeks.
                                    Term-structure vol (Heston integrated variance + vol-of-vol
                                    convexity), moneyness skew (second-order Heston quadratic
                                    smile), Vasicek per-step rate discounting. Vasicek closed-form
-                                   bond pricing. Dual call+put backward induction for chain pricing.
-                                   Exports: priceAmerican, computeGreeks, prepareTree,
-                                   priceWithTree, pricePairWithTree, prepareGreekTrees,
-                                   computeGreeksWithTrees, computeGreeksPairWithTrees,
-                                   computeEffectiveSigma, computeSkewSigma, vasicekBondPrice
-  chain.js             170 lines  ExpiryManager (rolling EXPIRY_COUNT window, QUARTERLY_CYCLE cycle),
+                                   bond pricing + duration. Dual call+put backward induction for
+                                   chain pricing. Tree reuse API (allocTree/allocGreekTrees) for
+                                   zero-allocation hot-path pricing.
+                                   Exports: priceAmerican, computeGreeks, allocTree, prepareTree,
+                                   priceWithTree, pricePairWithTree, allocGreekTrees,
+                                   prepareGreekTrees, computeGreeksWithTrees,
+                                   computeGreeksPairWithTrees, computeEffectiveSigma,
+                                   computeSkewSigma, vasicekBondPrice, vasicekDuration
+  chain.js             ~230 lines ExpiryManager (rolling EXPIRY_COUNT window, QUARTERLY_CYCLE cycle),
                                    generateStrikes(), buildChainSkeleton(),
-                                   priceChainExpiry() (lazy per-expiry pricing)
+                                   priceChainExpiry() (lazy per-expiry pricing with reusable
+                                   tree pool and pre-allocated result objects for zero-allocation
+                                   substep pricing)
   portfolio.js         770 lines  Signed-qty positions, market/limit/stop orders, netting,
                                    strategy groups, cash/margin, chargeBorrowInterest() (short
                                    stock/bond daily borrow cost), processExpiry() (options + bonds),
@@ -504,7 +509,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Camera (chart only)**: `shared-camera.js`, world X = day index. Strategy canvas manages its own X-range.
 - **Pure module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator.
 - **Custom event bus**: `shoals:*` events from ui.js to main.js, decouples DOM from portfolio state.
-- **Bond pricing**: Vasicek closed-form via `vasicekBondPrice(face, r, T, a, b, sigmaR)` from pricing.js. Accounts for rate mean-reversion (duration caps at `1/a`) and rate volatility (convexity premium). Degrades to `face * exp(-r * T)` when `a < 1e-8`. Volatility-aware spread via `computeBidAsk()`. Strategy view shows theta (interest accrual) and rho. Consumer modules read Vasicek params from `market.*` (shared state synced by main.js via `syncMarket`).
+- **Bond pricing**: Vasicek closed-form via `vasicekBondPrice(face, r, T, a, b, sigmaR)` from pricing.js. Accounts for rate mean-reversion (duration caps at `1/a`) and rate volatility (convexity premium). Degrades to `face * exp(-r * T)` when `a < 1e-8`. Bond rho uses `vasicekDuration(T, a)` = `B(T) = (1-e^{-aT})/a` for proper mean-reversion-adjusted sensitivity. Bond theta uses analytical Vasicek derivative of ln P. Volatility-aware spread via `computeBidAsk()`. Strategy view shows theta (interest accrual) and rho. Consumer modules read Vasicek params from `market.*` (shared state synced by main.js via `syncMarket`).
 - **Auto-scroll**: keeps latest candle at ~85% from left when playing.
 - **Toast fill price**: trade toast shows actual fill price (including bid/ask spread) via `pos.fillPrice`.
 - **Shared chain renderer**: `renderChainInto()` in chain-renderer.js builds both trade-tab and strategy-tab chain tables from a pre-priced expiry. `rebuildExpiryDropdown()` populates expiry dropdowns from the skeleton (only on day-complete/reset, not every substep). Uses event delegation (3 listeners on container, not per-cell). Trade tab passes `$._onChainCellClick`, strategy tab wraps `onAddLeg`.
@@ -555,7 +560,10 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **`q` (dividend yield) threads through all pricing** -- `priceAmerican(S, K, T, r, sigma, isPut, q, currentDay)` and `computeGreeks(S, K, T, r, sigma, isPut, q, currentDay)` accept `q` and optional `currentDay`. When `currentDay` is provided, discrete dividends at `QUARTERLY_CYCLE` boundaries are used; otherwise falls back to continuous yield.
 - **Dividends fire every `QUARTERLY_CYCLE` trading days** -- aligned with expiry cycle. `sim.day % QUARTERLY_CYCLE === 0` in `_onDayComplete()`. Stock price drops by `q/4` (ex-dividend), then cash payments to shareholders. No payment if `q === 0` or no stock positions.
 - **`q` is NOT in the GBM drift** -- stock price grows at `mu` (not `mu - q`) between dividend dates. The quarterly `S *= (1 - q/4)` drop is the only dividend effect on stock price, matching the binomial tree's discrete dividend model.
-- **`computeEffectiveSigma` and `computeSkewSigma` are exported from pricing.js** -- used by chain.js and strategy.js. `computeEffectiveSigma(v, T, kappa, theta, xi)` takes variance (not vol) and includes a vol-of-vol convexity adjustment when `xi > 0` (Gatheral 2006). `computeSkewSigma` adjusts vol per strike using second-order Heston: linear skew `ρξ/(2σ)` plus quadratic curvature `ξ²/(12σ²)`, both dampened by mean-reversion. Chain and strategy callers read Heston/Vasicek params from the shared `market` object (`src/market.js`).
+- **`computeEffectiveSigma` and `computeSkewSigma` are exported from pricing.js** -- used by chain.js and strategy.js. `computeEffectiveSigma(v, T, kappa, theta, xi)` takes variance (not vol) and includes a vol-of-vol convexity adjustment `ξ²·w/(2κ²)` when `xi > 0` (Gatheral 2006, additive to mean integrated variance). `computeSkewSigma` adjusts vol per strike using second-order Heston: linear skew `ρξ/(2σ)` plus quadratic curvature `ξ²/(12σ²)`, both dampened by mean-reversion. Chain and strategy callers read Heston/Vasicek params from the shared `market` object (`src/market.js`).
+- **`vasicekDuration(T, a)` exported from pricing.js** -- returns `B(T) = (1 - e^{-aT})/a`, the Vasicek bond duration. Used by strategy.js and portfolio.js for bond rho (instead of using `T` directly, which overstates rho when mean-reversion is strong). Falls back to `T` when `a < 1e-8`.
+- **Chain pricing uses reusable tree pool** -- `_rTree` (1 tree) and `_rGreekTrees` (7 trees) are pre-allocated in chain.js with `allocTree()`/`allocGreekTrees()`. `priceChainExpiry` passes these to `prepareTree(... into)` / `prepareGreekTrees(... into)` to fill existing Float64Array buffers instead of allocating new ones per strike. The price-only path also uses `_rResult`/`_rOptions` pre-allocated result objects (zero GC per substep). The `_rResult` singleton is invalidated on each call — callers must consume synchronously.
+- **`aggregateGreeks` includes stock and bond positions** -- stock positions contribute delta=qty per share. Bond positions contribute rho (via Vasicek duration) and theta (via Vasicek analytical derivative). Previously only option positions were included.
 - **Per-step rate arrays in tree** -- `puDisc` and `pdDisc` are `Float64Array(_N)` (not scalars). `_priceCore` and `_pricePairCore` index `puDisc[i]`/`pdDisc[i]` per backward-induction step. When `vasicek` is omitted, arrays are filled with uniform values.
 - **Dual pricing uses separate intermediates** -- `_pricePairCore` writes to `_cf10.._cf22` / `_pf10.._pf22` (pair intermediates), while `_priceCore` writes to `_f10.._f22` (single intermediates). `_pairDeltaGamma` reads pair intermediates; `_treeDeltaGamma` reads single intermediates. Do not mix — calling `_priceCore` after `_pricePairCore` overwrites `_V` (the call value buffer shared between both paths).
 - **No hardcoded colors in JS** -- chart.js and strategy.js use `_PALETTE` and `_r()` for all colors. CSS slider-track fallbacks in styles.css are the only remaining hardcoded rgba values (defensive fallback for when shared-tokens.js hasn't loaded).

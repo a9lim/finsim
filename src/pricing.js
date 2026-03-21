@@ -78,13 +78,14 @@ export function computeEffectiveSigma(v, T, kappa, theta, xi) {
     const meanVar = theta + (v - theta) * (1 - expNkT) / kT;
     if (meanVar < 1e-8) return Math.sqrt(Math.max(meanVar, 0));
 
-    // Vol-of-vol convexity: variance of integrated variance correction.
+    // Vol-of-vol convexity: additive variance correction from stochastic vol.
     // w(x) = (2/x²)(x - 1 + e^{-x}), the normalized OU variance weight.
+    // The correction ξ²·w/(2κ²) is added to the mean integrated variance.
     // Gatheral 2006, ch. 3; Lewis 2000, sec. 5.3.
     let adj = 0;
     if (xi > 0) {
         const w = 2 / (kT * kT) * (kT - 1 + expNkT);
-        adj = xi * xi / (2 * kappa * kappa * meanVar) * w;
+        adj = xi * xi / (2 * kappa * kappa) * w;
     }
 
     return Math.sqrt(Math.max(meanVar + adj, 0));
@@ -245,9 +246,12 @@ function _fillTree(tree, T, r, sigma, q, currentDay) {
     if (market.a > 0) {
         const va = market.a, vb = market.b;
         const rDiff = r - vb;
+        // Multiplicative recurrence for exp(-a·t_i): avoids N Math.exp calls
+        let expDecay = 1;                   // exp(-a · 0) = 1
+        const expStep = Math.exp(-va * dt); // constant step multiplier
         for (let i = 0; i < n; i++) {
-            const t_i = i * dt;
-            const r_i = vb + rDiff * Math.exp(-va * t_i);
+            const r_i = vb + rDiff * expDecay;
+            expDecay *= expStep;
             const drift_i = useDiscrete ? r_i : (r_i - q);
             const disc_i = Math.exp(-r_i * dt);
             // Clamp pu to [0,1] — negative rates can push e^{drift·dt} below d
@@ -268,29 +272,43 @@ function _fillTree(tree, T, r, sigma, q, currentDay) {
 }
 
 /**
+ * Allocate a fresh tree parameter object with typed arrays.
+ * Use when you need a persistent tree (e.g. strategy pre-computation).
+ * For hot-path chain pricing, pass this object back to prepareTree
+ * via the `into` parameter to reuse the buffers.
+ *
+ * @returns {object} Empty tree parameter object
+ */
+export function allocTree() {
+    return {
+        u: 0, d: 0, d2: 0, useDiscrete: false,
+        powU: new Float64Array(_N + 1),
+        divAdj: new Float64Array(_N + 1),
+        puDisc: new Float64Array(_N),
+        pdDisc: new Float64Array(_N),
+        valid: false,
+    };
+}
+
+/**
  * Prepare a reusable tree parameter object for batch pricing.
  *
- * Allocates its own typed arrays — safe to store and reuse across many
- * priceWithTree / computeGreeksWithTrees calls. For one-off pricing,
- * prefer priceAmerican() which uses a transparent cache instead.
+ * When `into` is provided, fills the existing tree's typed arrays
+ * instead of allocating new ones — eliminates GC pressure in hot loops.
+ * When omitted, allocates fresh typed arrays.
  *
  * @param {number} T          - Time to expiry in years
  * @param {number} r          - Risk-free rate
  * @param {number} sigma      - Volatility (annualised)
  * @param {number} [q=0]      - Dividend yield
  * @param {number} [currentDay] - Simulation day (enables discrete dividends)
+ * @param {object} [into]     - Existing tree object to fill (avoids allocation)
  * @returns {object} Tree parameter object for priceWithTree
  */
-export function prepareTree(T, r, sigma, q, currentDay) {
+export function prepareTree(T, r, sigma, q, currentDay, into) {
     q = q || 0;
-    const tree = {
-        u: 0, d: 0, d2: 0, useDiscrete: false,
-        powU: new Float64Array(_N + 1),
-        divAdj: new Float64Array(_N + 1),
-        puDisc: new Float64Array(_N),
-        pdDisc: new Float64Array(_N),
-        valid: T > 0 && sigma > 0,
-    };
+    const tree = into || allocTree();
+    tree.valid = T > 0 && sigma > 0;
     if (tree.valid) _fillTree(tree, T, r, sigma, q, currentDay);
     return tree;
 }
@@ -642,6 +660,21 @@ export function computeGreeks(S, K, T, r, sigma, isPut, q, currentDay) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Allocate a fresh Greek trees bundle with 7 tree objects.
+ * Pass back to prepareGreekTrees via `into` to reuse buffers.
+ *
+ * @returns {object} Empty Greek trees bundle
+ */
+export function allocGreekTrees() {
+    return {
+        base: allocTree(), thetaLo: allocTree(), thetaHi: allocTree(),
+        vegaUp: allocTree(), vegaDn: allocTree(),
+        rhoUp: allocTree(), rhoDn: allocTree(),
+        hT: 0, hSigma: 0, hR: 0,
+    };
+}
+
+/**
  * Prepare all 7 tree variants needed for Greek computation.
  *
  * Call once per (T, r, sigma, q, currentDay), then use
@@ -650,9 +683,12 @@ export function computeGreeks(S, K, T, r, sigma, isPut, q, currentDay) {
  * at the same expiry (e.g. chain overlay: 50 options × 7 trees = 350
  * tree preps reduced to 7).
  *
+ * When `into` is provided, fills existing tree buffers (zero allocation).
+ *
+ * @param {object} [into] - Existing Greek trees bundle to fill
  * @returns {object} Greek trees bundle for computeGreeksWithTrees
  */
-export function prepareGreekTrees(T, r, sigma, q, currentDay) {
+export function prepareGreekTrees(T, r, sigma, q, currentDay, into) {
     q = q || 0;
     const h_T     = 1 / TRADING_DAYS_PER_YEAR;
     const h_sigma = 0.001;
@@ -661,18 +697,18 @@ export function prepareGreekTrees(T, r, sigma, q, currentDay) {
     const T_lo = Math.max(T - h_T, 1e-10);
     const T_hi = T + h_T;
 
-    return {
-        base:    prepareTree(T, r, sigma, q, currentDay),
-        thetaLo: prepareTree(T_lo, r, sigma, q, currentDay),
-        thetaHi: prepareTree(T_hi, r, sigma, q, currentDay),
-        vegaUp:  prepareTree(T, r, sigma + h_sigma, q, currentDay),
-        vegaDn:  prepareTree(T, r, sigma - h_sigma, q, currentDay),
-        rhoUp:   prepareTree(T, r + h_r, sigma, q, currentDay),
-        rhoDn:   prepareTree(T, r - h_r, sigma, q, currentDay),
-        hT:      T_hi - T_lo,
-        hSigma:  h_sigma,
-        hR:      h_r,
-    };
+    const gt = into || allocGreekTrees();
+    prepareTree(T, r, sigma, q, currentDay, gt.base);
+    prepareTree(T_lo, r, sigma, q, currentDay, gt.thetaLo);
+    prepareTree(T_hi, r, sigma, q, currentDay, gt.thetaHi);
+    prepareTree(T, r, sigma + h_sigma, q, currentDay, gt.vegaUp);
+    prepareTree(T, r, sigma - h_sigma, q, currentDay, gt.vegaDn);
+    prepareTree(T, r + h_r, sigma, q, currentDay, gt.rhoUp);
+    prepareTree(T, r - h_r, sigma, q, currentDay, gt.rhoDn);
+    gt.hT = T_hi - T_lo;
+    gt.hSigma = h_sigma;
+    gt.hR = h_r;
+    return gt;
 }
 
 /**
@@ -826,6 +862,23 @@ export function vasicekBondPrice(face, r, T, a, b, sigmaR) {
     const sig2 = sigmaR * sigmaR;
     const lnA = (B - T) * (b - sig2 / (2 * a * a)) - sig2 * B * B / (4 * a);
     return face * Math.exp(lnA - B * r);
+}
+
+/**
+ * Vasicek bond duration B(T) = (1 - e^{-aT}) / a.
+ *
+ * This is -dP/(P·dr), the modified duration under Vasicek dynamics.
+ * Caps at 1/a for long maturities (mean-reversion effect).
+ * Falls back to T when a ≈ 0 (flat-rate model).
+ *
+ * @param {number} T - Time to maturity in years
+ * @param {number} a - Mean-reversion speed of rate
+ * @returns {number} Duration
+ */
+export function vasicekDuration(T, a) {
+    if (T <= 0) return 0;
+    if (a < 1e-8) return T;
+    return (1 - Math.exp(-a * T)) / a;
 }
 
 // ---------------------------------------------------------------------------
