@@ -20,6 +20,7 @@ export function posKey(type, strike, expiryDay) {
 
 function _wrapPrice(td, text, posMap, type, strike, expiryDay) {
     td.textContent = text;
+    td.classList.remove('pos-long', 'pos-short');
     const key = posKey(type, strike, expiryDay);
     const qty = posMap && posMap[key];
     if (qty) td.classList.add(qty > 0 ? 'pos-long' : 'pos-short');
@@ -159,6 +160,47 @@ export function bindChainTableClicks(container, onChainCellClick) {
 }
 
 // ---------------------------------------------------------------------------
+// In-place compact chain update (avoids DOM teardown during substeps)
+// ---------------------------------------------------------------------------
+
+/**
+ * Try to patch an existing compact chain table in-place.
+ * Returns true if update succeeded, false if a full rebuild is needed.
+ */
+function _updateCompactChainInPlace(container, pricedExpiry, posMap) {
+    const tbody = container.querySelector('tbody');
+    if (!tbody) return false;
+    const rows = tbody.children;
+    const opts = pricedExpiry.options;
+    if (rows.length !== opts.length) return false;
+
+    const midStrike = opts[Math.floor(opts.length / 2)]?.strike;
+    for (let i = 0; i < opts.length; i++) {
+        const row = opts[i];
+        const tr = rows[i];
+        const cells = tr.children;
+        // compact rows have 3 cells: call, strike, put
+        if (cells.length !== 3) return false;
+        // strike must match (structure unchanged)
+        if (parseInt(cells[1].textContent, 10) !== row.strike) return false;
+
+        const isAtm = row.strike === midStrike;
+        tr.className = 'chain-row' + (isAtm ? ' atm-row' : '');
+        cells[1].className = 'chain-cell strike-cell' + (isAtm ? ' atm-strike' : '');
+
+        const callMid = ((row.call.bid + row.call.ask) / 2).toFixed(2);
+        const putMid  = ((row.put.bid  + row.put.ask)  / 2).toFixed(2);
+
+        cells[0].dataset.tooltip = 'Bid ' + row.call.bid.toFixed(2) + ' / Ask ' + row.call.ask.toFixed(2);
+        _wrapPrice(cells[0], callMid, posMap, 'call', row.strike, pricedExpiry.day);
+
+        cells[2].dataset.tooltip = 'Bid ' + row.put.bid.toFixed(2) + ' / Ask ' + row.put.ask.toFixed(2);
+        _wrapPrice(cells[2], putMid, posMap, 'put', row.strike, pricedExpiry.day);
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // Exported: render chain into container
 // ---------------------------------------------------------------------------
 
@@ -199,9 +241,8 @@ export function rebuildExpiryDropdown(dropdownEl, skeleton, selectedIndex) {
  * @param {object|null} posMap - position map for indicators
  */
 export function renderChainInto(container, pricedExpiry, onClick, posMap) {
-    container.textContent = '';
-
     if (!pricedExpiry || !pricedExpiry.options || pricedExpiry.options.length === 0) {
+        container.textContent = '';
         const ph = document.createElement('div');
         ph.className = 'chain-placeholder';
         ph.textContent = 'No options for this expiry.';
@@ -209,6 +250,15 @@ export function renderChainInto(container, pricedExpiry, onClick, posMap) {
         return;
     }
 
+    // Try in-place update first (same expiry day + same strikes = no DOM rebuild)
+    if (container._chainExpiryDay === pricedExpiry.day
+        && _updateCompactChainInPlace(container, pricedExpiry, posMap)) {
+        return;
+    }
+
+    // Full rebuild needed (structure changed)
+    container.textContent = '';
+    container._chainExpiryDay = pricedExpiry.day;
     container.appendChild(buildChainTable(pricedExpiry, true, posMap));
     // Bind click delegation only once per container
     if (!container._chainClicksBound) {
