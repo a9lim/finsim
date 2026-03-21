@@ -62,6 +62,8 @@ src/
   llm.js             ~170 lines  LLMEventSource: Anthropic API via structured tool use
                                    (emit_events tool with JSON schema, forced via tool_choice).
                                    Full universe lore in system prompt. Fallback to offline on failure.
+  market.js             30 lines  Shared market state: mutable `market` object + `syncMarket(sim)`.
+                                   Single-writer (main.js), multiple readers. Leaf module (no imports).
   simulation.js        245 lines  GBM + Merton jumps + Heston stoch vol + Vasicek rate;
                                    beginDay()/substep()/finalizeDay() sub-step pipeline;
                                    prepopulate() synthetically backfills buffer via reverse
@@ -117,20 +119,21 @@ main.js
   |- src/config.js        (SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE)
   |- src/simulation.js    (Simulation -- imports config, history-buffer)
   |- src/history-buffer.js (HistoryBuffer -- no imports)
+  |- src/market.js         (market, syncMarket -- no imports, leaf module)
   |- src/chain.js         (buildChainSkeleton, priceChainExpiry, generateStrikes,
-  |                         ExpiryManager -- imports pricing, portfolio, config)
+  |                         ExpiryManager -- imports pricing, portfolio, market, config)
   |- src/portfolio.js     (portfolio, resetPortfolio, executeMarketOrder, computeBidAsk,
   |                         checkPendingOrders, chargeBorrowInterest, processDividends,
-  |                         processExpiry, setVasicekParams,
+  |                         processExpiry,
   |                         checkMargin, aggregateGreeks, closePosition, exerciseOption,
   |                         liquidateAll, placePendingOrder, cancelOrder, saveStrategy,
-  |                         executeStrategy -- imports pricing, config, position-value)
+  |                         executeStrategy -- imports pricing, market, config, position-value)
   |- src/events.js      (EventEngine, OFFLINE_EVENTS, PARAM_RANGES -- no imports)
   |- src/llm.js         (LLMEventSource -- imports events.js)
   |- src/chart.js         (ChartRenderer -- imports format-helpers; reads _PALETTE, _r globals)
-  |- src/strategy.js      (StrategyRenderer -- imports pricing, config)
+  |- src/strategy.js      (StrategyRenderer -- imports pricing, market, config)
   |- src/format-helpers.js  (fmtDollar, fmtNum, pnlClass, fmtDte, fmtRelDay, posTypeLabel -- imports config)
-  |- src/position-value.js  (imports pricing, config)
+  |- src/position-value.js  (imports pricing, market, config)
   |- src/chain-renderer.js  (posKey, renderChainInto, rebuildExpiryDropdown,
   |                         buildStockBondTable, buildChainTable, bindChainTableClicks
   |                         -- imports format-helpers; reads _haptics globals)
@@ -501,7 +504,7 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **Camera (chart only)**: `shared-camera.js`, world X = day index. Strategy canvas manages its own X-range.
 - **Pure module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator.
 - **Custom event bus**: `shoals:*` events from ui.js to main.js, decouples DOM from portfolio state.
-- **Bond pricing**: Vasicek closed-form via `vasicekBondPrice(face, r, T, a, b, sigmaR)` from pricing.js. Accounts for rate mean-reversion (duration caps at `1/a`) and rate volatility (convexity premium). Degrades to `face * exp(-r * T)` when `a < 1e-8`. Volatility-aware spread via `computeBidAsk()`. Strategy view shows theta (interest accrual) and rho. Vasicek params stored as module-level state in portfolio.js via `setVasicekParams(a, b, sigmaR)`.
+- **Bond pricing**: Vasicek closed-form via `vasicekBondPrice(face, r, T, a, b, sigmaR)` from pricing.js. Accounts for rate mean-reversion (duration caps at `1/a`) and rate volatility (convexity premium). Degrades to `face * exp(-r * T)` when `a < 1e-8`. Volatility-aware spread via `computeBidAsk()`. Strategy view shows theta (interest accrual) and rho. Consumer modules read Vasicek params from `market.*` (shared state synced by main.js via `syncMarket`).
 - **Auto-scroll**: keeps latest candle at ~85% from left when playing.
 - **Toast fill price**: trade toast shows actual fill price (including bid/ask spread) via `pos.fillPrice`.
 - **Shared chain renderer**: `renderChainInto()` in chain-renderer.js builds both trade-tab and strategy-tab chain tables from a pre-priced expiry. `rebuildExpiryDropdown()` populates expiry dropdowns from the skeleton (only on day-complete/reset, not every substep). Uses event delegation (3 listeners on container, not per-cell). Trade tab passes `$._onChainCellClick`, strategy tab wraps `onAddLeg`.
@@ -546,13 +549,13 @@ Browser-direct Anthropic API via `anthropic-dangerous-direct-browser-access` hea
 - **`worldToScreenX`/`screenToWorldX`** -- scalar camera methods in `shared-camera.js` avoid object allocation. chart.js uses these with fallback to `worldToScreen().x` for backwards compatibility.
 - **Strategy caches invalidate by key** -- `_cache` and `_summaryCache` use string keys from inputs. Changing legs, vol, rate, evalDay, zoom, or greek toggles auto-invalidates. Do not manually clear caches; they self-manage.
 - **`_precomputeLegs` / `_legPnlFast` / `_legGreeksFast`** -- standalone functions (not class methods) that precompute per-leg entry values once. The old `_legPnl`, `_totalPnl`, `_legGreeks`, `_totalGreeksAll` instance methods have been removed.
-- **Lazy chain: skeleton vs priced expiry** -- `chainSkeleton` (in main.js) holds expiry metadata + strikes with no pricing. `_priceExpiry(idx)` / `_priceExpiryGreeks(idx)` compute prices on demand for one expiry with term-structure vol, per-strike skew, and Vasicek rates (via `_hestonParams()` / `_vasicekParams()` helpers). Each strike gets its own tree (different skewed sigma). Only the currently visible expiry is priced each substep (25 tree preps + 25 dual inductions). Full Greeks: 175 tree preps + 175 dual inductions.
+- **Lazy chain: skeleton vs priced expiry** -- `chainSkeleton` (in main.js) holds expiry metadata + strikes with no pricing. `_priceExpiry(idx)` / `_priceExpiryGreeks(idx)` compute prices on demand for one expiry with term-structure vol, per-strike skew, and Vasicek rates (read from `market.*`). Each strike gets its own tree (different skewed sigma). Only the currently visible expiry is priced each substep (25 tree preps + 25 dual inductions). Full Greeks: 175 tree preps + 175 dual inductions.
 - **Substep UI updates** -- `_onSubstep()` fires after each substep batch during playback. It checks pending orders at intraday prices, reprices the visible expiry, and updates the sidebar (portfolio, rate, chain table). Dropdown rebuild happens only on day-complete via `chainDirty`.
 - **Strategy tab pauses sim** -- switching to the strategy tab sets `playing = false`. The user must manually resume after leaving the tab.
 - **`q` (dividend yield) threads through all pricing** -- `priceAmerican(S, K, T, r, sigma, isPut, q, currentDay)` and `computeGreeks(S, K, T, r, sigma, isPut, q, currentDay)` accept `q` and optional `currentDay`. When `currentDay` is provided, discrete dividends at `QUARTERLY_CYCLE` boundaries are used; otherwise falls back to continuous yield.
 - **Dividends fire every `QUARTERLY_CYCLE` trading days** -- aligned with expiry cycle. `sim.day % QUARTERLY_CYCLE === 0` in `_onDayComplete()`. Stock price drops by `q/4` (ex-dividend), then cash payments to shareholders. No payment if `q === 0` or no stock positions.
 - **`q` is NOT in the GBM drift** -- stock price grows at `mu` (not `mu - q`) between dividend dates. The quarterly `S *= (1 - q/4)` drop is the only dividend effect on stock price, matching the binomial tree's discrete dividend model.
-- **`computeEffectiveSigma` and `computeSkewSigma` are exported from pricing.js** -- used by chain.js and strategy.js. `computeEffectiveSigma(v, T, kappa, theta, xi)` takes variance (not vol) and includes a vol-of-vol convexity adjustment when `xi > 0` (Gatheral 2006). `computeSkewSigma` adjusts vol per strike using second-order Heston: linear skew `ρξ/(2σ)` plus quadratic curvature `ξ²/(12σ²)`, both dampened by mean-reversion. Chain and strategy callers pass `_hestonParams()` / `_vasicekParams()` from main.js.
+- **`computeEffectiveSigma` and `computeSkewSigma` are exported from pricing.js** -- used by chain.js and strategy.js. `computeEffectiveSigma(v, T, kappa, theta, xi)` takes variance (not vol) and includes a vol-of-vol convexity adjustment when `xi > 0` (Gatheral 2006). `computeSkewSigma` adjusts vol per strike using second-order Heston: linear skew `ρξ/(2σ)` plus quadratic curvature `ξ²/(12σ²)`, both dampened by mean-reversion. Chain and strategy callers read Heston/Vasicek params from the shared `market` object (`src/market.js`).
 - **Per-step rate arrays in tree** -- `puDisc` and `pdDisc` are `Float64Array(_N)` (not scalars). `_priceCore` and `_pricePairCore` index `puDisc[i]`/`pdDisc[i]` per backward-induction step. When `vasicek` is omitted, arrays are filled with uniform values.
 - **Dual pricing uses separate intermediates** -- `_pricePairCore` writes to `_cf10.._cf22` / `_pf10.._pf22` (pair intermediates), while `_priceCore` writes to `_f10.._f22` (single intermediates). `_pairDeltaGamma` reads pair intermediates; `_treeDeltaGamma` reads single intermediates. Do not mix — calling `_priceCore` after `_pricePairCore` overwrites `_V` (the call value buffer shared between both paths).
 - **No hardcoded colors in JS** -- chart.js and strategy.js use `_PALETTE` and `_r()` for all colors. CSS slider-track fallbacks in styles.css are the only remaining hardcoded rgba values (defensive fallback for when shared-tokens.js hasn't loaded).
