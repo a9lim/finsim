@@ -196,7 +196,7 @@
                 <button class="tab-btn active" id="tab-btn-trade" data-tab="trade" role="tab" aria-selected="true">Trade</button>
                 <button class="tab-btn" id="tab-btn-portfolio" data-tab="portfolio" role="tab" aria-selected="false">Portfolio</button>
                 <button class="tab-btn" id="tab-btn-strategy" data-tab="strategy" role="tab" aria-selected="false">Strategy</button>
-                <button class="tab-btn" id="tab-btn-settings" data-tab="settings" role="tab" aria-selected="false">Settings</button>
+                <button class="tab-btn" id="tab-btn-settings" data-tab="settings" role="tab" aria-selected="false">Info</button>
             </nav>
             <div class="tab-panels scrollbar-thin">
                 <!-- Trade Tab -->
@@ -392,6 +392,21 @@
                     <div id="event-log-section" class="stat-group hidden">
                         <div class="group-label">Event Log</div>
                         <div id="event-log" class="event-log"></div>
+                    </div>
+                    <div id="congress-section" class="stat-group hidden">
+                        <div class="group-label">Congress</div>
+                        <div class="congress-diagrams">
+                            <div class="congress-chamber">
+                                <div class="congress-chamber-label">Senate</div>
+                                <canvas id="senate-diagram" width="260" height="130"></canvas>
+                                <div id="senate-legend" class="congress-legend"></div>
+                            </div>
+                            <div class="congress-chamber">
+                                <div class="congress-chamber-label">House</div>
+                                <canvas id="house-diagram" width="260" height="130"></canvas>
+                                <div id="house-legend" class="congress-legend"></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="stat-group">
                         <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn">Advanced Parameters</button>

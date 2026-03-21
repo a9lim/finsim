@@ -24,7 +24,7 @@ import {
     syncSettingsUI, toggleStrategyView, showMarginCall, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay,
-    updateDynamicSections, updateEventLog,
+    updateDynamicSections, updateEventLog, updateCongressDiagrams,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
 import { EventEngine } from './src/events.js';
@@ -548,6 +548,7 @@ function _onDayComplete() {
             sim.recomputeK();
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+            updateCongressDiagrams($, eventEngine.world);
             if (typeof showToast !== 'undefined') {
                 for (let i = 0; i < events.length; i++) {
                     const ev = events[i];
@@ -826,6 +827,7 @@ function loadPreset(index) {
         eventEngine = null;
     }
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
+    updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
 
     updateUI();
     _repositionCamera();
@@ -840,6 +842,7 @@ function resetSim() {
     if (eventEngine) eventEngine.reset();
     if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
+    updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
 
     updateUI();
     _repositionCamera();

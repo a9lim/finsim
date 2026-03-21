@@ -104,6 +104,11 @@ export function cacheDOMElements($) {
     $.llmKeyToggle       = document.getElementById('llm-key-toggle');
     $.llmModel           = document.getElementById('llm-model');
     $.llmProvider        = document.getElementById('llm-provider');
+    $.congressSection    = document.getElementById('congress-section');
+    $.senateDiagram      = document.getElementById('senate-diagram');
+    $.houseDiagram       = document.getElementById('house-diagram');
+    $.senateLegend       = document.getElementById('senate-legend');
+    $.houseLegend        = document.getElementById('house-legend');
 }
 
 // ---------------------------------------------------------------------------
@@ -827,6 +832,9 @@ export function updateDynamicSections($, presetIndex) {
     if ($.eventLogSection) {
         $.eventLogSection.classList.toggle('hidden', !isDynamic);
     }
+    if ($.congressSection) {
+        $.congressSection.classList.toggle('hidden', !isDynamic);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -863,4 +871,99 @@ export function updateEventLog($, eventLog, dayOrigin) {
         row.appendChild(headlineSpan);
         $.eventLog.appendChild(row);
     }
+}
+
+// ---------------------------------------------------------------------------
+// updateCongressDiagrams -- parliament-style semicircle diagrams
+// ---------------------------------------------------------------------------
+
+const _CONGRESS_COLORS = {
+    federalist: '#9C6840',  // brown (extended.brown)
+    farmerLabor: '#509878', // green (extended.green)
+    independent: '#8A7E72', // slate (extended.slate)
+};
+
+function _drawParliament(canvas, segments, total) {
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || canvas.width;
+    const h = canvas.clientHeight || canvas.height;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    const cx = w / 2;
+    const cy = h - 4;
+    const outerR = Math.min(cx - 4, h - 8);
+    const innerR = outerR * 0.45;
+    const rows = 4;
+    const gap = 0.01; // small gap between segments in radians
+
+    // Draw rows of arcs from inside out
+    const rowWidth = (outerR - innerR) / rows;
+    for (let row = 0; row < rows; row++) {
+        const r1 = innerR + row * rowWidth + 1;
+        const r2 = innerR + (row + 1) * rowWidth - 1;
+
+        let startAngle = Math.PI; // left (180 deg)
+        for (const seg of segments) {
+            const sweep = (seg.count / total) * Math.PI;
+            if (sweep <= 0) continue;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, r2, startAngle + gap, startAngle + sweep - gap, false);
+            ctx.arc(cx, cy, r1, startAngle + sweep - gap, startAngle + gap, true);
+            ctx.closePath();
+            ctx.fillStyle = seg.color;
+            ctx.fill();
+
+            startAngle += sweep;
+        }
+    }
+}
+
+function _updateLegend(el, segments) {
+    if (!el) return;
+    el.textContent = '';
+    for (const seg of segments) {
+        if (seg.count <= 0) continue;
+        const item = document.createElement('span');
+        item.className = 'congress-legend-item';
+
+        const dot = document.createElement('span');
+        dot.className = 'congress-legend-dot';
+        dot.style.background = seg.color;
+
+        const label = document.createElement('span');
+        label.textContent = seg.label + ' ' + seg.count;
+
+        item.appendChild(dot);
+        item.appendChild(label);
+        el.appendChild(item);
+    }
+}
+
+export function updateCongressDiagrams($, world) {
+    if (!world || !$.senateDiagram) return;
+    const s = world.congress.senate;
+    const h = world.congress.house;
+
+    const senateSegs = [
+        { label: 'Farmer-Labor', count: s.farmerLabor, color: _CONGRESS_COLORS.farmerLabor },
+        { label: 'Independent', count: s.independent, color: _CONGRESS_COLORS.independent },
+        { label: 'Federalist', count: s.federalist, color: _CONGRESS_COLORS.federalist },
+    ];
+    const senateTotal = s.federalist + s.farmerLabor + s.independent;
+    _drawParliament($.senateDiagram, senateSegs, senateTotal);
+    _updateLegend($.senateLegend, senateSegs);
+
+    const houseSegs = [
+        { label: 'Farmer-Labor', count: h.farmerLabor, color: _CONGRESS_COLORS.farmerLabor },
+        { label: 'Federalist', count: h.federalist, color: _CONGRESS_COLORS.federalist },
+    ];
+    const houseTotal = h.federalist + h.farmerLabor;
+    _drawParliament($.houseDiagram, houseSegs, houseTotal);
+    _updateLegend($.houseLegend, houseSegs);
 }
