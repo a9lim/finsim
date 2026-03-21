@@ -393,6 +393,7 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-family: var(--font-mono);
 }
 
 .pos-pnl {
@@ -917,4 +918,73 @@ main {
     .epilogue-body {
         max-height: calc(100vh - 180px);
     }
+}
+
+/* Strategy name input */
+.sim-input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.sim-input:focus {
+    border-color: var(--accent);
+}
+.sim-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Saved strategies section in trade tab */
+.saved-strategies-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+/* Credit/debit coloring */
+#strategy-net-cost.pnl-up { color: var(--up); }
+#strategy-net-cost.pnl-down { color: var(--down); }
+
+/* Strategy group box in portfolio */
+.strategy-group {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 5px 8px;
+    margin-bottom: 3px;
+    font-size: 0.75rem;
+    transition: background 0.12s;
+}
+.strategy-group:hover {
+    background: var(--bg-hover);
+}
+.strategy-group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.strategy-group-header .strategy-group-name {
+    flex: 1;
+    font-family: var(--font-mono);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.strategy-group-header .strategy-group-pnl {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+.strategy-group-detail {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: 1.3;
 }

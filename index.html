@@ -256,6 +256,17 @@
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
                         <button id="full-chain-link" class="ghost-btn chain-expand-btn">View Full Chain</button>
+                        <div class="stat-group saved-strategies-section" id="saved-strategies-section">
+                            <div class="group-label">Saved Strategies</div>
+                            <select id="trade-strategy-select" class="sim-select" aria-label="Saved strategy">
+                                <option value="">Select a strategy&hellip;</option>
+                            </select>
+                            <div class="stat-row" id="strategy-credit-debit">
+                                <span class="stat-label">Net Cost</span>
+                                <span class="stat-value" id="strategy-net-cost">&mdash;</span>
+                            </div>
+                            <button id="trade-exec-strategy-btn" class="ghost-btn trade-btn up" disabled>Execute Strategy</button>
+                        </div>
                         <p class="panel-hint trade-hint">Left-click: buy &middot; Right-click: sell/short &middot; Hover: bid/ask <button class="info-trigger" type="button" data-info="bidask" aria-label="Info: Bid-Ask Spreads">?</button></p>
                     </div>
                 </div>
@@ -360,14 +371,31 @@
                         <div id="strategy-chain-table" class="chain-table">
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
-                        <p class="panel-hint trade-hint">Left-click: long &middot; Right-click: short &middot; Payoff <button class="info-trigger" type="button" data-info="payoff" aria-label="Info: Payoff Diagrams">?</button></p>
+                        <p class="panel-hint trade-hint">Left-click: long &middot; Right-click: short &middot; Strategies save relative strikes &amp; expiries. Payoff <button class="info-trigger" type="button" data-info="payoff" aria-label="Info: Payoff Diagrams">?</button></p>
+                        <div class="group-label">Legs</div>
                         <div id="strategy-legs-list" class="strategy-legs-list">
                             <p class="panel-hint">No legs added. Click buttons above to build a strategy.</p>
                         </div>
                         <div id="strategy-summary" class="strategy-summary"></div>
+                        <div class="group-label">Save Strategy</div>
+                        <div class="control-group">
+                            <label for="strategy-load-select">Strategy</label>
+                            <select id="strategy-load-select" class="sim-select" aria-label="Load saved strategy">
+                                <option value="">New strategy</option>
+                            </select>
+                        </div>
+                        <div id="strategy-edit-fields">
+                            <div class="control-group">
+                                <label for="strategy-name">Name</label>
+                                <input type="text" id="strategy-name" class="sim-input" placeholder="Strategy 1" maxlength="40">
+                            </div>
+                            <div class="ctrl-row"><label for="selectable-expiry-toggle">Selectable Expiry</label>
+                                <div class="tog-wrap"><input type="checkbox" id="selectable-expiry-toggle" checked role="switch" aria-checked="true">
+                                <label for="selectable-expiry-toggle" class="tog"><span class="tog-thumb"></span></label></div></div>
+                        </div>
                         <div class="quick-trade-row" style="margin-top:6px">
-                            <button id="save-strategy-btn" class="ghost-btn trade-btn bond" disabled>Save</button>
-                            <button id="exec-strategy-btn" class="ghost-btn trade-btn up" disabled>Execute</button>
+                            <button id="save-strategy-btn" class="ghost-btn trade-btn up" disabled>Save</button>
+                            <button id="delete-strategy-btn" class="ghost-btn trade-btn down" disabled>Delete</button>
                         </div>
                     </div>
                 </div>
