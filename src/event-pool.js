@@ -130,7 +130,7 @@ const FED_EVENTS = [
         category: 'fed',
         likelihood: 0.3,
         headline: 'Fed announces open-ended QE: $120B/month in Treasury and MBS purchases; "whatever it takes" language deployed',
-        params: { mu: 0.05, theta: -0.015, b: -0.01, sigmaR: -0.003, lambda: -0.5 },
+        params: { mu: 0.05, theta: -0.015, b: -0.01, sigmaR: -0.003, lambda: -0.5, q: 0.002 },
         magnitude: 'major',
         when: (sim, world) => !world.fed.qeActive && sim.b < 0.02,
         effects: (world) => { world.fed.qeActive = true; },
@@ -299,7 +299,7 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 0.7,
         headline: 'Barron signs executive order imposing 25% tariffs on $200B of imports; "America will no longer be ripped off," he declares at signing ceremony',
-        params: { mu: -0.05, theta: 0.02, lambda: 1.0, muJ: -0.02 },
+        params: { mu: -0.05, theta: 0.02, lambda: 1.0, muJ: -0.02, q: -0.001 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 0,
         effects: (world) => {
@@ -358,7 +358,7 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 1.0,
         headline: 'Beijing restricts rare earth exports to U.S. in retaliation; chip manufacturers warn of 6-month supply shortage. Defense stocks crater',
-        params: { mu: -0.08, theta: 0.04, lambda: 2.0, muJ: -0.05, sigmaR: 0.008 },
+        params: { mu: -0.08, theta: 0.04, lambda: 2.0, muJ: -0.05, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 3 && world.geopolitical.chinaRelations <= -2,
     },
@@ -384,7 +384,7 @@ const MACRO_EVENTS = [
             return base;
         },
         headline: 'Barron and Beijing announce "Phase One" trade deal framework; tariffs to be rolled back over 18 months. Barron: "The biggest deal in history, maybe ever"',
-        params: { mu: 0.05, theta: -0.02, lambda: -0.8, muJ: 0.01 },
+        params: { mu: 0.05, theta: -0.02, lambda: -0.8, muJ: 0.01, q: 0.002 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 2 && world.geopolitical.tradeWarStage < 4,
         effects: (world) => {
@@ -593,7 +593,7 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 0.5,
         headline: 'OPEC+ announces surprise 2M barrel/day production cut; oil surges 18% in a single session. Energy costs ripple through supply chains',
-        params: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.03, b: 0.01, sigmaR: 0.008 },
+        params: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.03, b: 0.01, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
         when: (sim, world) => !world.geopolitical.oilCrisis,
         effects: (world) => {
@@ -605,7 +605,7 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 0.4,
         headline: 'Barron imposes energy sanctions on major oil-exporting state; "They will feel the full force of American economic power." Crude jumps 8%',
-        params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.005 },
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.005, q: -0.001 },
         magnitude: 'moderate',
         when: (sim, world) => !world.geopolitical.sanctionsActive,
         effects: (world) => {
@@ -651,7 +651,7 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 1.0,
         headline: 'NBER officially declares recession began two quarters ago; Barron blames "obstructionist Congress and a reckless Fed." Markets already priced most of it',
-        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04, b: -0.01 },
+        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04, b: -0.01, q: -0.005 },
         magnitude: 'major',
         when: (sim, world) => sim.mu < -0.05 && sim.theta > 0.12 && !world.geopolitical.recessionDeclared,
         effects: (world) => {
@@ -664,7 +664,7 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 0.25,
         headline: 'Major European sovereign downgraded two notches; contagion fears spike as CDS spreads widen across periphery. Flight to quality drives Treasury yields down',
-        params: { mu: -0.04, theta: 0.025, lambda: 1.5, muJ: -0.03, b: -0.005, sigmaR: 0.008 },
+        params: { mu: -0.04, theta: 0.025, lambda: 1.5, muJ: -0.03, b: -0.005, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
     },
     {
@@ -1254,7 +1254,7 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'PNTH board authorizes $3B accelerated share buyback program; Dirks: "The market dramatically undervalues this company"',
-        params: { mu: 0.03, theta: -0.005, lambda: -0.2 },
+        params: { mu: 0.03, theta: -0.005, lambda: -0.2, q: -0.001 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.acquired && world.pnth.boardDirks >= 6,
     },
@@ -1280,7 +1280,7 @@ const PNTH_EARNINGS_EVENTS = [
             return base;
         },
         headline: 'PNTH crushes estimates: revenue +32% YoY, Atlas AI bookings up 60%. Raises full-year guidance. Stock surges after hours',
-        params: { mu: 0.04, theta: -0.01, lambda: -0.3 },
+        params: { mu: 0.04, theta: -0.01, lambda: -0.3, q: 0.002 },
         magnitude: 'moderate',
     },
     {
@@ -1318,7 +1318,7 @@ const PNTH_EARNINGS_EVENTS = [
             return base;
         },
         headline: 'PNTH disaster quarter: revenue misses by 12%, operating loss widens, three major customers paused contracts. Guidance slashed. Dirks faces board questions',
-        params: { mu: -0.04, theta: 0.015, lambda: 0.6, muJ: -0.02 },
+        params: { mu: -0.04, theta: 0.015, lambda: 0.6, muJ: -0.02, q: -0.002 },
         magnitude: 'moderate',
         effects: (world) => {
             world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
@@ -1333,7 +1333,7 @@ const PNTH_EARNINGS_EVENTS = [
             return base;
         },
         headline: 'PNTH raises full-year revenue guidance by 15% citing "unprecedented enterprise AI adoption"; lifts margin target. Bull case intact',
-        params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
+        params: { mu: 0.03, theta: -0.008, lambda: -0.2, q: 0.001 },
         magnitude: 'moderate',
         effects: (world) => {
             world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
@@ -1349,7 +1349,7 @@ const PNTH_EARNINGS_EVENTS = [
             return base;
         },
         headline: 'PNTH slashes guidance mid-quarter citing "regulatory headwinds and customer hesitation"; withdraws full-year outlook entirely. CFO: "Visibility is low"',
-        params: { mu: -0.03, theta: 0.012, lambda: 0.5, muJ: -0.01 },
+        params: { mu: -0.03, theta: 0.012, lambda: 0.5, muJ: -0.01, q: -0.001 },
         magnitude: 'moderate',
         effects: (world) => {
             world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
@@ -1482,6 +1482,44 @@ const SECTOR_EVENTS = [
         params: { mu: -0.015, theta: 0.008 },
         magnitude: 'minor',
     },
+
+    // -- Dividend / corporate payout events --------------------------------
+    {
+        id: 'corporate_dividend_boom',
+        category: 'sector',
+        likelihood: 0.8,
+        headline: 'S&P 500 dividend payments hit record high; 40 companies raised payouts this quarter on strong free cash flow and low leverage',
+        params: { mu: 0.015, theta: -0.005, q: 0.003 },
+        magnitude: 'minor',
+        when: (sim) => sim.mu > 0.03 && sim.q < 0.08,
+    },
+    {
+        id: 'dividend_cut_wave',
+        category: 'sector',
+        likelihood: 0.6,
+        headline: 'Wave of dividend cuts sweeps market: 15 blue-chip companies reduce or suspend payouts, citing margin pressure and uncertain outlook',
+        params: { mu: -0.02, theta: 0.01, q: -0.005 },
+        magnitude: 'moderate',
+        when: (sim) => sim.mu < -0.03 && sim.q > 0.01,
+    },
+    {
+        id: 'special_dividend_announcements',
+        category: 'sector',
+        likelihood: 0.6,
+        headline: 'Multiple large-caps announce special dividends as repatriation cash piles grow; $50B in one-time shareholder returns announced this week',
+        params: { mu: 0.02, theta: -0.005, q: 0.004 },
+        magnitude: 'moderate',
+        when: (sim) => sim.q < 0.06 && sim.mu > 0.0,
+    },
+    {
+        id: 'buyback_to_dividend_shift',
+        category: 'sector',
+        likelihood: 1.0,
+        headline: 'Corporate treasurers pivot from buybacks to dividends as institutional investors demand yield; dividend payout ratios rise across sectors',
+        params: { mu: 0.01, q: 0.003 },
+        magnitude: 'minor',
+        when: (sim) => sim.q < 0.05,
+    },
 ];
 const POLITICAL_EVENTS = [
     // =====================================================================
@@ -1613,7 +1651,7 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 0.4,
         headline: 'In rare bipartisan moment, Congress passes $500B infrastructure package; both parties claim credit. Construction and materials stocks jump',
-        params: { mu: 0.03, theta: -0.01, lambda: -0.2 },
+        params: { mu: 0.03, theta: -0.01, lambda: -0.2, q: 0.001 },
         magnitude: 'moderate',
     },
     {
@@ -1641,7 +1679,7 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 0.6,
         headline: 'Barron proposes sweeping corporate tax cut from 21% to 15%; analysts project $400B revenue shortfall. Markets rally, bond bears growl',
-        params: { mu: 0.03, theta: -0.005, b: 0.003 },
+        params: { mu: 0.03, theta: -0.005, b: 0.003, q: 0.002 },
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.trifecta,
         effects: (world) => {
@@ -1924,7 +1962,7 @@ const COMPOUND_EVENTS = [
         category: 'compound',
         likelihood: 1.0,
         headline: 'Stagflation fears grip markets as oil hits $140 and Fed leadership vacuum deepens; no policy response in sight. "Who\'s steering the ship?" asks Okafor',
-        params: { mu: -0.07, theta: 0.04, lambda: 2.0, sigmaR: 0.01 },
+        params: { mu: -0.07, theta: 0.04, lambda: 2.0, sigmaR: 0.01, q: -0.003 },
         magnitude: 'major',
         when: (sim, world) => world.fed.hartleyFired && world.geopolitical.oilCrisis,
     },
@@ -1933,7 +1971,7 @@ const COMPOUND_EVENTS = [
         category: 'compound',
         likelihood: 1.0,
         headline: '"Worst week since 2008": margin calls cascade as institutional investors flee; regulators hold emergency session. Circuit breakers triggered three days running',
-        params: { mu: -0.08, theta: 0.05, lambda: 3.0, muJ: -0.06, xi: 0.15 },
+        params: { mu: -0.08, theta: 0.05, lambda: 3.0, muJ: -0.06, xi: 0.15, q: -0.005 },
         magnitude: 'major',
         when: (sim, world) => world.fed.credibilityScore < 3 && world.geopolitical.recessionDeclared && sim.theta > 0.15,
     },
@@ -1980,7 +2018,7 @@ const COMPOUND_EVENTS = [
         category: 'compound',
         likelihood: 1.0,
         headline: 'Dollar drops 8% against reserve currency basket; foreign central banks accelerate reserve diversification as Vane\'s rate cuts erode confidence',
-        params: { mu: -0.05, theta: 0.03, lambda: 1.5, b: 0.01, sigmaR: 0.01 },
+        params: { mu: -0.05, theta: 0.03, lambda: 1.5, b: 0.01, sigmaR: 0.01, q: -0.002 },
         magnitude: 'major',
         when: (sim, world) => world.fed.vaneAppointed && sim.b < 0.02,
     },
@@ -1989,7 +2027,7 @@ const COMPOUND_EVENTS = [
         category: 'compound',
         likelihood: 1.5,
         headline: 'GDP rebounds sharply; recession officially over after two quarters of contraction. "V-shaped recovery" narrative takes hold, shorts scramble to cover',
-        params: { mu: 0.04, theta: -0.015, lambda: -0.5 },
+        params: { mu: 0.04, theta: -0.015, lambda: -0.5, q: 0.003 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.recessionDeclared && sim.mu > 0.03,
         effects: (world) => {
@@ -2002,11 +2040,439 @@ const COMPOUND_EVENTS = [
         category: 'compound',
         likelihood: 1.5,
         headline: 'OPEC+ reverses supply cuts; oil prices stabilize as geopolitical tensions ease. Consumer confidence rebounds on cheaper gas',
-        params: { mu: 0.03, theta: -0.01, lambda: -0.3 },
+        params: { mu: 0.03, theta: -0.01, lambda: -0.3, q: 0.001 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.oilCrisis && sim.theta < 0.10,
         effects: (world) => {
             world.geopolitical.oilCrisis = false;
+        },
+    },
+];
+const CONGRESSIONAL_EVENTS = [
+    // =====================================================================
+    //  ARC 9: CONGRESSIONAL DYNAMICS
+    //  Resignations, defections, special elections, leadership crises,
+    //  debt ceiling, and dividend-affecting legislation.
+    // =====================================================================
+
+    // -- Senate resignations & special elections ----------------------------
+    {
+        id: 'fed_senator_resigns_scandal',
+        category: 'congressional',
+        likelihood: 0.4,
+        headline: 'Federalist Sen. Hargrove resigns amid campaign finance indictment; Federalist governor appoints placeholder. Special election in 90 days',
+        params: { mu: -0.01, theta: 0.008, lambda: 0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.congress.senate.federalist >= 50,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 1);
+        },
+        followups: [
+            { id: 'special_election_senate_fed_holds', mtth: 45, weight: 0.4 },
+            { id: 'special_election_senate_fl_flips', mtth: 45, weight: 0.6 },
+        ],
+    },
+    {
+        id: 'fl_senator_resigns_health',
+        category: 'congressional',
+        likelihood: 0.4,
+        headline: 'Farmer-Labor Sen. Vasquez announces retirement citing health; Federalist-leaning state holds special election in deep-orange territory',
+        params: { mu: 0.01, theta: 0.005 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.congress.senate.farmerLabor >= 46,
+        followups: [
+            { id: 'special_election_senate_fed_gains', mtth: 45, weight: 0.7 },
+            { id: 'special_election_senate_fl_defends', mtth: 45, weight: 0.3 },
+        ],
+    },
+    {
+        id: 'special_election_senate_fed_holds',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Federalists hold Senate seat in special election; new senator pledges to continue Barron\'s agenda. Majority preserved',
+        params: { mu: 0.01, theta: -0.003 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'special_election_senate_fl_flips',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Farmer-Labor flips Senate seat in special election upset; margin now razor-thin. Barron\'s legislative agenda in jeopardy',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.congress.senate.federalist -= 1;
+            world.congress.senate.farmerLabor += 1;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+    },
+    {
+        id: 'special_election_senate_fed_gains',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Federalists pick up Senate seat in special election; expanded majority strengthens Barron\'s hand on confirmations',
+        params: { mu: 0.02, theta: -0.005 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.congress.senate.federalist += 1;
+            world.congress.senate.farmerLabor -= 1;
+        },
+    },
+    {
+        id: 'special_election_senate_fl_defends',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Farmer-Labor holds seat in hostile territory; surprise special election victory energizes opposition base',
+        params: { mu: -0.01, theta: 0.005 },
+        magnitude: 'minor',
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 1);
+        },
+    },
+
+    // -- House vacancies & special elections --------------------------------
+    {
+        id: 'house_reps_resign_wave',
+        category: 'congressional',
+        likelihood: 0.4,
+        headline: 'Three Federalist House members announce early departures; two join lobbying firms, one takes a corporate board seat. Governing majority thins',
+        params: { mu: -0.01, theta: 0.005, lambda: 0.1 },
+        magnitude: 'minor',
+        when: (sim, world, congress) => congress.fedControlsHouse && world.congress.house.federalist >= 220,
+        effects: (world) => {
+            world.congress.house.federalist -= 3;
+        },
+        followups: [
+            { id: 'house_special_elections_mixed', mtth: 50, weight: 0.7 },
+        ],
+    },
+    {
+        id: 'house_special_elections_mixed',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Special elections fill House vacancies: Federalists hold two of three seats, Farmer-Labor flips one in suburban district',
+        params: { mu: 0.005 },
+        magnitude: 'minor',
+        effects: (world) => {
+            // Fill 3 vacancies: Fed wins 2, FL wins 1
+            world.congress.house.federalist += 2;
+            world.congress.house.farmerLabor += 1;
+        },
+    },
+    {
+        id: 'fl_house_reps_resign_wave',
+        category: 'congressional',
+        likelihood: 0.3,
+        headline: 'Two veteran Farmer-Labor House members retire mid-term in safe green districts; replacements expected to be more progressive',
+        params: { mu: 0.005, theta: 0.003 },
+        magnitude: 'minor',
+        when: (sim, world) => world.congress.house.farmerLabor >= 210,
+        effects: (world) => {
+            // Safe seats, replacements assumed same party
+        },
+    },
+
+    // -- Party defections --------------------------------------------------
+    {
+        id: 'fed_rep_defects_to_fl',
+        category: 'congressional',
+        likelihood: 0.3,
+        headline: 'Rep. Calloway switches from Federalist to Farmer-Labor on House floor: "I can no longer support a party that has abandoned its principles"',
+        params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.congress.house.federalist >= 216 && world.election.barronApproval < 45,
+        effects: (world) => {
+            world.congress.house.federalist -= 1;
+            world.congress.house.farmerLabor += 1;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+        followups: [
+            { id: 'defection_fallout_fed', mtth: 10, weight: 0.6 },
+        ],
+    },
+    {
+        id: 'defection_fallout_fed',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Calloway\'s defection triggers soul-searching in Federalist caucus; two more moderates reportedly "exploring options." Leadership scrambles to shore up ranks',
+        params: { mu: -0.01, theta: 0.005 },
+        magnitude: 'minor',
+        when: (sim, world) => world.congress.house.federalist >= 214,
+        followups: [
+            { id: 'second_defection', mtth: 30, weight: 0.3 },
+        ],
+    },
+    {
+        id: 'second_defection',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Second Federalist representative switches parties; House majority hangs by a thread. Barron: "Good riddance to a FINO traitor"',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.congress.house.federalist -= 1;
+            world.congress.house.farmerLabor += 1;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+    },
+    {
+        id: 'fl_rep_defects_to_fed',
+        category: 'congressional',
+        likelihood: 0.2,
+        headline: 'Conservative Farmer-Labor Rep. Hendricks switches to Federalist Party: "The radical left has taken over my party." Barron celebrates on social media',
+        params: { mu: 0.015, theta: -0.005, lambda: -0.1 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.congress.house.farmerLabor >= 210 && world.election.barronApproval > 45,
+        effects: (world) => {
+            world.congress.house.farmerLabor -= 1;
+            world.congress.house.federalist += 1;
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 1);
+        },
+    },
+    {
+        id: 'fed_senator_defects',
+        category: 'congressional',
+        likelihood: 0.15,
+        headline: 'BREAKING: Sen. Morrison announces switch from Federalist to Independent, will caucus with Farmer-Labor. "I swore an oath to the Constitution, not to a party"',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5, sigmaR: 0.003 },
+        magnitude: 'major',
+        when: (sim, world) => world.congress.senate.federalist >= 50 && world.election.barronApproval < 42,
+        effects: (world) => {
+            world.congress.senate.federalist -= 1;
+            world.congress.senate.farmerLabor += 1;
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+        },
+    },
+
+    // -- Speaker / leadership crises ---------------------------------------
+    {
+        id: 'speaker_challenge',
+        category: 'congressional',
+        likelihood: 0.5,
+        headline: 'Hard-right Federalist bloc files motion to vacate the chair; House Speaker faces confidence vote as party fractures over spending bill',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.4 },
+        magnitude: 'moderate',
+        when: (sim, world, congress) => congress.fedControlsHouse && world.congress.house.federalist <= 225,
+        followups: [
+            { id: 'speaker_survives', mtth: 5, weight: 0.5 },
+            { id: 'speaker_ousted', mtth: 5, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'speaker_survives',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Speaker survives no-confidence vote 218-212 with help from three Farmer-Labor moderates; battered but still standing',
+        params: { mu: 0.01, theta: -0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'speaker_ousted',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'House Speaker ousted in historic vote; chamber paralyzed as no candidate can secure 218 votes. All legislation halted indefinitely',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, sigmaR: 0.004 },
+        magnitude: 'major',
+        when: (sim, world, congress) => congress.fedControlsHouse,
+        followups: [
+            { id: 'new_speaker_elected', mtth: 12, weight: 0.7 },
+            { id: 'speaker_chaos_continues', mtth: 12, weight: 0.3 },
+        ],
+    },
+    {
+        id: 'new_speaker_elected',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'After four rounds of voting, new House Speaker elected; moderate compromise candidate. Markets relieved as legislative function restored',
+        params: { mu: 0.02, theta: -0.008, lambda: -0.3 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'speaker_chaos_continues',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Week two without a House Speaker; 11 rounds of voting yield no winner. Government funding deadline approaching with no one to bring a bill to the floor',
+        params: { mu: -0.02, theta: 0.015, lambda: 0.5, sigmaR: 0.005 },
+        magnitude: 'moderate',
+        followups: [
+            { id: 'new_speaker_elected', mtth: 10, weight: 0.8 },
+        ],
+    },
+
+    // -- Debt ceiling ------------------------------------------------------
+    {
+        id: 'debt_ceiling_standoff',
+        category: 'congressional',
+        likelihood: 0.5,
+        headline: 'Treasury warns of "extraordinary measures" as debt ceiling deadline looms; rating agencies put U.S. on negative watch. T-bill yields spike',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, sigmaR: 0.008, b: 0.005 },
+        magnitude: 'major',
+        when: (sim, world, congress) => !congress.trifecta,
+        followups: [
+            { id: 'debt_ceiling_last_minute_deal', mtth: 15, weight: 0.6 },
+            { id: 'debt_ceiling_technical_default', mtth: 20, weight: 0.2 },
+            { id: 'debt_ceiling_clean_raise', mtth: 10, weight: 0.2 },
+        ],
+    },
+    {
+        id: 'debt_ceiling_last_minute_deal',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Debt ceiling raised in last-minute bipartisan deal with spending caps; markets rally in relief. "Government by crisis," says Okafor',
+        params: { mu: 0.03, theta: -0.01, lambda: -0.5, sigmaR: -0.003 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'debt_ceiling_technical_default',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'U.S. briefly misses Treasury coupon payment; first technical default in history. S&P strips AAA rating. Dollar tumbles as global shockwave hits',
+        params: { mu: -0.08, theta: 0.05, lambda: 3.0, muJ: -0.06, sigmaR: 0.02, b: 0.015, borrowSpread: 1.0, q: -0.003 },
+        magnitude: 'major',
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 10);
+        },
+        followups: [
+            { id: 'debt_ceiling_last_minute_deal', mtth: 5, weight: 0.9 },
+        ],
+    },
+    {
+        id: 'debt_ceiling_clean_raise',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Clean debt ceiling increase passes with bipartisan vote; crisis averted without drama for once. Markets barely react',
+        params: { mu: 0.01, theta: -0.005, sigmaR: -0.002 },
+        magnitude: 'minor',
+    },
+
+    // -- Congressional investigations & ethics -----------------------------
+    {
+        id: 'congressional_insider_trading_scandal',
+        category: 'congressional',
+        likelihood: 0.5,
+        headline: 'DOJ charges four sitting members of Congress with insider trading; trades traced to classified briefings on defense contracts. Bipartisan outrage erupts',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.4, borrowSpread: 0.1 },
+        magnitude: 'moderate',
+        effects: (world) => {
+            world.congress.house.federalist -= 2;
+            world.congress.house.farmerLabor -= 1;
+            world.congress.senate.federalist -= 1;
+        },
+        followups: [
+            { id: 'stock_act_reform', mtth: 30, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'stock_act_reform',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'STOCK Act reform passes both chambers unanimously: blind trusts mandatory for all members of Congress. "Should have been done years ago"',
+        params: { mu: 0.01, theta: -0.003 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'congressional_censure_barron',
+        category: 'congressional',
+        likelihood: 0.4,
+        headline: 'House passes censure resolution against President Barron for "abuse of executive power"; symbolic but historic. Barron: "A badge of honor"',
+        params: { mu: -0.015, theta: 0.008, lambda: 0.3 },
+        magnitude: 'moderate',
+        when: (sim, world, congress) => !congress.fedControlsHouse && world.election.barronApproval < 45,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
+    },
+
+    // -- Filibuster & procedural -------------------------------------------
+    {
+        id: 'filibuster_nuclear_option',
+        category: 'congressional',
+        likelihood: 0.3,
+        headline: 'Senate Majority Leader invokes nuclear option to eliminate legislative filibuster; major policy shifts now possible with bare 51-vote majority',
+        params: { mu: -0.02, theta: 0.015, lambda: 0.5, sigmaR: 0.004 },
+        magnitude: 'major',
+        when: (sim, world, congress) => congress.fedControlsSenate && world.congress.senate.federalist >= 52,
+        effects: (world) => {
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
+        },
+    },
+    {
+        id: 'senate_rejects_barron_nominee',
+        category: 'congressional',
+        likelihood: 0.5,
+        headline: 'Senate rejects Barron\'s pick for Secretary of Commerce 47-53; three Federalist moderates break ranks over nominee\'s conflicts of interest',
+        params: { mu: -0.01, theta: 0.005, lambda: 0.2 },
+        magnitude: 'minor',
+        when: (sim, world) => world.congress.senate.federalist <= 53,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 1);
+        },
+    },
+    {
+        id: 'congress_overrides_veto',
+        category: 'congressional',
+        likelihood: 0.15,
+        headline: 'Congress overrides presidential veto for the first time in Barron\'s term; bipartisan supermajority passes sanctions bill 78-22. Barron calls it "an unconstitutional coup"',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3, sigmaR: 0.003 },
+        magnitude: 'moderate',
+        when: (sim, world, congress) => congress.superMajority || (!congress.fedControlsHouse && world.congress.senate.federalist <= 55),
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+        },
+    },
+
+    // -- Dividend & tax legislation ----------------------------------------
+    {
+        id: 'dividend_tax_hike_bill',
+        category: 'congressional',
+        likelihood: 0.4,
+        headline: 'Farmer-Labor introduces bill to raise qualified dividend tax from 20% to 39.6%; corporations signal immediate pivot from dividends to buybacks',
+        params: { mu: -0.02, theta: 0.008, q: -0.005 },
+        magnitude: 'moderate',
+        when: (sim, world, congress) => !congress.trifecta && sim.q > 0.01,
+        followups: [
+            { id: 'dividend_tax_bill_stalls', mtth: 20, weight: 0.6 },
+            { id: 'dividend_tax_bill_compromise', mtth: 30, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'dividend_tax_bill_stalls',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Dividend tax bill dies in committee as Federalist senators filibuster; corporate treasurers resume normal payout plans',
+        params: { mu: 0.01, q: 0.003 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'dividend_tax_bill_compromise',
+        category: 'congressional',
+        likelihood: 1.0,
+        headline: 'Compromise dividend tax bill passes: qualified rate increases to 25% from 20%. Modest but meaningful shift toward retained earnings and buybacks',
+        params: { mu: -0.01, theta: 0.005, q: -0.003 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'corporate_tax_reform_passes',
+        category: 'congressional',
+        likelihood: 0.4,
+        headline: 'Barron\'s corporate tax reform passes both chambers: rate cut to 15%, repatriation holiday. Analysts project massive surge in shareholder returns',
+        params: { mu: 0.04, theta: -0.01, b: 0.003, q: 0.005 },
+        magnitude: 'major',
+        when: (sim, world, congress) => congress.trifecta,
+        effects: (world) => {
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
+        },
+    },
+    {
+        id: 'capital_gains_tax_scare',
+        category: 'congressional',
+        likelihood: 0.5,
+        headline: 'Senate Finance Committee floats doubling capital gains tax to 40%; wealthy investors front-run by locking in gains. Selling pressure intensifies',
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5, q: -0.002 },
+        magnitude: 'moderate',
+        when: (sim, world, congress) => !congress.trifecta,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 1);
         },
     },
 ];
@@ -2337,7 +2803,7 @@ const MARKET_EVENTS = [
             return base;
         },
         headline: 'Repo market seizure: overnight rates spike to 8% as dealers hoard reserves; Fed forced into emergency operations',
-        params: { mu: -0.05, theta: 0.035, lambda: 2.0, muJ: -0.04, borrowSpread: 0.8 },
+        params: { mu: -0.05, theta: 0.035, lambda: 2.0, muJ: -0.04, borrowSpread: 0.8, q: -0.003 },
         magnitude: 'major',
         followups: [
             { id: 'fed_emergency_repo', mtth: 3, weight: 0.8 },
@@ -2385,7 +2851,7 @@ const MARKET_EVENTS = [
             return base;
         },
         headline: 'Prime brokers issue wave of margin calls across hedge fund complex; forced liquidation drives broad-based selling',
-        params: { mu: -0.04, theta: 0.03, lambda: 2.5, muJ: -0.04, xi: 0.1, borrowSpread: 0.5 },
+        params: { mu: -0.04, theta: 0.03, lambda: 2.5, muJ: -0.04, xi: 0.1, borrowSpread: 0.5, q: -0.002 },
         magnitude: 'major',
     },
     {
@@ -2449,6 +2915,7 @@ export const OFFLINE_EVENTS = [
     ...MARKET_EVENTS,
     ...NEUTRAL_EVENTS,
     ...POLITICAL_EVENTS,
+    ...CONGRESSIONAL_EVENTS,
     ...INVESTIGATION_EVENTS,
     ...COMPOUND_EVENTS,
     ...MIDTERM_EVENTS,
