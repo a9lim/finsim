@@ -9,6 +9,8 @@
 import { fmtDollar, fmtNum, pnlClass, fmtDte, fmtRelDay, posTypeLabel } from './format-helpers.js';
 import { computeBidAsk } from './portfolio.js';
 import { renderChainInto, rebuildExpiryDropdown, buildStockBondTable, buildChainTable, bindChainTableClicks, posKey } from './chain-renderer.js';
+import { vasicekBondPrice } from './pricing.js';
+import { BOND_FACE_VALUE } from './config.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
 // ---------------------------------------------------------------------------
@@ -382,8 +384,9 @@ function _bidAskTip(mid, spot, sigma) {
 
 /**
  * @param {Array} skeleton - chain skeleton (has .day, .dte per entry)
+ * @param {Object} vasicek - optional Vasicek params { a, b, sigmaR }
  */
-export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, stratPosMap) {
+export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, stratPosMap, vasicek) {
     const dash = '\u2014';
     const stockTxt = spot != null ? spot.toFixed(2) : dash;
     const stockTip = _bidAskTip(spot, spot, sigma);
@@ -394,7 +397,9 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
         ? skeleton[isNaN(tradeIdx) ? skeleton.length - 1 : Math.min(tradeIdx, skeleton.length - 1)]
         : null;
     const tradeBondMid = tradeExp && rate != null
-        ? 100 * Math.exp(-rate * tradeExp.dte / 252)
+        ? vasicek
+            ? vasicekBondPrice(BOND_FACE_VALUE, rate, tradeExp.dte / 252, vasicek.a, vasicek.b, vasicek.sigmaR)
+            : BOND_FACE_VALUE * Math.exp(-rate * tradeExp.dte / 252)
         : null;
     const tradeBond = tradeBondMid != null ? tradeBondMid.toFixed(2) : dash;
 
@@ -412,7 +417,9 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
         ? skeleton[isNaN(stratIdx) ? skeleton.length - 1 : Math.min(stratIdx, skeleton.length - 1)]
         : null;
     const stratBondMid = stratExp && rate != null
-        ? 100 * Math.exp(-rate * stratExp.dte / 252)
+        ? vasicek
+            ? vasicekBondPrice(BOND_FACE_VALUE, rate, stratExp.dte / 252, vasicek.a, vasicek.b, vasicek.sigmaR)
+            : BOND_FACE_VALUE * Math.exp(-rate * stratExp.dte / 252)
         : null;
     const stratBond = stratBondMid != null ? stratBondMid.toFixed(2) : dash;
 
