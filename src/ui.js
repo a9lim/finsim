@@ -565,7 +565,6 @@ export function toggleStrategyView($, active) {
     if (active) {
         $.chartCanvas.classList.add('hidden');
         $.strategyCanvas.classList.remove('hidden');
-        $.timeSliderBar.classList.remove('hidden');
     } else {
         $.chartCanvas.classList.remove('hidden');
         $.strategyCanvas.classList.add('hidden');

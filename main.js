@@ -748,6 +748,9 @@ function _sliderFallbackDte() {
 }
 
 function updateTimeSliderRange() {
+    const hasLegs = strategyLegs.length > 0;
+    $.timeSliderBar.classList.toggle('hidden', !hasLegs);
+    if (!hasLegs) return;
     const minDTE = _getMinDTE();
     if (minDTE > 0) {
         $.timeSlider.disabled = false;
