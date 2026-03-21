@@ -877,11 +877,13 @@ export function updateEventLog($, eventLog, dayOrigin) {
 // updateCongressDiagrams -- parliament-style semicircle diagrams
 // ---------------------------------------------------------------------------
 
-const _CONGRESS_COLORS = {
-    federalist: '#9C6840',  // brown (extended.brown)
-    farmerLabor: '#509878', // green (extended.green)
-    independent: '#8A7E72', // slate (extended.slate)
-};
+function _congressColors() {
+    return {
+        federalist: _PALETTE.extended.brown,
+        farmerLabor: _PALETTE.extended.green,
+        independent: _PALETTE.extended.slate,
+    };
+}
 
 function _drawParliament(canvas, segments, total) {
     if (!canvas) return;
@@ -947,21 +949,22 @@ function _updateLegend(el, segments) {
 
 export function updateCongressDiagrams($, world) {
     if (!world || !$.senateDiagram) return;
+    const c = _congressColors();
     const s = world.congress.senate;
     const h = world.congress.house;
 
     const senateSegs = [
-        { label: 'Farmer-Labor', count: s.farmerLabor, color: _CONGRESS_COLORS.farmerLabor },
-        { label: 'Independent', count: s.independent, color: _CONGRESS_COLORS.independent },
-        { label: 'Federalist', count: s.federalist, color: _CONGRESS_COLORS.federalist },
+        { label: 'Farmer-Labor', count: s.farmerLabor, color: c.farmerLabor },
+        { label: 'Independent', count: s.independent, color: c.independent },
+        { label: 'Federalist', count: s.federalist, color: c.federalist },
     ];
     const senateTotal = s.federalist + s.farmerLabor + s.independent;
     _drawParliament($.senateDiagram, senateSegs, senateTotal);
     _updateLegend($.senateLegend, senateSegs);
 
     const houseSegs = [
-        { label: 'Farmer-Labor', count: h.farmerLabor, color: _CONGRESS_COLORS.farmerLabor },
-        { label: 'Federalist', count: h.federalist, color: _CONGRESS_COLORS.federalist },
+        { label: 'Farmer-Labor', count: h.farmerLabor, color: c.farmerLabor },
+        { label: 'Federalist', count: h.federalist, color: c.federalist },
     ];
     const houseTotal = h.federalist + h.farmerLabor;
     _drawParliament($.houseDiagram, houseSegs, houseTotal);
