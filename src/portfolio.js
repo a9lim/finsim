@@ -31,7 +31,6 @@ export const portfolio = {
     positions: [],  // { id, type, qty, strike?, expiryDay?, entryPrice, entryDay, strategyName? }
                     //   qty > 0 = long, qty < 0 = short
     orders:    [],  // { id, type, side, qty, orderType, triggerPrice, strike?, expiryDay?, strategyName? }
-    strategies:[],  // { name, legs: [{ type, side, qty, strike?, expiryDay? }] }
     closedBorrowCost: 0, // cumulative borrow cost from closed positions
     marginDebitCost:  0, // cumulative interest on negative cash (margin debit)
     totalDividends:   0, // cumulative net dividend income/cost
@@ -60,7 +59,6 @@ export function resetPortfolio(capital) {
     portfolio.initialCapital = cap;
     portfolio.positions      = [];
     portfolio.orders         = [];
-    portfolio.strategies     = [];
     portfolio.closedBorrowCost = 0;
     portfolio.marginDebitCost  = 0;
     portfolio.totalDividends   = 0;
@@ -285,11 +283,12 @@ export function executeMarketOrder(
     const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
     const fill = _fillPrice(type, side, mid, currentPrice, strike, currentVol);
 
-    // Find existing position of same type+strike+expiry for netting
+    // Find existing position of same type+strike+expiry+strategy for netting
     const existingIdx = portfolio.positions.findIndex(p =>
         p.type === type &&
         (strike == null ? p.strike == null : p.strike === strike) &&
-        (expiryDay == null ? p.expiryDay == null : p.expiryDay === expiryDay)
+        (expiryDay == null ? p.expiryDay == null : p.expiryDay === expiryDay) &&
+        (p.strategyName || null) === (strategyName || null)
     );
 
     if (existingIdx !== -1) {
@@ -786,52 +785,6 @@ export function processExpiry(expiryDay, currentPrice, currentDay) {
     }
 
     return { exercised, expired };
-}
-
-// ---------------------------------------------------------------------------
-// saveStrategy / executeStrategy
-// ---------------------------------------------------------------------------
-
-/**
- * Save a named multi-leg strategy.
- * @param {string}   name
- * @param {Object[]} legs  - [{ type, side, qty, strike?, expiryDay? }]
- */
-export function saveStrategy(name, legs) {
-    // Replace existing strategy with the same name, or append.
-    const idx = portfolio.strategies.findIndex(s => s.name === name);
-    const entry = { name, legs };
-    if (idx !== -1) {
-        portfolio.strategies[idx] = entry;
-    } else {
-        portfolio.strategies.push(entry);
-    }
-}
-
-/**
- * Execute all legs of a saved strategy as market orders.
- *
- * @param {string} strategyName
- * @param {number} currentPrice
- * @param {number} currentVol
- * @param {number} currentRate
- * @param {number} currentDay
- * @returns {Object[]} Array of filled position objects (nulls filtered out).
- */
-export function executeStrategy(strategyName, currentPrice, currentVol, currentRate, currentDay, q) {
-    const strategy = portfolio.strategies.find(s => s.name === strategyName);
-    if (!strategy) return [];
-
-    const positions = [];
-    for (const leg of strategy.legs) {
-        const pos = executeMarketOrder(
-            leg.type, leg.side, leg.qty,
-            currentPrice, currentVol, currentRate, currentDay,
-            leg.strike, leg.expiryDay, strategyName, q
-        );
-        if (pos) positions.push(pos);
-    }
-    return positions;
 }
 
 // ---------------------------------------------------------------------------

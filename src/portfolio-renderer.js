@@ -257,13 +257,12 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     const defaultPos = portfolio.positions.filter(p => !p.strategyName);
     _diffPositionRows($.defaultPositions, defaultPos, currentPrice, vol, rate, day, 'No open positions.', q);
 
-    // Strategy positions -- grouped by name, DOM diff
+    // Strategy positions -- grouped by name, single box per strategy
     const strategyNames = [...new Set(
         portfolio.positions.filter(p => p.strategyName).map(p => p.strategyName)
     )];
 
     if (strategyNames.length === 0) {
-        // Remove any leftover strategy groups
         const existingGroups = $.strategyPositions.querySelectorAll('.strategy-group');
         for (const g of existingGroups) g.remove();
         if (!$.strategyPositions.querySelector('.panel-hint')) {
@@ -274,7 +273,6 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
             $.strategyPositions.appendChild(hint);
         }
     } else {
-        // Remove stale hint
         const hint = $.strategyPositions.querySelector('.panel-hint');
         if (hint) hint.remove();
 
@@ -283,22 +281,80 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
             if (!strategyNames.includes(g.dataset.strategyName)) g.remove();
         }
 
-        // Add or update each strategy group
         for (const name of strategyNames) {
+            const groupPositions = portfolio.positions.filter(p => p.strategyName === name);
+            let totalPnl = 0;
+            for (const pos of groupPositions) {
+                totalPnl += computePositionPnl(pos, currentPrice, vol, rate, day, q);
+            }
+
+            // Nearest expiry among group positions
+            let nearestExpiry = Infinity;
+            for (const pos of groupPositions) {
+                if (pos.expiryDay != null && pos.expiryDay < nearestExpiry) nearestExpiry = pos.expiryDay;
+            }
+            const expiryStr = nearestExpiry < Infinity ? ' ' + fmtDte(nearestExpiry - day) : '';
+
+            // Compute strategy execution multiplier from base qty
+            // strategyBaseQty = per-execution qty for each leg, set at first execution
+            const ref = groupPositions.find(p => p.strategyBaseQty);
+            const mult = ref ? Math.round(Math.abs(ref.qty) / ref.strategyBaseQty) : 1;
+
+            // Build abridged constituents string using per-unit (base) quantities
+            const parts = groupPositions.map(pos => {
+                const baseQty = pos.strategyBaseQty || Math.abs(pos.qty);
+                const label = posTypeLabel(pos.type, pos.qty);
+                const isOption = pos.type === 'call' || pos.type === 'put';
+                const strikeStr = isOption && pos.strike != null ? ' K' + pos.strike : '';
+                return label + strikeStr + ' x' + baseQty;
+            });
+            const constituents = parts.join(', ');
+
             let group = $.strategyPositions.querySelector('.strategy-group[data-strategy-name="' + CSS.escape(name) + '"]');
             if (!group) {
                 group = document.createElement('div');
                 group.className = 'strategy-group';
                 group.dataset.strategyName = name;
-                const label = document.createElement('div');
-                label.className = 'group-label';
-                label.textContent = name;
-                group.appendChild(label);
+
+                const header = document.createElement('div');
+                header.className = 'strategy-group-header';
+
+                const nameEl = document.createElement('span');
+                nameEl.className = 'stat-label strategy-group-name';
+                header.appendChild(nameEl);
+
+                const pnlEl = document.createElement('span');
+                pnlEl.className = 'stat-value strategy-group-pnl';
+                header.appendChild(pnlEl);
+
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'ghost-btn pos-close-btn';
+                closeBtn.textContent = 'X';
+                closeBtn.title = 'Unwind strategy';
+                closeBtn.addEventListener('click', () => {
+                    closeBtn.dispatchEvent(new CustomEvent('shoals:unwindStrategy', { detail: { name }, bubbles: true }));
+                    if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
+                });
+                header.appendChild(closeBtn);
+
+                const detail = document.createElement('div');
+                detail.className = 'strategy-group-detail';
+
+                group.appendChild(header);
+                group.appendChild(detail);
                 $.strategyPositions.appendChild(group);
             }
-            // Diff positions within this group
-            const groupPositions = portfolio.positions.filter(p => p.strategyName === name);
-            _diffPositionRows(group, groupPositions, currentPrice, vol, rate, day, '', q);
+
+            // Update P/L and constituents
+            const pnlEl = group.querySelector('.strategy-group-pnl');
+            if (pnlEl) {
+                pnlEl.textContent = fmtDollar(totalPnl);
+                pnlEl.className = 'stat-value strategy-group-pnl ' + pnlClass(totalPnl);
+            }
+            const nameEl = group.querySelector('.strategy-group-name');
+            if (nameEl) nameEl.textContent = name + expiryStr + ' x' + mult;
+            const detail = group.querySelector('.strategy-group-detail');
+            if (detail) detail.textContent = constituents;
         }
     }
 
