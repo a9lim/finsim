@@ -12,7 +12,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://a9l.im/finsim">
     <meta name="twitter:card" content="summary">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -224,7 +224,7 @@
                             <input type="range" id="trade-qty" min="1" max="100" step="1" value="1">
                         </div>
                         <div class="control-group">
-                            <span class="ctrl-label">Order Type</span>
+                            <span class="ctrl-label">Order Type <button class="info-trigger" type="button" data-info="orderTypes" aria-label="Info: Order Types">?</button></span>
                             <div class="mode-toggles" id="order-type-toggles">
                                 <button class="mode-btn active" data-ordertype="market">Market</button>
                                 <button class="mode-btn" data-ordertype="limit">Limit</button>
@@ -238,7 +238,7 @@
                             </label>
                             <input type="range" id="trigger-price" min="50" max="150" step="0.50" value="100">
                         </div>
-                        <label for="trade-expiry">Expiry</label>
+                        <label for="trade-expiry">Expiry <button class="info-trigger" type="button" data-info="expiry" aria-label="Info: Expiry">?</button></label>
                         <select id="trade-expiry" class="sim-select" aria-label="Expiry date">
                             <option value="">Select expiry</option>
                         </select>
@@ -256,7 +256,7 @@
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
                         <button id="full-chain-link" class="ghost-btn chain-expand-btn">View Full Chain</button>
-                        <p class="panel-hint trade-hint">Left-click: buy &middot; Right-click: sell/short</p>
+                        <p class="panel-hint trade-hint">Left-click: buy &middot; Right-click: sell/short &middot; Hover: bid/ask <button class="info-trigger" type="button" data-info="bidask" aria-label="Info: Bid-Ask Spreads">?</button></p>
                     </div>
                 </div>
                 <!-- Portfolio Tab -->
@@ -264,15 +264,24 @@
                     <div class="stat-group">
                         <div class="group-label">Account</div>
                         <div class="stat-row">
-                            <span class="stat-label">Cash</span>
+                            <span class="stat-label-wrap">
+                                <span class="stat-label">Cash</span>
+                                <button class="info-trigger" type="button" data-info="cash" aria-label="Info: Cash">?</button>
+                            </span>
                             <span class="stat-value" id="cash-display">$10,000</span>
                         </div>
                         <div class="stat-row">
-                            <span class="stat-label">Portfolio Value</span>
+                            <span class="stat-label-wrap">
+                                <span class="stat-label">Portfolio Value</span>
+                                <button class="info-trigger" type="button" data-info="portfolioValue" aria-label="Info: Portfolio Value">?</button>
+                            </span>
                             <span class="stat-value" id="portfolio-value">$10,000</span>
                         </div>
                         <div class="stat-row">
-                            <span class="stat-label">Total P&L</span>
+                            <span class="stat-label-wrap">
+                                <span class="stat-label">Total P&L</span>
+                                <button class="info-trigger" type="button" data-info="totalPnl" aria-label="Info: Total P&L">?</button>
+                            </span>
                             <span class="stat-value" id="total-pnl">$0.00</span>
                         </div>
                         <div class="stat-row">
@@ -283,11 +292,17 @@
                             <span class="stat-value margin-ok" id="margin-status">OK</span>
                         </div>
                         <div class="stat-row">
-                            <span class="stat-label">Borrow Cost</span>
+                            <span class="stat-label-wrap">
+                                <span class="stat-label">Borrow Cost</span>
+                                <button class="info-trigger" type="button" data-info="borrowCost" aria-label="Info: Borrow Cost">?</button>
+                            </span>
                             <span class="stat-value" id="borrow-cost">$0.00</span>
                         </div>
                         <div class="stat-row">
-                            <span class="stat-label">Dividends</span>
+                            <span class="stat-label-wrap">
+                                <span class="stat-label">Dividends</span>
+                                <button class="info-trigger" type="button" data-info="dividends" aria-label="Info: Dividends">?</button>
+                            </span>
                             <span class="stat-value" id="dividend-income">$0.00</span>
                         </div>
                     </div>
@@ -312,18 +327,18 @@
                     <div class="stat-group">
                         <div class="group-label">Greeks</div>
                         <div id="greeks-aggregate">
-                            <div class="stat-row"><span class="stat-label greek-label-delta">Delta</span><span class="stat-value" id="greek-delta">0.00</span></div>
-                            <div class="stat-row"><span class="stat-label greek-label-gamma">Gamma</span><span class="stat-value" id="greek-gamma">0.00</span></div>
-                            <div class="stat-row"><span class="stat-label greek-label-theta">Theta</span><span class="stat-value" id="greek-theta">0.00</span></div>
-                            <div class="stat-row"><span class="stat-label greek-label-vega">Vega</span><span class="stat-value" id="greek-vega">0.00</span></div>
-                            <div class="stat-row"><span class="stat-label greek-label-rho">Rho</span><span class="stat-value" id="greek-rho">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-delta">Delta</span><button class="info-trigger" type="button" data-info="delta" aria-label="Info: Delta">?</button></span><span class="stat-value" id="greek-delta">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-gamma">Gamma</span><button class="info-trigger" type="button" data-info="gamma" aria-label="Info: Gamma">?</button></span><span class="stat-value" id="greek-gamma">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-theta">Theta</span><button class="info-trigger" type="button" data-info="theta_greek" aria-label="Info: Theta">?</button></span><span class="stat-value" id="greek-theta">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-vega">Vega</span><button class="info-trigger" type="button" data-info="vega" aria-label="Info: Vega">?</button></span><span class="stat-value" id="greek-vega">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-rho">Rho</span><button class="info-trigger" type="button" data-info="rho_greek" aria-label="Info: Rho">?</button></span><span class="stat-value" id="greek-rho">0.00</span></div>
                         </div>
                     </div>
                 </div>
                 <!-- Strategy Tab -->
                 <div class="tab-panel" id="tab-strategy" role="tabpanel" aria-labelledby="tab-btn-strategy">
                     <div class="stat-group" id="strategy-builder">
-                        <div class="group-label">Build Strategy</div>
+                        <div class="group-label">Build Strategy <button class="info-trigger" type="button" data-info="strategies" aria-label="Info: Strategy Builder">?</button></div>
                         <div class="control-group">
                             <label for="strategy-qty">Quantity <span class="slider-value" id="strategy-qty-val">1</span></label>
                             <input type="range" id="strategy-qty" min="1" max="100" step="1" value="1">
@@ -345,7 +360,7 @@
                         <div id="strategy-chain-table" class="chain-table">
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
-                        <p class="panel-hint trade-hint">Left-click: long &middot; Right-click: short</p>
+                        <p class="panel-hint trade-hint">Left-click: long &middot; Right-click: short &middot; Payoff <button class="info-trigger" type="button" data-info="payoff" aria-label="Info: Payoff Diagrams">?</button></p>
                         <div id="strategy-legs-list" class="strategy-legs-list">
                             <p class="panel-hint">No legs added. Click buttons above to build a strategy.</p>
                         </div>
@@ -359,7 +374,7 @@
                 <!-- Settings Tab -->
                 <div class="tab-panel" id="tab-settings" role="tabpanel" aria-labelledby="tab-btn-settings">
                     <div class="stat-group">
-                        <div class="group-label">Market Regime</div>
+                        <div class="group-label">Market Regime <button class="info-trigger" type="button" data-info="regime" aria-label="Info: Market Regime">?</button></div>
                         <select id="preset-select" class="sim-select" aria-label="Market preset">
                             <option value="0">Calm Bull</option>
                             <option value="1">Sideways</option>
@@ -370,13 +385,16 @@
                             <option value="6">Dynamic (LLM)</option>
                         </select>
                         <div class="stat-row">
-                            <span class="stat-label">Risk-Free Rate</span>
+                            <span class="stat-label-wrap">
+                                <span class="stat-label">Risk-Free Rate</span>
+                                <button class="info-trigger" type="button" data-info="riskFreeRate" aria-label="Info: Risk-Free Rate">?</button>
+                            </span>
                             <span class="stat-value" id="rate-display">0.00%</span>
                         </div>
                         <canvas class="rate-sparkline" id="rate-sparkline" width="280" height="40"></canvas>
                     </div>
                     <div id="llm-settings-section" class="stat-group hidden">
-                        <div class="group-label">LLM Settings</div>
+                        <div class="group-label">LLM Settings <button class="info-trigger" type="button" data-info="llm" aria-label="Info: LLM Integration">?</button></div>
                         <div class="ctrl-row">
                             <label class="stat-label" for="llm-provider">Provider</label>
                             <select id="llm-provider" class="sim-select" disabled>
@@ -404,7 +422,7 @@
                         </div>
                     </div>
                     <div id="event-log-section" class="stat-group hidden">
-                        <div class="group-label">Event Log</div>
+                        <div class="group-label">Event Log <button class="info-trigger" type="button" data-info="events" aria-label="Info: Event Engine">?</button></div>
                         <div id="event-log" class="event-log"></div>
                     </div>
                     <div id="congress-section" class="stat-group hidden">
@@ -423,7 +441,7 @@
                         </div>
                     </div>
                     <div class="stat-group">
-                        <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn">Advanced Parameters</button>
+                        <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn">Advanced Parameters <span class="info-trigger" role="button" tabindex="0" data-info="gbm" aria-label="Info: Pricing Models">?</span></button>
                         <div id="advanced-section" class="advanced-section hidden">
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-mu">Drift (mu)</label><button class="info-trigger" type="button" data-info="mu" aria-label="Info: Drift">?</button>
