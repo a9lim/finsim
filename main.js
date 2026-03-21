@@ -757,8 +757,8 @@ function updateTimeSliderRange() {
         $.timeSlider.value = 100;
     }
     const elapsed = _sliderElapsed(minDTE);
-    const nearestRemaining = minDTE - elapsed;
-    if ($.timeSliderLabel) $.timeSliderLabel.textContent = nearestRemaining + ' DTE';
+    const maxRemaining = _getMaxDTE() - elapsed;
+    if ($.timeSliderLabel) $.timeSliderLabel.textContent = maxRemaining + ' DTE';
 }
 
 // ---------------------------------------------------------------------------
