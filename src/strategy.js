@@ -563,21 +563,9 @@ export class StrategyRenderer {
             netCost += this._legEntryCost(leg, spot, vol, rate, _dteToT(legEntryDte), q, entryDay);
         }
 
-        // Extend sampling range to cover near-zero and far-upside
-        let xMin = 0.01;
-        let xMax = spot * 5;
-        for (const leg of legs) {
-            if (leg.strike != null) {
-                xMax = Math.max(xMax, leg.strike * 5);
-            }
-        }
-        // Max profit/loss at expiry using intrinsic payoffs
-        const xs   = new Array(SAMPLE_COUNT);
-        const pnls = new Array(SAMPLE_COUNT);
-
-        for (let i = 0; i < SAMPLE_COUNT; i++) {
-            const S = xMin + (i / (SAMPLE_COUNT - 1)) * (xMax - xMin);
-            xs[i] = S;
+        // Intrinsic payoff at expiry is piecewise linear — extremes occur at
+        // strike prices and endpoints (S=0, S→∞). Evaluate at each kink point.
+        const _pnlAt = (S) => {
             let pnl = 0;
             for (const leg of legs) {
                 const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1 : 1;
@@ -590,23 +578,39 @@ export class StrategyRenderer {
                     case 'bond': pnl += BOND_FACE_VALUE * mult; break;
                 }
             }
-            pnl -= netCost;
-            pnls[i] = pnl;
+            return pnl - netCost;
+        };
+
+        // Collect kink points (strikes + S=0)
+        const kinks = [0];
+        for (const leg of legs) {
+            if (leg.strike != null) kinks.push(leg.strike);
         }
 
         let maxProfit = -Infinity, maxLoss = Infinity;
-        for (const p of pnls) { if (p > maxProfit) maxProfit = p; if (p < maxLoss) maxLoss = p; }
+        for (const S of kinks) {
+            const p = _pnlAt(S);
+            if (p > maxProfit) maxProfit = p;
+            if (p < maxLoss) maxLoss = p;
+        }
 
-        // Check endpoints for unbounded profit/loss
-        const pnlAtHigh = pnls[pnls.length - 1];
-        const pnlNearHigh = pnls[pnls.length - 2];
-        if (pnlAtHigh > pnlNearHigh + 0.01 && pnlAtHigh === maxProfit) maxProfit = Infinity;
-        if (pnlAtHigh < pnlNearHigh - 0.01 && pnlAtHigh === maxLoss) maxLoss = -Infinity;
-        // Check low end too
-        const pnlAtLow = pnls[0];
-        const pnlNearLow = pnls[1];
-        if (pnlAtLow < pnlNearLow - 0.01 && pnlAtLow === maxLoss) maxLoss = -Infinity;
+        // Check slope as S→∞ to determine if profit/loss is unbounded
+        let slopeAtInf = 0;
+        for (const leg of legs) {
+            const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1 : 1;
+            const qty = Math.abs(leg.qty ?? 1);
+            const mult = qty * sign;
+            if (leg.type === 'call' || leg.type === 'stock') slopeAtInf += mult;
+        }
+        if (slopeAtInf > 0) maxProfit = Infinity;
+        else if (slopeAtInf < 0) maxLoss = -Infinity;
 
+        // Breakevens from piecewise linear payoff — sample between kink points
+        kinks.sort((a, b) => a - b);
+        const farPoint = (kinks[kinks.length - 1] || spot) * 3;
+        const samplePts = [...kinks, farPoint];
+        const xs = samplePts;
+        const pnls = samplePts.map(S => _pnlAt(S));
         const breakevens = _zeroCrossings(xs, pnls);
 
         const result = { maxProfit, maxLoss, breakevens, netCost };
