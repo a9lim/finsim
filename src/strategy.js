@@ -8,7 +8,7 @@
  * Exports: StrategyRenderer
  */
 
-import { priceAmerican, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
+import { priceAmerican, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice } from './pricing.js';
 import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
     STRATEGY_SAMPLES, STRATEGY_Y_PAD, STRATEGY_MARGIN,
@@ -169,8 +169,12 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
                 info.entryS = entryS;
                 break;
             case 'bond':
-                info.entryVal = BOND_FACE_VALUE * Math.exp(-rate * entryT);
-                info.bondCurVal = BOND_FACE_VALUE * Math.exp(-rate * T);
+                info.entryVal = vasicek
+                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, entryT, vasicek.a, vasicek.b, vasicek.sigmaR)
+                    : BOND_FACE_VALUE * Math.exp(-rate * entryT);
+                info.bondCurVal = vasicek
+                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, T, vasicek.a, vasicek.b, vasicek.sigmaR)
+                    : BOND_FACE_VALUE * Math.exp(-rate * T);
                 break;
         }
         return info;
@@ -622,7 +626,9 @@ export class StrategyRenderer {
                 // Entry cost for hypothetical stock position is spot * qty * sign
                 return spot * qty * sign;
             case 'bond': {
-                const bVal = BOND_FACE_VALUE * Math.exp(-rate * T);
+                const bVal = vasicek
+                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, T, vasicek.a, vasicek.b, vasicek.sigmaR)
+                    : BOND_FACE_VALUE * Math.exp(-rate * T);
                 return bVal * qty * sign;
             }
             default:
