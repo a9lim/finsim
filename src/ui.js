@@ -192,25 +192,14 @@ export function bindEvents($, handlers) {
     });
     $.fullChainLink.addEventListener('click', onFullChainOpen);
 
-    $.chainOverlayClose.addEventListener('click', () => {
-        $.chainOverlay.classList.add('hidden');
-        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
-    });
-    $.chainOverlay.addEventListener('click', (e) => {
-        if (e.target === $.chainOverlay) $.chainOverlay.classList.add('hidden');
-    });
+    const _hideClass = (el) => () => el.classList.add('hidden');
+    initOverlayDismiss($.chainOverlay, $.chainOverlayClose, _hideClass($.chainOverlay));
 
-    const closeTrade = () => {
-        $.tradeDialog.classList.add('hidden');
-        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
-    };
-    $.tradeDialogClose.addEventListener('click', closeTrade);
+    const closeTrade = _hideClass($.tradeDialog);
+    initOverlayDismiss($.tradeDialog, $.tradeDialogClose, closeTrade);
     $.tradeCancelBtn.addEventListener('click', closeTrade);
-    $.tradeDialog.addEventListener('click', (e) => {
-        if (e.target === $.tradeDialog) closeTrade();
-    });
 
-    $.marginCallClose.addEventListener('click', () => $.marginCallOverlay.classList.add('hidden'));
+    initOverlayDismiss($.marginCallOverlay, $.marginCallClose, _hideClass($.marginCallOverlay));
     $.marginCallDismiss.addEventListener('click', () => {
         $.marginCallOverlay.classList.add('hidden');
         if (typeof onDismissMargin === 'function') onDismissMargin();
@@ -220,9 +209,6 @@ export function bindEvents($, handlers) {
         $.marginCallOverlay.classList.add('hidden');
         if (typeof onLiquidate === 'function') onLiquidate();
         if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
-    });
-    $.marginCallOverlay.addEventListener('click', (e) => {
-        if (e.target === $.marginCallOverlay) $.marginCallOverlay.classList.add('hidden');
     });
 
     $._onChainCellClick = onChainCellClick;

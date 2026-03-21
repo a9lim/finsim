@@ -289,18 +289,7 @@ function init() {
     });
 
     // 11. Wire intro screen
-    if ($.introStart) {
-        $.introStart.onclick = () => {
-            if ($.introScreen) $.introScreen.classList.add('hidden');
-            document.body.classList.add('app-ready');
-            setTimeout(() => {
-                if ($.introScreen && $.introScreen.parentNode) {
-                    $.introScreen.remove();
-                }
-            }, 850);
-            if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
-        };
-    }
+    _intro.init($.introScreen, $.introStart);
 
     // 12. Wire info tips for slider labels
     wireInfoTips($);
