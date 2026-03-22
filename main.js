@@ -21,7 +21,7 @@ import {
     cacheDOMElements, bindEvents, updateChainDisplay,
     rebuildTradeDropdown, rebuildStrategyDropdown,
     updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateStockBondPrices,
-    syncSettingsUI, toggleStrategyView, showMarginCall, showChainOverlay,
+    syncSettingsUI, toggleStrategyView, showMarginCall, showFraudScreen, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
     updateDynamicSections, updateEventLog, updateCongressDiagrams,
@@ -255,7 +255,6 @@ function init() {
         onFullChainOpen:  () => openFullChain(),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
-        onDismissMargin:  () => { /* sim stays paused, overlay hidden by ui.js */ },
         onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
         onStrategyExpiryChange: (idx) => {
             const pe = _priceExpiry(idx);
@@ -931,6 +930,7 @@ function decycleSpeed() {
 
 function _resetCore(index) {
     document.getElementById('epilogue-overlay')?.classList.add('hidden');
+    document.getElementById('fraud-overlay')?.classList.add('hidden');
     sim.reset(index);
     resetPortfolio();
     sim.prepopulate();
@@ -1110,8 +1110,13 @@ function handleLiquidate() {
     chainDirty = true;
     updateUI();
     dirty = true;
-    if (typeof showToast !== 'undefined') showToast('All positions liquidated.');
     if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
+
+    if (portfolio.cash < sim.S) {
+        showFraudScreen($, portfolio.cash);
+    } else {
+        if (typeof showToast !== 'undefined') showToast('All positions liquidated.');
+    }
 }
 
 // ---------------------------------------------------------------------------

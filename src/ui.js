@@ -94,10 +94,11 @@ export function cacheDOMElements($) {
     $.tradeCancelBtn      = document.getElementById('trade-cancel-btn');
     $.tradeDialogClose    = document.getElementById('trade-dialog-close');
     $.marginCallOverlay   = document.getElementById('margin-call-overlay');
-    $.marginCallClose     = document.getElementById('margin-call-close');
     $.marginCallMsg       = document.getElementById('margin-call-msg');
     $.marginCallLiquidate = document.getElementById('margin-call-liquidate');
-    $.marginCallDismiss   = document.getElementById('margin-call-dismiss');
+    $.fraudOverlay        = document.getElementById('fraud-overlay');
+    $.fraudMsg            = document.getElementById('fraud-msg');
+    $.fraudReset          = document.getElementById('fraud-reset');
     $.introScreen = document.getElementById('intro-screen');
     $.introStart  = document.getElementById('intro-start');
     $.strategyLegsList = document.getElementById('strategy-legs-list');
@@ -149,7 +150,7 @@ export function bindEvents($, handlers) {
         onPresetChange, onReset, onSliderChange, onTimeSlider,
         onBuyStock, onShortStock, onBuyBond, onShortBond,
         onChainCellClick, onFullChainOpen, onExpiryChange,
-        onTradeSubmit, onLiquidate, onDismissMargin,
+        onTradeSubmit, onLiquidate,
         onLLMKeyChange, onLLMModelChange,
     } = handlers;
 
@@ -225,16 +226,14 @@ export function bindEvents($, handlers) {
     initOverlayDismiss($.tradeDialog, $.tradeDialogClose, closeTrade);
     $.tradeCancelBtn.addEventListener('click', closeTrade);
 
-    initOverlayDismiss($.marginCallOverlay, $.marginCallClose, _hideClass($.marginCallOverlay));
-    $.marginCallDismiss.addEventListener('click', () => {
-        $.marginCallOverlay.classList.add('hidden');
-        if (typeof onDismissMargin === 'function') onDismissMargin();
-        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
-    });
     $.marginCallLiquidate.addEventListener('click', () => {
         $.marginCallOverlay.classList.add('hidden');
         if (typeof onLiquidate === 'function') onLiquidate();
         if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
+    });
+    $.fraudReset.addEventListener('click', () => {
+        $.fraudOverlay.classList.add('hidden');
+        if (typeof onReset === 'function') onReset();
     });
 
     $._onChainCellClick = onChainCellClick;
@@ -559,22 +558,63 @@ export function showMarginCall($, marginInfo) {
     const msg = $.marginCallMsg;
     msg.textContent = '';
     const frag = document.createDocumentFragment();
-    frag.appendChild(document.createTextNode('Your portfolio equity ('));
+    frag.appendChild(document.createTextNode('Portfolio equity '));
     const eq = document.createElement('strong');
     eq.textContent = fmtDollar(equity);
     frag.appendChild(eq);
-    frag.appendChild(document.createTextNode(') is below the maintenance margin requirement ('));
+    frag.appendChild(document.createTextNode(' is below the maintenance requirement of '));
     const req = document.createElement('strong');
     req.textContent = fmtDollar(required);
     frag.appendChild(req);
-    frag.appendChild(document.createTextNode('). Shortfall: '));
+    frag.appendChild(document.createTextNode('. Shortfall: '));
     const sf = document.createElement('strong');
     sf.className = 'margin-alert';
     sf.textContent = fmtDollar(shortfall);
     frag.appendChild(sf);
-    frag.appendChild(document.createTextNode('. Liquidate positions or dismiss and manage risk manually.'));
+    frag.appendChild(document.createTextNode('.'));
     msg.appendChild(frag);
     $.marginCallOverlay.classList.remove('hidden');
+    if (typeof _haptics !== 'undefined') _haptics.trigger('error');
+}
+
+export function showFraudScreen($, equity) {
+    const loss = fmtDollar(Math.abs(equity));
+    $.fraudMsg.textContent = '';
+    const frag = document.createDocumentFragment();
+
+    const p1 = document.createElement('p');
+    p1.className = 'fraud-message';
+    p1.textContent = 'Following the forced liquidation of all positions, your account '
+        + 'remains in deficit by ' + loss + '. Regulators have flagged the account for '
+        + 'review.';
+    frag.appendChild(p1);
+
+    const p2 = document.createElement('p');
+    p2.className = 'fraud-message';
+    p2.textContent = 'After a brief but enthusiastic investigation, a federal grand jury has '
+        + 'returned indictments on the following charges:';
+    const c1 = document.createElement('span');
+    c1.className = 'fraud-charge';
+    c1.textContent = '18 U.S.C. \u00A7 1348 \u2014 Securities Fraud';
+    p2.appendChild(c1);
+    const c2 = document.createElement('span');
+    c2.className = 'fraud-charge';
+    c2.textContent = '26 U.S.C. \u00A7 7201 \u2014 Tax Evasion';
+    p2.appendChild(c2);
+    frag.appendChild(p2);
+
+    const p3 = document.createElement('p');
+    p3.className = 'fraud-message';
+    p3.textContent = 'You have been sentenced to 25 years at a minimum-security federal '
+        + 'correctional facility. Your broker sends their regards.';
+    const sent = document.createElement('span');
+    sent.className = 'fraud-sentence';
+    sent.textContent = 'Better luck next time.';
+    p3.appendChild(sent);
+    frag.appendChild(p3);
+
+    $.fraudMsg.appendChild(frag);
+    $.fraudOverlay.classList.remove('hidden');
     if (typeof _haptics !== 'undefined') _haptics.trigger('error');
 }
 
