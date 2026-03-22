@@ -1228,7 +1228,7 @@ function executeWithRollback(resolvedLegs, strategyName) {
             leg.strike, leg.expiryDay, strategyName, sim.q
         );
         if (pos) {
-            if (!pos.strategyBaseQty) pos.strategyBaseQty = absQty;
+            if (!pos.strategyBaseQty) pos.strategyBaseQty = leg._baseQty || absQty;
             results.push(pos);
         } else {
             failed = true;
@@ -1321,7 +1321,7 @@ function handleTradeExecStrategy() {
     const overrideDay = strat.selectableExpiry ? _tradeExpiryDay() : null;
     const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
     const mult = parseInt($.tradeQty?.value, 10) || 1;
-    const scaled = mult === 1 ? resolved : resolved.map(l => ({ ...l, qty: l.qty * mult }));
+    const scaled = resolved.map(l => ({ ...l, _baseQty: Math.abs(l.qty), qty: l.qty * mult }));
     executeWithRollback(scaled, strat.name);
 }
 
