@@ -476,6 +476,10 @@ function init() {
                         playing = false;
                         updatePlayBtn($, playing);
                     }
+                } else {
+                    // Chart canvas was hidden — re-sync buffer size
+                    chart.resize();
+                    _repositionCamera();
                 }
                 dirty = true;
             }
