@@ -320,7 +320,7 @@ function init() {
     document.addEventListener('shoals:closePosition', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
-            const ok = closePosition(id, sim.S, market.sigma, sim.r, sim.day, sim.q);
+            const ok = closePosition(sim, id, sim.S, market.sigma, sim.r, sim.day, sim.q);
             if (ok && typeof showToast !== 'undefined') showToast('Position closed.');
             chainDirty = true;
             updateUI();
@@ -357,7 +357,7 @@ function init() {
         const positions = portfolio.positions.filter(p => p.strategyName === name);
         let closed = 0;
         for (const pos of [...positions]) {
-            if (closePosition(pos.id, sim.S, market.sigma, sim.r, sim.day, sim.q)) closed++;
+            if (closePosition(sim, pos.id, sim.S, market.sigma, sim.r, sim.day, sim.q)) closed++;
         }
         if (closed > 0) {
             if (typeof showToast !== 'undefined') showToast('Unwound "' + name + '" (' + closed + ' position' + (closed > 1 ? 's' : '') + ').');
@@ -588,7 +588,7 @@ function _onSubstep() {
     const vol = market.sigma;
 
     // Check pending orders at intraday price
-    const filledOrders = checkPendingOrders(sim.S, vol, sim.r, sim.day, sim.q);
+    const filledOrders = checkPendingOrders(sim, sim.S, vol, sim.r, sim.day, sim.q);
     for (const pos of filledOrders) {
         if (typeof showToast !== 'undefined') {
             const side = pos.qty > 0 ? 'Bought' : 'Sold';
@@ -634,7 +634,7 @@ function _onDayComplete() {
         }
     }
 
-    const { expired, unwound } = processExpiry(sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
+    const { expired, unwound } = processExpiry(sim, sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
     if (unwound.length > 0) {
         const names = [...new Set(unwound.map(p => p.strategyName))];
         for (const name of names) {
@@ -1022,7 +1022,7 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
     const vol = market.sigma;
     const orderType = _getOrderType();
     if (orderType === 'market') {
-        const pos = executeMarketOrder(type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q);
+        const pos = executeMarketOrder(sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q);
         if (pos) {
             const label = side === 'short' ? 'Shorted' : 'Bought';
             if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + pos.fillPrice.toFixed(2));
@@ -1084,7 +1084,7 @@ function handleTradeSubmit(data) {
 
     if (orderType === 'market') {
         const pos = executeMarketOrder(
-            type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q
+            sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q
         );
         if (pos) {
             if (typeof showToast !== 'undefined') showToast('Order filled: ' + type + ' x' + qty);
@@ -1106,7 +1106,7 @@ function handleTradeSubmit(data) {
 
 function handleLiquidate() {
     const vol = market.sigma;
-    liquidateAll(sim.S, vol, sim.r, sim.day, sim.q);
+    liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
     chainDirty = true;
     updateUI();
     dirty = true;
@@ -1229,7 +1229,7 @@ function executeWithRollback(resolvedLegs, strategyName) {
         const side = leg.qty < 0 ? 'short' : 'long';
         const absQty = Math.abs(leg.qty);
         const pos = executeMarketOrder(
-            leg.type, side, absQty, sim.S, market.sigma, sim.r, sim.day,
+            sim, leg.type, side, absQty, sim.S, market.sigma, sim.r, sim.day,
             leg.strike, leg.expiryDay, strategyName, sim.q
         );
         if (pos) {
