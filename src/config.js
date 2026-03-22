@@ -6,7 +6,7 @@
 // -- Simulation timing --
 export const TRADING_DAYS_PER_YEAR = 252;
 export const INTRADAY_STEPS = 16;
-export const QUARTERLY_CYCLE = 63; // trading days per quarter (approximate)
+export const QUARTERLY_CYCLE = 63; // trading days per quarter
 export const HISTORY_CAPACITY = 252;
 export const BINOMIAL_STEPS = 128;
 export const SPEED_OPTIONS = [0.125, 0.25, 0.5, 1, 2];
@@ -15,7 +15,7 @@ export const SPEED_OPTIONS = [0.125, 0.25, 0.5, 1, 2];
 export const INITIAL_PRICE = 100;
 export const BOND_FACE_VALUE = 100;
 export const STRIKE_INTERVAL = 5;
-export const STRIKE_RANGE = 12;     // strikes each side of ATM
+export const STRIKE_RANGE = 10;     // strikes each side of ATM
 export const EXPIRY_COUNT = 8;      // number of active expiry dates
 
 // -- Portfolio & margin --
@@ -55,7 +55,7 @@ export const CHART_LEFT_MARGIN = 80;       // left margin for camera positioning
 export const CHART_RIGHT_MARGIN = 120;    // fixed right margin for autoscroll (CSS px)
 
 // -- Strategy rendering --
-export const STRATEGY_SAMPLES = 200;       // sample points across X range
+export const STRATEGY_SAMPLES = 128;       // sample points across X range
 export const STRATEGY_Y_PAD = 0.15;        // 15% vertical padding
 export const STRATEGY_MARGIN = { top: 24, right: 16, bottom: 48, left: 68 };
 

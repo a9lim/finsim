@@ -247,7 +247,7 @@ incorporating the discrete price drop into the tree without breaking recombinati
 <p>For chain pricing, both call and put at each strike share a single backward induction
 pass. At each node, the loop computes call intrinsic $\\max(S - K, 0)$ and put intrinsic
 $\\max(K - S, 0)$ simultaneously, halving the number of tree traversals.
-At 25 strikes per expiry, this saves 25 full backward inductions.</p>
+At 21 strikes per expiry, this saves 21 full backward inductions.</p>
 
 <h3>Performance Optimisations</h3>
 <ul>

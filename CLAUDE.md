@@ -27,14 +27,14 @@ Serve from `a9lim.github.io/` -- shared files load via absolute paths (`/shared-
 ## File Map
 
 ```
-main.js               1454 lines  Orchestrator: DOM cache $, rAF loop, sub-step streaming,
+main.js               1472 lines  Orchestrator: DOM cache $, rAF loop, sub-step streaming,
                                    live candle animation, camera, shortcuts, event wiring,
                                    strategy builder (with rollback), ExpiryManager, world state,
                                    executeWithRollback, selectable expiry resolution
-index.html              654 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs),
+index.html              673 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs),
                                    chain/trade/margin-call/reference/epilogue overlays, intro,
                                    strategy save/load UI, trade-tab saved strategies section
-styles.css              990 lines  Chain, positions, strategy, trade dialog, margin alert,
+styles.css             1121 lines  Chain, positions, strategy, trade dialog, margin alert,
                                    P&L/Greek colors, responsive breakpoints, strategy groups,
                                    sim-input, credit/debit coloring
 colors.js                59 lines  Financial color aliases (up/down/call/put/stock/bond/
@@ -42,31 +42,32 @@ colors.js                59 lines  Financial color aliases (up/down/call/put/sto
 src/
   config.js              74 lines  All constants (timing, instruments, margin, spreads, events,
                                    rendering), PRESETS (5 static + 2 dynamic), DEFAULT_PRESET=5
-  simulation.js         248 lines  GBM + Merton + Heston + Vasicek; beginDay()/substep()/
+  simulation.js         251 lines  GBM + Merton + Heston + Vasicek; beginDay()/substep()/
                                    finalizeDay() pipeline; prepopulate() reverse-backfill
-  pricing.js            784 lines  CRR binomial tree: term-structure vol, moneyness skew,
+  pricing.js            834 lines  CRR binomial tree: term-structure vol, moneyness skew,
                                    Vasicek per-step discounting, discrete dividends. Dual
                                    call+put induction. Vasicek bond pricing + duration.
                                    Tree reuse API for zero-alloc pricing. All pricing
                                    uses prepareTree+priceWithTree (no priceAmerican).
   chain.js              230 lines  ExpiryManager, generateStrikes(), buildChainSkeleton(),
                                    priceChainExpiry() with reusable tree pool
-  portfolio.js         1003 lines  Signed-qty positions, market/limit/stop orders, netting
+  portfolio.js         1009 lines  Signed-qty positions, market/limit/stop orders, netting
                                    (includes strategyName), cash/margin, borrow interest,
                                    dividends, option expiry, bid/ask spreads
-  chart.js              720 lines  ChartRenderer: log Y-axis OHLC candles, live candle cubic
+  chart.js              728 lines  ChartRenderer: log Y-axis OHLC candles, live candle cubic
                                    interpolation, position markers, strike lines; shared-camera.js
   strategy.js           955 lines  StrategyRenderer: payoff P&L, Greek overlays, breakevens
                                    (analytical at expiry), input-keyed caching, tree-based
                                    per-leg entry values
-  ui.js                1010 lines  DOM binding, display updaters, overlay management;
+  ui.js                1056 lines  DOM binding, display updaters, overlay management;
                                    delegates to chain-renderer.js and portfolio-renderer.js.
                                    Strategy dropdowns, credit/debit, built-in disable logic
-  events.js             453 lines  EventEngine: Poisson scheduler, MTTH followup chains, Fed
+  events.js             457 lines  EventEngine: Poisson scheduler, MTTH followup chains, Fed
                                    schedule, boredom boost, midterms. Re-exports PARAM_RANGES.
-  event-pool.js        2933 lines  ~88 curated offline events (Fed, macro, sector, PNTH,
-                                   neutral/flavor). Exports OFFLINE_EVENTS, PARAM_RANGES,
-                                   getEventById(). World-state structured effects on events.
+  event-pool.js        3147 lines  ~370 curated offline events across 12 categories (Fed,
+                                   macro, sector, PNTH, congressional, investigation, political,
+                                   market, neutral, compound, midterm). Exports OFFLINE_EVENTS,
+                                   PARAM_RANGES, getEventById(). World-state structured effects.
   world-state.js        170 lines  Mutable narrative state: congressional seats (Senate/House
                                    by party), PNTH board factions, geopolitical escalation,
                                    Fed credibility, investigations, election cycle.
@@ -76,7 +77,7 @@ src/
                                    universe lore in system prompt, offline fallback
   epilogue.js           449 lines  generateEpilogue(): 4-page narrative ending from world
                                    state + portfolio + event log. Congressional diagrams,
-                                   financial scorecards. Triggered at TERM_END_DAY (1008).
+                                   financial scorecards. Triggered at TERM_END_DAY.
   market.js              27 lines  Shared mutable market state + syncMarket(sim). Leaf module.
   history-buffer.js     103 lines  Ring buffer (capacity 252) for OHLC bars
   format-helpers.js      59 lines  fmtDollar(), fmtNum(), pnlClass(), fmtDte(), fmtRelDay()
@@ -89,7 +90,7 @@ src/
                                    rebuildExpiryDropdown(), buildStockBondTable(), posKey()
   portfolio-renderer.js  363 lines  Portfolio display with DOM diffing, strategy group
                                    boxes (name, expiry, multiplier, P/L, unwind)
-  reference.js          659 lines  30 reference entries with KaTeX math
+  reference.js         1617 lines  29 reference entries with KaTeX math
   theme.js                9 lines  initTheme(), toggleTheme() (delegates to _toolbar)
 ```
 
@@ -102,15 +103,15 @@ main.js
   |- market.js             (leaf module -- single-writer main.js, multiple readers)
   |- chain.js              (imports pricing, portfolio, market, config)
   |- portfolio.js          (imports pricing, market, config, position-value)
-  |- events.js             (imports event-pool)
+  |- events.js             (imports config, world-state, event-pool)
   |- event-pool.js         (OFFLINE_EVENTS, PARAM_RANGES, getEventById)
   |- llm.js                (imports events)
   |- world-state.js        (createWorldState, congressHelpers, applyStructuredEffects)
   |- epilogue.js           (imports position-value, config)
-  |- chart.js              (imports format-helpers; reads _PALETTE globals)
+  |- chart.js              (imports format-helpers, config; reads _PALETTE globals)
   |- strategy.js           (imports pricing, market, config)
   |- strategy-store.js     (imports pricing, portfolio, market, config)
-  |- ui.js                 (imports format-helpers, chain-renderer, portfolio-renderer, portfolio)
+  |- ui.js                 (imports format-helpers, chain-renderer, portfolio, pricing, config)
   |- chain-renderer.js     (imports format-helpers; reads _haptics globals)
   |- portfolio-renderer.js (imports position-value, format-helpers)
   |- format-helpers.js     (imports config)
@@ -166,9 +167,9 @@ Per-step Vasicek rate discounting. Discrete proportional dividends at `QUARTERLY
 
 ## Options Chain
 
-ATM = `round(S/5)*5`, 12 strikes each side (up to 25). `ExpiryManager` maintains 8 rolling expiries on 63-day cycle.
+ATM = `round(S/5)*5`, 10 strikes each side (21 total). `ExpiryManager` maintains 8 rolling expiries on 63-day cycle.
 
-**Lazy pricing**: `buildChainSkeleton()` returns metadata only. `priceChainExpiry()` prices one expiry on demand -- sidebar uses price-only (25 dual inductions/substep), full chain overlay adds Greeks (175 inductions). Pre-allocated tree pool for zero GC.
+**Lazy pricing**: `buildChainSkeleton()` returns metadata only. `priceChainExpiry()` prices one expiry on demand -- sidebar uses price-only (21 dual inductions/substep), full chain overlay adds Greeks (147 inductions). Pre-allocated tree pool for zero GC.
 
 ## Portfolio System
 
@@ -190,7 +191,7 @@ ATM = `round(S/5)*5`, 12 strikes each side (up to 25). `ExpiryManager` maintains
 
 Floating glass panels over full-viewport canvas. Fixed topbar, right slide-in sidebar (4 tabs: Trade/Portfolio/Strategy/Settings), bottom pill bar.
 
-**Overlays**: chain (pauses sim), trade dialog (confirm button cloned each open), margin call, reference (KaTeX, 30 entries), epilogue (4-page narrative).
+**Overlays**: chain (pauses sim), trade dialog (confirm button cloned each open), margin call, reference (KaTeX, 29 entries), epilogue (4-page narrative).
 
 **Custom events**: `shoals:closePosition`, `shoals:exerciseOption`, `shoals:cancelOrder`, `shoals:unwindStrategy` -- ui.js/portfolio-renderer.js -> main.js.
 
@@ -208,7 +209,7 @@ Two dynamic presets use `EventEngine` (events.js) + event pool (event-pool.js):
 - **Non-Fed**: Poisson rate 1/30 with 8-15 day cooldown (effective ~1/41.5). Boredom boost after 3 minor events.
 - **PNTH earnings**: quarterly (~63 days with jitter)
 - **Followups**: MTTH chains, Poisson-sampled delay, recursive (max depth 5)
-- **Midterm elections**: day 504, campaign season from day 440. Term ends day 1008.
+- **Midterm elections**: live day 504, campaign season from live day 440. Term ends live day 1008. (Config constants add `HISTORY_CAPACITY` offset: e.g. `TERM_END_DAY = 252 + 1008 = 1260`.)
 
 ### World State
 
