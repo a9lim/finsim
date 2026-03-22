@@ -401,7 +401,7 @@ function _priceCore(S, K, isPut, tree) {
  * Shares loop overhead, Si computation, and powU/divAdj lookups between
  * call and put, halving the number of tree traversals needed when both
  * option types at the same strike are required (the common case for chain
- * pricing: 25 strikes × 1 dual pass vs 25 × 2 single passes).
+ * pricing: 21 strikes × 1 dual pass vs 21 × 2 single passes).
  *
  * Call price stored in _V[0], put price in _VP[0].
  * Pair intermediates (_cf10.._cf22, _pf10.._pf22) set for delta/gamma.

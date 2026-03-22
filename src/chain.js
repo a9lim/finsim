@@ -101,11 +101,11 @@ const _rTree = allocTree();
 const _rGreekTrees = allocGreekTrees();
 
 // Pre-allocated result pool for the price-only chain path.
-// Avoids creating ~75 objects (25 options × 3 sub-objects) per substep.
+// Avoids creating ~63 objects (21 options × 3 sub-objects) per substep.
 // WARNING: _rResult is a shared mutable singleton. The reference returned by
 // priceChainExpiry (price-only path) is invalidated on the next call.
 // Callers must consume results synchronously before calling again.
-const _MAX_STRIKES = 25;
+const _MAX_STRIKES = 21;
 const _rResult = { day: 0, dte: 0, options: [] };
 const _rOptions = [];
 for (let i = 0; i < _MAX_STRIKES; i++) {
@@ -143,8 +143,8 @@ export function buildChainSkeleton(S, currentDay, expiries) {
  *
  * Reads Heston and Vasicek parameters from the shared market object.
  *
- * When greeks=false (default): 25 tree preps + 25 dual inductions.
- * When greeks=true: 25×7 tree preps + 25×7 dual inductions.
+ * When greeks=false (default): 21 tree preps + 21 dual inductions.
+ * When greeks=true: 21×7 tree preps + 21×7 dual inductions.
  * Use greeks=true only for the full chain overlay.
  *
  * @param {number} S     - Spot price
