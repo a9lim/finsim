@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ADV } from './src/config.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
 import {
@@ -13,7 +13,7 @@ import {
     chargeBorrowInterest, processDividends, checkMargin, aggregateGreeks,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
-    computeBidAsk,
+    computeBidAsk, computeNetDelta, computeGrossNotional,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -36,6 +36,12 @@ import { computePositionValue } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
+import {
+    resetImpactState, computeRecoveryDrift,
+    updateParamShifts, decayParamShifts,
+    applyParamOverlays, removeParamOverlays,
+    selectImpactToast,
+} from './src/price-impact.js';
 import {
     listStrategies, getStrategy, saveStrategy, deleteStrategy,
     resolveLegs, computeNetCost, legsToRelative, nextAutoName,
@@ -69,6 +75,8 @@ let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
+let _recoveryDrift = 0;
+let _savedOverlays = {};
 
 // ---------------------------------------------------------------------------
 // Rate sparkline helpers
@@ -526,6 +534,9 @@ function frame(now) {
         if (!dayInProgress) {
             // Start a new day if enough time has passed since last tick
             if (now - lastTickTime >= tickInterval) {
+                _recoveryDrift = computeRecoveryDrift();
+                sim.mu += _recoveryDrift;
+                _savedOverlays = applyParamOverlays(sim);
                 sim.beginDay();
                 dayInProgress = true;
                 // Advance by tickInterval (not now) to avoid drift; clamp
@@ -559,6 +570,8 @@ function frame(now) {
             // All sub-steps done — finalize the day
             if (sim.dayComplete) {
                 sim.finalizeDay();
+                sim.mu -= _recoveryDrift;
+                removeParamOverlays(sim, _savedOverlays);
                 dayInProgress = false;
                 syncMarket(sim);
                 _onDayComplete();
@@ -671,6 +684,17 @@ function _onDayComplete() {
             }
         }
     }
+
+    // Layer 3: update param shifts based on gross exposure
+    const grossNotional = computeGrossNotional();
+    const grossRatio = grossNotional / (market.S * ADV);
+    updateParamShifts(grossRatio);
+    decayParamShifts();
+
+    // Impact toast
+    const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
+    const toast = selectImpactToast(grossRatio, hasOptions ? 'option' : 'stock', sim.day);
+    if (toast) showToast(toast, 'info');
 
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     chainDirty = true;
@@ -933,6 +957,7 @@ function _resetCore(index) {
     document.getElementById('fraud-overlay')?.classList.add('hidden');
     sim.reset(index);
     resetPortfolio();
+    resetImpactState();
     sim.prepopulate();
     syncMarket(sim);
     _initRateHistory();
