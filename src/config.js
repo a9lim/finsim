@@ -29,6 +29,29 @@ export const STOCKBOND_SPREAD_PCT = 0.001;  // 0.1% of mid price
 export const OPTION_SPREAD_PCT = 0.01;      // 1% of mid price
 export const MONEYNESS_SPREAD_WEIGHT = 0.05; // weight on |log(S/K)| for options
 
+// -- Price impact (Almgren-Chriss) --
+export const ADV                    = 500;     // average daily volume (displayed as "500k")
+export const PERM_COEFF             = 0.10;    // permanent impact coefficient
+export const TEMP_COEFF             = 0.05;    // temporary impact coefficient
+export const OPT_PERM_COEFF         = 0.12;    // options permanent impact
+export const OPT_TEMP_COEFF         = 0.06;    // options temporary impact
+export const OI_ATM_BASE            = 50;      // ATM open interest baseline (displayed as "50k")
+export const OI_MONEYNESS_DECAY     = 4.0;     // OI decay with moneyness
+export const RECOVERY_HALF_LIFE     = 3;       // days for impact recovery
+export const PARAM_SHIFT_HALF_LIFE  = 5;       // days for Layer 3 param decay
+export const IMPACT_TOAST_COOLDOWN  = 10;      // days between impact toasts
+export const IMPACT_THRESHOLD_25    = 0.25;    // 25% ADV — mild vol uptick
+export const IMPACT_THRESHOLD_50    = 0.50;    // 50% ADV — moderate vol + spread
+export const IMPACT_THRESHOLD_75    = 0.75;    // 75% ADV — vol spike + drift dampening
+export const IMPACT_THRESHOLD_100   = 1.00;    // 100% ADV — popup trigger eligible
+export const MAX_PLAYER_MU_SHIFT    = 0.05;
+export const MAX_PLAYER_THETA_SHIFT = 0.01;
+export const MAX_PLAYER_XI_SHIFT    = 0.02;
+export const MAX_PLAYER_KAPPA_SHIFT = 0.5;
+export const MAX_PLAYER_SIGMAR_SHIFT= 0.005;
+export const EVENT_COUPLING_CAP     = 0.20;    // max ±20% event amplification
+export const ROGUE_TRADING_THRESHOLD= 0.50;    // game over at 50% equity loss
+
 // -- Event engine --
 export const MAX_EVENT_LOG = 20;           // max event log entries displayed
 export const MAX_FOLLOWUP_DEPTH = 5;       // max recursion depth for MTTH chains

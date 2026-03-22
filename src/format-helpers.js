@@ -8,7 +8,11 @@ const _dollarFmt = new Intl.NumberFormat('en-US', {
 });
 
 export function fmtDollar(v) {
-    return (v < 0 ? '-$' : '$') + _dollarFmt.format(Math.abs(v));
+    return (v < 0 ? '-$' : '$') + _dollarFmt.format(Math.abs(v)) + 'k';
+}
+
+export function fmtQty(v) {
+    return Math.abs(v).toLocaleString() + 'k';
 }
 
 export function fmtNum(v, dp = 4) { return Number(v).toFixed(dp); }
