@@ -224,6 +224,7 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
         if (i === skipIdx) continue;
         const pos = portfolio.positions[i];
         equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
+        if (pos._reservedMargin) equity += pos._reservedMargin;
 
         if (pos.qty < 0) {
             const absQty = Math.abs(pos.qty);
@@ -814,6 +815,7 @@ export function portfolioValue(currentPrice, currentVol, currentRate, currentDay
     let total = portfolio.cash;
     for (const pos of portfolio.positions) {
         total += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
+        if (pos._reservedMargin) total += pos._reservedMargin;
     }
     return total;
 }
@@ -888,6 +890,7 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
 
     for (const pos of portfolio.positions) {
         equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
+        if (pos._reservedMargin) equity += pos._reservedMargin;
 
         if (pos.qty < 0) {
             const absQty = Math.abs(pos.qty);

@@ -593,21 +593,20 @@ function _onSubstep() {
         chainDirty = true;
     }
 
+    // Compute margin (equity + required) for display and peak/drawdown tracking
+    const substepMargin = checkMargin(sim.S, market.sigma, sim.r, sim.day, sim.q);
+
     // Track peak equity and drawdown for epilogue scorecard
     if (eventEngine) {
-        let equity = portfolio.cash;
-        for (const pos of portfolio.positions) {
-            equity += computePositionValue(pos, sim.S, market.sigma, sim.r, sim.day, sim.q);
-        }
-        if (equity > portfolio.peakValue) portfolio.peakValue = equity;
+        if (substepMargin.equity > portfolio.peakValue) portfolio.peakValue = substepMargin.equity;
         if (portfolio.peakValue > 0) {
-            const dd = 1 - equity / portfolio.peakValue;
+            const dd = 1 - substepMargin.equity / portfolio.peakValue;
             if (dd > portfolio.maxDrawdown) portfolio.maxDrawdown = dd;
         }
     }
 
     // Lightweight UI update: reprice visible expiry, update portfolio, rate
-    updateSubstepUI();
+    updateSubstepUI(substepMargin);
 }
 
 /** Called after all 16 sub-steps complete — runs portfolio/chain/margin checks. */
@@ -766,7 +765,7 @@ function updateUI(precomputedMargin) {
 }
 
 /** Lightweight UI update called every substep — reprices visible expiry only. */
-function updateSubstepUI() {
+function updateSubstepUI(marginInfo) {
     const vol = market.sigma;
     const pMap = _buildPosMap();
     const sMap = strategyMode ? _buildStrategyPosMap() : null;
@@ -782,7 +781,7 @@ function updateSubstepUI() {
     }
 
     // Portfolio mark-to-market
-    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, undefined, sim.q);
+    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, marginInfo, sim.q);
     if (activeTab === 'portfolio') {
         updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     }
