@@ -269,7 +269,6 @@ export class StrategyRenderer {
     constructor(canvas) {
         this._canvas = canvas;
         this._ctx    = canvas.getContext('2d');
-        this._dpr    = window.devicePixelRatio || 1;
         this._dirty  = false;
 
         // X-range zoom state (set per draw via resetRange or wheel)
@@ -299,21 +298,10 @@ export class StrategyRenderer {
 
     /** Update canvas dimensions accounting for device pixel ratio. */
     resize() {
-        const canvas = this._canvas;
-        const dpr    = window.devicePixelRatio || 1;
-        this._dpr    = dpr;
-        const cssW   = canvas.clientWidth  || canvas.width  / dpr;
-        const cssH   = canvas.clientHeight || canvas.height / dpr;
-        const newBufW = Math.round(cssW * dpr);
-        const newBufH = Math.round(cssH * dpr);
-        // Only reset buffer if size changed (setting canvas.width clears it)
-        if (canvas.width !== newBufW || canvas.height !== newBufH) {
-            canvas.width  = newBufW;
-            canvas.height = newBufH;
-        }
-        this._ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        this._cssW = cssW;
-        this._cssH = cssH;
+        const r = resizeCanvasDPR(this._canvas, this._ctx);
+        this._dpr  = r.dpr;
+        this._cssW = r.width;
+        this._cssH = r.height;
     }
 
     /**

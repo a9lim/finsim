@@ -59,10 +59,11 @@ src/
                                    (includes strategyName), cash/margin, borrow interest,
                                    dividends, option expiry, bid/ask spreads
   chart.js              728 lines  ChartRenderer: log Y-axis OHLC candles, live candle cubic
-                                   interpolation, position markers, strike lines; shared-camera.js
+                                   interpolation, position markers, strike lines; shared-camera.js;
+                                   uses resizeCanvasDPR() from shared-utils.js
   strategy.js           955 lines  StrategyRenderer: payoff P&L, Greek overlays, breakevens
                                    (analytical at expiry), input-keyed caching, tree-based
-                                   per-leg entry values
+                                   per-leg entry values; uses resizeCanvasDPR()
   ui.js                1056 lines  DOM binding, display updaters, overlay management;
                                    delegates to chain-renderer.js and portfolio-renderer.js.
                                    Strategy dropdowns, credit/debit, built-in disable logic
