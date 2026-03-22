@@ -9,7 +9,7 @@ export const INTRADAY_STEPS = 16;
 export const QUARTERLY_CYCLE = 63; // trading days per quarter (approximate)
 export const HISTORY_CAPACITY = 252;
 export const BINOMIAL_STEPS = 128;
-export const SPEED_OPTIONS = [0.25, 0.5, 1, 2, 4];
+export const SPEED_OPTIONS = [0.125, 0.25, 0.5, 1, 2];
 
 // -- Instruments --
 export const INITIAL_PRICE = 100;
@@ -52,7 +52,7 @@ export const CHART_PADDING_T = 24;         // top padding (CSS px)
 export const CHART_SLOT_PX = 12;           // px per day at zoom=1
 export const CHART_BODY_RATIO = 0.6;       // fraction of slot that is candle body
 export const CHART_LEFT_MARGIN = 80;       // left margin for camera positioning (CSS px)
-export const CHART_AUTOSCROLL_PCT = 0.85;  // keep latest candle at this screen fraction
+export const CHART_RIGHT_MARGIN = 120;    // fixed right margin for autoscroll (CSS px)
 
 // -- Strategy rendering --
 export const STRATEGY_SAMPLES = 200;       // sample points across X range

@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_AUTOSCROLL_PCT, DEFAULT_PRESET } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET } from './src/config.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
 import {
@@ -395,7 +395,7 @@ function init() {
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
-    updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
+    updateSpeedBtn($, SPEED_OPTIONS[speedIndex] * 2);
     _syncLerpSpeed();
     lastSpot = sim.S;
     strategy.resetRange(sim.S, strategyLegs);
@@ -417,12 +417,7 @@ function init() {
     updateUI();
 
     // 15. Position camera so latest candle is visible
-    if (camera) {
-        const lastDay = sim.history.maxDay;
-        const viewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
-        const targetScreenX = viewW * CHART_AUTOSCROLL_PCT;
-        camera.x = (lastDay + 0.5) - (targetScreenX - viewW / 2) / camera.zoom;
-    }
+    _repositionCamera();
 
     // 16. Wire resize via ResizeObserver on chart container
     // This fires during CSS sidebar transition AND window resize.
@@ -430,13 +425,19 @@ function init() {
     // setting canvas.width clears the buffer — if we wait for the next
     // rAF frame, the user sees a blank flash.
     const chartContainer = document.getElementById('chart-container');
+    let prevViewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
     function handleResize() {
         chart.resize();
         if (strategyMode) strategy.resize();
-        if (camera) camera.setViewport(
-            $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800,
-            $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600
-        );
+        const newW = $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800;
+        const newH = $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600;
+        if (camera) {
+            // Shift camera so the right edge stays anchored during sidebar slide
+            const dw = newW - prevViewW;
+            if (dw !== 0) camera.panBy(dw / 2, 0);
+            camera.setViewport(newW, newH);
+        }
+        prevViewW = newW;
         // Immediate redraw to avoid blank frame
         renderCurrentView();
         dirty = false; // already rendered this frame
@@ -686,8 +687,8 @@ function _onDayComplete() {
         const viewW = $.chartCanvas.clientWidth || 800;
         const targetWorldX = lastDay + 1;
         const rightEdgeWorld = camera.screenToWorldX
-            ? camera.screenToWorldX(viewW * CHART_AUTOSCROLL_PCT)
-            : camera.screenToWorld(viewW * CHART_AUTOSCROLL_PCT, 0).x;
+            ? camera.screenToWorldX(viewW - CHART_RIGHT_MARGIN)
+            : camera.screenToWorld(viewW - CHART_RIGHT_MARGIN, 0).x;
         if (targetWorldX > rightEdgeWorld) {
             const dx = targetWorldX - rightEdgeWorld;
             camera.panBy(-dx * camera.zoom, 0);
@@ -910,14 +911,14 @@ function _syncLerpSpeed() {
 
 function cycleSpeed() {
     speedIndex = (speedIndex + 1) % SPEED_OPTIONS.length;
-    updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
+    updateSpeedBtn($, SPEED_OPTIONS[speedIndex] * 2);
     _syncLerpSpeed();
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
 
 function decycleSpeed() {
     speedIndex = (speedIndex - 1 + SPEED_OPTIONS.length) % SPEED_OPTIONS.length;
-    updateSpeedBtn($, SPEED_OPTIONS[speedIndex]);
+    updateSpeedBtn($, SPEED_OPTIONS[speedIndex] * 2);
     _syncLerpSpeed();
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
@@ -1429,7 +1430,7 @@ function _repositionCamera() {
     if (!camera) return;
     const lastDay = sim.history.maxDay;
     const viewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
-    const targetScreenX = viewW * CHART_AUTOSCROLL_PCT;
+    const targetScreenX = viewW - CHART_RIGHT_MARGIN;
     camera.x = (lastDay + 0.5) - (targetScreenX - viewW / 2) / camera.zoom;
 }
 
