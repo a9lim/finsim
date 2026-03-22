@@ -4,8 +4,8 @@
  * Optimised for batch pricing: tree parameters are cached and reused across
  * calls with the same (T, r, sigma, q, currentDay). Inner backward
  * induction uses incremental d² stepping instead of Math.pow (~12x faster per
- * node). Tree-based delta/gamma extracted from CRR nodes at steps 1 & 2,
- * reducing computeGreeks from 9 to 7 backward inductions.
+ * node). Tree-based delta/gamma/theta extracted from CRR nodes at steps 1 & 2,
+ * reducing computeGreeks from 9 to 5 backward inductions.
  *
  * BSS smoothing (Broadie-Detemple): every tree carries a companion tree with
  * N-1 steps. All public pricing/Greek APIs average the N and N-1 results,
@@ -583,28 +583,28 @@ export function pricePairWithTree(S, K, tree) {
 // ---------------------------------------------------------------------------
 
 /**
- * Allocate a fresh Greek trees bundle with 7 tree objects.
+ * Allocate a fresh Greek trees bundle with 5 tree objects.
+ * Theta is computed from the tree's center node at step 2 (no bump trees).
  * Pass back to prepareGreekTrees via `into` to reuse buffers.
  *
  * @returns {object} Empty Greek trees bundle
  */
 export function allocGreekTrees() {
     return {
-        base: allocTree(), thetaLo: allocTree(), thetaHi: allocTree(),
+        base: allocTree(),
         vegaUp: allocTree(), vegaDn: allocTree(),
         rhoUp: allocTree(), rhoDn: allocTree(),
-        hT: 0, hSigma: 0, hR: 0,
+        dt: 0, hSigma: 0, hR: 0,
     };
 }
 
 /**
- * Prepare all 7 tree variants needed for Greek computation.
+ * Prepare all 5 tree variants needed for Greek computation.
+ * Theta is derived from the base tree's center node at step 2
+ * (no bump trees needed). Vega and rho use finite-difference bumps.
  *
  * Call once per (T, r, sigma, q, currentDay), then use
  * computeGreeksWithTrees for each (S, K, isPut) combination.
- * Eliminates redundant tree preparation when pricing many options
- * at the same expiry (e.g. chain overlay: 50 options × 7 trees = 350
- * tree preps reduced to 7).
  *
  * When `into` is provided, fills existing tree buffers (zero allocation).
  *
@@ -613,22 +613,16 @@ export function allocGreekTrees() {
  */
 export function prepareGreekTrees(T, r, sigma, q, currentDay, into) {
     q = q || 0;
-    const h_T     = 1 / TRADING_DAYS_PER_YEAR;
-    const h_sigma = 0.001;
-    const h_r     = 0.0001;
-
-    const T_lo = Math.max(T - h_T, 1e-10);
-    const T_hi = T + h_T;
+    const h_sigma = 0.01;
+    const h_r     = 0.001;
 
     const gt = into || allocGreekTrees();
     prepareTree(T, r, sigma, q, currentDay, gt.base);
-    prepareTree(T_lo, r, sigma, q, currentDay, gt.thetaLo);
-    prepareTree(T_hi, r, sigma, q, currentDay, gt.thetaHi);
     prepareTree(T, r, sigma + h_sigma, q, currentDay, gt.vegaUp);
     prepareTree(T, r, sigma - h_sigma, q, currentDay, gt.vegaDn);
     prepareTree(T, r + h_r, sigma, q, currentDay, gt.rhoUp);
     prepareTree(T, r - h_r, sigma, q, currentDay, gt.rhoDn);
-    gt.hT = T_hi - T_lo;
+    gt.dt = T / gt.base.n;
     gt.hSigma = h_sigma;
     gt.hR = h_r;
     return gt;
@@ -637,8 +631,9 @@ export function prepareGreekTrees(T, r, sigma, q, currentDay, into) {
 /**
  * Compute Greeks using pre-prepared trees.
  *
- * Tree-based delta/gamma + finite-difference theta/vega/rho.
- * Each call runs 7 backward inductions (no tree preparation overhead).
+ * Tree-based delta/gamma/theta + finite-difference vega/rho.
+ * Theta uses the center node at step 2: (V_mid2 - V_0) / (2·dt).
+ * Each call runs 5 backward inductions (no tree preparation overhead).
  *
  * @param {number}  S     - Spot price
  * @param {number}  K     - Strike
@@ -657,31 +652,29 @@ export function computeGreeksWithTrees(S, K, isPut, gt) {
     // Base price — sets _f10..._f22; BSS average with companion tree
     let price = _priceCore(S, K, isPut, gt.base);
     let { delta, gamma } = _treeDeltaGamma(S, gt.base);
+    let theta = (_f21 - price) / (2 * gt.dt);
     if (bss) {
         const p2 = _priceCore(S, K, isPut, gt.base._b);
         const dg2 = _treeDeltaGamma(S, gt.base._b);
+        const theta2 = (_f21 - p2) / (2 * (gt.dt * gt.base.n / gt.base._b.n));
         price = 0.5 * (price + p2);
         delta = 0.5 * (delta + dg2.delta);
         gamma = 0.5 * (gamma + dg2.gamma);
+        theta = 0.5 * (theta + theta2);
     }
 
-    // Finite-difference theta/vega/rho (BSS averaged)
-    let pTlo = _priceCore(S, K, isPut, gt.thetaLo);
-    let pThi = _priceCore(S, K, isPut, gt.thetaHi);
+    // Finite-difference vega/rho (BSS averaged)
     let pSu  = _priceCore(S, K, isPut, gt.vegaUp);
     let pSd  = _priceCore(S, K, isPut, gt.vegaDn);
     let pRu  = _priceCore(S, K, isPut, gt.rhoUp);
     let pRd  = _priceCore(S, K, isPut, gt.rhoDn);
     if (bss) {
-        pTlo = 0.5 * (pTlo + _priceCore(S, K, isPut, gt.thetaLo._b));
-        pThi = 0.5 * (pThi + _priceCore(S, K, isPut, gt.thetaHi._b));
         pSu  = 0.5 * (pSu  + _priceCore(S, K, isPut, gt.vegaUp._b));
         pSd  = 0.5 * (pSd  + _priceCore(S, K, isPut, gt.vegaDn._b));
         pRu  = 0.5 * (pRu  + _priceCore(S, K, isPut, gt.rhoUp._b));
         pRd  = 0.5 * (pRd  + _priceCore(S, K, isPut, gt.rhoDn._b));
     }
 
-    const theta = (pTlo - pThi) / gt.hT;
     const vega  = (pSu - pSd) / (2 * gt.hSigma);
     const rho   = (pRu - pRd) / (2 * gt.hR);
 
@@ -694,10 +687,11 @@ export function computeGreeksWithTrees(S, K, isPut, gt) {
 
 /**
  * Compute Greeks for both call and put at the same strike using dual
- * backward induction. Each of the 7 tree variants runs a single pass
+ * backward induction. Each of the 5 tree variants runs a single pass
  * producing both call and put values simultaneously.
+ * Theta uses the center node at step 2 from the base tree.
  *
- * Total: 7 dual backward inductions instead of 14 single inductions.
+ * Total: 5 dual backward inductions instead of 10 single inductions.
  * Shares loop overhead, Si computation, and array lookups between
  * call and put within each induction pass.
  *
@@ -718,6 +712,7 @@ export function computeGreeksPairWithTrees(S, K, gt) {
     }
 
     const bss = gt.base._b && gt.base._b.valid;
+    const inv2dt = 1 / (2 * gt.dt);
 
     // Base price — sets pair intermediates (_cf10.._cf22, _pf10.._pf22)
     _pricePairCore(S, K, gt.base);
@@ -725,20 +720,23 @@ export function computeGreeksPairWithTrees(S, K, gt) {
     _pairDeltaGamma(S, gt.base);
     let cD = _callDelta, cG = _callGamma;
     let pD = _putDelta,  pG = _putGamma;
+    let cTh = (_cf21 - cP) * inv2dt;
+    let pTh = (_pf21 - pP) * inv2dt;
 
     if (bss) {
         _pricePairCore(S, K, gt.base._b);
+        const bdt2 = gt.dt * gt.base.n / gt.base._b.n;
+        const cTh2 = (_cf21 - _V[0]) / (2 * bdt2);
+        const pTh2 = (_pf21 - _VP[0]) / (2 * bdt2);
         cP = 0.5 * (cP + _V[0]); pP = 0.5 * (pP + _VP[0]);
         _pairDeltaGamma(S, gt.base._b);
         cD = 0.5 * (cD + _callDelta); cG = 0.5 * (cG + _callGamma);
         pD = 0.5 * (pD + _putDelta);  pG = 0.5 * (pG + _putGamma);
+        cTh = 0.5 * (cTh + cTh2);
+        pTh = 0.5 * (pTh + pTh2);
     }
 
-    // Finite-difference theta/vega/rho — 6 dual inductions (BSS averaged)
-    _pricePairCore(S, K, gt.thetaLo);
-    let cTlo = _V[0], pTlo = _VP[0];
-    _pricePairCore(S, K, gt.thetaHi);
-    let cThi = _V[0], pThi = _VP[0];
+    // Finite-difference vega/rho — 4 dual inductions (BSS averaged)
     _pricePairCore(S, K, gt.vegaUp);
     let cVu = _V[0], pVu = _VP[0];
     _pricePairCore(S, K, gt.vegaDn);
@@ -749,10 +747,6 @@ export function computeGreeksPairWithTrees(S, K, gt) {
     let cRd = _V[0], pRd = _VP[0];
 
     if (bss) {
-        _pricePairCore(S, K, gt.thetaLo._b);
-        cTlo = 0.5 * (cTlo + _V[0]); pTlo = 0.5 * (pTlo + _VP[0]);
-        _pricePairCore(S, K, gt.thetaHi._b);
-        cThi = 0.5 * (cThi + _V[0]); pThi = 0.5 * (pThi + _VP[0]);
         _pricePairCore(S, K, gt.vegaUp._b);
         cVu = 0.5 * (cVu + _V[0]); pVu = 0.5 * (pVu + _VP[0]);
         _pricePairCore(S, K, gt.vegaDn._b);
@@ -763,20 +757,19 @@ export function computeGreeksPairWithTrees(S, K, gt) {
         cRd = 0.5 * (cRd + _V[0]); pRd = 0.5 * (pRd + _VP[0]);
     }
 
-    const invHT = 1 / gt.hT;
     const inv2hSigma = 1 / (2 * gt.hSigma);
     const inv2hR = 1 / (2 * gt.hR);
 
     return {
         call: {
             price: cP, delta: cD, gamma: cG,
-            theta: (cTlo - cThi) * invHT,
+            theta: cTh,
             vega: (cVu - cVd) * inv2hSigma,
             rho: (cRu - cRd) * inv2hR,
         },
         put: {
             price: pP, delta: pD, gamma: pG,
-            theta: (pTlo - pThi) * invHT,
+            theta: pTh,
             vega: (pVu - pVd) * inv2hSigma,
             rho: (pRu - pRd) * inv2hR,
         },
