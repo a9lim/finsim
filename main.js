@@ -23,7 +23,7 @@ import {
     updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateStockBondPrices,
     syncSettingsUI, toggleStrategyView, showMarginCall, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
-    renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay,
+    renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
     updateDynamicSections, updateEventLog, updateCongressDiagrams,
     refreshTooltip,
     updateStrategyDropdowns, updateCreditDebit,
@@ -775,6 +775,8 @@ function updateSubstepUI(marginInfo) {
     const tradePriced = _priceExpiry(_tradeExpiryIdx());
     updateChainDisplay($, tradePriced, pMap);
     updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap);
+
+    updateTriggerPriceSlider($, sim.S);
 
     if (strategyMode) {
         const stratPriced = _priceExpiry(_strategyExpiryIdx());
