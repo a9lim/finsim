@@ -351,20 +351,137 @@ main {
 }
 
 /* --- Margin Call --- */
+#margin-call-overlay {
+    backdrop-filter: blur(8px) saturate(1.2);
+    background: #C8434122;
+}
+
 .margin-call-content {
-    max-width: 380px;
-    padding: 1.25rem;
+    max-width: 400px;
+    padding: 2rem 2rem 1.5rem;
+    text-align: center;
+    border: 1px solid var(--down);
+    animation: marginPulse 2s ease-in-out infinite;
+}
+
+@keyframes marginPulse {
+    0%, 100% { box-shadow: 0 0 20px #C8434133, 0 0 60px #C8434111; }
+    50%      { box-shadow: 0 0 30px #C8434155, 0 0 80px #C8434122; }
+}
+
+.margin-call-icon {
+    color: var(--down);
+    margin-bottom: 0.75rem;
+    animation: marginShake 0.6s ease-in-out;
+}
+
+@keyframes marginShake {
+    0%, 100% { transform: translateX(0); }
+    15%      { transform: translateX(-8px) rotate(-4deg); }
+    30%      { transform: translateX(7px) rotate(3deg); }
+    45%      { transform: translateX(-6px) rotate(-2deg); }
+    60%      { transform: translateX(4px) rotate(1deg); }
+    75%      { transform: translateX(-2px); }
 }
 
 .margin-call-title {
     color: var(--down);
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    letter-spacing: 0.04em;
+    margin-bottom: 1rem;
 }
 
 .margin-call-message {
     font-size: 0.82rem;
     color: var(--text-secondary);
-    margin-bottom: 12px;
-    line-height: 1.5;
+    margin-bottom: 1.25rem;
+    line-height: 1.6;
+}
+
+.margin-call-liquidate-btn {
+    width: 100%;
+    background: var(--down);
+    color: #fff;
+    border-color: var(--down);
+    font-weight: 600;
+    padding: 0.6rem 1.25rem;
+    transition: background 0.15s, transform 0.1s;
+}
+
+.margin-call-liquidate-btn:hover {
+    background: #a83535;
+    transform: scale(1.02);
+}
+
+/* --- Fraud / Game Over --- */
+#fraud-overlay {
+    backdrop-filter: blur(12px) saturate(1.1);
+    background: #080B11DD;
+}
+
+.fraud-content {
+    max-width: 440px;
+    padding: 2.5rem 2rem 2rem;
+    text-align: center;
+    border: 1px solid var(--text-muted);
+    background: var(--bg-panel);
+}
+
+.fraud-icon {
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.fraud-title {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    color: var(--text);
+    letter-spacing: 0.04em;
+    margin-bottom: 0.25rem;
+}
+
+.fraud-subtitle {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    margin-bottom: 1.25rem;
+}
+
+.fraud-body {
+    text-align: left;
+}
+
+.fraud-message {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    margin-bottom: 1.25rem;
+}
+
+.fraud-charge {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--down);
+    margin-top: 0.5rem;
+    letter-spacing: 0.02em;
+}
+
+.fraud-sentence {
+    display: block;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 0.75rem;
+}
+
+.fraud-reset-btn {
+    width: 100%;
+    padding: 0.6rem 1.25rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
 }
 
 /* --- Greeks Display --- */
@@ -671,7 +788,8 @@ main {
 
     /* Trade dialog and chain overlay fill screen on mobile */
     .trade-dialog-content,
-    .margin-call-content {
+    .margin-call-content,
+    .fraud-content {
         max-width: none;
         margin: 16px;
     }
