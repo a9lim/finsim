@@ -47,8 +47,6 @@ export class ChartRenderer {
         this.SLOT_PX    = CHART_SLOT_PX;
         this.BODY_RATIO = CHART_BODY_RATIO;
 
-        this._dpr = window.devicePixelRatio || 1;
-
         // Theme color cache — invalidated when data-theme changes
         this._cachedTheme = null;
         this._isDark = false;
@@ -74,32 +72,14 @@ export class ChartRenderer {
        changes.
     ----------------------------------------------- */
     resize() {
-        const dpr = window.devicePixelRatio || 1;
-        this._dpr = dpr;
-
-        const rect = this.canvas.getBoundingClientRect();
-        const w = rect.width  || this.canvas.offsetWidth  || 800;
-        const h = rect.height || this.canvas.offsetHeight || 600;
-
-        const newBufW = Math.round(w * dpr);
-        const newBufH = Math.round(h * dpr);
-
-        // Only reset canvas buffer if size actually changed
-        // (setting canvas.width clears the canvas, causing flash)
-        if (this.canvas.width !== newBufW || this.canvas.height !== newBufH) {
-            this.canvas.width  = newBufW;
-            this.canvas.height = newBufH;
-        }
-
-        this.width  = w;
-        this.height = h;
-
-        // Set DPR transform — draw() uses CSS-px coordinates
-        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const r = resizeCanvasDPR(this.canvas, this.ctx);
+        this._dpr   = r.dpr;
+        this.width  = r.width;
+        this.height = r.height;
 
         // Keep camera viewport in sync
         if (this.camera) {
-            this.camera.setViewport(w, h);
+            this.camera.setViewport(r.width, r.height);
         }
     }
 
