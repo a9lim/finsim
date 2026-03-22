@@ -10,7 +10,7 @@ import { fmtDollar, fmtNum, pnlClass, fmtDte, fmtRelDay, posTypeLabel } from './
 import { computeBidAsk } from './portfolio.js';
 import { renderChainInto, rebuildExpiryDropdown, buildStockBondTable, buildChainTable, bindChainTableClicks, posKey } from './chain-renderer.js';
 import { vasicekBondPrice } from './pricing.js';
-import { BOND_FACE_VALUE } from './config.js';
+import { BOND_FACE_VALUE, STRIKE_INTERVAL, STRIKE_RANGE } from './config.js';
 import { market } from './market.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
@@ -270,7 +270,7 @@ export function bindEvents($, handlers) {
     }
 
     // Trigger price slider
-    if ($.triggerPrice) _forms.bindSlider($.triggerPrice, $.triggerPriceVal, null, v => '$' + v.toFixed(2));
+    if ($.triggerPrice) _forms.bindSlider($.triggerPrice, $.triggerPriceVal, null, v => '$' + v.toFixed(0));
 
     // Strategy builder: stock/bond cell clicks -> add leg
     if ($.strategyStockCell && typeof handlers.onAddLeg === 'function') {
@@ -615,23 +615,29 @@ export function updateSpeedBtn($, speed) {
  * Called whenever the chain is rebuilt.
  */
 /**
+ * Update trigger price slider range to match strike prices.
+ */
+export function updateTriggerPriceSlider($, spot) {
+    if (!$.triggerPrice || !spot) return;
+    const atm = Math.round(spot / STRIKE_INTERVAL) * STRIKE_INTERVAL;
+    const trigMin = Math.max(STRIKE_INTERVAL, atm - STRIKE_RANGE * STRIKE_INTERVAL);
+    const trigMax = atm + STRIKE_RANGE * STRIKE_INTERVAL;
+    $.triggerPrice.min = trigMin;
+    $.triggerPrice.max = trigMax;
+    $.triggerPrice.step = STRIKE_INTERVAL;
+    const curTrig = parseFloat($.triggerPrice.value);
+    if (curTrig < trigMin || curTrig > trigMax) {
+        $.triggerPrice.value = atm;
+    }
+    $.triggerPriceVal.textContent = '$' + parseFloat($.triggerPrice.value).toFixed(0);
+}
+
+/**
  * Update strategy selectors: chain table + trigger price slider.
  */
 export function updateStrategySelectors($, pricedExpiry, spot, onAddLeg, posMap) {
     updateStrategyChainDisplay($, pricedExpiry, onAddLeg, posMap);
-
-    // Trigger price slider range based on current spot (+-30%)
-    if ($.triggerPrice && spot) {
-        const trigMin = Math.max(1, Math.round(spot * 0.7 * 2) / 2);
-        const trigMax = Math.round(spot * 1.3 * 2) / 2;
-        $.triggerPrice.min = trigMin;
-        $.triggerPrice.max = trigMax;
-        const curTrig = parseFloat($.triggerPrice.value);
-        if (curTrig < trigMin || curTrig > trigMax) {
-            $.triggerPrice.value = Math.round(spot * 2) / 2;
-        }
-        $.triggerPriceVal.textContent = '$' + parseFloat($.triggerPrice.value).toFixed(2);
-    }
+    updateTriggerPriceSlider($, spot);
 }
 
 /**
