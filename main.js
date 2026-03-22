@@ -667,16 +667,17 @@ function _onDayComplete() {
 
     // Fire dynamic events
     if (eventEngine) {
-        const events = eventEngine.maybeFire(sim, sim.day);
-        if (events.length > 0) {
+        const netDelta = computeNetDelta();
+        const { fired, popups } = eventEngine.maybeFire(sim, sim.day, netDelta);
+        if (fired.length > 0) {
             sim.recomputeK();
             syncMarket(sim);
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
             updateCongressDiagrams($, eventEngine.world);
             if (typeof showToast !== 'undefined') {
-                for (let i = 0; i < events.length; i++) {
-                    const ev = events[i];
+                for (let i = 0; i < fired.length; i++) {
+                    const ev = fired[i];
                     const duration = ev.magnitude === 'major' ? 8000
                         : ev.magnitude === 'moderate' ? 5000 : 3000;
                     setTimeout(function() { showToast(ev.headline, duration); }, i * 1500);
