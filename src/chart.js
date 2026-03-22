@@ -492,21 +492,29 @@ export class ChartRenderer {
             ctx.font        = `11px var(--font-mono, monospace)`;
             ctx.textBaseline = 'bottom';
 
-            // Deduplicate strike levels to avoid drawing duplicate lines
-            const drawnStrikes = new Set();
+            // Collect colors per strike: track whether green/rose appear
+            const strikeColors = new Map(); // strike -> { green, rose }
+            const green = palette.call || palette.up;
+            const rose  = palette.put  || palette.down;
 
             for (const pos of openOptions) {
                 const strike = pos.strike;
-                if (drawnStrikes.has(strike)) continue;
-                drawnStrikes.add(strike);
+                if (!strikeColors.has(strike)) strikeColors.set(strike, { green: false, rose: false });
+                const entry = strikeColors.get(strike);
+                const isShort = pos.qty < 0;
+                if ((pos.type === 'call') !== isShort) entry.green = true;
+                else entry.rose = true;
+            }
 
+            for (const [strike, flags] of strikeColors) {
                 const ys = priceToY(strike);
                 if (ys < plotY || ys > plotY + plotH) continue;
 
                 const py = Math.round(ys) + 0.5;
 
-                // Color by call/put
-                const lineColor = pos.type === 'call' ? (palette.call || palette.up) : (palette.put || palette.down);
+                const lineColor = (flags.green && flags.rose)
+                    ? (_PALETTE.extended.yellow)
+                    : flags.green ? green : rose;
                 ctx.strokeStyle = lineColor + '99'; // semi-transparent
                 ctx.setLineDash(strikeDash);
                 ctx.beginPath();
