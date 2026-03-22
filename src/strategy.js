@@ -692,8 +692,8 @@ export class StrategyRenderer {
         ctx.fillStyle    = accentColor;
         ctx.font         = '11px var(--font-mono, monospace)';
         ctx.textAlign    = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(_fmt$(spot), x, plotY - 4);
+        ctx.textBaseline = 'top';
+        ctx.fillText(_fmt$(spot), x, plotY + plotH + 4);
         ctx.restore();
     }
 
