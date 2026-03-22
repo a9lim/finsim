@@ -27,6 +27,7 @@ import {
     updateDynamicSections, updateEventLog, updateCongressDiagrams,
     refreshTooltip,
     updateStrategyDropdowns, updateCreditDebit,
+    showPopupEvent,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
 import { EventEngine } from './src/events.js';
@@ -46,6 +47,7 @@ import {
     listStrategies, getStrategy, saveStrategy, deleteStrategy,
     resolveLegs, computeNetCost, legsToRelative, nextAutoName,
 } from './src/strategy-store.js';
+import { applyStructuredEffects } from './src/world-state.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -77,6 +79,11 @@ let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
 let _recoveryDrift = 0;
 let _savedOverlays = {};
+
+const _popupQueue = [];
+const playerChoices = {};
+const impactHistory = [];
+const quarterlyReviews = [];
 
 // ---------------------------------------------------------------------------
 // Rate sparkline helpers
@@ -627,6 +634,44 @@ function _onSubstep() {
 }
 
 /** Called after all 16 sub-steps complete — runs portfolio/chain/margin checks. */
+function _processPopupQueue() {
+    if (_popupQueue.length === 0) return;
+    // Don't show if another overlay is open
+    if (!$.chainOverlay.classList.contains('hidden')) return;
+    if (!$.tradeDialog.classList.contains('hidden')) return;
+    if (!$.marginCallOverlay.classList.contains('hidden')) return;
+
+    const event = _popupQueue.shift();
+    playing = false;
+    _toolbar.updatePlayBtn(playing);
+
+    const contextText = typeof event.context === 'function'
+        ? event.context(sim, eventEngine?.world, portfolio)
+        : event.context || '';
+
+    showPopupEvent($, event.headline, contextText, event.choices, (idx) => {
+        const choice = event.choices[idx];
+        if (choice.deltas && eventEngine) {
+            eventEngine.applyDeltas(sim, choice.deltas);
+        }
+        if (choice.effects && eventEngine) {
+            applyStructuredEffects(eventEngine.world, choice.effects);
+        }
+        if (choice.playerFlag) {
+            playerChoices[choice.playerFlag] = sim.day;
+        }
+        if (choice.followups && eventEngine) {
+            for (const fu of choice.followups) {
+                eventEngine.scheduleFollowup(fu, sim.day);
+            }
+        }
+        if (choice.resultToast) {
+            showToast(choice.resultToast, 'info');
+        }
+        dirty = true;
+    });
+}
+
 function _onDayComplete() {
     const vol = market.sigma;
 
@@ -669,6 +714,7 @@ function _onDayComplete() {
     if (eventEngine) {
         const netDelta = computeNetDelta();
         const { fired, popups } = eventEngine.maybeFire(sim, sim.day, netDelta);
+        for (const ev of popups) _popupQueue.push(ev);
         if (fired.length > 0) {
             sim.recomputeK();
             syncMarket(sim);
@@ -731,6 +777,8 @@ function _onDayComplete() {
 
     updateUI(margin);
     dirty = true;
+
+    _processPopupQueue();
 }
 
 // ---------------------------------------------------------------------------
@@ -956,6 +1004,11 @@ function decycleSpeed() {
 function _resetCore(index) {
     document.getElementById('epilogue-overlay')?.classList.add('hidden');
     document.getElementById('fraud-overlay')?.classList.add('hidden');
+    document.getElementById('popup-event-overlay')?.classList.add('hidden');
+    _popupQueue.length = 0;
+    for (const k in playerChoices) delete playerChoices[k];
+    impactHistory.length = 0;
+    quarterlyReviews.length = 0;
     sim.reset(index);
     resetPortfolio();
     resetImpactState();

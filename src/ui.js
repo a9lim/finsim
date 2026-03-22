@@ -99,6 +99,10 @@ export function cacheDOMElements($) {
     $.fraudOverlay        = document.getElementById('fraud-overlay');
     $.fraudMsg            = document.getElementById('fraud-msg');
     $.fraudReset          = document.getElementById('fraud-reset');
+    $.popupOverlay   = document.getElementById('popup-event-overlay');
+    $.popupHeadline  = document.getElementById('popup-event-headline');
+    $.popupContext   = document.getElementById('popup-event-context');
+    $.popupChoices   = document.getElementById('popup-event-choices');
     $.introScreen = document.getElementById('intro-screen');
     $.introStart  = document.getElementById('intro-start');
     $.strategyLegsList = document.getElementById('strategy-legs-list');
@@ -1053,4 +1057,36 @@ export function updateCongressDiagrams($, world) {
     const houseTotal = h.federalist + h.farmerLabor;
     _drawParliament($.houseDiagram, houseSegs, houseTotal);
     _updateLegend($.houseLegend, houseSegs, 218);
+}
+
+export function showPopupEvent($, headline, context, choices, onChoice) {
+    $.popupHeadline.textContent = headline;
+    $.popupContext.textContent = context;
+    $.popupChoices.textContent = '';
+    choices.forEach((c, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'popup-choice-btn';
+        const lbl = document.createElement('span');
+        lbl.className = 'popup-choice-label';
+        lbl.textContent = c.label;
+        const desc = document.createElement('span');
+        desc.className = 'popup-choice-desc';
+        desc.textContent = c.desc;
+        btn.appendChild(lbl);
+        btn.appendChild(desc);
+        btn.addEventListener('click', () => {
+            $.popupOverlay.classList.add('hidden');
+            onChoice(i);
+        });
+        $.popupChoices.appendChild(btn);
+    });
+    $.popupOverlay.classList.remove('hidden');
+}
+
+export function hidePopupEvent($) {
+    $.popupOverlay.classList.add('hidden');
+}
+
+export function isPopupVisible($) {
+    return !$.popupOverlay.classList.contains('hidden');
 }
