@@ -38,7 +38,7 @@ import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
 import {
-    resetImpactState, resetDailyVolume, computeRecoveryDrift,
+    resetImpactState, resetDailyVolume, decaySubstepVolume, computeRecoveryDrift,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
     selectImpactToast,
@@ -566,6 +566,7 @@ function frame(now) {
             let stepped = false;
             while (sim.substepsDone < targetSteps) {
                 sim.substep();
+                decaySubstepVolume();
                 chart.setLiveCandle(sim._partial);
                 stepped = true;
             }
