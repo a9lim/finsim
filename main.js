@@ -1574,7 +1574,7 @@ function handleSaveStrategy() {
     updateStrategyBuilder();
 }
 
-function executeWithRollback(resolvedLegs, strategyName) {
+function executeWithRollback(resolvedLegs, strategyName, execMult) {
     const savedCash = portfolio.cash;
     const savedPositions = portfolio.positions.map(p => ({ ...p }));
     const savedClosedBorrowCost = portfolio.closedBorrowCost;
@@ -1612,7 +1612,7 @@ function executeWithRollback(resolvedLegs, strategyName) {
         if (typeof _haptics !== 'undefined') _haptics.trigger('error');
     } else if (results.length > 0) {
         const totalCost = savedCash - portfolio.cash;
-        const mult = results[0].strategyBaseQty ? Math.round(Math.abs(results[0].qty) / results[0].strategyBaseQty) : 1;
+        const mult = execMult || 1;
         const perUnit = Math.abs(totalCost / mult);
         const verb = totalCost > 0 ? 'at' : 'for credit';
         const name = strategyName + 's';
@@ -1691,7 +1691,7 @@ function handleTradeExecStrategy() {
     const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
     const mult = parseInt($.tradeQty?.value, 10) || 1;
     const scaled = resolved.map(l => ({ ...l, _baseQty: Math.abs(l.qty), qty: l.qty * mult }));
-    executeWithRollback(scaled, strat.name);
+    executeWithRollback(scaled, strat.name, mult);
 }
 
 function _updateTradeCreditDebit() {
