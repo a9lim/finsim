@@ -637,7 +637,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
             const fmtVal = (v) => {
                 if (v === Infinity) return '\u221E';
                 if (v === -Infinity) return '-\u221E';
-                return (v < 0 ? '-$' : '$') + Math.abs(v).toFixed(2);
+                return (v < 0 ? '-' : '') + Math.abs(v).toFixed(2);
             };
             const items = [
                 { label: summary.netCost < 0 ? 'Net Credit' : 'Net Debit', value: fmtVal(Math.abs(summary.netCost)), cls: summary.netCost < 0 ? 'pnl-up' : 'pnl-down' },
@@ -647,7 +647,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
             if (summary.breakevens.length > 0) {
                 items.push({
                     label: 'Breakeven' + (summary.breakevens.length > 1 ? 's' : ''),
-                    value: summary.breakevens.map(b => '$' + b.toFixed(2)).join(', '),
+                    value: summary.breakevens.map(b => b.toFixed(2)).join(', '),
                     cls: '',
                 });
             }
@@ -708,7 +708,7 @@ export function updateCreditDebit($, netCost) {
     }
     const isCredit = netCost < 0;
     const label = isCredit ? 'Net Credit' : 'Net Debit';
-    const value = '$' + Math.abs(netCost).toFixed(2);
+    const value = Math.abs(netCost).toFixed(2);
     $.strategyCreditDebit.querySelector('.stat-label').textContent = label;
     $.strategyNetCost.textContent = value;
     $.strategyNetCost.className = 'stat-value ' + (isCredit ? 'pnl-up' : 'pnl-down');
