@@ -36,15 +36,14 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
                 ? vasicekBondPrice(BOND_FACE_VALUE, rate, dte, market.a, market.b, market.sigmaR)
                 : BOND_FACE_VALUE * Math.exp(-rate * dte);
         case 'call':
-        case 'put':
+        case 'put': {
             if (dte <= 0 || vol <= 0) return Math.max(0, type === 'call' ? S - strike : strike - S);
+            const sigmaEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+            const sigma = computeSkewSigma(sigmaEff, S, strike, dte, market.rho, market.xi, market.kappa);
             if (!_tree) _tree = allocTree();
-            {
-                const sigmaEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-                const sigma = computeSkewSigma(sigmaEff, S, strike, dte, market.rho, market.xi, market.kappa);
-                prepareTree(dte, rate, sigma, q, day, _tree);
-            }
+            prepareTree(dte, rate, sigma, q, day, _tree);
             return priceWithTree(S, strike, type === 'put', _tree);
+        }
         default: return 0;
     }
 }
