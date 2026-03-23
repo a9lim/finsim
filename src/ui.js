@@ -1010,7 +1010,7 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
     let tag = $.popupOverlay.querySelector('.popup-tag');
     if (!tag) {
         tag = document.createElement('span');
-        tag.className = 'popup-tag';
+        tag.className = 'popup-tag glass';
         $.popupHeadline.parentNode.insertBefore(tag, $.popupHeadline);
     }
     tag.textContent = meta.label;
@@ -1022,7 +1022,7 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
     $.popupChoices.textContent = '';
     choices.forEach((c, i) => {
         const btn = document.createElement('button');
-        btn.className = 'popup-choice-btn';
+        btn.className = 'popup-choice-btn glass';
         const lbl = document.createElement('span');
         lbl.className = 'popup-choice-label';
         lbl.textContent = c.label;
