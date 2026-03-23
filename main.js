@@ -1486,7 +1486,8 @@ function executeWithRollback(resolvedLegs, strategyName) {
         const mult = results[0].strategyBaseQty ? Math.round(Math.abs(results[0].qty) / results[0].strategyBaseQty) : 1;
         const perUnit = Math.abs(totalCost / mult);
         const verb = totalCost > 0 ? 'at' : 'for credit';
-        if (typeof showToast !== 'undefined') showToast('Executed ' + mult + 'k ' + strategyName + ' ' + verb + ' $' + perUnit.toFixed(2));
+        const name = mult > 1 ? strategyName + 's' : strategyName;
+        if (typeof showToast !== 'undefined') showToast('Executed ' + mult + 'k ' + name + ' ' + verb + ' $' + perUnit.toFixed(2));
         if (typeof _haptics !== 'undefined') _haptics.trigger('success');
     }
     chainDirty = true;
