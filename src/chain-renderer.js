@@ -64,13 +64,13 @@ function buildChainRow(row, expiry, isAtm, compact, posMap, spot) {
         tr.appendChild(putTd);
     } else {
         const logSK = spot > 0 ? Math.log(spot / row.strike) : 0;
-        const callOI = Math.round(modeledOI('call', logSK, expiry.dte));
-        const putOI  = Math.round(modeledOI('put',  logSK, expiry.dte));
+        const callOI = modeledOI('call', logSK, expiry.dte).toFixed(2) + 'k';
+        const putOI  = modeledOI('put',  logSK, expiry.dte).toFixed(2) + 'k';
         const cellDefs = [
             { text: row.call.bid.toFixed(2) + ' / ' + row.call.ask.toFixed(2), cls: 'call-cell', type: 'call' },
-            { text: String(callOI), cls: 'chain-greek', type: null },
+            { text: callOI, cls: 'chain-greek', type: null },
             { text: String(row.strike),        cls: 'strike-cell' + (isAtm ? ' atm-strike' : ''), type: null },
-            { text: String(putOI),  cls: 'chain-greek', type: null },
+            { text: putOI,  cls: 'chain-greek', type: null },
             { text: row.put.bid.toFixed(2) + ' / ' + row.put.ask.toFixed(2), cls: 'put-cell', type: 'put' },
         ];
         for (const c of cellDefs) {
