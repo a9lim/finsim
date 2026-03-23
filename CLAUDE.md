@@ -31,16 +31,16 @@ Serve from `a9lim.github.io/` -- shared files load via absolute paths (`/shared-
 ## File Map
 
 ```
-main.js               1622 lines  Orchestrator: DOM cache $, rAF loop, sub-step streaming,
+main.js               1706 lines  Orchestrator: DOM cache $, rAF loop, sub-step streaming,
                                    live candle animation, camera, shortcuts, event wiring,
                                    strategy builder (with rollback), ExpiryManager, world state,
                                    executeWithRollback, selectable expiry resolution,
                                    price impact overlays, popup queue, playerChoices/
                                    impactHistory/quarterlyReviews tracking, rogue trading
-index.html              729 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs),
-                                   chain/trade/margin-call/popup/reference/epilogue overlays,
+index.html              691 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs),
+                                   chain/trade/popup/reference/epilogue overlays,
                                    intro (Meridian Capital framing), strategy save/load UI
-styles.css             1164 lines  Chain, positions, strategy, trade dialog, margin alert,
+styles.css             1065 lines  Chain, positions, strategy, trade dialog,
                                    popup decision events, P&L/Greek colors, responsive
                                    breakpoints, strategy groups, sim-input, credit/debit
 colors.js                59 lines  Financial color aliases (up/down/call/put/stock/bond/
@@ -58,7 +58,7 @@ src/
                                    uses prepareTree+priceWithTree (no priceAmerican).
   chain.js              230 lines  ExpiryManager, generateStrikes(), buildChainSkeleton(),
                                    priceChainExpiry() with reusable tree pool
-  portfolio.js         1062 lines  Signed-qty positions, market/limit/stop orders, netting
+  portfolio.js         1070 lines  Signed-qty positions, market/limit/stop orders, netting
                                    (includes strategyName), cash/margin, borrow interest,
                                    dividends, option expiry, bid/ask spreads, slippage
                                    integration, computeNetDelta(), computeGrossNotional()
@@ -68,10 +68,10 @@ src/
   strategy.js           955 lines  StrategyRenderer: payoff P&L, Greek overlays, breakevens
                                    (analytical at expiry), input-keyed caching, tree-based
                                    per-leg entry values; uses resizeCanvasDPR()
-  ui.js                1119 lines  DOM binding, display updaters, overlay management;
+  ui.js                1054 lines  DOM binding, display updaters, overlay management;
                                    delegates to chain-renderer.js and portfolio-renderer.js.
                                    Strategy dropdowns, credit/debit, built-in disable logic,
-                                   showPopupEvent()
+                                   showPopupEvent() with category theming
   events.js             529 lines  EventEngine: Poisson scheduler, MTTH followup chains, Fed
                                    schedule, boredom boost, midterms. maybeFire() returns
                                    { fired, popups }. Event coupling via _computeCoupling().
@@ -82,7 +82,7 @@ src/
                                    to interactive popup format with player choices. ~20 events
                                    have portfolioFlavor functions. Exports OFFLINE_EVENTS,
                                    PARAM_RANGES, getEventById(). World-state structured effects.
-  price-impact.js       282 lines  Almgren-Chriss price impact: permanent (sqrt) + temporary
+  price-impact.js       283 lines  Almgren-Chriss price impact: permanent (sqrt) + temporary
                                    (linear) components for stock and options. Modeled OI with
                                    moneyness decay. Delta hedge feedback. Cumulative volume
                                    tracking (no order-splitting exploit). Recovery drift.
@@ -106,11 +106,12 @@ src/
   history-buffer.js     103 lines  Ring buffer (capacity 252) for OHLC bars
   format-helpers.js      63 lines  fmtDollar() (appends "k"), fmtQty(), fmtNum(), pnlClass(),
                                    fmtDte(), fmtRelDay()
-  strategy-store.js    257 lines  Built-in strategy defs (8 presets, selectable expiry),
+  strategy-store.js    259 lines  Built-in strategy defs (8 presets, selectable expiry),
                                    localStorage CRUD (hash IDs, name collision enforcement),
                                    resolveLegs (with override expiry), formatLeg,
-                                   computeNetCost, legsToRelative, nextAutoName
-  position-value.js      85 lines  computePositionValue(), computePositionPnl()
+                                   computeNetCost (uses vol surface), legsToRelative, nextAutoName
+  position-value.js      88 lines  unitPrice() (uses vol surface for options),
+                                   computePositionValue(), computePositionPnl()
   chain-renderer.js     314 lines  Chain table DOM with event delegation: renderChainInto(),
                                    rebuildExpiryDropdown(), buildStockBondTable(), posKey()
   portfolio-renderer.js  363 lines  Portfolio display with DOM diffing, strategy group
@@ -151,8 +152,8 @@ main.js
 
 ### Sub-Step Streaming (playing)
 
-1. `frame()` resets daily volume, applies recovery drift + param overlays, calls `sim.beginDay()`
-2. 16 sub-steps paced across tick interval. Each `sim.substep()` mutates partial bar in-place
+1. `frame()` applies recovery drift + param overlays, calls `sim.beginDay()`
+2. 16 sub-steps paced across tick interval. Each substep resets cumulative impact volume, then `sim.substep()` mutates partial bar in-place
 3. `chart.setLiveCandle(bar)` does smoothstep cubic interpolation between sub-step values
 4. `_onSubstep()`: checks pending orders, reprices visible chain expiry, updates portfolio/UI
 5. After 16 sub-steps, `sim.finalizeDay()`, overlays removed. `_onDayComplete()`: borrow interest, expiry, dividends (quarterly), quarterly review, rogue trading check, event engine (with coupling), Layer 3 param shifts, impact toasts, portfolio-triggered popups, popup queue processing, margin check, skeleton rebuild
@@ -196,7 +197,7 @@ Per-step Vasicek rate discounting. Discrete proportional dividends at `QUARTERLY
 
 Almgren-Chriss framework with permanent (information) + temporary (liquidity) components.
 
-**Stock slippage**: `impact = coeff * sigma * sqrt(qty / ADV)` (permanent, shifts `sim.S`) + `coeff * sigma * (qty / ADV)` (temporary, fill-only). Cumulative volume tracked per day — incremental formula `sqrt(cum + qty) - sqrt(cum)` prevents order-splitting exploits. Fill prices clamped to $0.01 minimum.
+**Stock slippage**: permanent `coeff * sigma * (sqrt((cum+qty)/ADV) - sqrt(cum/ADV))` shifts `sim.S` (information/price discovery, NOT in fill cost). Temporary `coeff * sigma * (2*cum + qty) / ADV` is the fill cost (liquidity, integral model). Cumulative volume tracked per substep — trades within the same substep batch; book refills between substeps. Fill prices clamped to $0.01 minimum.
 
 **Options slippage**: same framework but scaled by `qty / modeledOI` instead of `qty / ADV`. Modeled OI drops exponentially with moneyness (`OI_MONEYNESS_DECAY = 4.0`) — deep OTM options have severe slippage. Market maker delta hedge creates secondary stock impact.
 
@@ -224,7 +225,7 @@ Almgren-Chriss framework with permanent (information) + temporary (liquidity) co
 
 ## Display Scaling
 
-All internal values (cash, quantities, prices, margin) remain at the original scale ($10,000 starting capital). The UI appends "k" to all displayed dollar amounts and quantities via `fmtDollar()` and `fmtQty()` in `format-helpers.js`. The player sees "$10,000k" = $10M. Pricing engine is completely untouched.
+All internal values (cash, quantities, prices, margin) remain at the original scale ($10,000 starting capital). The UI appends "k" to portfolio-scale dollar amounts via `fmtDollar()` and to quantities via `fmtQty()`. Per-unit prices (fills, strikes, option prices, strategy net debit/credit, breakevens) display raw `$X.XX` without "k". Strategy leg quantities are raw (1x call + 1x put); the "k" applies to the execution multiplier in the portfolio display and trade qty slider.
 
 ## Options Chain
 
@@ -258,7 +259,7 @@ Floating glass panels over full-viewport canvas. Fixed topbar, right slide-in si
 
 **Overlays**: chain (pauses sim), trade dialog (confirm button cloned each open), popup decision (pauses sim, glass panel, category-themed, used for narrative events + margin calls + game over), reference (KaTeX, 29 entries), epilogue (4-page narrative). Old standalone margin-call and fraud overlays removed — all decision points flow through the popup system.
 
-**Popup overlay**: uses `sim-overlay-panel glass` wrapper with `sim-overlay-body` inside. Headline, context paragraph, and choice buttons rendered via `showPopupEvent()`. Queue drains when blocking overlays close (deferred via `setTimeout`).
+**Popup overlay**: uses `sim-overlay-panel glass` wrapper with `sim-overlay-body` inside. Category badge (monospace, category-colored), headline, context paragraph, and choice buttons (bg-hover on glass panel, no nested glass). `showPopupEvent()` accepts category and magnitude — category sets accent color on badge/border, magnitude controls backdrop intensity. Queue drains when blocking overlays close (deferred via `setTimeout`).
 
 **Custom events**: `shoals:closePosition`, `shoals:exerciseOption`, `shoals:cancelOrder`, `shoals:unwindStrategy` -- ui.js/portfolio-renderer.js -> main.js.
 
@@ -315,7 +316,7 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **Price impact overlays**: `_recoveryDrift` and `_savedOverlays` applied before `beginDay()`, removed after `finalizeDay()`. Player param shifts tracked separately from event-caused shifts.
 - **Popup queue**: `_popupQueue` in main.js. Popups queued from `maybeFire()` and `evaluatePortfolioPopups()`. Processed at end-of-day and on overlay close. FIFO, one at a time.
 - **Player choices**: `playerChoices` map (flag → day) in main.js. Set by popup choice `playerFlag`. Read by epilogue and subsequent popup `trigger()` conditions.
-- **Cumulative volume**: `price-impact.js` tracks buy/sell volume per day (stock, options per-strike, hedges). Resets each day via `resetDailyVolume()`. Prevents order-splitting exploits on sqrt impact.
+- **Cumulative volume**: `price-impact.js` tracks buy/sell volume per substep (stock, options per-strike, hedges). Resets each substep via `resetDailyVolume()`. Trades while paused (same substep) batch together. Both permanent (sqrt) and temporary (integral) components are split-proof. Permanent impact is NOT in fill cost — it's price discovery only.
 
 ## Gotchas
 
@@ -348,5 +349,8 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **`_fillPrice` includes slippage** -- signature is `(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay)`. Bonds skip slippage (spread only). Fills clamped to $0.01 minimum.
 - **`showToast` takes `(message, duration)` only** -- duration is numeric milliseconds, NOT a severity string. No severity parameter exists.
 - **`scheduleFollowup` structure** -- must push `{ event, chainId, targetDay, weight, depth }` matching `_checkFollowups` format. Do NOT use `{ id, fireDay }`.
-- **Impact state must be reset** -- `resetImpactState()` and `resetPopupCooldowns()` in `_resetCore()`. `resetDailyVolume()` at start of each day in `frame()`.
-- **`fmtDollar` appends "k"** -- all displayed dollar values show institutional scale. Internal math unchanged.
+- **Impact state must be reset** -- `resetImpactState()` and `resetPopupCooldowns()` in `_resetCore()`. `resetDailyVolume()` at start of each substep in `frame()`.
+- **Always use vol surface for options** -- never pass flat `market.sigma` to option pricing. Use `computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi)` + `computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa)`. `unitPrice()` in position-value.js does this automatically. Flat vol is only acceptable for stock/bond spreads and slippage magnitude (second-order effects).
+- **`computeEffectiveSigma` signature** -- `(v, T, kappa, theta, xi)` — takes variance `v`, NOT vol. Do NOT pass extra args (S, K, rho) — those go to `computeSkewSigma`.
+- **No nested `.glass`** -- elements inside a `.glass` panel should NOT also have `.glass` class. Nested backdrop-filter stacks, making inner elements more opaque. Use `bg-hover` or `bg-elevated` for differentiation within glass panels.
+- **`fmtDollar` appends "k"** -- portfolio-scale dollar values only. Per-unit prices (fills, strategy net debit, breakevens, trigger prices) use raw `$X.XX`. Do NOT use `fmtDollar` for per-unit values.
