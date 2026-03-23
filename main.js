@@ -1593,6 +1593,7 @@ function executeWithRollback(resolvedLegs, strategyName, execMult) {
         );
         if (pos) {
             if (!pos.strategyBaseQty) pos.strategyBaseQty = leg._baseQty || absQty;
+            pos._fillCost = pos.fillPrice * absQty * (side === 'long' ? 1 : -1);
             results.push(pos);
         } else {
             failed = true;
@@ -1611,10 +1612,10 @@ function executeWithRollback(resolvedLegs, strategyName, execMult) {
         if (typeof showToast !== 'undefined') showToast('Strategy failed (leg ' + (results.length + 1) + ' rejected) \u2014 all legs unwound.');
         if (typeof _haptics !== 'undefined') _haptics.trigger('error');
     } else if (results.length > 0) {
-        const totalCost = savedCash - portfolio.cash;
+        const netDebit = results.reduce((sum, r) => sum + r._fillCost, 0);
         const mult = execMult || 1;
-        const perUnit = Math.abs(totalCost / mult);
-        const verb = totalCost > 0 ? 'at' : 'for credit';
+        const perUnit = Math.abs(netDebit / mult);
+        const verb = netDebit > 0 ? 'at' : 'for credit';
         const name = strategyName + 's';
         if (typeof showToast !== 'undefined') showToast('Executed ' + mult + 'k ' + name + ' ' + verb + ' $' + perUnit.toFixed(2));
         if (typeof _haptics !== 'undefined') _haptics.trigger('success');
