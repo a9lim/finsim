@@ -1,8 +1,7 @@
 // src/strategy-store.js
 import { computeBidAsk, computeOptionBidAsk } from './portfolio.js';
-import { priceWithTree, allocTree, prepareTree, vasicekBondPrice, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
+import { unitPrice } from './position-value.js';
 import { market } from './market.js';
-import { BOND_FACE_VALUE } from './config.js';
 
 const LS_KEY = 'shoals_strategies';
 const MAX_STRATEGIES = 50;
@@ -213,32 +212,18 @@ export function formatLeg(leg) {
 
 // --- Net cost computation ---
 
-let _costTree = null; // reuse tree to avoid GC pressure (called every substep)
-
 export function computeNetCost(legs, S, vol, r, day, q, expiries, overrideExpiryDay) {
     const resolved = resolveLegs(legs, S, day, expiries, overrideExpiryDay);
     let net = 0;
-    if (!_costTree) _costTree = allocTree();
     for (let i = 0; i < resolved.length; i++) {
         const leg = resolved[i];
         const absQty = Math.abs(leg.qty);
         const isLong = leg.qty > 0;
-        let mid, ba;
-        if (leg.type === 'stock') {
-            mid = S;
-            ba = computeBidAsk(mid, vol);
-        } else if (leg.type === 'bond') {
-            mid = vasicekBondPrice(BOND_FACE_VALUE, r, 1, market.a, market.b, market.sigmaR);
-            ba = computeBidAsk(mid, market.sigmaR);
-        } else {
-            const T = Math.max((leg.expiryDay - day) / 252, 1/252);
-            const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
-            const sigma = computeSkewSigma(sigmaEff, S, leg.strike, T, market.rho, market.xi, market.kappa);
-            prepareTree(T, r, sigma, q, day, _costTree);
-            const isPut = leg.type === 'put';
-            mid = priceWithTree(S, leg.strike, isPut, _costTree);
-            ba = computeOptionBidAsk(mid, S, leg.strike, sigma);
-        }
+        const mid = unitPrice(leg.type, S, vol, r, day, leg.strike, leg.expiryDay, q);
+        const spreadVol = leg.type === 'bond' ? market.sigmaR : vol;
+        const ba = (leg.type === 'call' || leg.type === 'put')
+            ? computeOptionBidAsk(mid, S, leg.strike, spreadVol)
+            : computeBidAsk(mid, spreadVol);
         const fill = isLong ? ba.ask : ba.bid;
         net += (isLong ? fill : -fill) * absQty;
     }

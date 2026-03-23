@@ -9,6 +9,7 @@
  */
 
 import { allocTree, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
+import { unitPrice } from './position-value.js';
 import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
     STRATEGY_SAMPLES, STRATEGY_Y_PAD, STRATEGY_MARGIN,
@@ -618,31 +619,10 @@ export class StrategyRenderer {
         const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                    : (leg.side === 'short') ? -1 : 1;
         const qty  = Math.abs(leg.qty ?? 1);
-
-        switch (leg.type) {
-            case 'call':
-            case 'put': {
-                const isPut = leg.type === 'put';
-                const K     = leg.strike ?? spot;
-                const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
-                const sigma = computeSkewSigma(sigmaEff, spot, K, T, market.rho, market.xi, market.kappa);
-                if (!this._entryTree) this._entryTree = allocTree();
-                prepareTree(T, rate, sigma, q, entryDay, this._entryTree);
-                const price = priceWithTree(spot, K, isPut, this._entryTree);
-                return price * qty * sign;
-            }
-            case 'stock':
-                // Entry cost for hypothetical stock position is spot * qty * sign
-                return spot * qty * sign;
-            case 'bond': {
-                const bVal = market.a >= 1e-8
-                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, T, market.a, market.b, market.sigmaR)
-                    : BOND_FACE_VALUE * Math.exp(-rate * T);
-                return bVal * qty * sign;
-            }
-            default:
-                return 0;
-        }
+        const K = leg.strike ?? spot;
+        const expiryDay = entryDay != null ? entryDay + Math.round(T * TRADING_DAYS_PER_YEAR) : null;
+        const mid = unitPrice(leg.type, spot, vol, rate, entryDay ?? 0, K, expiryDay, q);
+        return mid * qty * sign;
     }
 
     // -----------------------------------------------------------------------
