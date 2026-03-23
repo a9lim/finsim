@@ -59,7 +59,8 @@ export function computeStockImpact(qty, sigma) {
     // Incremental permanent impact: cost of going from cumVol to cumVol+qty
     const cumRef = qty > 0 ? _cumStockBuy : _cumStockSell;
     const perm   = PERM_COEFF * sigma * (Math.sqrt((cumRef + absQty) / ADV) - Math.sqrt(cumRef / ADV)) * sign;
-    const temp   = TEMP_COEFF * sigma * (absQty / ADV) * sign;
+    // Average marginal cost over [cum, cum+qty]: TEMP * (2*cum + qty) / (2*ADV)
+    const temp   = TEMP_COEFF * sigma * (2 * cumRef + absQty) / (2 * ADV) * sign;
     // Update cumulative volume
     if (qty > 0) _cumStockBuy += absQty; else _cumStockSell += absQty;
     return { permanent: perm, temporary: temp, fillAdjustment: perm + temp };
@@ -94,7 +95,7 @@ export function computeOptionImpact(qty, sigma, moneyness, dte, strike, expiryDa
     if (!cum) { cum = { buy: 0, sell: 0 }; _cumOption.set(key, cum); }
     const cumRef = qty > 0 ? cum.buy : cum.sell;
     const perm   = OPT_PERM_COEFF * sigma * (Math.sqrt((cumRef + absQty) / oi) - Math.sqrt(cumRef / oi)) * sign;
-    const temp   = OPT_TEMP_COEFF * sigma * (absQty / oi) * sign;
+    const temp   = OPT_TEMP_COEFF * sigma * (2 * cumRef + absQty) / (2 * oi) * sign;
     // Update cumulative
     if (qty > 0) cum.buy += absQty; else cum.sell += absQty;
     return { permanent: perm, temporary: temp, fillAdjustment: perm + temp };

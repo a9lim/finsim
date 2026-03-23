@@ -32,9 +32,9 @@ export const MONEYNESS_SPREAD_WEIGHT = 0.05; // weight on |log(S/K)| for options
 // -- Price impact (Almgren-Chriss) --
 export const ADV                    = 500;     // average daily volume (displayed as "500k")
 export const PERM_COEFF             = 0.10;    // permanent impact coefficient
-export const TEMP_COEFF             = 0.05;    // temporary impact coefficient
+export const TEMP_COEFF             = 0.10;    // temporary impact coefficient (doubled for integral model)
 export const OPT_PERM_COEFF         = 0.12;    // options permanent impact
-export const OPT_TEMP_COEFF         = 0.06;    // options temporary impact
+export const OPT_TEMP_COEFF         = 0.12;    // options temporary impact (doubled for integral model)
 export const OI_ATM_BASE            = 50;      // ATM open interest baseline (displayed as "50k")
 export const OI_MONEYNESS_DECAY     = 4.0;     // OI decay with moneyness
 export const RECOVERY_HALF_LIFE     = 3;       // days for impact recovery
