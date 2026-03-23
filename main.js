@@ -40,7 +40,6 @@ import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
 import {
     resetImpactState, resetDailyVolume,
-    decayStockPermanentImpact, decayOptionPermanentImpact,
     getStockTemporaryImpact,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
@@ -568,8 +567,6 @@ function frame(now) {
         if (!dayInProgress) {
             // Start a new day if enough time has passed since last tick
             if (now - lastTickTime >= tickInterval) {
-                decayStockPermanentImpact(sim);
-                decayOptionPermanentImpact();
                 _savedOverlays = applyParamOverlays(sim);
                 sim.beginDay();
                 dayInProgress = true;

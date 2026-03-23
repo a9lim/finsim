@@ -2,7 +2,7 @@ import {
     ADV, PERM_COEFF, TEMP_COEFF,
     OPT_PERM_COEFF, OPT_TEMP_COEFF,
     OI_ATM_BASE, OI_MONEYNESS_DECAY,
-    RECOVERY_HALF_LIFE, PARAM_SHIFT_HALF_LIFE,
+    PARAM_SHIFT_HALF_LIFE,
     IMPACT_TOAST_COOLDOWN,
     IMPACT_THRESHOLD_25, IMPACT_THRESHOLD_50,
     IMPACT_THRESHOLD_75, IMPACT_THRESHOLD_100,
@@ -13,7 +13,6 @@ import {
 } from './config.js';
 
 /* ── mutable state ── */
-let _unrecoveredImpact = 0;
 const _playerParamShifts = { mu: 0, theta: 0, xi: 0, kappa: 0, sigmaR: 0 };
 const _playerParamCaps = {
     mu: MAX_PLAYER_MU_SHIFT, theta: MAX_PLAYER_THETA_SHIFT,
@@ -41,7 +40,6 @@ const _cumOption = new Map();
 
 /* ── reset ── */
 export function resetImpactState() {
-    _unrecoveredImpact = 0;
     for (const k in _playerParamShifts) _playerParamShifts[k] = 0;
     _lastToastDay = -Infinity;
     _optionPermanentImpact.clear();
@@ -85,7 +83,7 @@ export function modeledOI(moneyness, dte) {
     return Math.max(1,
         OI_ATM_BASE
         * Math.exp(-OI_MONEYNESS_DECAY * moneyness * moneyness)
-        * Math.sqrt(Math.max(1, dte) / 63)
+        * Math.sqrt(63 / Math.max(1, dte))
     );
 }
 
@@ -121,8 +119,8 @@ export function computeOptionImpact(qty, sigma, moneyness, dte, strike, expiryDa
  * @returns {number} Permanent stock price shift from hedge
  */
 export function computeDeltaHedgeImpact(optQty, delta, sigma) {
-    // MM takes opposite side then hedges: buys stock for sold calls, sells for sold puts
-    const hedgeQty = -optQty * delta;
+    // MM takes opposite side then hedges: buys stock when player buys calls, sells when player buys puts
+    const hedgeQty = optQty * delta;
     const absHedge = Math.abs(hedgeQty);
     if (absHedge < 0.01) return 0;
     const sign = hedgeQty > 0 ? 1 : -1;
@@ -141,7 +139,6 @@ export function applyPermanentImpact(sim, shift) {
     if (Math.abs(shift) < 1e-8) return;
     sim.S += shift;
     if (sim.S < 0.01) sim.S = 0.01;
-    _unrecoveredImpact += shift;
 }
 
 /* ── Per-strike option permanent impact ── */
@@ -176,29 +173,6 @@ export function getOptionTemporaryImpact(type, strike, expiryDay) {
     return _optionTemporaryImpact.get(`${type}_${strike}_${expiryDay}`) || 0;
 }
 
-export function decayOptionPermanentImpact() {
-    const factor = 1 - Math.pow(0.5, 1 / RECOVERY_HALF_LIFE);
-    for (const [key, val] of _optionPermanentImpact) {
-        const decayed = val * (1 - factor);
-        if (Math.abs(decayed) < 1e-8) _optionPermanentImpact.delete(key);
-        else _optionPermanentImpact.set(key, decayed);
-    }
-}
-
-/* ── Stock permanent impact recovery (called once per day) ── */
-
-/**
- * Decay unrecovered stock impact and apply directly to sim.S.
- * Half-life of RECOVERY_HALF_LIFE days (e.g. +2 impact → +1 after 3 days).
- */
-export function decayStockPermanentImpact(sim) {
-    if (Math.abs(_unrecoveredImpact) < 1e-8) { _unrecoveredImpact = 0; return; }
-    const decayFrac = 1 - Math.pow(0.5, 1 / RECOVERY_HALF_LIFE);
-    const recovery = _unrecoveredImpact * decayFrac;
-    sim.S -= recovery;
-    if (sim.S < 0.01) sim.S = 0.01;
-    _unrecoveredImpact -= recovery;
-}
 
 /* ── Layer 3: Parameter shifts from large exposure ── */
 
@@ -332,5 +306,4 @@ export function selectImpactToast(grossRatio, instrument, day) {
 }
 
 /* ── Accessors ── */
-export function getUnrecoveredImpact() { return _unrecoveredImpact; }
 export function getPlayerParamShifts() { return { ..._playerParamShifts }; }

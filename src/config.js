@@ -37,7 +37,6 @@ export const OPT_PERM_COEFF         = 0.12;    // options permanent impact
 export const OPT_TEMP_COEFF         = 0.06;    // options temporary impact
 export const OI_ATM_BASE            = 50;      // ATM open interest baseline (displayed as "50k")
 export const OI_MONEYNESS_DECAY     = 4.0;     // OI decay with moneyness
-export const RECOVERY_HALF_LIFE     = 3;       // days for impact recovery
 export const PARAM_SHIFT_HALF_LIFE  = 5;       // days for Layer 3 param decay
 export const IMPACT_TOAST_COOLDOWN  = 10;      // days between impact toasts
 export const IMPACT_THRESHOLD_25    = 0.25;    // 25% ADV — mild vol uptick
