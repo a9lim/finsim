@@ -78,9 +78,13 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
         actions.appendChild(exBtn);
     }
 
+    const numCol = document.createElement('div');
+    numCol.className = 'pos-nums';
+    numCol.appendChild(pnlEl);
+    numCol.appendChild(valueEl);
+
     row.appendChild(labelEl);
-    row.appendChild(valueEl);
-    row.appendChild(pnlEl);
+    row.appendChild(numCol);
     row.appendChild(actions);
     return row;
 }
@@ -333,13 +337,18 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
                 nameEl.className = 'stat-label strategy-group-name';
                 header.appendChild(nameEl);
 
-                const valEl = document.createElement('span');
-                valEl.className = 'stat-value strategy-group-value';
-                header.appendChild(valEl);
+                const numCol = document.createElement('div');
+                numCol.className = 'pos-nums';
 
                 const pnlEl = document.createElement('span');
                 pnlEl.className = 'stat-value strategy-group-pnl';
-                header.appendChild(pnlEl);
+                numCol.appendChild(pnlEl);
+
+                const valEl = document.createElement('span');
+                valEl.className = 'stat-value strategy-group-value';
+                numCol.appendChild(valEl);
+
+                header.appendChild(numCol);
 
                 const closeBtn = document.createElement('button');
                 closeBtn.className = 'ghost-btn pos-close-btn';
