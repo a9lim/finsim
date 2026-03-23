@@ -324,6 +324,23 @@ function init() {
             }
             dirty = true;
         },
+        onSelectableExpiryChange: (checked) => {
+            if (checked && strategyLegs.length > 0) {
+                const newDay = _strategyExpiryDay();
+                if (newDay != null) {
+                    for (const leg of strategyLegs) {
+                        if (leg.type !== 'stock') {
+                            leg.expiryDay = newDay;
+                            leg._refDay = sim.day;
+                        }
+                    }
+                    strategy.resetRange(sim.S, strategyLegs);
+                    updateStrategyBuilder();
+                    updateTimeSliderRange();
+                    dirty = true;
+                }
+            }
+        },
         onSaveStrategy:   () => handleSaveStrategy(),
         onDeleteStrategy:  () => handleDeleteStrategy(),
         onTradeExecStrategy: () => handleTradeExecStrategy(),

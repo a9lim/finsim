@@ -251,6 +251,15 @@ export function bindEvents($, handlers) {
         });
     }
 
+    // Selectable expiry toggle -- override legs when turned on
+    if ($.selectableExpiryToggle) {
+        $.selectableExpiryToggle.addEventListener('change', () => {
+            if (typeof handlers.onSelectableExpiryChange === 'function') {
+                handlers.onSelectableExpiryChange($.selectableExpiryToggle.checked);
+            }
+        });
+    }
+
     // Order type toggle (Market / Limit / Stop)
     if ($.orderTypeToggles) {
         _forms.bindModeGroup($.orderTypeToggles, 'ordertype', v => {
@@ -726,12 +735,10 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
     const row = document.createElement('div');
     row.className = 'leg-row stat-row';
 
-    // Label: "Long CALL K105 12d" or "Short STOCK" etc.
+    // Label: "L:CALL ATM+5 3mo" matching portfolio format
     const label = document.createElement('span');
     label.className = 'stat-label';
-    const isShort = leg.qty < 0;
-    const sideStr = isShort ? 'Short' : 'Long';
-    let desc = sideStr + ' ' + leg.type.toUpperCase();
+    let desc = posTypeLabel(leg.type, leg.qty);
     if (leg.strike != null) {
         const atm = Math.round((leg._refS || 100) / 5) * 5;
         const offset = leg.strike - atm;
@@ -739,12 +746,8 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
     }
     if (leg.expiryDay != null) {
         const expiry = skeleton ? skeleton.find(e => e.day === leg.expiryDay) : null;
-        if (expiry) {
-            desc += ' ' + expiry.dte + 'd';
-        } else {
-            const refDay = leg._refDay || 0;
-            desc += ' ' + Math.max(1, leg.expiryDay - refDay) + 'd';
-        }
+        const dte = expiry ? expiry.dte : Math.max(1, leg.expiryDay - (leg._refDay || 0));
+        desc += ' ' + fmtDte(dte);
     }
     label.textContent = desc;
 
