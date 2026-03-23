@@ -417,7 +417,7 @@ function _pageWorld(world, sim, impactHistory) {
 
 // -- Page 4: Your Legacy -----------------------------------------------------
 
-function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews) {
+function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason = null) {
     // Compute equity
     let equity = portfolio.cash;
     for (const pos of portfolio.positions) {
@@ -444,6 +444,12 @@ function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, qua
     else rating = "Lehman'd";
 
     let body = '';
+
+    // -- Compliance termination ----------------------------------------------
+    if (terminationReason === 'compliance') {
+        body += _h3('Terminated for Cause');
+        body += _p('Your tenure at Meridian Capital ended not with a market catastrophe, but with a compliance file thick enough to serve as a doorstop. Repeated defiance of risk limits and regulatory directives left the firm no choice. The official termination letter cited "persistent non-compliance with internal risk management policies." The unofficial version was simpler: you didn\'t know when to listen.');
+    }
 
     // -- Reputation reveal ---------------------------------------------------
     const reputation = _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, portfolio);
@@ -551,11 +557,11 @@ function _absDeltaSum(evt) {
 
 // -- Main export --------------------------------------------------------------
 
-export function generateEpilogue(world, sim, portfolio, eventLog, playerChoices = {}, impactHistory = [], quarterlyReviews = []) {
+export function generateEpilogue(world, sim, portfolio, eventLog, playerChoices = {}, impactHistory = [], quarterlyReviews = [], terminationReason = null) {
     return [
         _pageElection(world, playerChoices),
         _pagePNTH(world, playerChoices),
         _pageWorld(world, sim, impactHistory),
-        _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews),
+        _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason),
     ];
 }
