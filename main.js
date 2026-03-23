@@ -672,7 +672,7 @@ function _processPopupQueue() {
             }
         }
         if (choice.resultToast) {
-            showToast(choice.resultToast, 'info');
+            showToast(choice.resultToast, 4000);
         }
         dirty = true;
     });
@@ -738,7 +738,7 @@ function _onDayComplete() {
         if (playerChoices.cooperated_sec || playerChoices.silent_sec || playerChoices.accepted_insider_tip) {
             text += ' The SEC inquiry hasn\'t helped perception of the desk.';
         }
-        showToast(text, rating === 'poor' ? 'warning' : 'info', 8000);
+        showToast(text, rating === 'poor' ? 8000 : 5000);
     }
 
     const { expired, unwound } = processExpiry(sim, sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
@@ -801,7 +801,7 @@ function _onDayComplete() {
     // Impact toast
     const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
     const toast = selectImpactToast(grossRatio, hasOptions ? 'option' : 'stock', sim.day);
-    if (toast) showToast(toast, 'info');
+    if (toast) showToast(toast, 3000);
 
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     chainDirty = true;

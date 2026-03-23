@@ -493,9 +493,17 @@ export class EventEngine {
 
     scheduleFollowup(followup, fromDay) {
         const id = typeof followup === 'string' ? followup : followup.id;
-        const mtth = typeof followup === 'object' ? followup.mtth : 20;
+        const mtth = typeof followup === 'object' ? (followup.mtth ?? 20) : 20;
         const delay = Math.max(1, Math.round(mtth + (Math.random() - 0.5) * mtth * 0.3));
-        this._pendingFollowups.push({ id, fireDay: fromDay + delay });
+        const event = getEventById(id);
+        if (!event) return;
+        this._pendingFollowups.push({
+            event,
+            chainId: 'choice_' + fromDay + '_' + id,
+            targetDay: fromDay + delay,
+            weight: 1,
+            depth: 1,
+        });
     }
 
     // -- Timing helpers ---------------------------------------------------
