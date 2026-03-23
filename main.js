@@ -34,7 +34,7 @@ import { initTheme, toggleTheme } from './src/theme.js';
 import { EventEngine } from './src/events.js';
 import { LLMEventSource } from './src/llm.js';
 import { generateEpilogue } from './src/epilogue.js';
-import { computePositionValue } from './src/position-value.js';
+import { computePositionValue, computePositionPnl } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
@@ -50,6 +50,11 @@ import {
 } from './src/strategy-store.js';
 import { applyStructuredEffects } from './src/world-state.js';
 import { evaluatePortfolioPopups, resetPopupCooldowns } from './src/popup-events.js';
+import {
+    compliance, resetCompliance, effectiveHeat,
+    onComplianceTriggered, onComplianceChoice,
+} from './src/compliance.js';
+import { COMPLIANCE_GAME_OVER_HEAT } from './src/config.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -656,6 +661,10 @@ function _processPopupQueue() {
         : event.context || '';
 
     const popupCat = event.category || (event.id && event.id.startsWith('desk_') ? 'desk' : '');
+    // Compliance pre-processing: check profitability since last review
+    if (event.choices && event.choices.some(c => c.complianceTier)) {
+        onComplianceTriggered(_portfolioEquity(), sim.day);
+    }
     showPopupEvent($, event.headline, contextText, event.choices, (idx) => {
         const choice = event.choices[idx];
         if (choice.deltas && eventEngine) {
@@ -674,6 +683,76 @@ function _processPopupQueue() {
         }
         if (choice.resultToast) {
             showToast(choice.resultToast, 4000);
+        }
+        // -- Declarative trade execution --
+        if (choice.trades) {
+            const vol = market.sigma;
+            const snapshot = [...portfolio.positions];
+            let closed = 0;
+            let pnlSum = 0;
+            for (const trade of choice.trades) {
+                let targets;
+                if (trade.action === 'close_all') {
+                    for (const p of snapshot) {
+                        pnlSum += computePositionPnl(p, sim.S, vol, sim.r, sim.day, sim.q);
+                    }
+                    liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                    closed = snapshot.length;
+                    break;
+                } else if (trade.action === 'close_type') {
+                    targets = snapshot.filter(p => p.type === trade.type);
+                } else if (trade.action === 'close_short') {
+                    targets = snapshot.filter(p =>
+                        (p.type === 'stock' && p.qty < 0) ||
+                        (p.type === 'call' && p.qty < 0) ||
+                        (p.type === 'put' && p.qty > 0)
+                    );
+                } else if (trade.action === 'close_long') {
+                    targets = snapshot.filter(p =>
+                        (p.type === 'stock' && p.qty > 0) ||
+                        (p.type === 'call' && p.qty > 0) ||
+                        (p.type === 'put' && p.qty < 0)
+                    );
+                } else if (trade.action === 'close_options') {
+                    targets = snapshot.filter(p => p.type === 'call' || p.type === 'put');
+                } else if (trade.action === 'hedge_unlimited_risk') {
+                    let nuu = 0;
+                    for (const p of portfolio.positions) {
+                        if (p.type === 'stock' || p.type === 'call') nuu += p.qty;
+                    }
+                    if (nuu < 0) {
+                        const hedgeQty = Math.abs(nuu);
+                        executeMarketOrder(
+                            sim, 'stock', 'long', hedgeQty,
+                            sim.S, vol, sim.r, sim.day,
+                            undefined, undefined, undefined, sim.q
+                        );
+                        showToast(`Hedge placed: bought ${hedgeQty} shares at market.`, 4000);
+                    }
+                    continue;
+                }
+                if (targets) {
+                    for (const p of targets) {
+                        pnlSum += computePositionPnl(p, sim.S, vol, sim.r, sim.day, sim.q);
+                        if (closePosition(sim, p.id, sim.S, vol, sim.r, sim.day, sim.q)) {
+                            closed++;
+                        }
+                    }
+                }
+            }
+            if (closed > 0) {
+                const sign = pnlSum >= 0 ? '+' : '';
+                showToast(`Closed ${closed} position${closed > 1 ? 's' : ''}. P&L: ${sign}${fmtDollar(pnlSum)}`, 4000);
+                chainDirty = true;
+                updateUI();
+            }
+        }
+        // -- Compliance tier processing --
+        if (choice.complianceTier) {
+            onComplianceChoice(choice.complianceTier);
+            if (effectiveHeat() >= COMPLIANCE_GAME_OVER_HEAT) {
+                _showComplianceTermination();
+            }
         }
         // Margin call actions
         if (event._marginAction) {
@@ -735,6 +814,13 @@ function _showGameOver(contextText) {
         _gameOverAction: true,
     });
     _processPopupQueue();
+}
+
+function _showComplianceTermination() {
+    playing = false;
+    updatePlayBtn($, playing);
+    playerChoices['compliance_terminated'] = sim.day;
+    _showEpilogue('compliance');
 }
 
 function _portfolioEquity() {
@@ -1157,6 +1243,7 @@ function _resetCore(index) {
     impactHistory.length = 0;
     quarterlyReviews.length = 0;
     resetPopupCooldowns();
+    resetCompliance();
     sim.reset(index);
     resetPortfolio();
     resetImpactState();
@@ -1619,8 +1706,8 @@ function updateStrategyBuilder() {
 // Epilogue overlay controller
 // ---------------------------------------------------------------------------
 
-function _showEpilogue() {
-    const pages = generateEpilogue(eventEngine.world, sim, portfolio, eventEngine.eventLog, playerChoices, impactHistory, quarterlyReviews);
+function _showEpilogue(terminationReason = null) {
+    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason);
     let currentPage = 0;
 
     const overlay = document.getElementById('epilogue-overlay');
