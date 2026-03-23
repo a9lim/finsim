@@ -1099,6 +1099,8 @@ const _popupCategoryMeta = {
     market:         { label: 'Markets',             color: 'var(--ext-yellow)' },
     compound:       { label: 'Crisis',              color: 'var(--ext-red)' },
     desk:           { label: 'Meridian Capital',    color: 'var(--accent)' },
+    margin:         { label: 'Margin Call',         color: 'var(--down)' },
+    gameover:       { label: 'Game Over',           color: 'var(--ext-red)' },
 };
 
 export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude) {
