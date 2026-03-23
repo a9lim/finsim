@@ -1380,6 +1380,7 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
     chainDirty = true;
     updateUI();
     dirty = true;
+    _refreshChainOverlayIfOpen();
 }
 
 function handleBuyStock() {
