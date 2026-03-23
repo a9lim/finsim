@@ -306,7 +306,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
                 const label = posTypeLabel(pos.type, pos.qty);
                 const isOption = pos.type === 'call' || pos.type === 'put';
                 const strikeStr = isOption && pos.strike != null ? ' K' + pos.strike : '';
-                return label + strikeStr + ' x' + fmtQty(baseQty);
+                return label + strikeStr + ' x' + baseQty;
             });
             const constituents = parts.join(', ');
 
@@ -352,7 +352,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
                 pnlEl.className = 'stat-value strategy-group-pnl ' + pnlClass(totalPnl);
             }
             const nameEl = group.querySelector('.strategy-group-name');
-            if (nameEl) nameEl.textContent = name + expiryStr + ' x' + mult;
+            if (nameEl) nameEl.textContent = name + expiryStr + ' x' + fmtQty(mult);
             const detail = group.querySelector('.strategy-group-detail');
             if (detail) detail.textContent = constituents;
         }

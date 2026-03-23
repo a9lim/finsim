@@ -256,7 +256,7 @@ export function bindEvents($, handlers) {
     }
 
     // Strategy tab qty slider
-    if ($.strategyQty) _forms.bindSlider($.strategyQty, $.strategyQtyVal, null, v => v + 'k');
+    if ($.strategyQty) _forms.bindSlider($.strategyQty, $.strategyQtyVal);
 
     // Strategy expiry dropdown -- rebuild strategy chain on change
     if ($.strategyExpiry) {
