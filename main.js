@@ -645,7 +645,6 @@ function _processPopupQueue() {
     // Don't show if another overlay is open
     if (!$.chainOverlay.classList.contains('hidden')) return;
     if (!$.tradeDialog.classList.contains('hidden')) return;
-    if (!$.marginCallOverlay.classList.contains('hidden')) return;
     if (!$.popupOverlay.classList.contains('hidden')) return;
 
     const event = _popupQueue.shift();

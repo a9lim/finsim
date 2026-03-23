@@ -93,12 +93,6 @@ export function cacheDOMElements($) {
     $.tradeConfirmBtn     = document.getElementById('trade-confirm-btn');
     $.tradeCancelBtn      = document.getElementById('trade-cancel-btn');
     $.tradeDialogClose    = document.getElementById('trade-dialog-close');
-    $.marginCallOverlay   = document.getElementById('margin-call-overlay');
-    $.marginCallMsg       = document.getElementById('margin-call-msg');
-    $.marginCallLiquidate = document.getElementById('margin-call-liquidate');
-    $.fraudOverlay        = document.getElementById('fraud-overlay');
-    $.fraudMsg            = document.getElementById('fraud-msg');
-    $.fraudReset          = document.getElementById('fraud-reset');
     $.popupOverlay   = document.getElementById('popup-event-overlay');
     $.popupHeadline  = document.getElementById('popup-event-headline');
     $.popupContext   = document.getElementById('popup-event-context');
@@ -230,17 +224,6 @@ export function bindEvents($, handlers) {
     const closeTrade = _hideClass($.tradeDialog, onTradeClose);
     initOverlayDismiss($.tradeDialog, $.tradeDialogClose, closeTrade);
     $.tradeCancelBtn.addEventListener('click', closeTrade);
-
-    $.marginCallLiquidate.addEventListener('click', () => {
-        $.marginCallOverlay.classList.add('hidden');
-        if (typeof onLiquidate === 'function') onLiquidate();
-        if (typeof onMarginClose === 'function') onMarginClose();
-        if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
-    });
-    $.fraudReset.addEventListener('click', () => {
-        $.fraudOverlay.classList.add('hidden');
-        if (typeof onReset === 'function') onReset();
-    });
 
     $._onChainCellClick = onChainCellClick;
     $._onTradeSubmit    = onTradeSubmit;
@@ -552,101 +535,6 @@ export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posM
     renderOverlay();
     $.chainOverlay.classList.remove('hidden');
     if (typeof _haptics !== 'undefined') _haptics.trigger('light');
-}
-
-// ---------------------------------------------------------------------------
-// showMarginCall
-// ---------------------------------------------------------------------------
-
-export function showMarginCall($, marginInfo) {
-    const { equity, required } = marginInfo;
-    const shortfall = required - equity;
-    const msg = $.marginCallMsg;
-    msg.textContent = '';
-    const frag = document.createDocumentFragment();
-    frag.appendChild(document.createTextNode('Portfolio equity '));
-    const eq = document.createElement('strong');
-    eq.textContent = fmtDollar(equity);
-    frag.appendChild(eq);
-    frag.appendChild(document.createTextNode(' is below the maintenance requirement of '));
-    const req = document.createElement('strong');
-    req.textContent = fmtDollar(required);
-    frag.appendChild(req);
-    frag.appendChild(document.createTextNode('. Shortfall: '));
-    const sf = document.createElement('strong');
-    sf.className = 'margin-alert';
-    sf.textContent = fmtDollar(shortfall);
-    frag.appendChild(sf);
-    frag.appendChild(document.createTextNode('.'));
-    msg.appendChild(frag);
-    $.marginCallOverlay.classList.remove('hidden');
-    if (typeof _haptics !== 'undefined') _haptics.trigger('error');
-}
-
-export function showRogueTrading($, equity, initialCapital) {
-    const lossAmt = Math.abs(initialCapital - equity);
-    const h2 = document.createElement('h2');
-    h2.style.cssText = 'color:var(--ext-red);margin:0 0 12px';
-    h2.textContent = 'ROGUE TRADING INVESTIGATION';
-
-    const p1 = document.createElement('p');
-    p1.textContent = 'Meridian Capital\'s internal audit has uncovered '
-        + fmtDollar(lossAmt) + ' in unauthorized losses on your desk.';
-
-    const p2 = document.createElement('p');
-    p2.textContent = 'Bank security has been called. Your access has been revoked. The SEC has been notified.';
-
-    const p3 = document.createElement('p');
-    p3.style.cssText = 'color:var(--text-muted);margin-top:16px;font-style:italic';
-    p3.textContent = '"The losses were hidden across multiple accounts using a series of fictitious hedging transactions." \u2014 Internal report';
-
-    $.fraudMsg.textContent = '';
-    $.fraudMsg.appendChild(h2);
-    $.fraudMsg.appendChild(p1);
-    $.fraudMsg.appendChild(p2);
-    $.fraudMsg.appendChild(p3);
-    $.fraudOverlay.classList.remove('hidden');
-}
-
-export function showFraudScreen($, equity) {
-    const loss = fmtDollar(Math.abs(equity));
-    $.fraudMsg.textContent = '';
-    const frag = document.createDocumentFragment();
-
-    const p1 = document.createElement('p');
-    p1.className = 'fraud-message';
-    p1.textContent = 'Following the forced liquidation of all positions, your account '
-        + 'remains in deficit by ' + loss + '. Regulators have flagged the account for '
-        + 'review.';
-    frag.appendChild(p1);
-
-    const p2 = document.createElement('p');
-    p2.className = 'fraud-message';
-    p2.textContent = 'After a brief but enthusiastic investigation, a federal grand jury has '
-        + 'returned indictments on the following charges:';
-    const c1 = document.createElement('span');
-    c1.className = 'fraud-charge';
-    c1.textContent = '18 U.S.C. \u00A7 1348 \u2014 Securities Fraud';
-    p2.appendChild(c1);
-    const c2 = document.createElement('span');
-    c2.className = 'fraud-charge';
-    c2.textContent = '26 U.S.C. \u00A7 7201 \u2014 Tax Evasion';
-    p2.appendChild(c2);
-    frag.appendChild(p2);
-
-    const p3 = document.createElement('p');
-    p3.className = 'fraud-message';
-    p3.textContent = 'You have been sentenced to 25 years at a minimum-security federal '
-        + 'correctional facility. Your broker sends their regards.';
-    const sent = document.createElement('span');
-    sent.className = 'fraud-sentence';
-    sent.textContent = 'Better luck next time.';
-    p3.appendChild(sent);
-    frag.appendChild(p3);
-
-    $.fraudMsg.appendChild(frag);
-    $.fraudOverlay.classList.remove('hidden');
-    if (typeof _haptics !== 'undefined') _haptics.trigger('error');
 }
 
 // ---------------------------------------------------------------------------

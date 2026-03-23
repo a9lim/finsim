@@ -71,7 +71,7 @@ src/
   ui.js                1119 lines  DOM binding, display updaters, overlay management;
                                    delegates to chain-renderer.js and portfolio-renderer.js.
                                    Strategy dropdowns, credit/debit, built-in disable logic,
-                                   showPopupEvent(), showRogueTrading()
+                                   showPopupEvent()
   events.js             529 lines  EventEngine: Poisson scheduler, MTTH followup chains, Fed
                                    schedule, boredom boost, midterms. maybeFire() returns
                                    { fired, popups }. Event coupling via _computeCoupling().
@@ -256,7 +256,7 @@ ATM = `round(S/5)*5`, 10 strikes each side (21 total). `ExpiryManager` maintains
 
 Floating glass panels over full-viewport canvas. Fixed topbar, right slide-in sidebar (4 tabs: Trade/Portfolio/Strategy/Settings), bottom pill bar.
 
-**Overlays**: chain (pauses sim), trade dialog (confirm button cloned each open), margin call, popup decision (pauses sim, glass panel, choice buttons), reference (KaTeX, 29 entries), epilogue (4-page narrative).
+**Overlays**: chain (pauses sim), trade dialog (confirm button cloned each open), popup decision (pauses sim, glass panel, category-themed, used for narrative events + margin calls + game over), reference (KaTeX, 29 entries), epilogue (4-page narrative). Old standalone margin-call and fraud overlays removed — all decision points flow through the popup system.
 
 **Popup overlay**: uses `sim-overlay-panel glass` wrapper with `sim-overlay-body` inside. Headline, context paragraph, and choice buttons rendered via `showPopupEvent()`. Queue drains when blocking overlays close (deferred via `setTimeout`).
 
