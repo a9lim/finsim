@@ -379,6 +379,13 @@ main {
     font-family: var(--font-mono);
 }
 
+.pos-value {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+}
+
 .pos-pnl {
     flex-shrink: 0;
     font-family: var(--font-mono);
@@ -979,6 +986,12 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.strategy-group-header .strategy-group-value {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
 }
 .strategy-group-header .strategy-group-pnl {
     flex-shrink: 0;

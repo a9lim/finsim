@@ -1094,6 +1094,9 @@ function updateUI(precomputedMargin) {
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     updateRateDisplay($, sim.r, rateHistory);
     refreshTooltip();
+    if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
+        _updateTradeCreditDebit();
+    }
     if (strategyMode && strategyLegs.length > 0) {
         updateStrategyBuilder();
     }
