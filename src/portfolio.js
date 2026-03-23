@@ -105,9 +105,9 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
         addStockTemporaryImpact(impact.temporary);
         return Math.max(0.01, spreadFill + impact.temporary);
     } else {
-        const moneyness = Math.abs(Math.log(currentPrice / strike));
+        const logSK = Math.log(currentPrice / strike);
         const dte = Math.max(1, (expiryDay || 0) - currentDay);
-        const impact = computeOptionImpact(signedQty, currentVol, moneyness, dte, strike, expiryDay || 0);
+        const impact = computeOptionImpact(type, signedQty, currentVol, logSK, dte, strike, expiryDay || 0);
         applyOptionPermanentImpact(type, strike, expiryDay || 0, impact.permanent);
         addOptionTemporaryImpact(type, strike, expiryDay || 0, impact.temporary);
         const T = dte / TRADING_DAYS_PER_YEAR;

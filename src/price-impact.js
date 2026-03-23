@@ -77,28 +77,39 @@ export function computeStockImpact(qty, sigma) {
 }
 
 /**
- * Compute modeled open interest for an option at given moneyness and DTE.
+ * Compute modeled open interest for an option.
+ * @param {string} type  'call' or 'put'
+ * @param {number} logSK ln(S/K) — positive = call ITM / put OTM
+ * @param {number} dte   Days to expiry
  */
-export function modeledOI(moneyness, dte) {
+export function modeledOI(type, logSK, dte) {
+    const absM = Math.abs(logSK);
+    // ITM options have sharply lower OI than OTM (traders close/exercise ITM)
+    const isITM = (type === 'call' && logSK > 0) || (type === 'put' && logSK < 0);
+    const decay = isITM
+        ? Math.exp(-OI_MONEYNESS_DECAY * 2.5 * absM * absM)  // steep ITM penalty
+        : Math.exp(-OI_MONEYNESS_DECAY * absM * absM);        // gentler OTM decay
+    // OTM puts get 1.5x OI boost (hedging demand)
+    const putSkew = (type === 'put' && !isITM) ? 1.5 : 1.0;
     return Math.max(1,
-        OI_ATM_BASE
-        * Math.exp(-OI_MONEYNESS_DECAY * moneyness * moneyness)
+        OI_ATM_BASE * decay * putSkew
         * Math.sqrt(63 / Math.max(1, dte))
     );
 }
 
 /**
  * Compute permanent + temporary impact for an options trade.
+ * @param {string} type      'call' or 'put'
  * @param {number} qty       Signed quantity
  * @param {number} sigma     Current Heston vol
- * @param {number} moneyness abs(ln(S/K))
+ * @param {number} logSK     ln(S/K) — signed
  * @param {number} dte       Days to expiry
  * @returns {{ permanent: number, temporary: number }}
  */
-export function computeOptionImpact(qty, sigma, moneyness, dte, strike, expiryDay) {
+export function computeOptionImpact(type, qty, sigma, logSK, dte, strike, expiryDay) {
     const absQty = Math.abs(qty);
     const sign   = qty > 0 ? 1 : -1;
-    const oi     = modeledOI(moneyness, dte);
+    const oi     = modeledOI(type, logSK, dte);
     // Per-strike cumulative volume
     const key = `${strike}_${expiryDay}`;
     let cum = _cumOption.get(key);
