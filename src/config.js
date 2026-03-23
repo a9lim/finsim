@@ -52,6 +52,13 @@ export const MAX_PLAYER_SIGMAR_SHIFT= 0.005;
 export const EVENT_COUPLING_CAP     = 0.20;    // max ±20% event amplification
 export const ROGUE_TRADING_THRESHOLD= 0.50;    // game over at 50% equity loss
 
+// -- Compliance system --
+export const COMPLIANCE_GAME_OVER_HEAT = 5;   // effective heat >= this = fired
+export const COMPLIANCE_CREDIBILITY_CAP = 5;  // max credibility accumulation
+export const COMPLIANCE_COOLDOWN_HEAT_COEFF = 0.1;  // cooldown scaling per effective heat
+export const COMPLIANCE_THRESHOLD_CRED_COEFF = 0.15; // threshold scaling per credibility
+export const TIP_REAL_PROBABILITY = 0.70;     // probability insider tip is real
+
 // -- Event engine --
 export const MAX_EVENT_LOG = 20;           // max event log entries displayed
 export const MAX_FOLLOWUP_DEPTH = 5;       // max recursion depth for MTTH chains
