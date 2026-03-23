@@ -31,12 +31,14 @@ Serve from `a9lim.github.io/` -- shared files load via absolute paths (`/shared-
 ## File Map
 
 ```
-main.js               1706 lines  Orchestrator: DOM cache $, rAF loop, sub-step streaming,
+main.js               1805 lines  Orchestrator: DOM cache $, rAF loop, sub-step streaming,
                                    live candle animation, camera, shortcuts, event wiring,
                                    strategy builder (with rollback), ExpiryManager, world state,
                                    executeWithRollback, selectable expiry resolution,
                                    price impact overlays, popup queue, playerChoices/
-                                   impactHistory/quarterlyReviews tracking, rogue trading
+                                   impactHistory/quarterlyReviews tracking, rogue trading,
+                                   declarative trade execution, compliance integration,
+                                   insider tip scheduling
 index.html              691 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs),
                                    chain/trade/popup/reference/epilogue overlays,
                                    intro (Meridian Capital framing), strategy save/load UI
@@ -46,8 +48,8 @@ styles.css             1065 lines  Chain, positions, strategy, trade dialog,
 colors.js                59 lines  Financial color aliases (up/down/call/put/stock/bond/
                                    delta/gamma/theta/vega/rho), CSS var injection
 src/
-  config.js              97 lines  All constants (timing, instruments, margin, spreads, events,
-                                   rendering, price impact, rogue trading threshold),
+  config.js             103 lines  All constants (timing, instruments, margin, spreads, events,
+                                   rendering, price impact, rogue trading threshold, compliance),
                                    PRESETS (5 static + 2 dynamic), DEFAULT_PRESET=5
   simulation.js         251 lines  GBM + Merton + Heston + Vasicek; beginDay()/substep()/
                                    finalizeDay() pipeline; prepopulate() reverse-backfill
@@ -76,20 +78,25 @@ src/
                                    schedule, boredom boost, midterms. maybeFire() returns
                                    { fired, popups }. Event coupling via _computeCoupling().
                                    Era gating (early/mid/late). scheduleFollowup() public API.
-  event-pool.js        5226 lines  ~265 curated offline events across 12 categories (Fed,
+  event-pool.js        3210 lines  ~277 curated offline events across 12 categories (Fed,
                                    macro, sector, PNTH, congressional, investigation, political,
-                                   market, neutral, compound, midterm). ~57 events converted
-                                   to interactive popup format with player choices. ~20 events
-                                   have portfolioFlavor functions. Exports OFFLINE_EVENTS,
-                                   PARAM_RANGES, getEventById(). World-state structured effects.
+                                   market, neutral, compound, midterm). All events fire as
+                                   toasts (no popups). 12 insider-tip outcome events (6 real +
+                                   6 fake). ~20 events have portfolioFlavor functions. Exports
+                                   OFFLINE_EVENTS, PARAM_RANGES, getEventById().
   price-impact.js       283 lines  Almgren-Chriss price impact: permanent (sqrt) + temporary
                                    (linear) components for stock and options. Modeled OI with
                                    moneyness decay. Delta hedge feedback. Cumulative volume
                                    tracking (no order-splitting exploit). Recovery drift.
                                    Layer 3 parameter shifts. Impact toast generation.
-  popup-events.js      1029 lines  25 portfolio-triggered popup events. Trigger based on
-                                   portfolio state x world state (position size, P&L,
-                                   leverage, timing). Cooldown tracking. evaluatePortfolioPopups()
+  compliance.js          91 lines  Compliance heat/credibility state. effectiveHeat(),
+                                   onComplianceTriggered(), onComplianceChoice(),
+                                   cooldownMultiplier(), thresholdMultiplier(), complianceTone()
+  popup-events.js      1248 lines  26 portfolio-triggered popup events (10 compliance with
+                                   declarative trades + complianceTier, 3 insider tip with
+                                   randomized tip pool, 12 atmosphere, 1 unlimited risk).
+                                   Notional-based triggers, compliance-scaled cooldowns.
+                                   evaluatePortfolioPopups(), pickTip()
   world-state.js        170 lines  Mutable narrative state: congressional seats (Senate/House
                                    by party), PNTH board factions, geopolitical escalation,
                                    Fed credibility, investigations, election cycle.
@@ -97,10 +104,10 @@ src/
                                    WORLD_STATE_RANGES, applyStructuredEffects()
   llm.js                271 lines  LLMEventSource: Anthropic API via structured tool use,
                                    universe lore in system prompt, offline fallback
-  epilogue.js           561 lines  generateEpilogue(): 4-page narrative ending from world
+  epilogue.js           567 lines  generateEpilogue(): 4-page narrative ending from world
                                    state + portfolio + event log + playerChoices +
-                                   impactHistory + quarterlyReviews. Reputation synthesis
-                                   (Insider/Principled/Speculator/Survivor/Kingmaker/Ghost).
+                                   impactHistory + quarterlyReviews + terminationReason.
+                                   Reputation synthesis, compliance termination ending.
                                    Congressional diagrams, financial scorecards.
   market.js              27 lines  Shared mutable market state + syncMarket(sim). Leaf module.
   history-buffer.js     103 lines  Ring buffer (capacity 252) for OHLC bars
@@ -134,7 +141,8 @@ main.js
   |- llm.js                (imports events)
   |- world-state.js        (createWorldState, congressHelpers, applyStructuredEffects)
   |- price-impact.js       (imports config)
-  |- popup-events.js       (imports config, portfolio)
+  |- compliance.js         (imports config; leaf module)
+  |- popup-events.js       (imports config, portfolio, market, position-value, compliance)
   |- epilogue.js           (imports position-value, config)
   |- chart.js              (imports format-helpers, config; reads _PALETTE globals)
   |- strategy.js           (imports pricing, market, config)
@@ -211,17 +219,33 @@ Almgren-Chriss framework with permanent (information) + temporary (liquidity) co
 
 ## Popup Decision Events
 
-~57 narrative events + ~25 portfolio-triggered events present interactive choices that pause the simulation.
+~26 portfolio-triggered events in `popup-events.js` present interactive choices that pause the simulation. Event-pool events no longer use popups — they fire as toasts.
 
-**Narrative popups**: existing events in `event-pool.js` with `popup: true`, `era` tag, `context()` function, and `choices[]` array. Each choice has `deltas`, `effects` (applyStructuredEffects format), `followups`, `playerFlag`, and `resultToast`.
+**Compliance popups** (10 events): supervisor/compliance directives with declarative `trades` arrays and `complianceTier` ('full'|'partial'|'defiant'). Full compliance executes trades (e.g. `close_all`, `close_short`, `close_type`). Triggers use notional-relative thresholds scaled by `thresholdMultiplier()`. Cooldowns scaled by `cooldownMultiplier()`. Context text uses `complianceTone()` for escalating language.
 
-**Portfolio-triggered popups** (`popup-events.js`): fire when portfolio state (position size, P&L, leverage) intersects world state (investigations, elections, crises). Each has `trigger(sim, world, portfolio)`, `cooldown` (60-300 days), and era gating.
+**Insider tip popups** (3 events): vague initial description. Player can decline (clean record) or ask for more (randomized tip from `INSIDER_TIPS` pool, 70% real / 30% fake, scheduled as followup ~14 days out). Real tips add compliance heat.
 
-**Popup queue**: `_popupQueue` in main.js, processed at end-of-day and when blocking overlays close. Popups pause the sim, present choices, apply effects, record `playerFlag` in `playerChoices` map.
+**Atmosphere popups** (12 events): narrative/reputation moments without trade implications. No `trades` or `complianceTier`.
+
+**Unlimited risk popup** (1 event): fires when `netUncoveredUpside` (sum of stock qty + call qty) is negative and notional exceeds 10% of equity. Offers close_short, hedge_unlimited_risk (buys stock), or defy.
+
+**Popup queue**: `_popupQueue` in main.js, processed at end-of-day and when blocking overlays close. Popups pause the sim, present choices, apply effects, execute trades, process compliance tier, record `playerFlag` in `playerChoices` map.
 
 **Era gating**: `early` (day ≤500), `mid` (500-800), `late` (≥800). Escalating stakes over the presidential term.
 
 **portfolioFlavor**: ~20 non-popup events have `portfolioFlavor(portfolio)` functions that append position-aware text to toast headlines.
+
+## Compliance System
+
+`compliance.js` tracks regulatory pressure on the player. State: `heat` (defiance accumulator), `credibility` (capped at 5, grows faster with bigger profits), `equityAtLastReview`, `lastReviewDay`.
+
+**Effective heat** = `heat - credibility` (can go negative). Determines tone (warm < 0, professional 0-1, pointed 2-3, final_warning 4, terminated ≥5) and game over at ≥5 (triggers epilogue with "fired for cause" ending).
+
+**On compliance trigger**: if profitable since last review, heat resets to 0 and credibility increases (scaled by profit ratio, capped per-review at +2). If not profitable, heat stays.
+
+**Choice effects**: full compliance → heat -= 1, partial → unchanged, defiant → heat += 1-2.
+
+**Scaling**: cooldowns × `cooldownMultiplier()` (high heat = shorter), thresholds × `thresholdMultiplier()` (high credibility = more lenient).
 
 ## Display Scaling
 
@@ -349,7 +373,12 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **`_fillPrice` includes slippage** -- signature is `(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay)`. Bonds skip slippage (spread only). Fills clamped to $0.01 minimum.
 - **`showToast` takes `(message, duration)` only** -- duration is numeric milliseconds, NOT a severity string. No severity parameter exists.
 - **`scheduleFollowup` structure** -- must push `{ event, chainId, targetDay, weight, depth }` matching `_checkFollowups` format. Do NOT use `{ id, fireDay }`.
-- **Impact state must be reset** -- `resetImpactState()` and `resetPopupCooldowns()` in `_resetCore()`. `resetDailyVolume()` at start of each substep in `frame()`.
+- **Impact state must be reset** -- `resetImpactState()`, `resetPopupCooldowns()`, and `resetCompliance()` in `_resetCore()`. `resetDailyVolume()` at start of each substep in `frame()`. `resetPopupCooldowns()` also clears `_usedTips`.
+- **Compliance triggers use notional, not delta** -- `_shortDirectionalNotional()` and `_longDirectionalNotional()` account for directional exposure (long put = short, short put = long). Do not use raw `qty` sign for directional classification.
+- **`close_short` is directional** -- closes short stock, short calls, AND long puts (all short-directional). Similarly `close_long` closes long stock, long calls, short puts.
+- **Compliance game over triggers epilogue** -- `_showComplianceTermination()` calls `_showEpilogue('compliance')`, not `_resetCore()`. The epilogue shows a "fired for cause" ending.
+- **Event-pool events have no popups** -- all ~277 events in `event-pool.js` fire as toasts only. Popup decision events live exclusively in `popup-events.js`.
+- **Insider tip events use `_tipAction` flag** -- choices with `_tipAction: true` trigger tip scheduling in the choice handler. The tip is rolled (70/30 real/fake) at choice time, not at followup time.
 - **Always use vol surface for options** -- never pass flat `market.sigma` to option pricing. Use `computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi)` + `computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa)`. `unitPrice()` in position-value.js does this automatically. Flat vol is only acceptable for stock/bond spreads and slippage magnitude (second-order effects).
 - **`computeEffectiveSigma` signature** -- `(v, T, kappa, theta, xi)` — takes variance `v`, NOT vol. Do NOT pass extra args (S, K, rho) — those go to `computeSkewSigma`.
 - **No nested `.glass`** -- elements inside a `.glass` panel should NOT also have `.glass` class. Nested backdrop-filter stacks, making inner elements more opaque. Use `bg-hover` or `bg-elevated` for differentiation within glass panels.
