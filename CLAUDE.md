@@ -119,13 +119,14 @@ src/
   strategy-store.js    259 lines  Built-in strategy defs (8 presets, selectable expiry),
                                    localStorage CRUD (hash IDs, name collision enforcement),
                                    resolveLegs (with override expiry), formatLeg,
-                                   computeNetCost (uses vol surface), legsToRelative, nextAutoName
+                                   computeNetCost (uses unitPrice), legsToRelative, nextAutoName
   position-value.js      88 lines  unitPrice() (uses vol surface + per-strike impact
                                    for options), computePositionValue(), computePositionPnl()
   chain-renderer.js     314 lines  Chain table DOM with event delegation: renderChainInto(),
-                                   rebuildExpiryDropdown(), buildStockBondTable(), posKey()
+                                   rebuildExpiryDropdown(), buildStockBondTable(), posKey().
+                                   Full chain shows modeled OI (not delta) per strike.
   portfolio-renderer.js  363 lines  Portfolio display with DOM diffing, strategy group
-                                   boxes (name, expiry, multiplier, P/L, unwind)
+                                   boxes (name, expiry, multiplier, value, P/L, unwind)
   reference.js         1617 lines  29 reference entries with KaTeX math
   theme.js                9 lines  initTheme(), toggleTheme() (delegates to _toolbar)
 ```
@@ -148,10 +149,10 @@ main.js
   |- popup-events.js       (imports config, portfolio, market, position-value, compliance)
   |- epilogue.js           (imports position-value, config)
   |- chart.js              (imports format-helpers, config; reads _PALETTE globals)
-  |- strategy.js           (imports pricing, market, config)
-  |- strategy-store.js     (imports pricing, portfolio, market, config)
+  |- strategy.js           (imports pricing, position-value, market, config)
+  |- strategy-store.js     (imports portfolio, position-value, market)
   |- ui.js                 (imports format-helpers, chain-renderer, portfolio, pricing, price-impact, config)
-  |- chain-renderer.js     (imports format-helpers; reads _haptics globals)
+  |- chain-renderer.js     (imports format-helpers, price-impact; reads _haptics globals)
   |- portfolio-renderer.js (imports position-value, format-helpers)
   |- format-helpers.js     (imports config)
   |- position-value.js     (imports pricing, price-impact, market, config)
@@ -210,7 +211,7 @@ Almgren-Chriss framework with permanent (information) + temporary (liquidity) co
 
 **Stock slippage**: permanent `coeff * sigma * (sqrt((cum+qty)/ADV) - sqrt(cum/ADV))` shifts `sim.S` (information/price discovery, truly permanent — no decay). Temporary `coeff * sigma * (2*cum + qty) / ADV` is the fill cost (liquidity, integral model) and shifts the displayed stock price for the current substep. Cumulative volume tracked per substep — trades within the same substep batch; book refills between substeps. Fill prices clamped to $0.01 minimum.
 
-**Options slippage**: same framework but scaled by `qty / modeledOI` instead of `qty / ADV`. Modeled OI = `OI_ATM_BASE * exp(-OI_MONEYNESS_DECAY * m²) * sqrt(63/dte)` — drops with moneyness (deep OTM = severe slippage) and increases for near-term expiries (front-month has most liquidity). Per-strike permanent impact tracked in `_optionPermanentImpact` map (keyed by `type_strike_expiryDay`), applied to chain display prices. Temporary impact tracked similarly, resets each substep. Market maker delta hedge (using tree-computed delta via `computeGreeksWithTrees`) creates secondary permanent stock impact.
+**Options slippage**: same framework but scaled by `qty / modeledOI` instead of `qty / ADV`. Modeled OI is asymmetric: `OI_ATM_BASE * decay * putSkew * sqrt(63/dte)` where decay uses `OI_MONEYNESS_DECAY` (steeper 2.5x for ITM options than OTM), OTM puts get 1.5x boost (hedging demand), and near-term expiries have more liquidity. `modeledOI(type, logSK, dte)` takes signed `ln(S/K)` to distinguish ITM from OTM. Per-strike permanent impact tracked in `_optionPermanentImpact` map (keyed by `type_strike_expiryDay`), applied to chain display prices and `unitPrice()`. Temporary impact tracked similarly, resets each substep. Market maker delta hedge (using tree-computed delta via `computeGreeksWithTrees`) creates secondary permanent stock impact.
 
 **Bonds**: spread only, no price impact (Vasicek-priced, deep market).
 
@@ -258,7 +259,7 @@ All internal values (cash, quantities, prices, margin) remain at the original sc
 
 ATM = `round(S/5)*5`, 10 strikes each side (21 total). `ExpiryManager` maintains 8 rolling expiries on 63-day cycle.
 
-**Lazy pricing**: `buildChainSkeleton()` returns metadata only. `priceChainExpiry()` prices one expiry on demand -- sidebar uses price-only (21 dual inductions/substep), full chain overlay adds Greeks (147 inductions). Pre-allocated tree pool for zero GC.
+**Lazy pricing**: `buildChainSkeleton()` returns metadata only. `priceChainExpiry()` prices one expiry on demand — sidebar uses price-only (21 dual inductions/substep), full chain overlay adds Greeks (147 inductions) and displays modeled OI per strike (asymmetric: ITM penalty, OTM put boost). Pre-allocated tree pool for zero GC. Full chain overlay refreshes after trades via `_refreshChainOverlay` to reflect price impact.
 
 ## Portfolio System
 
@@ -337,7 +338,7 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **`market` shared state**: single-writer (main.js via `syncMarket`), multiple readers
 - **Custom event bus**: `shoals:*` events from ui.js -> main.js
 - **Chain event delegation**: 3 listeners on container, not per-cell. Bound once (`_chainClicksBound`)
-- **Tree reuse**: every module owns reusable trees -- chain.js (`_rTree`/`_rGreekTrees`), portfolio.js (`_marginTree`/`_greekTrees`/`_gt`), position-value.js (`_tree`), strategy.js (`_entryTree` + per-leg `info.tree`), strategy-store.js (`_costTree`)
+- **Tree reuse**: every module owns reusable trees -- chain.js (`_rTree`/`_rGreekTrees`), portfolio.js (`_marginTree`/`_greekTrees`/`_gt`), position-value.js (`_tree`), strategy.js (per-leg `info.tree`)
 - **Strategies in localStorage**: `shoals_strategies` key, hash-based IDs. Built-ins are const in `strategy-store.js`, never in localStorage. `currentStrategyHash` in main.js tracks loaded user strategy.
 - **Relative legs**: all saved strategies store `strikeOffset` / `dteOffset`, resolved at execution time via `resolveLegs()`.
 - **Price impact overlays**: `_savedOverlays` (Layer 3 param shifts) applied before `beginDay()`, removed after `finalizeDay()`. Player param shifts tracked separately from event-caused shifts. Per-strike option impact (permanent + temporary) applied in `chain.js` and `position-value.js` to displayed/mark-to-market prices.
@@ -372,6 +373,7 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **Position netting includes `strategyName`** -- two strategies with the same type/strike/expiry but different names create separate positions.
 - **`syncMarket` after `prepopulate`** -- must call `syncMarket(sim)` after `sim.prepopulate()` in both `init()` and `_resetCore()` or market params (v, kappa, theta, xi, rho) will be zero.
 - **`strategyBaseQty` on positions** -- set at first strategy execution, preserved through netting. Used by portfolio-renderer to compute execution multiplier vs per-unit leg quantities.
+- **`executeWithRollback` toast uses `execMult`** -- the multiplier passed from the caller, NOT derived from the netted position. Toast shows net debit (sum of fill × qty × sign), not cash change (which includes margin reserves for short legs).
 - **`executeMarketOrder` takes `sim` first** -- signature is `(sim, type, side, qty, ...)`. All portfolio functions that execute trades (`closePosition`, `checkPendingOrders`, `processExpiry`, `liquidateAll`) also take `sim` as first parameter.
 - **`_fillPrice` includes slippage** -- signature is `(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay)`. Bonds skip slippage (spread only). Fills clamped to $0.01 minimum. For options, computes tree-based delta via `_gt` for the MM hedge (not an approximation).
 - **`showToast` takes `(message, duration)` only** -- duration is numeric milliseconds, NOT a severity string. No severity parameter exists.
@@ -383,7 +385,7 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **Compliance game over triggers epilogue** -- `_showComplianceTermination()` calls `_showEpilogue('compliance')`, not `_resetCore()`. The epilogue shows a "fired for cause" ending.
 - **Event-pool events have no popups** -- all ~277 events in `event-pool.js` fire as toasts only. Popup decision events live exclusively in `popup-events.js`.
 - **Insider tip events use `_tipAction` flag** -- choices with `_tipAction: true` trigger tip scheduling in the choice handler. The tip is rolled (70/30 real/fake) at choice time, not at followup time.
-- **Always use vol surface for options** -- never pass flat `market.sigma` to option pricing. Use `computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi)` + `computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa)`. `unitPrice()` in position-value.js does this automatically. Flat vol is only acceptable for stock/bond spreads and slippage magnitude (second-order effects).
+- **Always use `unitPrice()` for pricing** -- canonical pricing function in position-value.js. Includes vol surface (term structure + skew), per-strike permanent + temporary impact, and stock temporary impact. Use it for fills, net cost, entry cost, mark-to-market — everywhere except margin calculations (which intentionally use raw tree pricing to prevent impact manipulation) and payoff curve sampling (which evaluates at many hypothetical stock prices). Do NOT use direct tree pricing or raw `sim.S` for display/valuation.
 - **`computeEffectiveSigma` signature** -- `(v, T, kappa, theta, xi)` — takes variance `v`, NOT vol. Do NOT pass extra args (S, K, rho) — those go to `computeSkewSigma`.
 - **No nested `.glass`** -- elements inside a `.glass` panel should NOT also have `.glass` class. Nested backdrop-filter stacks, making inner elements more opaque. Use `bg-hover` or `bg-elevated` for differentiation within glass panels.
 - **`fmtDollar` appends "k"** -- portfolio-scale dollar values only. Per-unit prices (fills, strategy net debit, breakevens, trigger prices) use raw `$X.XX`. Do NOT use `fmtDollar` for per-unit values.
