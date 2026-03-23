@@ -69,8 +69,9 @@ src/
                                    interpolation, position markers, strike lines; shared-camera.js;
                                    uses resizeCanvasDPR() from shared-utils.js
   strategy.js           955 lines  StrategyRenderer: payoff P&L, Greek overlays, breakevens
-                                   (analytical at expiry), input-keyed caching, tree-based
-                                   per-leg entry values; uses resizeCanvasDPR()
+                                   (analytical at expiry), input-keyed caching, unitPrice-based
+                                   entry values, tree-based hypothetical S sweep; uses
+                                   resizeCanvasDPR()
   ui.js                1054 lines  DOM binding, display updaters, overlay management;
                                    delegates to chain-renderer.js and portfolio-renderer.js.
                                    Strategy dropdowns, credit/debit, built-in disable logic,
@@ -291,7 +292,7 @@ Floating glass panels over full-viewport canvas. Fixed topbar, right slide-in si
 
 **Custom events**: `shoals:closePosition`, `shoals:exerciseOption`, `shoals:cancelOrder`, `shoals:unwindStrategy` -- ui.js/portfolio-renderer.js -> main.js.
 
-**Strategy tab**: sets `strategyMode = true`, pauses sim, shows strategy canvas + time-to-expiry slider (percentage maps to `evalDay`, clamped to min DTE). Strategy dropdown auto-loads on select ("New strategy" clears builder). Built-in strategies disable name/toggle/save/delete via `ctrl-disabled`. Selectable expiry toggle controls whether legs use the selected expiry or per-leg DTE offsets.
+**Strategy tab**: sets `strategyMode = true`, pauses sim, shows strategy canvas + time-to-expiry slider (percentage maps to `evalDay`, clamped to min DTE). Strategy dropdown auto-loads on select ("New strategy" clears builder). Built-in strategies disable name/toggle/save/delete via `ctrl-disabled`. Selectable expiry toggle controls whether legs use the selected expiry or per-leg DTE offsets. On tab switch, `strategy._cache` and `_summaryCache` are invalidated and `updateStrategyBuilder()` is called so chart/summary/chain reflect current price impact state from trades on other tabs.
 
 ## Dynamic Regime
 
