@@ -17,7 +17,7 @@ import {
     MONEYNESS_SPREAD_WEIGHT,
 } from './config.js';
 
-import { allocTree, prepareTree, priceWithTree, allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
+import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import {
     computeStockImpact, computeOptionImpact,
     computeDeltaHedgeImpact, applyPermanentImpact,
@@ -25,7 +25,6 @@ import {
     addStockTemporaryImpact, addOptionTemporaryImpact,
 } from './price-impact.js';
 
-let _marginTree = null;
 let _greekTrees = null;
 import { computePositionValue, unitPrice } from './position-value.js';
 import { market } from './market.js';
@@ -232,32 +231,11 @@ function _marginForShort(type, qty, fillPrice, currentPrice, currentVol, current
  * Compute maintenance margin for a single short position (proposed or actual).
  */
 function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q) {
-    switch (type) {
-        case 'stock':
-            return MAINTENANCE_MARGIN * currentPrice * absQty;
-        case 'bond': {
-            const dte = expiryDay != null
-                ? Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0) : 0;
-            return MAINTENANCE_MARGIN * vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR) * absQty;
-        }
-        case 'call':
-        case 'put': {
-            const dte = expiryDay != null
-                ? Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0) : 0;
-            let optMid;
-            if (dte > 0 && currentVol > 0) {
-                if (!_marginTree) _marginTree = allocTree();
-                const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-                const sig = computeSkewSigma(sigEff, currentPrice, strike, dte, market.rho, market.xi, market.kappa);
-                prepareTree(dte, currentRate, sig, q, currentDay, _marginTree);
-                optMid = priceWithTree(currentPrice, strike, type === 'put', _marginTree);
-            } else {
-                optMid = Math.max(0, type === 'call' ? currentPrice - strike : strike - currentPrice);
-            }
-            return Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
-        }
-        default: return 0;
+    const mid = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
+    if (type === 'call' || type === 'put') {
+        return Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
     }
+    return MAINTENANCE_MARGIN * mid * absQty;
 }
 
 /**
@@ -292,28 +270,11 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
 
         if (pos.qty < 0) {
             const absQty = Math.abs(pos.qty);
-            const dte = pos.expiryDay != null
-                ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
-                : 0;
-            switch (pos.type) {
-                case 'stock':
-                    required += MAINTENANCE_MARGIN * currentPrice * absQty;
-                    break;
-                case 'bond': {
-                    const bp = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR);
-                    required += MAINTENANCE_MARGIN * bp * absQty;
-                    break;
-                }
-                case 'call':
-                case 'put': {
-                    if (!_marginTree) _marginTree = allocTree();
-                    const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-                    const sig = computeSkewSigma(sigEff, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
-                    prepareTree(dte, currentRate, sig, q, currentDay, _marginTree);
-                    const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
-                    required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
-                    break;
-                }
+            const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
+            if (pos.type === 'call' || pos.type === 'put') {
+                required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
+            } else {
+                required += MAINTENANCE_MARGIN * mid * absQty;
             }
         }
     }
@@ -905,31 +866,11 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
         if (pos.qty >= 0) continue; // Only short positions
 
         const absQty = Math.abs(pos.qty);
-        const dte = pos.expiryDay != null
-            ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
-            : 0;
-
-        switch (pos.type) {
-            case 'stock':
-                total += MAINTENANCE_MARGIN * currentPrice * absQty;
-                break;
-
-            case 'bond': {
-                const bondPrice = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR);
-                total += MAINTENANCE_MARGIN * bondPrice * absQty;
-                break;
-            }
-
-            case 'call':
-            case 'put': {
-                if (!_marginTree) _marginTree = allocTree();
-                const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-                const sig = computeSkewSigma(sigEff, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
-                prepareTree(dte, currentRate, sig, q, currentDay, _marginTree);
-                const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
-                total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
-                break;
-            }
+        const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
+        if (pos.type === 'call' || pos.type === 'put') {
+            total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
+        } else {
+            total += MAINTENANCE_MARGIN * mid * absQty;
         }
     }
 
@@ -962,28 +903,11 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
 
         if (pos.qty < 0) {
             const absQty = Math.abs(pos.qty);
-            const dte = pos.expiryDay != null
-                ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
-                : 0;
-            switch (pos.type) {
-                case 'stock':
-                    required += MAINTENANCE_MARGIN * currentPrice * absQty;
-                    break;
-                case 'bond': {
-                    const bondPrice = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR);
-                    required += MAINTENANCE_MARGIN * bondPrice * absQty;
-                    break;
-                }
-                case 'call':
-                case 'put': {
-                    if (!_marginTree) _marginTree = allocTree();
-                    const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-                    const sig = computeSkewSigma(sigEff, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
-                    prepareTree(dte, currentRate, sig, q, currentDay, _marginTree);
-                    const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
-                    required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
-                    break;
-                }
+            const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
+            if (pos.type === 'call' || pos.type === 'put') {
+                required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
+            } else {
+                required += MAINTENANCE_MARGIN * mid * absQty;
             }
         }
     }
