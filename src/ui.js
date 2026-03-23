@@ -1086,7 +1086,47 @@ export function updateCongressDiagrams($, world) {
     _updateLegend($.houseLegend, houseSegs, 218);
 }
 
-export function showPopupEvent($, headline, context, choices, onChoice) {
+const _popupCategoryMeta = {
+    fed:            { label: 'Federal Reserve',    color: 'var(--ext-blue)' },
+    investigation:  { label: 'Investigation',      color: 'var(--ext-red)' },
+    pnth:           { label: 'Palanthropic',       color: 'var(--ext-purple)' },
+    pnth_earnings:  { label: 'PNTH Earnings',      color: 'var(--ext-purple)' },
+    congressional:  { label: 'Congress',            color: 'var(--ext-indigo)' },
+    political:      { label: 'Political',           color: 'var(--ext-orange)' },
+    midterm:        { label: 'Election',            color: 'var(--ext-rose)' },
+    macro:          { label: 'Macro',               color: 'var(--ext-cyan)' },
+    sector:         { label: 'Sector',              color: 'var(--ext-lime)' },
+    market:         { label: 'Markets',             color: 'var(--ext-yellow)' },
+    compound:       { label: 'Crisis',              color: 'var(--ext-red)' },
+    desk:           { label: 'Meridian Capital',    color: 'var(--accent)' },
+};
+
+export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude) {
+    // Category badge + accent color
+    const meta = _popupCategoryMeta[category] || _popupCategoryMeta.desk;
+    const panel = $.popupOverlay.querySelector('.sim-overlay-panel');
+    panel.style.borderTopColor = meta.color;
+
+    // Magnitude-based backdrop
+    if (magnitude === 'major') {
+        $.popupOverlay.style.background = 'rgba(0,0,0,0.55)';
+        $.popupOverlay.style.backdropFilter = 'blur(8px) saturate(1.2)';
+    } else {
+        $.popupOverlay.style.background = '';
+        $.popupOverlay.style.backdropFilter = '';
+    }
+
+    // Category tag
+    let tag = $.popupOverlay.querySelector('.popup-tag');
+    if (!tag) {
+        tag = document.createElement('span');
+        tag.className = 'popup-tag';
+        $.popupHeadline.parentNode.insertBefore(tag, $.popupHeadline);
+    }
+    tag.textContent = meta.label;
+    tag.style.color = meta.color;
+    tag.style.borderColor = meta.color;
+
     $.popupHeadline.textContent = headline;
     $.popupContext.textContent = context;
     $.popupChoices.textContent = '';
@@ -1103,11 +1143,16 @@ export function showPopupEvent($, headline, context, choices, onChoice) {
         btn.appendChild(desc);
         btn.addEventListener('click', () => {
             $.popupOverlay.classList.add('hidden');
+            // Clean up inline styles
+            panel.style.borderTopColor = '';
+            $.popupOverlay.style.background = '';
+            $.popupOverlay.style.backdropFilter = '';
             onChoice(i);
         });
         $.popupChoices.appendChild(btn);
     });
     $.popupOverlay.classList.remove('hidden');
+    if (typeof _haptics !== 'undefined') _haptics.trigger(magnitude === 'major' ? 'medium' : 'light');
 }
 
 export function hidePopupEvent($) {

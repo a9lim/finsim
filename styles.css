@@ -1121,17 +1121,36 @@ main {
 }
 
 /* -- Popup decision events -- */
-.popup-event-body { max-width: 520px; }
+.popup-event-body {
+    max-width: 520px;
+    border-top: 3px solid var(--accent);
+    transition: border-top-color 0.2s;
+}
+.popup-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 2px 8px;
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    margin-bottom: 10px;
+    color: var(--accent);
+}
 .popup-headline {
     font-family: var(--font-display);
     font-size: 1.25rem;
     margin: 0 0 12px;
     color: var(--text);
+    line-height: 1.35;
 }
 .popup-context {
     color: var(--text-secondary);
     line-height: 1.6;
     margin: 0 0 20px;
+    font-size: 0.875rem;
 }
 .popup-choices {
     display: flex;
@@ -1148,17 +1167,23 @@ main {
     border-radius: var(--radius-md);
     cursor: pointer;
     text-align: left;
-    transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.2s, background 0.2s, transform 0.1s;
 }
 .popup-choice-btn:hover {
     border-color: var(--accent);
     background: var(--bg-hover);
+    transform: translateX(4px);
+}
+.popup-choice-btn:active {
+    transform: translateX(2px);
 }
 .popup-choice-label {
     font-weight: 600;
     color: var(--text);
+    font-size: 0.9rem;
 }
 .popup-choice-desc {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
+    line-height: 1.4;
 }

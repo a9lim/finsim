@@ -655,6 +655,7 @@ function _processPopupQueue() {
         ? event.context(sim, eventEngine?.world, portfolio)
         : event.context || '';
 
+    const popupCat = event.category || (event.id && event.id.startsWith('desk_') ? 'desk' : '');
     showPopupEvent($, event.headline, contextText, event.choices, (idx) => {
         const choice = event.choices[idx];
         if (choice.deltas && eventEngine) {
@@ -675,7 +676,7 @@ function _processPopupQueue() {
             showToast(choice.resultToast, 4000);
         }
         dirty = true;
-    });
+    }, popupCat, event.magnitude);
 }
 
 function _portfolioEquity() {
