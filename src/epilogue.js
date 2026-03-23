@@ -505,7 +505,7 @@ function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, qua
         body += _h3('Timeline Highlights');
         for (const evt of highlights) {
             const dayLabel = `Day ${evt.day}`;
-            body += `<div class="stat-row"><span class="epilogue-highlight-day">${dayLabel}</span><span>${evt.headline}</span></div>`;
+            body += `<div class="epilogue-timeline-row"><span class="epilogue-timeline-day">${dayLabel}</span><span class="epilogue-timeline-text">${evt.headline}</span></div>`;
         }
     }
 
