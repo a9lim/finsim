@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ADV } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ADV, ROGUE_TRADING_THRESHOLD } from './src/config.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
 import {
@@ -21,7 +21,7 @@ import {
     cacheDOMElements, bindEvents, updateChainDisplay,
     rebuildTradeDropdown, rebuildStrategyDropdown,
     updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateStockBondPrices,
-    syncSettingsUI, toggleStrategyView, showMarginCall, showFraudScreen, showChainOverlay,
+    syncSettingsUI, toggleStrategyView, showMarginCall, showFraudScreen, showRogueTrading, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
     updateDynamicSections, updateEventLog, updateCongressDiagrams,
@@ -674,6 +674,23 @@ function _processPopupQueue() {
     });
 }
 
+function _portfolioEquity() {
+    let equity = portfolio.cash;
+    for (const p of portfolio.positions) {
+        equity += computePositionValue(p, sim.S, market.sigma, sim.r, sim.day, sim.q);
+    }
+    return equity;
+}
+
+function _recordImpact(day, direction, magnitude, context) {
+    if (Math.abs(magnitude) < 0.5) return;
+    impactHistory.push({ day, direction, magnitude, context });
+    if (impactHistory.length > 15) {
+        impactHistory.sort((a, b) => Math.abs(b.magnitude) - Math.abs(a.magnitude));
+        impactHistory.length = 15;
+    }
+}
+
 function _onDayComplete() {
     const vol = market.sigma;
 
@@ -692,6 +709,32 @@ function _onDayComplete() {
             const label = divNet > 0 ? 'Dividend received' : 'Dividend charged';
             showToast(label + ': $' + Math.abs(divNet).toFixed(2));
         }
+    }
+
+    // Quarterly desk review (live trading only)
+    if (sim.day > HISTORY_CAPACITY && sim.day % QUARTERLY_CYCLE === 0) {
+        const buyHoldPnl = (sim.S - 100) * (portfolio.initialCapital / 100);
+        const actualPnl = _portfolioEquity() - portfolio.initialCapital;
+        const vsBenchmark = actualPnl - buyHoldPnl;
+        let rating;
+        if (vsBenchmark > portfolio.initialCapital * 0.1) rating = 'strong';
+        else if (vsBenchmark > 0) rating = 'solid';
+        else if (vsBenchmark > -portfolio.initialCapital * 0.1) rating = 'underperform';
+        else rating = 'poor';
+
+        quarterlyReviews.push({ day: sim.day, pnl: actualPnl, vsBenchmark, rating });
+
+        const texts = {
+            strong: 'Quarterly Desk Review: Meridian\'s risk committee notes exceptional returns.',
+            solid: 'Quarterly Desk Review: Solid quarter. Book within risk parameters.',
+            underperform: 'Quarterly Desk Review: Returns lag benchmark. Risk committee requests position summary.',
+            poor: 'Quarterly Desk Review: Managing Director Liu wants a meeting about your book.',
+        };
+        let text = texts[rating];
+        if (playerChoices.cooperated_sec || playerChoices.silent_sec || playerChoices.accepted_insider_tip) {
+            text += ' The SEC inquiry hasn\'t helped perception of the desk.';
+        }
+        showToast(text, rating === 'poor' ? 'warning' : 'info', 8000);
     }
 
     const { expired, unwound } = processExpiry(sim, sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
@@ -758,6 +801,15 @@ function _onDayComplete() {
 
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     chainDirty = true;
+
+    // Rogue trading check (before margin)
+    const equity = _portfolioEquity();
+    if (equity < portfolio.initialCapital * ROGUE_TRADING_THRESHOLD) {
+        showRogueTrading($, equity, portfolio.initialCapital);
+        playing = false;
+        updatePlayBtn($, playing);
+        return;
+    }
 
     // Check margin
     const margin = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
@@ -1120,6 +1172,7 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
             const label = side === 'short' ? 'Shorted' : 'Bought';
             if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + pos.fillPrice.toFixed(2));
             if (typeof _haptics !== 'undefined') _haptics.trigger('success');
+            if (type === 'stock') _recordImpact(sim.day, side === 'long' ? 1 : -1, qty, 'Stock trade');
         } else {
             if (typeof showToast !== 'undefined') showToast('Insufficient margin.');
             if (typeof _haptics !== 'undefined') _haptics.trigger('error');

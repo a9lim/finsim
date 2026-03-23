@@ -581,6 +581,31 @@ export function showMarginCall($, marginInfo) {
     if (typeof _haptics !== 'undefined') _haptics.trigger('error');
 }
 
+export function showRogueTrading($, equity, initialCapital) {
+    const lossAmt = Math.abs(initialCapital - equity);
+    const h2 = document.createElement('h2');
+    h2.style.cssText = 'color:var(--ext-red);margin:0 0 12px';
+    h2.textContent = 'ROGUE TRADING INVESTIGATION';
+
+    const p1 = document.createElement('p');
+    p1.textContent = 'Meridian Capital\'s internal audit has uncovered '
+        + fmtDollar(lossAmt) + ' in unauthorized losses on your desk.';
+
+    const p2 = document.createElement('p');
+    p2.textContent = 'Bank security has been called. Your access has been revoked. The SEC has been notified.';
+
+    const p3 = document.createElement('p');
+    p3.style.cssText = 'color:var(--text-muted);margin-top:16px;font-style:italic';
+    p3.textContent = '"The losses were hidden across multiple accounts using a series of fictitious hedging transactions." \u2014 Internal report';
+
+    $.fraudMsg.textContent = '';
+    $.fraudMsg.appendChild(h2);
+    $.fraudMsg.appendChild(p1);
+    $.fraudMsg.appendChild(p2);
+    $.fraudMsg.appendChild(p3);
+    $.fraudOverlay.classList.remove('hidden');
+}
+
 export function showFraudScreen($, equity) {
     const loss = fmtDollar(Math.abs(equity));
     $.fraudMsg.textContent = '';
