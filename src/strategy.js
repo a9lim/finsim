@@ -8,7 +8,7 @@
  * Exports: StrategyRenderer
  */
 
-import { allocTree, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
+import { allocTree, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { unitPrice } from './position-value.js';
 import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
@@ -142,40 +142,33 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
 
         const info = { type: leg.type, mult, T, rate, vol };
 
+        // Entry value via unitPrice (includes vol surface + price impact)
+        const K = leg.strike ?? entryS;
+        const entryExpiryDay = entryDay != null ? entryDay + Math.round(entryT * TRADING_DAYS_PER_YEAR) : null;
+        info.entryVal = unitPrice(leg.type, entryS, vol, rate, entryDay ?? 0, K, entryExpiryDay, q);
+
         switch (leg.type) {
             case 'call':
             case 'put': {
                 const isPut = leg.type === 'put';
-                const K = leg.strike ?? entryS;
-                // Term-structure vol + moneyness skew
+                // Term-structure vol + moneyness skew for evaluation tree
                 const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
                 const sigma = computeSkewSigma(sigmaEff, entryS, K, T, market.rho, market.xi, market.kappa);
-                // Entry vol: same skew at entry time
-                const entrySigmaEff = computeEffectiveSigma(market.v, entryT, market.kappa, market.theta, market.xi);
-                const entrySigma = computeSkewSigma(entrySigmaEff, entryS, K, entryT, market.rho, market.xi, market.kappa);
                 info.K = K;
                 info.isPut = isPut;
                 info.vol = sigma;
-                // Pre-prepare trees for entry and evaluation pricing
-                const entryTree = prepareTree(entryT, rate, entrySigma, q, entryDay);
-                info.entryVal = priceWithTree(entryS, K, isPut, entryTree);
                 info.q = q;
                 info.evalDay = evalDay;
-                // Avoids transparent cache thrashing when legs have different T.
                 info.tree = prepareTree(T, rate, sigma, q, evalDay);
-                info.greekTrees = null; // lazily prepared on first Greek request
+                info.greekTrees = null;
                 break;
             }
             case 'stock':
-                info.entryS = entryS;
+                info.entryS = info.entryVal; // unitPrice includes temporary impact
                 break;
             case 'bond':
-                info.entryVal = market.a >= 1e-8
-                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, entryT, market.a, market.b, market.sigmaR)
-                    : BOND_FACE_VALUE * Math.exp(-rate * entryT);
-                info.bondCurVal = market.a >= 1e-8
-                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, T, market.a, market.b, market.sigmaR)
-                    : BOND_FACE_VALUE * Math.exp(-rate * T);
+                info.bondCurVal = unitPrice('bond', entryS, vol, rate, evalDay ?? 0, null,
+                    entryDay != null ? entryDay + Math.round(T * TRADING_DAYS_PER_YEAR) : null, q);
                 break;
         }
         return info;
