@@ -2493,25 +2493,91 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 0.7,
         headline: 'BREAKING: Sen. Okafor announces presidential bid from the steps of the Capitol: "This administration has failed every test of leadership. I will not"',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
         magnitude: 'moderate',
         when: (sim, world) => sim.day > 750 && !world.election.okaforRunning,
-        effects: (world) => {
-            world.election.okaforRunning = true;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
-        },
+        popup: true,
+        era: 'late',
+        context: (sim, world, portfolio) =>
+            'Senator Okafor just announced her presidential bid live on the Capitol steps. The crowd is enormous. Polling has her within striking distance of Barron in key swing states. Markets hate uncertainty, and a competitive primary season means months of policy unpredictability. Meridian\'s political risk desk is already fielding calls from clients.',
+        choices: [
+            {
+                label: 'Position for volatility',
+                desc: 'A contested race means months of uncertainty. Buy vol and widen hedges.',
+                deltas: { mu: -0.02, theta: 0.015, lambda: 0.4 },
+                effects: [
+                    { path: 'election.okaforRunning', op: 'set', value: true },
+                    { path: 'election.barronApproval', op: 'add', value: -3 },
+                ],
+                playerFlag: 'bought_vol_okafor_entry',
+                resultToast: 'You buy volatility into the race. Contested elections are vol machines.',
+            },
+            {
+                label: 'Lean pro-business',
+                desc: 'Okafor is anti-Wall Street. If she gains traction, defensives outperform. But Barron usually wins these fights.',
+                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+                effects: [
+                    { path: 'election.okaforRunning', op: 'set', value: true },
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                playerFlag: 'bet_on_barron_vs_okafor',
+                resultToast: 'You bet the incumbent advantage holds. Barron has survived worse.',
+            },
+            {
+                label: 'Donate to Okafor\'s campaign',
+                desc: 'A quiet max donation through Meridian\'s PAC. If she wins, you have a friend in the White House.',
+                deltas: { mu: -0.025, theta: 0.012, lambda: 0.5 },
+                effects: [
+                    { path: 'election.okaforRunning', op: 'set', value: true },
+                    { path: 'election.barronApproval', op: 'add', value: -3 },
+                ],
+                playerFlag: 'donated_to_okafor',
+                resultToast: 'You hedge politically. The donation is legal, but compliance raises an eyebrow.',
+            },
+        ],
     },
     {
         id: 'okafor_scandal',
         category: 'political',
         likelihood: 0.5,
         headline: 'Opposition research bombshell: Okafor\'s husband held Zhaowei stock while she chaired the Intelligence Committee. She calls it "a smear campaign"',
-        params: { mu: 0.02, theta: 0.008 },
         magnitude: 'moderate',
         when: (sim, world) => world.election.okaforRunning || world.investigations.okaforProbeStage >= 1,
-        effects: (world) => {
-            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
-        },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'Oppo research just landed: Senator Okafor\'s husband traded Zhaowei stock while she had classified intelligence briefings on the company. It\'s front-page news. The irony is thick -- the anti-corruption crusader caught in a potential conflict of interest. Barron\'s surrogates are all over cable news. Markets are repricing the political landscape.',
+        choices: [
+            {
+                label: 'Bet on Barron recovery',
+                desc: 'This neutralizes Okafor\'s moral authority. Barron\'s agenda gets easier -- go risk-on.',
+                deltas: { mu: 0.03, theta: 0.005, lambda: -0.1 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 4 },
+                ],
+                playerFlag: 'bet_barron_on_okafor_scandal',
+                resultToast: 'You bet the scandal cripples Okafor\'s credibility. Barron stocks rally.',
+            },
+            {
+                label: 'Fade the noise',
+                desc: 'Scandals cut both ways. Okafor will survive this -- her base doesn\'t care about oppo.',
+                deltas: { mu: 0.015, theta: 0.008 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 2 },
+                ],
+                playerFlag: 'faded_okafor_scandal',
+                resultToast: 'You stay neutral. These stories burn bright and fade fast.',
+            },
+            {
+                label: 'Short the Zhaowei connection',
+                desc: 'If the committee investigates Zhaowei ties further, the whole sector takes heat.',
+                deltas: { mu: 0.02, theta: 0.012, lambda: 0.3 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 3 },
+                ],
+                playerFlag: 'shorted_zhaowei_on_scandal',
+                resultToast: 'You position against Zhaowei-linked exposure. If the probe widens, you profit.',
+            },
+        ],
     },
 
     // =====================================================================
@@ -2569,9 +2635,38 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 1.0,
         headline: 'Government funding bill stalls as House Democrats refuse to pass Barron\'s defense spending increase; continuing resolution buys 45 days',
-        params: { mu: -0.01, theta: 0.005 },
-        magnitude: 'minor',
+        magnitude: 'moderate',
         when: (sim, world, congress) => !congress.trifecta,
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'The spending bill just died on the House floor. Farmer-Labor is refusing to pass Barron\'s 8% defense increase without domestic spending concessions. A continuing resolution buys 45 days, but the clock is ticking toward another shutdown standoff. Defense contractors are already pricing in delays. Meridian\'s government sector desk is asking for direction.',
+        choices: [
+            {
+                label: 'Short defense, long staples',
+                desc: 'Defense spending gets cut in CRs. Rotate into sectors that benefit from gridlock.',
+                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+                effects: [],
+                playerFlag: 'rotated_on_gridlock',
+                resultToast: 'You rotate sectors. CRs are bad for defense but gridlock keeps taxes low.',
+            },
+            {
+                label: 'Buy the CR dip',
+                desc: 'They always reach a deal eventually. The 45-day window is a buying opportunity.',
+                deltas: { mu: -0.008, theta: 0.003 },
+                effects: [],
+                playerFlag: 'bought_cr_dip',
+                resultToast: 'You buy the pullback. Congress always kicks the can -- might as well profit from it.',
+            },
+            {
+                label: 'Lobby for the deal',
+                desc: 'Meridian has connections on the Appropriations Committee. Push for a resolution that helps the book.',
+                deltas: { mu: -0.01, theta: 0.005, lambda: 0.1 },
+                effects: [],
+                playerFlag: 'lobbied_spending_deal',
+                resultToast: 'You work the phones. A staffer on Appropriations owes Meridian a favor.',
+            },
+        ],
     },
     {
         id: 'budget_deal_passes',
@@ -2581,6 +2676,12 @@ const POLITICAL_EVENTS = [
         params: { mu: 0.02, theta: -0.005, b: 0.002 },
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.trifecta,
+        portfolioFlavor: (portfolio) => {
+            const bondQty = portfolio.positions.filter(p => p.type === 'bond').reduce((s, p) => s + p.qty, 0);
+            if (bondQty > 5) return 'Your long bond book winces as $1.4T in new spending means more Treasury supply.';
+            if (bondQty < -5) return 'Your short bond position benefits as the spending bill pushes yields higher.';
+            return null;
+        },
     },
     {
         id: 'bipartisan_infrastructure',
@@ -2595,11 +2696,46 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 0.8,
         headline: 'Government shutdown looms as midnight deadline approaches; agencies prepare furlough notices. Markets pricing in 2-week disruption',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.3, sigmaR: 0.003 },
         magnitude: 'moderate',
         when: (sim, world, congress) => !congress.trifecta,
-        followups: [
-            { id: 'shutdown_resolved', mtth: 8, weight: 0.7 },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'It\'s 6pm and the government shuts down at midnight. Agency heads have sent furlough notices. The bond market is already jittery -- T-bill yields spiked 15bps in the last hour. Historically shutdowns last 5-16 days and shave 0.1-0.2% off quarterly GDP per week. The desk needs to be positioned before Asia opens.',
+        choices: [
+            {
+                label: 'Buy the shutdown',
+                desc: 'Shutdowns always end. The panic selling creates a textbook snap-back opportunity.',
+                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2, sigmaR: 0.002 },
+                effects: [],
+                followups: [
+                    { id: 'shutdown_resolved', mtth: 6, weight: 0.8 },
+                ],
+                playerFlag: 'bought_shutdown_dip',
+                resultToast: 'You buy the fear. Shutdowns are temporary -- the recovery is usually fast.',
+            },
+            {
+                label: 'Hedge and wait',
+                desc: 'Buy puts and reduce exposure. If it drags on past two weeks, GDP takes a real hit.',
+                deltas: { mu: -0.025, theta: 0.012, lambda: 0.4, sigmaR: 0.004 },
+                effects: [],
+                followups: [
+                    { id: 'shutdown_resolved', mtth: 10, weight: 0.6 },
+                ],
+                playerFlag: 'hedged_shutdown',
+                resultToast: 'You hedge into the shutdown. The protection costs carry but limits downside.',
+            },
+            {
+                label: 'Sell vol into the spike',
+                desc: 'Implied vol is way above realized. Write premium and collect theta while everyone panics.',
+                deltas: { mu: -0.02, theta: 0.015, lambda: 0.3, sigmaR: 0.003 },
+                effects: [],
+                followups: [
+                    { id: 'shutdown_resolved', mtth: 8, weight: 0.7 },
+                ],
+                playerFlag: 'sold_vol_shutdown',
+                resultToast: 'You sell premium into the spike. If the shutdown is short, you keep the theta.',
+            },
         ],
     },
     {
@@ -2615,12 +2751,44 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 0.6,
         headline: 'Barron proposes sweeping corporate tax cut from 21% to 15%; analysts project $400B revenue shortfall. Markets rally, bond bears growl',
-        params: { mu: 0.03, theta: -0.005, b: 0.003, q: 0.002 },
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.trifecta,
-        effects: (world) => {
-            world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
-        },
+        popup: true,
+        era: 'early',
+        context: (sim, world, portfolio) =>
+            'Barron just proposed cutting the corporate rate from 21% to 15%. With a Federalist trifecta, this could actually pass. Analysts are projecting a $400B revenue shortfall, which means bonds sell off on supply fears, but equities are surging on the after-tax earnings boost. Every sell-side desk on the Street is revising EPS estimates upward. Meridian needs a view before the open.',
+        choices: [
+            {
+                label: 'Go all-in on equities',
+                desc: 'A 6-point tax cut is a direct EPS boost of ~8%. Buy everything with operating leverage.',
+                deltas: { mu: 0.04, theta: -0.008, b: 0.004, q: 0.003 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 3 },
+                ],
+                playerFlag: 'went_long_tax_cut',
+                resultToast: 'You go long the tax cut. If it passes, earnings estimates jump overnight.',
+            },
+            {
+                label: 'Short bonds, neutral equities',
+                desc: 'The deficit impact is huge. Rates have to rise on the supply overhang.',
+                deltas: { mu: 0.025, theta: -0.003, b: 0.005, q: 0.002 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 2 },
+                ],
+                playerFlag: 'shorted_bonds_tax_cut',
+                resultToast: 'You short duration. The Treasury is going to drown the market in paper.',
+            },
+            {
+                label: 'Fade it -- won\'t pass',
+                desc: 'Even with a trifecta, deficit hawks in the Senate will water it down. Sell the rally.',
+                deltas: { mu: 0.02, theta: -0.002, b: 0.002, q: 0.001 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 1 },
+                ],
+                playerFlag: 'faded_tax_cut_proposal',
+                resultToast: 'You sell the enthusiasm. Congress has a way of disappointing the market.',
+            },
+        ],
     },
     {
         id: 'clay_opposition_rally',
@@ -2639,11 +2807,43 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 0.6,
         headline: 'Federal court blocks Barron executive order on media regulation; ruling calls it "a frontal assault on the First Amendment." DOJ will appeal',
-        params: { mu: -0.01, theta: 0.005, sigmaR: 0.002 },
-        magnitude: 'minor',
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
-        },
+        magnitude: 'moderate',
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'A federal judge just blocked Barron\'s media regulation executive order in a scorching 47-page opinion. The ruling is constitutionally significant -- it limits presidential authority over tech platforms. DOJ says they\'ll appeal to the circuit, which could take months. Media and tech stocks are rallying on the news, but the uncertainty over the appeal creates a wide range of outcomes.',
+        choices: [
+            {
+                label: 'Buy the court win',
+                desc: 'Deregulation is good for tech and media. The appeal will take months -- enjoy the tailwind.',
+                deltas: { mu: -0.005, theta: 0.003, sigmaR: 0.001 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                playerFlag: 'bought_court_block',
+                resultToast: 'You bet on judicial restraint. The courts keep blocking Barron\'s overreach.',
+            },
+            {
+                label: 'Hedge the appeal',
+                desc: 'If the circuit reverses, the whiplash will be violent. Buy protection.',
+                deltas: { mu: -0.015, theta: 0.008, sigmaR: 0.003 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                playerFlag: 'hedged_appeal',
+                resultToast: 'You hedge against the appeal. Constitutional fights are binary -- either way is dramatic.',
+            },
+            {
+                label: 'Ignore it',
+                desc: 'Courts block executive orders every month. This changes nothing fundamental.',
+                deltas: { mu: -0.01, theta: 0.005, sigmaR: 0.002 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                playerFlag: 'ignored_overreach_ruling',
+                resultToast: 'You shrug it off. The market will forget this ruling by next week.',
+            },
+        ],
     },
 ];
 const INVESTIGATION_EVENTS = [
@@ -3337,6 +3537,11 @@ const CONGRESSIONAL_EVENTS = [
             world.congress.senate.farmerLabor += 1;
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
         },
+        portfolioFlavor: (portfolio) => {
+            const longStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty > 0).reduce((s, p) => s + p.qty, 0);
+            if (longStock > 10) return 'Your long equity book dips as the Federalist majority narrows and deregulation odds shrink.';
+            return null;
+        },
     },
     {
         id: 'special_election_senate_fed_gains',
@@ -3410,16 +3615,58 @@ const CONGRESSIONAL_EVENTS = [
         category: 'congressional',
         likelihood: 0.3,
         headline: 'Rep. Calloway switches from Federalist to Farmer-Labor on House floor: "I can no longer support a party that has abandoned its principles"',
-        params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
         magnitude: 'moderate',
         when: (sim, world) => world.congress.house.federalist >= 216 && world.election.barronApproval < 45,
-        effects: (world) => {
-            world.congress.house.federalist -= 1;
-            world.congress.house.farmerLabor += 1;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
-        },
-        followups: [
-            { id: 'defection_fallout_fed', mtth: 10, weight: 0.6 },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'Rep. Calloway just switched parties on live television. The House majority is now razor-thin -- one more defection and the Federalists lose the gavel. This could cascade: two more moderates are reportedly "exploring options." Barron\'s legislative agenda, including the tax bill and deregulation package, is suddenly at risk. Markets are recalculating the probability of divided government.',
+        choices: [
+            {
+                label: 'Price in divided government',
+                desc: 'The majority is crumbling. Position for gridlock: lower vol, lower growth, status quo policy.',
+                deltas: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+                effects: [
+                    { path: 'congress.house.federalist', op: 'add', value: -1 },
+                    { path: 'congress.house.farmerLabor', op: 'add', value: 1 },
+                    { path: 'election.barronApproval', op: 'add', value: -3 },
+                ],
+                followups: [
+                    { id: 'defection_fallout_fed', mtth: 8, weight: 0.7 },
+                ],
+                playerFlag: 'priced_divided_govt',
+                resultToast: 'You bet on gridlock. If more defections follow, you\'re ahead of the curve.',
+            },
+            {
+                label: 'Bet on party discipline',
+                desc: 'Calloway is a lone wolf. Leadership will lock down the caucus with committee threats.',
+                deltas: { mu: -0.01, theta: 0.005, lambda: 0.1 },
+                effects: [
+                    { path: 'congress.house.federalist', op: 'add', value: -1 },
+                    { path: 'congress.house.farmerLabor', op: 'add', value: 1 },
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                followups: [
+                    { id: 'defection_fallout_fed', mtth: 12, weight: 0.4 },
+                ],
+                playerFlag: 'bet_on_party_discipline',
+                resultToast: 'You bet leadership holds the line. Calloway is a one-off -- probably.',
+            },
+            {
+                label: 'Call Calloway\'s office',
+                desc: 'Meridian has a PAC. A newly independent congressman might appreciate some friends on Wall Street.',
+                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+                effects: [
+                    { path: 'congress.house.federalist', op: 'add', value: -1 },
+                    { path: 'congress.house.farmerLabor', op: 'add', value: 1 },
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                followups: [
+                    { id: 'defection_fallout_fed', mtth: 10, weight: 0.6 },
+                ],
+                playerFlag: 'courted_calloway',
+                resultToast: 'You reach out. Party-switchers need new donors. Meridian can be very friendly.',
+            },
         ],
     },
     {
@@ -3482,12 +3729,49 @@ const CONGRESSIONAL_EVENTS = [
         category: 'congressional',
         likelihood: 0.5,
         headline: 'Hard-right Federalist bloc files motion to vacate the chair; House Speaker faces confidence vote as party fractures over spending bill',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.4 },
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.fedControlsHouse && world.congress.house.federalist <= 225,
-        followups: [
-            { id: 'speaker_survives', mtth: 5, weight: 0.5 },
-            { id: 'speaker_ousted', mtth: 5, weight: 0.5 },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'The hard-right Freedom Caucus just filed a motion to vacate the Speaker\'s chair. The vote is tomorrow. If the Speaker is ousted, the House will be paralyzed for days or weeks -- no votes, no bills, no confirmations. Last time this happened, markets sold off for two straight weeks. The bond market is already pricing in legislative paralysis.',
+        choices: [
+            {
+                label: 'Bet on chaos',
+                desc: 'The caucus is fractured. No one can get to 218. Buy puts and short duration.',
+                deltas: { mu: -0.03, theta: 0.015, lambda: 0.6 },
+                effects: [],
+                followups: [
+                    { id: 'speaker_ousted', mtth: 5, weight: 0.6 },
+                    { id: 'speaker_survives', mtth: 5, weight: 0.4 },
+                ],
+                playerFlag: 'bet_on_speaker_chaos',
+                resultToast: 'You bet the Speaker falls. If the House is leaderless, nothing passes.',
+            },
+            {
+                label: 'Bet on survival',
+                desc: 'Speakers always survive these stunts. Buy the dip before the relief rally.',
+                deltas: { mu: -0.015, theta: 0.005, lambda: 0.2 },
+                effects: [],
+                followups: [
+                    { id: 'speaker_survives', mtth: 5, weight: 0.6 },
+                    { id: 'speaker_ousted', mtth: 5, weight: 0.4 },
+                ],
+                playerFlag: 'bet_on_speaker_survival',
+                resultToast: 'You buy the dip. Motions to vacate are usually performative.',
+            },
+            {
+                label: 'Trade the binary',
+                desc: 'This is a coin flip. Buy straddles and profit from the resolution either way.',
+                deltas: { mu: -0.02, theta: 0.01, lambda: 0.4 },
+                effects: [],
+                followups: [
+                    { id: 'speaker_survives', mtth: 5, weight: 0.5 },
+                    { id: 'speaker_ousted', mtth: 5, weight: 0.5 },
+                ],
+                playerFlag: 'straddled_speaker_vote',
+                resultToast: 'You buy vol on the binary outcome. Either way, the move will be sharp.',
+            },
         ],
     },
     {
@@ -3537,13 +3821,52 @@ const CONGRESSIONAL_EVENTS = [
         category: 'congressional',
         likelihood: 0.5,
         headline: 'Treasury warns of "extraordinary measures" as debt ceiling deadline looms; rating agencies put U.S. on negative watch. T-bill yields spike',
-        params: { mu: -0.03, theta: 0.02, lambda: 0.8, sigmaR: 0.008, b: 0.005 },
         magnitude: 'major',
         when: (sim, world, congress) => !congress.trifecta,
-        followups: [
-            { id: 'debt_ceiling_last_minute_deal', mtth: 15, weight: 0.6 },
-            { id: 'debt_ceiling_technical_default', mtth: 20, weight: 0.2 },
-            { id: 'debt_ceiling_clean_raise', mtth: 10, weight: 0.2 },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'The Treasury Secretary just announced "extraordinary measures" as the debt ceiling X-date approaches. Rating agencies have the U.S. on negative watch. T-bill yields inside the X-date window spiked 80bps in an hour. CDS on U.S. sovereign debt just hit an all-time high. This is the biggest macro event of the year. If the U.S. technically defaults -- even briefly -- the reverberations will be global. Meridian\'s risk committee wants the desk positioned before the weekend.',
+        choices: [
+            {
+                label: 'Buy the fear',
+                desc: 'They will never actually default. Buy the panic and collect the snap-back.',
+                deltas: { mu: -0.02, theta: 0.015, lambda: 0.5, sigmaR: 0.005, b: 0.003 },
+                effects: [],
+                followups: [
+                    { id: 'debt_ceiling_last_minute_deal', mtth: 12, weight: 0.7 },
+                    { id: 'debt_ceiling_clean_raise', mtth: 8, weight: 0.2 },
+                    { id: 'debt_ceiling_technical_default', mtth: 20, weight: 0.1 },
+                ],
+                playerFlag: 'bought_debt_ceiling_fear',
+                resultToast: 'You buy the panic. The U.S. has never defaulted and you don\'t think today is the day.',
+            },
+            {
+                label: 'Hedge for default',
+                desc: 'Even a technical default would be catastrophic. Buy protection on everything.',
+                deltas: { mu: -0.04, theta: 0.025, lambda: 1.2, sigmaR: 0.01, b: 0.008 },
+                effects: [],
+                followups: [
+                    { id: 'debt_ceiling_last_minute_deal', mtth: 18, weight: 0.5 },
+                    { id: 'debt_ceiling_technical_default', mtth: 15, weight: 0.3 },
+                    { id: 'debt_ceiling_clean_raise', mtth: 12, weight: 0.2 },
+                ],
+                playerFlag: 'hedged_debt_ceiling',
+                resultToast: 'You load up on protection. If they fumble this, the hedges will print.',
+            },
+            {
+                label: 'Short the curve',
+                desc: 'Whatever happens, the yield curve is going to steepen violently. Position for it.',
+                deltas: { mu: -0.03, theta: 0.02, lambda: 0.8, sigmaR: 0.008, b: 0.006 },
+                effects: [],
+                followups: [
+                    { id: 'debt_ceiling_last_minute_deal', mtth: 15, weight: 0.6 },
+                    { id: 'debt_ceiling_technical_default', mtth: 20, weight: 0.2 },
+                    { id: 'debt_ceiling_clean_raise', mtth: 10, weight: 0.2 },
+                ],
+                playerFlag: 'shorted_curve_debt_ceiling',
+                resultToast: 'You short the front end. The bill market is broken regardless of the outcome.',
+            },
         ],
     },
     {
@@ -3567,6 +3890,14 @@ const CONGRESSIONAL_EVENTS = [
         followups: [
             { id: 'debt_ceiling_last_minute_deal', mtth: 5, weight: 0.9 },
         ],
+        portfolioFlavor: (portfolio) => {
+            const bondQty = portfolio.positions.filter(p => p.type === 'bond').reduce((s, p) => s + p.qty, 0);
+            if (bondQty > 5) return 'Your bond portfolio is in freefall as the U.S. loses its AAA rating. This is unprecedented.';
+            if (bondQty < -5) return 'Your short bond position is exploding in value. The unthinkable just happened.';
+            const totalVal = Math.abs(portfolio.cash) + portfolio.positions.reduce((s, p) => s + Math.abs(p.qty) * 100, 0);
+            if (totalVal > 5000) return 'Meridian\'s risk systems are flashing red. Every desk on the Street is getting margin-called.';
+            return null;
+        },
     },
     {
         id: 'debt_ceiling_clean_raise',
@@ -3621,12 +3952,44 @@ const CONGRESSIONAL_EVENTS = [
         category: 'congressional',
         likelihood: 0.3,
         headline: 'Senate Majority Leader invokes nuclear option to eliminate legislative filibuster; major policy shifts now possible with bare 51-vote majority',
-        params: { mu: -0.02, theta: 0.015, lambda: 0.5, sigmaR: 0.004 },
         magnitude: 'major',
         when: (sim, world, congress) => congress.fedControlsSenate && world.congress.senate.federalist >= 52,
-        effects: (world) => {
-            world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
-        },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'The Senate Majority Leader just nuked the legislative filibuster. This is historic -- it means Barron\'s entire agenda (tax cuts, deregulation, defense spending) can pass with a bare 51-vote majority. No more compromising with Farmer-Labor. Markets are violently repricing: equities surging on the pro-business agenda, bonds selling off on deficit fears. The policy regime just changed fundamentally.',
+        choices: [
+            {
+                label: 'Go full risk-on',
+                desc: 'Deregulation and tax cuts are coming unimpeded. Buy everything that benefits from Barron\'s agenda.',
+                deltas: { mu: -0.01, theta: 0.01, lambda: 0.3, sigmaR: 0.003 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 3 },
+                ],
+                playerFlag: 'went_risk_on_nuclear',
+                resultToast: 'You lean into the new regime. Barron can pass anything now.',
+            },
+            {
+                label: 'Hedge the pendulum',
+                desc: 'What the majority gives, the next majority takes away. This cuts both ways when power shifts.',
+                deltas: { mu: -0.025, theta: 0.02, lambda: 0.6, sigmaR: 0.005 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 2 },
+                ],
+                playerFlag: 'hedged_nuclear_pendulum',
+                resultToast: 'You hedge. The filibuster protected both sides. Now policy whipsaws with every election.',
+            },
+            {
+                label: 'Short bonds aggressively',
+                desc: 'No filibuster means no fiscal restraint. The deficit is about to explode. Dump duration.',
+                deltas: { mu: -0.015, theta: 0.012, lambda: 0.4, sigmaR: 0.006 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 2 },
+                ],
+                playerFlag: 'shorted_bonds_nuclear',
+                resultToast: 'You short bonds. Without the filibuster, there\'s no one to stop the spending.',
+            },
+        ],
     },
     {
         id: 'senate_rejects_barron_nominee',
@@ -3688,24 +4051,88 @@ const CONGRESSIONAL_EVENTS = [
         category: 'congressional',
         likelihood: 0.4,
         headline: 'Barron\'s corporate tax reform passes both chambers: rate cut to 15%, repatriation holiday. Analysts project massive surge in shareholder returns',
-        params: { mu: 0.04, theta: -0.01, b: 0.003, q: 0.005 },
         magnitude: 'major',
         when: (sim, world, congress) => congress.trifecta,
-        effects: (world) => {
-            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
-        },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'It passed. Both chambers. Corporate rate goes from 21% to 15% with a one-time repatriation holiday at 8%. Trillions in offshore cash is about to flood back into U.S. markets. Every S&P 500 company just got an immediate after-tax earnings boost. The question is how much is already priced in -- and whether the deficit impact will hammer bonds.',
+        choices: [
+            {
+                label: 'Chase the momentum',
+                desc: 'This is a generational tax cut. Buy the rally and ride the buyback wave.',
+                deltas: { mu: 0.05, theta: -0.012, b: 0.004, q: 0.006 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 4 },
+                ],
+                playerFlag: 'chased_tax_reform_rally',
+                resultToast: 'You go long into the tax cut. Buybacks and special dividends are coming.',
+            },
+            {
+                label: 'Sell the news',
+                desc: 'The market priced this in weeks ago. Take profits while everyone else FOMO\'s in.',
+                deltas: { mu: 0.03, theta: -0.005, b: 0.002, q: 0.004 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 3 },
+                ],
+                playerFlag: 'sold_tax_reform_news',
+                resultToast: 'You take profits. The euphoria phase is usually the top.',
+            },
+            {
+                label: 'Play the repatriation',
+                desc: 'The real story is the cash repatriation. Go long dollar and short foreign equities.',
+                deltas: { mu: 0.04, theta: -0.008, b: 0.003, q: 0.005 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: 3 },
+                ],
+                playerFlag: 'played_repatriation',
+                resultToast: 'You position for the cash wave. Trillions flowing home means dollar strength.',
+            },
+        ],
     },
     {
         id: 'capital_gains_tax_scare',
         category: 'congressional',
         likelihood: 0.5,
         headline: 'Senate Finance Committee floats doubling capital gains tax to 40%; wealthy investors front-run by locking in gains. Selling pressure intensifies',
-        params: { mu: -0.03, theta: 0.015, lambda: 0.5, q: -0.002 },
         magnitude: 'moderate',
         when: (sim, world, congress) => !congress.trifecta,
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 1);
-        },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'The Senate Finance Committee just leaked a proposal to double the capital gains rate to 40%. It\'s a trial balloon, but wealthy investors are already locking in gains at the current rate. The selling pressure is accelerating -- every family office and HNW client is calling their broker. Meridian\'s prime brokerage desk reports record sell orders. The irony is that the selling itself might tank markets enough to kill the proposal politically.',
+        choices: [
+            {
+                label: 'Front-run the selling',
+                desc: 'If big money is liquidating, get ahead of the wave. Cut equity exposure now.',
+                deltas: { mu: -0.04, theta: 0.02, lambda: 0.7, q: -0.003 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -1 },
+                ],
+                playerFlag: 'front_ran_cap_gains_selling',
+                resultToast: 'You sell ahead of the wave. If the proposal gains traction, you dodged the worst.',
+            },
+            {
+                label: 'Buy the overreaction',
+                desc: 'This will never pass -- Barron will veto it. The selling is a gift.',
+                deltas: { mu: -0.02, theta: 0.008, lambda: 0.3, q: -0.001 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -1 },
+                ],
+                playerFlag: 'bought_cap_gains_overreaction',
+                resultToast: 'You buy the panic. Trial balloons rarely become law.',
+            },
+            {
+                label: 'Harvest your own gains',
+                desc: 'Regardless of what the market does, lock in gains at current rates before the window closes.',
+                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5, q: -0.002 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -1 },
+                ],
+                playerFlag: 'harvested_cap_gains',
+                resultToast: 'You lock in gains. Better to pay 20% now than risk 40% later.',
+            },
+        ],
     },
 ];
 const MIDTERM_EVENTS = [
@@ -3726,22 +4153,86 @@ const MIDTERM_EVENTS = [
         category: 'midterm',
         likelihood: 1.0,
         headline: 'Farmer-Labor elects new House Speaker; pledges immediate investigations into Barron administration. "Accountability starts now"',
-        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
-        },
+        popup: true,
+        era: 'late',
+        context: (sim, world, portfolio) =>
+            'Farmer-Labor just elected a new House Speaker who promised "accountability from day one." Subpoenas are coming -- for the White House, for PNTH, possibly for trading firms with administration connections. Meridian\'s government affairs team is already flagging potential exposure. The new Speaker controls the legislative agenda, the committee chairs, and the investigation timeline. Barron\'s entire second-half agenda is dead on arrival.',
+        choices: [
+            {
+                label: 'Position for investigations',
+                desc: 'Subpoena power means hearings, headlines, and volatility. Buy protection.',
+                deltas: { mu: -0.04, theta: 0.02, lambda: 0.7 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -3 },
+                ],
+                playerFlag: 'positioned_for_fl_investigations',
+                resultToast: 'You hedge for the coming subpoena storm. Investigation season is volatility season.',
+            },
+            {
+                label: 'Buy the gridlock',
+                desc: 'Divided government means no new regulation and no new taxes. That\'s bullish.',
+                deltas: { mu: -0.02, theta: 0.008, lambda: 0.3 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                playerFlag: 'bought_fl_gridlock',
+                resultToast: 'You go long gridlock. Markets love a Congress that can\'t do anything.',
+            },
+            {
+                label: 'Build a relationship',
+                desc: 'The new Speaker\'s chief of staff used to work at Goldman. Meridian knows people who know people.',
+                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                playerFlag: 'courted_fl_speaker',
+                resultToast: 'You reach out through back channels. It\'s always good to have friends in the majority.',
+            },
+        ],
     },
     {
         id: 'midterm_lame_duck_barron',
         category: 'midterm',
         likelihood: 1.0,
         headline: 'Barron retreats to Mar-a-Lago after historic losses; agenda effectively dead. Aides describe him as "furious and isolated." Markets rally on gridlock',
-        params: { mu: 0.04, theta: -0.02, lambda: -0.5, sigmaR: -0.003 },
         magnitude: 'major',
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 8);
-        },
+        popup: true,
+        era: 'late',
+        context: (sim, world, portfolio) =>
+            'Historic wipeout. Barron lost the House by 30+ seats and the Senate is gone too. He\'s retreated to Mar-a-Lago and aides say he\'s "furious and isolated." His legislative agenda is dead. Markets are rallying hard on the gridlock trade -- no new regulation, no new taxes, no new spending. The question is whether a wounded, angry president lashes out with executive orders or accepts the new reality.',
+        choices: [
+            {
+                label: 'Ride the gridlock rally',
+                desc: 'A neutered president is the market\'s favorite president. Go max long.',
+                deltas: { mu: 0.05, theta: -0.025, lambda: -0.6, sigmaR: -0.004 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -10 },
+                ],
+                playerFlag: 'rode_lame_duck_rally',
+                resultToast: 'You go all-in on gridlock. A president who can\'t pass laws can\'t break things.',
+            },
+            {
+                label: 'Stay cautious',
+                desc: 'A cornered Barron is a dangerous Barron. He\'ll lash out with executive orders and tariffs.',
+                deltas: { mu: 0.03, theta: -0.01, lambda: -0.3, sigmaR: -0.002 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -8 },
+                ],
+                playerFlag: 'stayed_cautious_lame_duck',
+                resultToast: 'You stay hedged. Wounded presidents do unpredictable things.',
+            },
+            {
+                label: 'Short the executive overreach',
+                desc: 'Barron will go scorched-earth with executive orders. The courts will be overwhelmed.',
+                deltas: { mu: 0.02, theta: -0.005, lambda: -0.2, sigmaR: -0.001 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -8 },
+                ],
+                playerFlag: 'shorted_lame_duck_overreach',
+                resultToast: 'You bet on executive chaos. Barron never goes quietly.',
+            },
+        ],
     },
     {
         id: 'midterm_status_quo',
@@ -3756,11 +4247,43 @@ const MIDTERM_EVENTS = [
         category: 'midterm',
         likelihood: 1.0,
         headline: 'Farmer-Labor takes Senate majority by one seat; committee chairmanships flip. Okafor gains full subpoena power over Intelligence Committee',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
         magnitude: 'moderate',
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
-        },
+        popup: true,
+        era: 'late',
+        context: (sim, world, portfolio) =>
+            'Farmer-Labor just flipped the Senate by a single seat. Every committee chairmanship changes hands. Senator Okafor now has full subpoena power as Intelligence Committee chair -- she can compel testimony from anyone in the Barron orbit. Judicial confirmations grind to a halt. Markets are digesting the implications: more investigations, fewer judges, but also fewer deficit-expanding bills.',
+        choices: [
+            {
+                label: 'Position for the subpoenas',
+                desc: 'Okafor will use her new power aggressively. PNTH and Barron allies are in the crosshairs.',
+                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -4 },
+                ],
+                playerFlag: 'positioned_for_senate_flip_subpoenas',
+                resultToast: 'You hedge for Okafor\'s investigations. She\'s been waiting for this gavel.',
+            },
+            {
+                label: 'Trade the confirmation freeze',
+                desc: 'No more Barron judges. No more regulatory appointees. The status quo is locked in.',
+                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -3 },
+                ],
+                playerFlag: 'traded_confirmation_freeze',
+                resultToast: 'You position for regulatory stasis. No new judges means no new precedents.',
+            },
+            {
+                label: 'Bet on compromise',
+                desc: 'Narrow majorities force compromise. Both sides need to deal. Buy the center.',
+                deltas: { mu: -0.01, theta: 0.005, lambda: 0.1 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                playerFlag: 'bet_on_senate_compromise',
+                resultToast: 'You bet on bipartisanship. One-seat majorities make everyone a swing vote.',
+            },
+        ],
     },
 ];
 
