@@ -7,7 +7,7 @@
    ===================================================== */
 
 import { computePositionPnl } from './position-value.js';
-import { fmtDollar, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
+import { fmtDollar, fmtQty, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
 
 // ---------------------------------------------------------------------------
 // Margin display formatter (pure function -- no portfolio access)
@@ -33,7 +33,7 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
     const isOption   = pos.type === 'call' || pos.type === 'put';
     const strikeStr  = isOption && pos.strike != null ? ' K' + pos.strike : '';
     const expiryStr  = pos.expiryDay != null ? ' ' + fmtDte(pos.expiryDay - day) : '';
-    const labelStr   = typeLabel + strikeStr + expiryStr + ' x' + absQty;
+    const labelStr   = typeLabel + strikeStr + expiryStr + ' x' + fmtQty(absQty);
 
     const row = document.createElement('div');
     row.className = 'data-row pos-row stat-row';
@@ -86,7 +86,7 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
 function _buildOrderRow(order) {
     const typeLabel = posTypeLabel(order.type, order.side);
     const strikeStr = order.strike != null ? ' K' + order.strike : '';
-    const labelStr  = typeLabel + strikeStr + ' x' + order.qty + ' ' + order.orderType + ' @ ' + fmtDollar(order.triggerPrice);
+    const labelStr  = typeLabel + strikeStr + ' x' + fmtQty(order.qty) + ' ' + order.orderType + ' @ ' + fmtDollar(order.triggerPrice);
 
     const row = document.createElement('div');
     row.className = 'data-row order-row stat-row';
@@ -306,7 +306,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
                 const label = posTypeLabel(pos.type, pos.qty);
                 const isOption = pos.type === 'call' || pos.type === 'put';
                 const strikeStr = isOption && pos.strike != null ? ' K' + pos.strike : '';
-                return label + strikeStr + ' x' + baseQty;
+                return label + strikeStr + ' x' + fmtQty(baseQty);
             });
             const constituents = parts.join(', ');
 

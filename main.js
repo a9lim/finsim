@@ -617,7 +617,7 @@ function _onSubstep() {
     for (const pos of filledOrders) {
         if (typeof showToast !== 'undefined') {
             const side = pos.qty > 0 ? 'Bought' : 'Sold';
-            showToast(side + ' ' + Math.abs(pos.qty) + ' ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
+            showToast(side + ' ' + Math.abs(pos.qty) + 'k ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
         }
         chainDirty = true;
     }
@@ -1174,7 +1174,7 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
         const pos = executeMarketOrder(sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q);
         if (pos) {
             const label = side === 'short' ? 'Shorted' : 'Bought';
-            if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + pos.fillPrice.toFixed(2));
+            if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + 'k ' + type + ' at $' + pos.fillPrice.toFixed(2));
             if (typeof _haptics !== 'undefined') _haptics.trigger('success');
             if (type === 'stock') _recordImpact(sim.day, side === 'long' ? 1 : -1, qty, 'Stock trade');
         } else {
@@ -1184,7 +1184,7 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
     } else {
         const triggerPrice = _getTriggerPrice();
         placePendingOrder(type, side, qty, orderType, triggerPrice, strike, expiryDay);
-        if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' order placed for ' + qty + ' ' + type + '.');
+        if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' order placed for ' + qty + 'k ' + type + '.');
         if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
     }
     chainDirty = true;
@@ -1237,7 +1237,7 @@ function handleTradeSubmit(data) {
             sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q
         );
         if (pos) {
-            if (typeof showToast !== 'undefined') showToast('Order filled: ' + type + ' x' + qty);
+            if (typeof showToast !== 'undefined') showToast('Order filled: ' + type + ' x' + qty + 'k');
             if (typeof _haptics !== 'undefined') _haptics.trigger('success');
         } else {
             if (typeof showToast !== 'undefined') showToast('Order failed — insufficient margin.');

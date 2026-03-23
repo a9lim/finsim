@@ -246,7 +246,7 @@ export function bindEvents($, handlers) {
     $._onTradeSubmit    = onTradeSubmit;
 
     // Trade tab qty slider
-    if ($.tradeQty) _forms.bindSlider($.tradeQty, $.tradeQtyVal);
+    if ($.tradeQty) _forms.bindSlider($.tradeQty, $.tradeQtyVal, null, v => v + 'k');
 
     // Trade tab expiry dropdown
     if ($.tradeExpiry) {
@@ -256,7 +256,7 @@ export function bindEvents($, handlers) {
     }
 
     // Strategy tab qty slider
-    if ($.strategyQty) _forms.bindSlider($.strategyQty, $.strategyQtyVal);
+    if ($.strategyQty) _forms.bindSlider($.strategyQty, $.strategyQtyVal, null, v => v + 'k');
 
     // Strategy expiry dropdown -- rebuild strategy chain on change
     if ($.strategyExpiry) {
