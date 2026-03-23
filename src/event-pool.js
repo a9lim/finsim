@@ -493,17 +493,61 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 0.5,
         headline: 'Barron signs executive order imposing 25% tariffs on $200B of imports; "America will no longer be ripped off," he declares at signing ceremony',
-        params: { mu: -0.05, theta: 0.02, lambda: 1.0, muJ: -0.02, q: -0.001 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 0,
-        effects: (world) => {
-            world.geopolitical.tradeWarStage = 1;
-            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
-        },
-        followups: [
-            { id: 'trade_retaliation', mtth: 15, weight: 0.8 },
-            { id: 'tariff_selloff', mtth: 3, weight: 0.6 },
+        popup: true,
+        era: 'early',
+        context: (sim, world, portfolio) =>
+            'Barron just signed sweeping tariffs on $200B of imports live from the Oval Office. Futures are cratering — S&P down 2% and falling. Supply chain names are getting destroyed in after-hours. Beijing is expected to retaliate within days. The desk is scrambling: this is the opening shot of a trade war, and every macro book on the Street needs to reposition before Asia opens.',
+        choices: [
+            {
+                label: 'Go risk-off',
+                desc: 'Cut equity exposure and buy vol. Trade wars escalate before they de-escalate.',
+                deltas: { mu: -0.05, theta: 0.02, lambda: 1.0, muJ: -0.02, q: -0.001 },
+                effects: [
+                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 },
+                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                followups: [
+                    { id: 'trade_retaliation', mtth: 15, weight: 0.8 },
+                    { id: 'tariff_selloff', mtth: 3, weight: 0.7 },
+                ],
+                playerFlag: 'went_risk_off_tariffs',
+                resultToast: 'You de-risk into the tariff shock. If Beijing retaliates, you\'re positioned.',
+            },
+            {
+                label: 'Buy the overreaction',
+                desc: 'Tariffs are a negotiating tactic. Barron will cut a deal once markets punish him enough.',
+                deltas: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
+                effects: [
+                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 },
+                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                followups: [
+                    { id: 'trade_retaliation', mtth: 18, weight: 0.7 },
+                    { id: 'tariff_selloff', mtth: 3, weight: 0.5 },
+                ],
+                playerFlag: 'bought_tariff_dip',
+                resultToast: 'You buy the panic. If this is theater, you profit from the snap-back.',
+            },
+            {
+                label: 'Rotate to domestic',
+                desc: 'Tariffs hurt importers but help domestic producers. Sector rotation, not risk reduction.',
+                deltas: { mu: -0.04, theta: 0.018, lambda: 0.8, muJ: -0.015, q: -0.001 },
+                effects: [
+                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 },
+                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                followups: [
+                    { id: 'trade_retaliation', mtth: 15, weight: 0.8 },
+                    { id: 'tariff_selloff', mtth: 3, weight: 0.6 },
+                ],
+                playerFlag: 'rotated_domestic_tariffs',
+                resultToast: 'You rotate to domestic plays. Trade wars create winners and losers — pick the right side.',
+            },
         ],
     },
     {
@@ -519,16 +563,56 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 1.0,
         headline: 'Beijing retaliates with matching tariffs on U.S. agriculture and energy; Liang Wei\'s Zhaowei announces "strategic decoupling plan"',
-        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 1,
-        effects: (world) => {
-            world.geopolitical.tradeWarStage = 2;
-            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
-        },
-        followups: [
-            { id: 'zhaowei_ban', mtth: 30, weight: 0.6 },
-            { id: 'tariff_exemptions', mtth: 20, weight: 0.4 },
+        popup: true,
+        era: 'early',
+        context: (sim, world, portfolio) =>
+            'Beijing just dropped matching tariffs on U.S. agriculture and energy. Zhaowei\'s Liang Wei went on state television to announce a "strategic decoupling plan" — they\'re building parallel supply chains. Soybean futures are limit-down, energy names are tanking. This is no longer a negotiating tactic; it\'s an economic conflict. The desk needs to decide whether this escalates further or if we\'re near peak pain.',
+        choices: [
+            {
+                label: 'Escalation trade',
+                desc: 'This gets worse before it gets better. Add downside protection and go short global trade.',
+                deltas: { mu: -0.05, theta: 0.025, lambda: 1.0, muJ: -0.03 },
+                effects: [
+                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 },
+                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
+                ],
+                followups: [
+                    { id: 'zhaowei_ban', mtth: 25, weight: 0.7 },
+                ],
+                playerFlag: 'bet_on_escalation',
+                resultToast: 'You position for further escalation. If Barron bans Zhaowei next, you\'re ahead of the curve.',
+            },
+            {
+                label: 'Bet on de-escalation',
+                desc: 'Both sides feel the pain now. Back-channel talks will produce exemptions within weeks.',
+                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.01 },
+                effects: [
+                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 },
+                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
+                ],
+                followups: [
+                    { id: 'tariff_exemptions', mtth: 18, weight: 0.6 },
+                ],
+                playerFlag: 'bet_on_deescalation',
+                resultToast: 'You bet on diplomacy. If exemptions come through, the relief rally will be sharp.',
+            },
+            {
+                label: 'Play the spread',
+                desc: 'Long domestic producers, short importers. The winners and losers are clear — profit from dislocation.',
+                deltas: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+                effects: [
+                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 },
+                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
+                ],
+                followups: [
+                    { id: 'zhaowei_ban', mtth: 30, weight: 0.5 },
+                    { id: 'tariff_exemptions', mtth: 20, weight: 0.4 },
+                ],
+                playerFlag: 'played_trade_war_spread',
+                resultToast: 'You play the relative value. Dislocation is a trader\'s best friend.',
+            },
         ],
     },
     {
@@ -555,6 +639,13 @@ const MACRO_EVENTS = [
         params: { mu: -0.08, theta: 0.04, lambda: 2.0, muJ: -0.05, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 3 && world.geopolitical.chinaRelations <= -2,
+        portfolioFlavor: (portfolio) => {
+            const putQty = portfolio.positions.filter(p => p.type === 'put').reduce((s, p) => s + p.qty, 0);
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (putQty < -3) return 'Your short put book is getting crushed as the rare earth embargo sends vol through the roof.';
+            if (stockQty > 10) return 'Your long equity position is bleeding as the supply chain seizure ripples through every sector.';
+            return null;
+        },
     },
     {
         id: 'tariff_exemptions',
@@ -578,14 +669,50 @@ const MACRO_EVENTS = [
             return base;
         },
         headline: 'Barron and Beijing announce "Phase One" trade deal framework; tariffs to be rolled back over 18 months. Barron: "The biggest deal in history, maybe ever"',
-        params: { mu: 0.05, theta: -0.02, lambda: -0.8, muJ: 0.01, q: 0.002 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 2 && world.geopolitical.tradeWarStage < 4,
-        effects: (world) => {
-            world.geopolitical.tradeWarStage = 4;
-            world.geopolitical.chinaRelations = Math.min(3, world.geopolitical.chinaRelations + 2);
-            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
-        },
+        popup: true,
+        era: 'late',
+        context: (sim, world, portfolio) =>
+            'Barron and Beijing just announced a "Phase One" trade deal framework on the White House lawn. Tariffs will be rolled back over 18 months, and Barron is calling it "the biggest deal in history, maybe ever." Futures are ripping — S&P up 3% and climbing. The question is whether this deal has teeth or is just a photo op. The fine print is thin, and enforcement mechanisms are vague. Meridian\'s macro desk needs to decide: is the trade war over, or is this a ceasefire that collapses at the first provocation?',
+        choices: [
+            {
+                label: 'Full risk-on',
+                desc: 'The trade war is over. Load up on equities, close hedges, ride the relief rally.',
+                deltas: { mu: 0.06, theta: -0.025, lambda: -1.0, muJ: 0.015, q: 0.003 },
+                effects: [
+                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 },
+                    { path: 'geopolitical.chinaRelations', op: 'add', value: 2 },
+                    { path: 'election.barronApproval', op: 'add', value: 3 },
+                ],
+                playerFlag: 'went_risk_on_trade_deal',
+                resultToast: 'You go all-in on the deal. If it holds, the rally has legs for months.',
+            },
+            {
+                label: 'Cautious optimism',
+                desc: 'Take partial profits on hedges but keep some protection. Phase One deals have failed before.',
+                deltas: { mu: 0.04, theta: -0.015, lambda: -0.6, muJ: 0.008, q: 0.002 },
+                effects: [
+                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 },
+                    { path: 'geopolitical.chinaRelations', op: 'add', value: 2 },
+                    { path: 'election.barronApproval', op: 'add', value: 3 },
+                ],
+                playerFlag: 'cautious_on_trade_deal',
+                resultToast: 'You trim hedges but stay vigilant. Phase One is a start, not a finish.',
+            },
+            {
+                label: 'Sell the news',
+                desc: 'This deal is vapor — no enforcement, no specifics. Sell into the euphoria.',
+                deltas: { mu: 0.03, theta: -0.01, lambda: -0.4, muJ: 0.005, q: 0.001 },
+                effects: [
+                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 },
+                    { path: 'geopolitical.chinaRelations', op: 'add', value: 2 },
+                    { path: 'election.barronApproval', op: 'add', value: 3 },
+                ],
+                playerFlag: 'sold_trade_deal_news',
+                resultToast: 'You sell the rally. "Buy the rumor, sell the news" — the oldest play in the book.',
+            },
+        ],
     },
 
     // =====================================================================
@@ -630,6 +757,13 @@ const MACRO_EVENTS = [
         headline: 'Oil prices surge 12% as strikes threaten Strait shipping lanes; energy stocks rally but consumer discretionary tanks',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.004 },
         magnitude: 'moderate',
+        portfolioFlavor: (portfolio) => {
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
+            if (stockQty > 10) return 'Your long equity book is taking heat as energy costs crush margins across the board.';
+            if (hasOptions) return 'Your options book is getting re-marked as implied vol spikes on the oil shock.';
+            return null;
+        },
     },
     {
         id: 'mideast_ground_deployment',
@@ -787,12 +921,44 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 0.35,
         headline: 'OPEC+ announces surprise 2M barrel/day production cut; oil surges 18% in a single session. Energy costs ripple through supply chains',
-        params: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.03, b: 0.01, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
         when: (sim, world) => !world.geopolitical.oilCrisis,
-        effects: (world) => {
-            world.geopolitical.oilCrisis = true;
-        },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'OPEC+ just blindsided the market with a 2M barrel/day production cut. Crude is up 18% and still climbing. Energy stocks are surging but everything else is getting crushed — airlines, transports, consumer discretionary. The supply shock feeds directly into inflation, which means the Fed is boxed in. This is a stagflation scare in real-time. Meridian\'s commodity desk is overwhelmed — every client wants a view.',
+        choices: [
+            {
+                label: 'Stagflation hedge',
+                desc: 'Go short equities, short bonds, position for higher rates and lower growth simultaneously.',
+                deltas: { mu: -0.06, theta: 0.035, lambda: 1.5, muJ: -0.03, b: 0.012, sigmaR: 0.008, q: -0.002 },
+                effects: [
+                    { path: 'geopolitical.oilCrisis', op: 'set', value: true },
+                ],
+                playerFlag: 'hedged_stagflation',
+                resultToast: 'You position for the worst case: growth slows while inflation rips. Classic stagflation trade.',
+            },
+            {
+                label: 'Buy the energy spike',
+                desc: 'Rotate into energy names. OPEC cuts tend to stick — the supply deficit will persist.',
+                deltas: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, b: 0.008, sigmaR: 0.006, q: -0.001 },
+                effects: [
+                    { path: 'geopolitical.oilCrisis', op: 'set', value: true },
+                ],
+                playerFlag: 'bought_energy_spike',
+                resultToast: 'You rotate into energy. If the cut holds, $100+ oil is coming.',
+            },
+            {
+                label: 'Fade the panic',
+                desc: 'OPEC members always cheat on quotas. The cut won\'t hold — buy the dip in broad equities.',
+                deltas: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.015, b: 0.006, sigmaR: 0.005 },
+                effects: [
+                    { path: 'geopolitical.oilCrisis', op: 'set', value: true },
+                ],
+                playerFlag: 'faded_opec_cut',
+                resultToast: 'You bet OPEC can\'t hold discipline. If members cheat, oil falls and equities recover.',
+            },
+        ],
     },
     {
         id: 'energy_sanctions',
@@ -814,6 +980,12 @@ const MACRO_EVENTS = [
         params: { mu: -0.02, theta: 0.01, b: 0.004, sigmaR: 0.003 },
         magnitude: 'moderate',
         when: (sim) => sim.b < 0.12,
+        portfolioFlavor: (portfolio) => {
+            const bondQty = portfolio.positions.filter(p => p.type === 'bond').reduce((s, p) => s + p.qty, 0);
+            if (bondQty > 5) return 'Your long bond book is getting hammered as rate-cut expectations evaporate on the hot CPI print.';
+            if (bondQty < -5) return 'Your short duration trade is paying off nicely as inflation re-accelerates.';
+            return null;
+        },
     },
     {
         id: 'cpi_surprise_low',
@@ -845,13 +1017,47 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 1.0,
         headline: 'NBER officially declares recession began two quarters ago; Barron blames "obstructionist Congress and a reckless Fed." Markets already priced most of it',
-        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04, b: -0.01, q: -0.005 },
         magnitude: 'major',
         when: (sim, world) => sim.mu < -0.05 && sim.theta > 0.12 && !world.geopolitical.recessionDeclared,
-        effects: (world) => {
-            world.geopolitical.recessionDeclared = true;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 8);
-        },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'The NBER just made it official: the economy has been in recession for two quarters. Barron is blaming Congress and the Fed, but the damage is done — unemployment is rising, earnings estimates are collapsing, and credit spreads are blowing out. The question for Meridian\'s desk is whether the market has already priced this in. The declaration is lagging — smart money has been positioned for months. Is the bottom in, or is there more pain ahead?',
+        choices: [
+            {
+                label: 'Bottom-fish',
+                desc: 'The recession was priced months ago. NBER declarations are backward-looking — the recovery trade starts now.',
+                deltas: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02, b: -0.008, q: -0.003 },
+                effects: [
+                    { path: 'geopolitical.recessionDeclared', op: 'set', value: true },
+                    { path: 'election.barronApproval', op: 'add', value: -8 },
+                ],
+                playerFlag: 'bottom_fished_recession',
+                resultToast: 'You buy into the official declaration. If the worst is behind us, you caught the turn.',
+            },
+            {
+                label: 'Full defensive',
+                desc: 'The declaration is just the beginning. Earnings haven\'t fully cracked yet — go to cash and bonds.',
+                deltas: { mu: -0.07, theta: 0.035, lambda: 1.8, muJ: -0.05, b: -0.012, q: -0.005 },
+                effects: [
+                    { path: 'geopolitical.recessionDeclared', op: 'set', value: true },
+                    { path: 'election.barronApproval', op: 'add', value: -8 },
+                ],
+                playerFlag: 'went_full_defensive_recession',
+                resultToast: 'You hunker down. Cash is king in a recession — preservation over performance.',
+            },
+            {
+                label: 'Sell vol into capitulation',
+                desc: 'Vol is at panic levels. The VIX always mean-reverts. Sell premium and collect the fear premium.',
+                deltas: { mu: -0.05, theta: 0.025, lambda: 1.2, muJ: -0.03, b: -0.01, q: -0.004 },
+                effects: [
+                    { path: 'geopolitical.recessionDeclared', op: 'set', value: true },
+                    { path: 'election.barronApproval', op: 'add', value: -8 },
+                ],
+                playerFlag: 'sold_vol_recession',
+                resultToast: 'You sell fear. Implied vol is way above realized — if it normalizes, you profit handsomely.',
+            },
+        ],
     },
     {
         id: 'sovereign_debt_scare',
@@ -2256,16 +2462,74 @@ const SECTOR_EVENTS = [
         category: 'sector',
         likelihood: 0.7,
         headline: 'AI regulation bill passes Congress with bipartisan support; mandates safety audits, licensing for frontier models. PNTH compliance costs estimated at $200M/year',
-        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'Congress just passed the AI Safety and Accountability Act with rare bipartisan support. Every frontier model now needs a federal safety audit before deployment, and licensing fees could cost PNTH $200M/year. The bill is a moat for incumbents who can afford compliance — but a sledgehammer for startups. PNTH stock is down 4% in after-hours, but the smart money is debating whether regulation actually helps the incumbents long-term.',
+        choices: [
+            {
+                label: 'Regulation is a moat',
+                desc: 'Only PNTH and a few others can afford compliance. Buy the dip — this kills competition.',
+                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+                effects: [],
+                playerFlag: 'regulation_is_moat',
+                resultToast: 'You buy the regulatory moat thesis. Compliance costs crush small players — PNTH wins by default.',
+            },
+            {
+                label: 'De-risk tech exposure',
+                desc: 'Regulatory regimes only tighten from here. Reduce sector exposure before the next shoe drops.',
+                deltas: { mu: -0.04, theta: 0.02, lambda: 0.6 },
+                effects: [],
+                playerFlag: 'derisked_on_regulation',
+                resultToast: 'You reduce tech exposure. Regulation is a ratchet — it only turns one way.',
+            },
+            {
+                label: 'Play the compliance trade',
+                desc: 'Long audit firms and compliance tech, short the unprepared. Someone profits from every regulation.',
+                deltas: { mu: -0.025, theta: 0.012, lambda: 0.4 },
+                effects: [],
+                playerFlag: 'played_compliance_trade',
+                resultToast: 'You position in the compliance ecosystem. Every new rule creates a new business.',
+            },
+        ],
     },
     {
         id: 'doj_antitrust_cloud',
         category: 'sector',
         likelihood: 0.6,
         headline: 'DOJ files antitrust suit against three major cloud providers alleging market allocation; enterprise AI contracts could be voided. Sector-wide repricing',
-        params: { mu: -0.03, theta: 0.02, lambda: 0.6 },
         magnitude: 'moderate',
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'The DOJ just filed a massive antitrust case alleging the three major cloud providers carved up the enterprise AI market between them. If the court agrees, existing contracts could be voided and PNTH\'s cloud partnerships are at risk. Cloud stocks are down 6-8% across the board. The case will take years to resolve, but the uncertainty is repricing the entire sector right now. Meridian\'s tech desk needs a view — is this a buying opportunity or the start of a structural re-rating?',
+        choices: [
+            {
+                label: 'Buy the antitrust dip',
+                desc: 'These cases take 3-5 years and usually settle. The selloff is overdone for a long-dated risk.',
+                deltas: { mu: -0.015, theta: 0.012, lambda: 0.3 },
+                effects: [],
+                playerFlag: 'bought_antitrust_dip',
+                resultToast: 'You buy the selloff. Antitrust cases move at glacial speed — the market will forget.',
+            },
+            {
+                label: 'Rotate out of cloud',
+                desc: 'Even if the case fails, the overhang will cap multiples for years. Move to less exposed names.',
+                deltas: { mu: -0.035, theta: 0.025, lambda: 0.7 },
+                effects: [],
+                playerFlag: 'rotated_out_of_cloud',
+                resultToast: 'You rotate away from cloud. The legal overhang will weigh on sentiment for quarters.',
+            },
+            {
+                label: 'Bet on PNTH independence',
+                desc: 'If the cloud oligopoly breaks, PNTH gets more negotiating power. Long PNTH, short cloud.',
+                deltas: { mu: -0.025, theta: 0.018, lambda: 0.5 },
+                effects: [],
+                playerFlag: 'bet_pnth_independence',
+                resultToast: 'You play the PNTH angle. A weaker cloud oligopoly means better terms for AI platforms.',
+            },
+        ],
     },
     {
         id: 'semiconductor_shortage',
@@ -2274,6 +2538,12 @@ const SECTOR_EVENTS = [
         headline: 'TSMC warns of 16-week lead times on advanced nodes; AI chip allocations cut 30%. PNTH scrambles for alternative supply',
         params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
         magnitude: 'minor',
+        portfolioFlavor: (portfolio) => {
+            const callQty = portfolio.positions.filter(p => p.type === 'call').reduce((s, p) => s + p.qty, 0);
+            if (callQty > 3) return 'Your long call positions are losing value as the chip shortage clouds the growth outlook.';
+            if (callQty < -3) return 'Your short calls are benefiting from the supply disruption dragging on the sector.';
+            return null;
+        },
     },
     {
         id: 'semiconductor_glut',
@@ -2288,8 +2558,37 @@ const SECTOR_EVENTS = [
         category: 'sector',
         likelihood: 0.6,
         headline: '500M user records exposed in breach at major social platform; Congress demands hearings, calls for data privacy legislation. Tech sentiment sours',
-        params: { mu: -0.025, theta: 0.015, lambda: 0.4 },
         magnitude: 'moderate',
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            '500 million user records just leaked from a major social platform — names, emails, SSNs, the full package. Congress is already scheduling hearings, and three privacy bills are being drafted simultaneously. Tech sentiment is toxic right now. The breach has nothing to do with AI or PNTH specifically, but the sector is selling off sympathetically. Privacy regulation could reshape data economics across the entire tech stack.',
+        choices: [
+            {
+                label: 'Buy the sympathetic selloff',
+                desc: 'PNTH isn\'t the one that got breached. The sector-wide selloff is indiscriminate — buy quality names.',
+                deltas: { mu: -0.015, theta: 0.01, lambda: 0.2 },
+                effects: [],
+                playerFlag: 'bought_breach_dip',
+                resultToast: 'You buy quality into the panic. The breach is someone else\'s problem — PNTH\'s security is best-in-class.',
+            },
+            {
+                label: 'Short the regulatory risk',
+                desc: 'Privacy legislation will hit ad-driven models hardest, but compliance costs spread everywhere.',
+                deltas: { mu: -0.03, theta: 0.02, lambda: 0.5 },
+                effects: [],
+                playerFlag: 'shorted_privacy_risk',
+                resultToast: 'You short into the privacy scare. New regulations mean new costs across the sector.',
+            },
+            {
+                label: 'Long cybersecurity',
+                desc: 'Every CISO just got emergency budget approval. Security spending surges after every major breach.',
+                deltas: { mu: -0.02, theta: 0.012, lambda: 0.3 },
+                effects: [],
+                playerFlag: 'went_long_cybersecurity',
+                resultToast: 'You go long security names. Fear is the best salesperson for cybersecurity products.',
+            },
+        ],
     },
     {
         id: 'tech_ipo_frenzy',
@@ -2312,8 +2611,37 @@ const SECTOR_EVENTS = [
         category: 'sector',
         likelihood: 0.5,
         headline: 'Major cyberattack takes down power grid in three states; CISA attributes to state-sponsored actors. Congress fast-tracks cybersecurity spending bill',
-        params: { mu: -0.025, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'Three states just went dark. A coordinated cyberattack took down the power grid in the Northeast, and CISA is attributing it to state-sponsored actors. Congress is fast-tracking a $50B cybersecurity spending bill. Markets are in shock — the attack exposes how vulnerable critical infrastructure really is. Defense and cybersecurity names are surging, but the broader market is selling off on the geopolitical escalation. This is both a threat and a massive spending catalyst.',
+        choices: [
+            {
+                label: 'Go long defense and cyber',
+                desc: 'This is a Sputnik moment for cybersecurity. Federal spending will surge — buy the beneficiaries.',
+                deltas: { mu: -0.015, theta: 0.01, lambda: 0.3 },
+                effects: [],
+                playerFlag: 'went_long_cyber_defense',
+                resultToast: 'You go long the defense response. Every attack is a budget increase for someone.',
+            },
+            {
+                label: 'Risk-off on escalation',
+                desc: 'State-sponsored attacks can escalate fast. If attribution leads to sanctions, markets sell off further.',
+                deltas: { mu: -0.035, theta: 0.02, lambda: 0.7 },
+                effects: [],
+                playerFlag: 'went_risk_off_cyber',
+                resultToast: 'You de-risk on geopolitical escalation. If this triggers a diplomatic crisis, there\'s more downside.',
+            },
+            {
+                label: 'Play PNTH\'s defense angle',
+                desc: 'Atlas AI is the government\'s best cyber defense tool. PNTH\'s defense contracts get priority after this.',
+                deltas: { mu: -0.02, theta: 0.012, lambda: 0.4 },
+                effects: [],
+                playerFlag: 'played_pnth_cyber_angle',
+                resultToast: 'You bet on PNTH\'s defense business. Atlas is the government\'s best weapon against cyber threats.',
+            },
+        ],
     },
     {
         id: 'ai_spending_forecast_up',
@@ -2336,12 +2664,44 @@ const SECTOR_EVENTS = [
         category: 'sector',
         likelihood: 0.8,
         headline: 'Zhaowei\'s Qilin-4 model tops PNTH Atlas on three major AI benchmarks; Liang Wei: "The gap is closed." Western analysts skeptical of methodology',
-        params: { mu: -0.02, theta: 0.01 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.acquired,
-        effects: (world) => {
-            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
-        },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'Zhaowei just dropped Qilin-4, and it\'s topping Atlas on three major benchmarks. Liang Wei held a press conference declaring "the gap is closed." PNTH is down 5% in pre-market, and the entire Western AI thesis is being questioned. Some analysts are skeptical of Zhaowei\'s methodology — the benchmarks may be gamed — but the optics are devastating. The geopolitical dimension makes this worse: if Chinese AI is competitive, the chip export controls look futile.',
+        choices: [
+            {
+                label: 'Sell PNTH, buy the dip later',
+                desc: 'The competitive moat just narrowed. Sell first, ask questions about methodology later.',
+                deltas: { mu: -0.03, theta: 0.015, lambda: 0.3 },
+                effects: [
+                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+                ],
+                playerFlag: 'sold_pnth_on_zhaowei',
+                resultToast: 'You sell into the competitive scare. If Qilin-4 is real, PNTH\'s premium is unjustified.',
+            },
+            {
+                label: 'Buy the skepticism',
+                desc: 'Chinese benchmarks are routinely gamed. Atlas has real-world deployment — benchmarks don\'t matter.',
+                deltas: { mu: -0.01, theta: 0.005 },
+                effects: [
+                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+                ],
+                playerFlag: 'dismissed_zhaowei_benchmarks',
+                resultToast: 'You bet against the benchmarks. If the methodology is flawed, PNTH recovers fast.',
+            },
+            {
+                label: 'Hedge with chip plays',
+                desc: 'Whether Zhaowei wins or not, the AI compute arms race intensifies. Long semiconductor names.',
+                deltas: { mu: -0.02, theta: 0.01, lambda: 0.1 },
+                effects: [
+                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+                ],
+                playerFlag: 'hedged_with_chips',
+                resultToast: 'You go long the picks and shovels. Both sides of the AI race need chips.',
+            },
+        ],
     },
     {
         id: 'zhaowei_beijing_summit',
@@ -2375,6 +2735,12 @@ const SECTOR_EVENTS = [
         headline: 'Tech layoffs accelerate: 40,000 cuts announced this month across six major firms. "Efficiency era" rhetoric masks slowing growth',
         params: { mu: -0.015, theta: 0.008 },
         magnitude: 'minor',
+        portfolioFlavor: (portfolio) => {
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (stockQty > 10) return 'Your long equity book winces at the layoff headlines — "efficiency" is code for slowing revenue growth.';
+            if (stockQty < -5) return 'Your short equity position benefits as the layoff wave signals the growth cycle is turning.';
+            return null;
+        },
     },
 
     // -- Dividend / corporate payout events --------------------------------
