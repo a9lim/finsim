@@ -38,7 +38,7 @@ import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
 import {
-    resetImpactState, resetDailyVolume, decaySubstepVolume, computeRecoveryDrift,
+    resetImpactState, resetDailyVolume, computeRecoveryDrift,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
     selectImpactToast,
@@ -566,7 +566,6 @@ function frame(now) {
             let stepped = false;
             while (sim.substepsDone < targetSteps) {
                 sim.substep();
-                decaySubstepVolume();
                 chart.setLiveCandle(sim._partial);
                 stepped = true;
             }
@@ -726,9 +725,14 @@ function _onDayComplete() {
             if (typeof showToast !== 'undefined') {
                 for (let i = 0; i < fired.length; i++) {
                     const ev = fired[i];
+                    let headline = ev.headline;
+                    if (ev.portfolioFlavor) {
+                        const flavor = ev.portfolioFlavor(portfolio);
+                        if (flavor) headline += ' ' + flavor;
+                    }
                     const duration = ev.magnitude === 'major' ? 8000
                         : ev.magnitude === 'moderate' ? 5000 : 3000;
-                    setTimeout(function() { showToast(ev.headline, duration); }, i * 1500);
+                    setTimeout(function() { showToast(headline, duration); }, i * 1500);
                 }
             }
         }
