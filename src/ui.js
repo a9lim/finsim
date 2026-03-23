@@ -637,7 +637,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
             const fmtVal = (v) => {
                 if (v === Infinity) return '\u221E';
                 if (v === -Infinity) return '-\u221E';
-                return fmtDollar(v);
+                return (v < 0 ? '-$' : '$') + Math.abs(v).toFixed(2);
             };
             const items = [
                 { label: summary.netCost < 0 ? 'Net Credit' : 'Net Debit', value: fmtVal(Math.abs(summary.netCost)), cls: summary.netCost < 0 ? 'pnl-up' : 'pnl-down' },
