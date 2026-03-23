@@ -143,19 +143,26 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Compliance flags your short book during active investigation',
         context: (sim, world) => {
             const netDelta = computeNetDelta();
-            return `Your net delta is ${netDelta.toFixed(0)} — deeply short — while federal investigators are circling. Compliance has pulled your trading records and wants a meeting. The optics of a large directional bet during an investigation are terrible. The general counsel is asking pointed questions about your information sources.`;
+            const tone = complianceTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `Your net delta is ${netDelta.toFixed(0)} — deeply short — while federal investigators are circling. Compliance has pulled your trading records and wants a meeting. The optics of a large directional bet during an investigation are terrible. The general counsel is asking pointed questions about your information sources.`;
         },
         choices: [
             {
-                label: 'Reduce exposure',
-                desc: 'Cover half the short book to appease compliance. It hurts, but it buys goodwill.',
-                deltas: { theta: -0.005 },
+                label: 'Cover short positions',
+                desc: 'Close all short directional exposure to appease compliance.',
+                trades: [{ action: 'close_short' }],
+                complianceTier: 'full',
                 playerFlag: 'cooperated_with_compliance',
-                resultToast: 'You covered some shorts. Compliance notes your cooperation.',
+                resultToast: 'Short exposure closed. Compliance notes your cooperation.',
             },
             {
                 label: 'Argue your thesis',
                 desc: 'Present your fundamental case. The position is based on public information.',
+                complianceTier: 'defiant',
                 deltas: { xi: 0.01 },
                 playerFlag: 'argued_with_compliance',
                 resultToast: 'Compliance is unconvinced but allows the position. They\'re watching.',
@@ -163,6 +170,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Ignore the email',
                 desc: 'Delete it. You don\'t answer to paper-pushers.',
+                complianceTier: 'defiant',
                 deltas: { xi: 0.02, theta: 0.005 },
                 playerFlag: 'ignored_compliance',
                 resultToast: 'Bold move. Compliance escalates to the risk committee.',
@@ -183,22 +191,36 @@ export const PORTFOLIO_POPUPS = [
         headline: '"Do you know something we don\'t?"',
         context: (sim, world) => {
             const netDelta = computeNetDelta();
-            return `You're carrying ${netDelta.toFixed(0)} delta — massively long — into what everyone else sees as a worsening macro picture. Two PMs on the floor pulled you aside at lunch. The CRO wants to know your thesis. Either you're brilliant or reckless, and right now nobody can tell which.`;
+            const tone = complianceTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `You're carrying ${netDelta.toFixed(0)} delta — massively long — into what everyone else sees as a worsening macro picture. Two PMs on the floor pulled you aside at lunch. The CRO wants to know your thesis. Either you're brilliant or reckless, and right now nobody can tell which.`;
         },
         choices: [
             {
-                label: 'Stand your ground',
-                desc: 'The crowd is wrong. You\'ve done the work.',
-                deltas: {},
-                playerFlag: 'stood_ground_long',
-                resultToast: 'The floor is watching. If you\'re right, you\'re a legend.',
+                label: 'Close long positions',
+                desc: 'Close all long directional exposure. Remove the question mark.',
+                trades: [{ action: 'close_long' }],
+                complianceTier: 'full',
+                playerFlag: 'closed_suspicious_long',
+                resultToast: 'Long exposure closed. The whispers stop.',
             },
             {
-                label: 'Trim quietly',
-                desc: 'Reduce by a third. No need to advertise the derisking.',
-                deltas: { theta: -0.003 },
+                label: 'Close options only',
+                desc: 'Keep the stock but close the leveraged option bets.',
+                trades: [{ action: 'close_options' }],
+                complianceTier: 'partial',
                 playerFlag: 'trimmed_suspicious_long',
-                resultToast: 'You lighten up. The whispers die down.',
+                resultToast: 'Options closed. The core position stays.',
+            },
+            {
+                label: 'Stand your ground',
+                desc: 'The crowd is wrong. You\'ve done the work.',
+                complianceTier: 'defiant',
+                playerFlag: 'stood_ground_long',
+                resultToast: 'The floor is watching. If you\'re right, you\'re a legend.',
             },
         ],
     },
@@ -218,19 +240,26 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Market maker complains about single-strike concentration',
         context: () => {
             const { strike, notional } = _maxStrikeConcentration();
-            return `You have $${(notional / 1000).toFixed(1)}k notional concentrated at the ${strike} strike. The designated market maker for that series called the head of trading to complain about your flow. They're widening spreads on your name specifically and threatening to pull liquidity if you keep stacking.`;
+            const tone = complianceTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `You have $${(notional / 1000).toFixed(1)}k notional concentrated at the ${strike} strike. The designated market maker for that series called the head of trading to complain about your flow. They're widening spreads on your name specifically and threatening to pull liquidity if you keep stacking.`;
         },
         choices: [
             {
-                label: 'Spread it out',
-                desc: 'Diversify across strikes. Wider exposure, tighter spreads.',
-                deltas: {},
-                playerFlag: 'spread_strikes',
-                resultToast: 'The market maker backs off. Spreads normalize.',
+                label: 'Close concentrated options',
+                desc: 'Close all option positions. Start fresh with diversified strikes.',
+                trades: [{ action: 'close_options' }],
+                complianceTier: 'full',
+                playerFlag: 'closed_concentrated_options',
+                resultToast: 'Options closed. The market maker backs off.',
             },
             {
                 label: 'Let them complain',
                 desc: 'You like this strike. Their job is to make markets.',
+                complianceTier: 'defiant',
                 deltas: { xi: 0.01 },
                 playerFlag: 'ignored_mm_complaint',
                 resultToast: 'Spreads widen on your positions. The desk takes note.',
@@ -253,26 +282,34 @@ export const PORTFOLIO_POPUPS = [
             const eq = _equity();
             const gross = computeGrossNotional();
             const ratio = (gross / eq).toFixed(1);
-            return `Your gross notional is $${(gross / 1000).toFixed(0)}k against $${(eq / 1000).toFixed(0)}k equity — a ${ratio}x leverage ratio. The risk desk has flagged you for an intraday review. At Meridian, anything above 3x triggers a conversation. Above 5x triggers a forced reduction. The head of risk is on his way to your desk.`;
+            const tone = complianceTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `Your gross notional is $${(gross / 1000).toFixed(0)}k against $${(eq / 1000).toFixed(0)}k equity — a ${ratio}x leverage ratio. The risk desk has flagged you for an intraday review. At Meridian, anything above 3x triggers a conversation. Above 5x triggers a forced reduction. The head of risk is on his way to your desk.`;
         },
         choices: [
             {
-                label: 'Deleverage immediately',
-                desc: 'Cut positions to bring leverage under 3x. Show you\'re responsible.',
-                deltas: { theta: -0.005 },
-                playerFlag: 'deleveraged_voluntarily',
-                resultToast: 'Risk desk logs your voluntary compliance. Good standing preserved.',
+                label: 'Close everything',
+                desc: 'Liquidate all positions. Zero leverage. Maximum compliance.',
+                trades: [{ action: 'close_all' }],
+                complianceTier: 'full',
+                playerFlag: 'deleveraged_fully',
+                resultToast: 'All positions closed. Risk desk signs off. Good standing preserved.',
             },
             {
-                label: 'Negotiate a temporary waiver',
-                desc: 'Explain the thesis. Ask for 5 days to let the trade work.',
-                deltas: {},
-                playerFlag: 'negotiated_leverage_waiver',
-                resultToast: 'Waiver granted — 5 days. The clock is ticking.',
+                label: 'Close options',
+                desc: 'Close the leveraged option positions. Keep stock and bonds.',
+                trades: [{ action: 'close_options' }],
+                complianceTier: 'partial',
+                playerFlag: 'deleveraged_options',
+                resultToast: 'Options closed. Leverage reduced.',
             },
             {
                 label: 'Push back hard',
                 desc: '"I\'m the one making money on this floor." Risky, but maybe they back off.',
+                complianceTier: 'defiant',
                 deltas: { xi: 0.015 },
                 playerFlag: 'pushed_back_risk_desk',
                 resultToast: 'The head of risk blinks. But he writes it up. HR has a copy.',
@@ -291,19 +328,33 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Your name is on the tape',
         context: () => {
             const absStock = _absStockQty();
-            return `You're carrying ${absStock} shares — more than ${((absStock / ADV) * 100).toFixed(0)}% of average daily volume. The prime broker's execution desk called to let you know that "the street knows." Counterparties are positioning around your flow. Your entries and exits are being front-run. Every tick in your direction is cheaper; every tick against you is more expensive.`;
+            const tone = complianceTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `You're carrying ${absStock} shares — more than ${((absStock / ADV) * 100).toFixed(0)}% of average daily volume. The prime broker's execution desk called to let you know that "the street knows." Counterparties are positioning around your flow. Your entries and exits are being front-run. Every tick in your direction is cheaper; every tick against you is more expensive.`;
         },
         choices: [
             {
+                label: 'Close stock positions',
+                desc: 'Get your name off the tape. Close all stock exposure.',
+                trades: [{ action: 'close_type', type: 'stock' }],
+                complianceTier: 'full',
+                playerFlag: 'cleared_tape_presence',
+                resultToast: 'Stock positions closed. The street forgets your name.',
+            },
+            {
                 label: 'Work the position slowly',
                 desc: 'Use TWAP-style execution. Accept worse fills for less market impact.',
-                deltas: {},
+                complianceTier: 'partial',
                 playerFlag: 'worked_position_slowly',
                 resultToast: 'You\'re a known name now. The street adjusts.',
             },
             {
                 label: 'Own it',
                 desc: 'If they know your name, make them fear it. Add size.',
+                complianceTier: 'defiant',
                 deltas: { xi: 0.01, theta: 0.003 },
                 playerFlag: 'owned_tape_presence',
                 resultToast: 'Aggressive. The PB raises your margin requirement.',
@@ -375,22 +426,28 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Compliance flags large bond position ahead of FOMC',
         context: (sim, world) => {
             const bondNot = _bondNotional();
-            return `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure with an FOMC meeting imminent. The surveillance team has flagged the timing. They want documentation of your decision-making process — when you initiated the position, what public information you used, and whether you've had any contact with Fed officials or their staff. Standard protocol, but the paperwork is a headache.`;
+            const tone = complianceTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure with an FOMC meeting imminent. The surveillance team has flagged the timing. They want documentation of your decision-making process — when you initiated the position, what public information you used, and whether you've had any contact with Fed officials or their staff. Standard protocol, but the paperwork is a headache.`;
         },
         choices: [
             {
-                label: 'File the documentation',
-                desc: 'Comply fully. Tedious but keeps your record clean.',
-                deltas: {},
-                playerFlag: 'filed_fomc_docs',
-                resultToast: 'Documentation filed. Compliance satisfied.',
+                label: 'Close bond positions',
+                desc: 'Close all bonds before the meeting. Not worth the scrutiny.',
+                trades: [{ action: 'close_type', type: 'bond' }],
+                complianceTier: 'full',
+                playerFlag: 'closed_bonds_before_fomc',
+                resultToast: 'Bond positions closed. The flag is removed from your file.',
             },
             {
-                label: 'Reduce before the meeting',
-                desc: 'Close half the position. Not worth the scrutiny.',
-                deltas: { sigmaR: -0.001 },
-                playerFlag: 'reduced_before_fomc',
-                resultToast: 'Position trimmed. The flag is removed from your file.',
+                label: 'File the documentation',
+                desc: 'Comply fully with the paperwork. Tedious but keeps your record clean.',
+                complianceTier: 'partial',
+                playerFlag: 'filed_fomc_docs',
+                resultToast: 'Documentation filed. Compliance satisfied.',
             },
         ],
     },
@@ -522,12 +579,26 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const loss = ((1 - eq / INITIAL_CAPITAL) * 100).toFixed(0);
-            return `You're down ${loss}%. The risk committee has convened an emergency session. The CRO, general counsel, and your MD are in the conference room. The conversation is short: explain the losses, present a plan, or face position limits. The compliance officer is taking notes. HR is cc'd on the meeting invite. This is not a drill.`;
+            const tone = complianceTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `You're down ${loss}%. The risk committee has convened an emergency session. The CRO, general counsel, and your MD are in the conference room. The conversation is short: explain the losses, present a plan, or face position limits. The compliance officer is taking notes. HR is cc'd on the meeting invite. This is not a drill.`;
         },
         choices: [
             {
+                label: 'Close everything',
+                desc: 'Liquidate all positions. Rebuild from cash.',
+                trades: [{ action: 'close_all' }],
+                complianceTier: 'full',
+                playerFlag: 'liquidated_for_committee',
+                resultToast: 'All positions closed. The committee notes your cooperation.',
+            },
+            {
                 label: 'Present a recovery plan',
                 desc: 'Show them the path back. Reduced risk, tighter stops, disciplined execution.',
+                complianceTier: 'partial',
                 deltas: { theta: -0.005 },
                 playerFlag: 'presented_recovery_plan',
                 resultToast: 'The committee gives you 30 days. The clock is ticking.',
@@ -535,16 +606,10 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Blame the market',
                 desc: 'It was an unprecedented move. Nobody saw it coming. The model was fine.',
+                complianceTier: 'defiant',
                 deltas: { xi: 0.02 },
                 playerFlag: 'blamed_market',
                 resultToast: 'Nobody buys it. Position limits imposed immediately.',
-            },
-            {
-                label: 'Take responsibility',
-                desc: 'Own it fully. Ask for support, not excuses.',
-                deltas: {},
-                playerFlag: 'took_responsibility',
-                resultToast: 'Respect on the floor goes up. The committee loosens the leash slightly.',
             },
         ],
     },
@@ -603,29 +668,37 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const loss = ((1 - eq / INITIAL_CAPITAL) * 100).toFixed(0);
-            return `Down ${loss}% in your first year. Your MD closes the glass door and sits across from you. "Look, everyone has rough patches. But the partners are asking questions. I need to give them something. What's your plan?" This is the conversation every junior trader dreads. Your answer defines the next six months.`;
+            const tone = complianceTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `Down ${loss}% in your first year. Your MD closes the glass door and sits across from you. "Look, everyone has rough patches. But the partners are asking questions. I need to give them something. What's your plan?" This is the conversation every junior trader dreads. Your answer defines the next six months.`;
         },
         choices: [
             {
-                label: 'Show conviction',
-                desc: '"The positions are right. I need more time and a bit more risk budget."',
-                deltas: {},
-                playerFlag: 'showed_conviction_early',
-                resultToast: 'Your MD nods slowly. "Don\'t make me regret this."',
+                label: 'Promise to flatten',
+                desc: '"I\'ll reduce risk and rebuild from a clean book."',
+                trades: [{ action: 'close_all' }],
+                complianceTier: 'full',
+                deltas: { theta: -0.005, xi: -0.01 },
+                playerFlag: 'promised_to_flatten',
+                resultToast: 'All positions closed. Your MD looks relieved.',
             },
             {
                 label: 'Ask for mentorship',
                 desc: '"I could use guidance. Can you pair me with a senior PM?"',
+                complianceTier: 'partial',
                 deltas: { theta: -0.003 },
                 playerFlag: 'asked_for_mentorship',
-                resultToast: 'Your MD arranges weekly sessions with the head of macro. Humbling, but useful.',
+                resultToast: 'Your MD arranges weekly sessions with the head of macro.',
             },
             {
-                label: 'Promise to flatten',
-                desc: '"I\'ll reduce risk and rebuild from a clean book."',
-                deltas: { theta: -0.005, xi: -0.01 },
-                playerFlag: 'promised_to_flatten',
-                resultToast: 'Safe answer. Your MD looks relieved. But the partners wanted boldness.',
+                label: 'Show conviction',
+                desc: '"The positions are right. I need more time and a bit more risk budget."',
+                complianceTier: 'defiant',
+                playerFlag: 'showed_conviction_early',
+                resultToast: 'Your MD nods slowly. "Don\'t make me regret this."',
             },
         ],
     },
@@ -990,22 +1063,29 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Profiting from geopolitical crisis draws scrutiny',
         context: (sim, world) => {
             const crisis = world.geopolitical.oilCrisis ? 'oil crisis' : 'Middle East escalation';
-            return `The ${crisis} is deepening. You're short and making money. An investigative journalist from ProPublica is writing about "Wall Street winners in wartime." Your firm's compliance team received a FOIA request for communication records. Nobody is accusing you of anything illegal — shorting during a crisis is perfectly legal — but the court of public opinion operates by different rules.`;
+            const tone = complianceTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `The ${crisis} is deepening. You're short and making money. An investigative journalist from ProPublica is writing about "Wall Street winners in wartime." Your firm's compliance team received a FOIA request for communication records. Nobody is accusing you of anything illegal — shorting during a crisis is perfectly legal — but the court of public opinion operates by different rules.`;
         },
         choices: [
             {
-                label: 'Cover the short quietly',
-                desc: 'Take profits and reduce the headline risk.',
-                deltas: { theta: -0.003 },
+                label: 'Cover all shorts',
+                desc: 'Close all short directional exposure. Take profits and remove the target.',
+                trades: [{ action: 'close_short' }],
+                complianceTier: 'full',
                 playerFlag: 'covered_crisis_short',
-                resultToast: 'Position closed. The story runs without your firm\'s name.',
+                resultToast: 'Short positions closed. The story runs without your firm\'s name.',
             },
             {
                 label: 'Hold the position',
                 desc: 'You have a fiduciary duty to your investors. The position is legal and well-reasoned.',
+                complianceTier: 'defiant',
                 deltas: { xi: 0.01 },
                 playerFlag: 'held_crisis_short',
-                resultToast: 'You hold. The article mentions Meridian in paragraph 14. Nobody reads that far.',
+                resultToast: 'You hold. The article mentions Meridian in paragraph 14.',
             },
         ],
     },
@@ -1023,22 +1103,28 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Compliance requires documentation on bond position during hiking cycle',
         context: (sim) => {
             const bondNot = _bondNotional();
-            return `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure during an active Fed hiking cycle. Every FOMC meeting is a binary event for your book. Compliance is requiring pre-trade documentation for all duration trades until the cycle ends. Every trade needs a written rationale filed before execution. It's bureaucratic, but it's also protection if anyone ever questions your timing.`;
+            const tone = complianceTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure during an active Fed hiking cycle. Every FOMC meeting is a binary event for your book. Compliance is requiring pre-trade documentation for all duration trades until the cycle ends. Every trade needs a written rationale filed before execution. It's bureaucratic, but it's also protection if anyone ever questions your timing.`;
         },
         choices: [
             {
-                label: 'Accept the requirement',
-                desc: 'File the paperwork. It\'s annoying but reasonable.',
-                deltas: {},
-                playerFlag: 'accepted_bond_docs',
-                resultToast: 'Documentation filed. Compliance is satisfied. Your paper trail is clean.',
-            },
-            {
                 label: 'Close the bond book',
                 desc: 'Not worth the hassle. Focus on equities and options.',
-                deltas: { sigmaR: -0.001 },
+                trades: [{ action: 'close_type', type: 'bond' }],
+                complianceTier: 'full',
                 playerFlag: 'closed_bond_book',
                 resultToast: 'Bond positions closed. One less thing for compliance to flag.',
+            },
+            {
+                label: 'Accept the requirement',
+                desc: 'File the paperwork. It\'s annoying but reasonable.',
+                complianceTier: 'partial',
+                playerFlag: 'accepted_bond_docs',
+                resultToast: 'Documentation filed. Compliance is satisfied. Your paper trail is clean.',
             },
         ],
     },
