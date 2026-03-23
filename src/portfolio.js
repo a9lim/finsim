@@ -94,9 +94,11 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
 
     const signedQty = side === 'long' ? qty : -qty;
 
-    if (type === 'stock' || type === 'bond') {
-        const vol = type === 'bond' ? sim.sigmaR : currentVol;
-        const impact = computeStockImpact(signedQty, vol);
+    if (type === 'bond') {
+        // Bonds: spread only, no price impact (Vasicek-priced, deep market)
+        return spreadFill;
+    } else if (type === 'stock') {
+        const impact = computeStockImpact(signedQty, currentVol);
         applyPermanentImpact(sim, impact.permanent);
         return Math.max(0.01, spreadFill + impact.fillAdjustment);
     } else {
