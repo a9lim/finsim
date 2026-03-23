@@ -91,9 +91,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Compliance flags your short book during active investigation',
         context: (sim, world) => {
             const netDelta = computeNetDelta();
-            return `Your net delta is ${netDelta.toFixed(0)} — deeply short — while federal investigators are circling. ` +
-                'Compliance has pulled your trading records and wants a meeting. The optics of a large directional bet during an investigation ' +
-                'are terrible. The general counsel is asking pointed questions about your information sources.';
+            return `Your net delta is ${netDelta.toFixed(0)} — deeply short — while federal investigators are circling. Compliance has pulled your trading records and wants a meeting. The optics of a large directional bet during an investigation are terrible. The general counsel is asking pointed questions about your information sources.`;
         },
         choices: [
             {
@@ -131,9 +129,7 @@ export const PORTFOLIO_POPUPS = [
         headline: '"Do you know something we don\'t?"',
         context: (sim, world) => {
             const netDelta = computeNetDelta();
-            return `You\'re carrying ${netDelta.toFixed(0)} delta — massively long — into what everyone else sees as a worsening macro picture. ` +
-                'Two PMs on the floor pulled you aside at lunch. The CRO wants to know your thesis. Either you\'re brilliant or reckless, ' +
-                'and right now nobody can tell which.';
+            return `You're carrying ${netDelta.toFixed(0)} delta — massively long — into what everyone else sees as a worsening macro picture. Two PMs on the floor pulled you aside at lunch. The CRO wants to know your thesis. Either you're brilliant or reckless, and right now nobody can tell which.`;
         },
         choices: [
             {
@@ -161,9 +157,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Market maker complains about single-strike concentration',
         context: () => {
             const conc = _strikeConcentration();
-            return `You have ${conc} contracts concentrated at a single strike. The designated market maker for that series called ` +
-                'the head of trading to complain about your flow. They\'re widening spreads on your name specifically and threatening ' +
-                'to pull liquidity if you keep stacking.';
+            return `You have ${conc} contracts concentrated at a single strike. The designated market maker for that series called the head of trading to complain about your flow. They're widening spreads on your name specifically and threatening to pull liquidity if you keep stacking.`;
         },
         choices: [
             {
@@ -198,10 +192,7 @@ export const PORTFOLIO_POPUPS = [
             const eq = _equity();
             const gross = computeGrossNotional();
             const ratio = (gross / eq).toFixed(1);
-            return `Your gross notional is $${(gross / 1000).toFixed(0)}k against $${(eq / 1000).toFixed(0)}k equity — ` +
-                `a ${ratio}x leverage ratio. The risk desk has flagged you for an intraday review. ` +
-                'At Meridian, anything above 3x triggers a conversation. Above 5x triggers a forced reduction. ' +
-                'The head of risk is on his way to your desk.';
+            return `Your gross notional is $${(gross / 1000).toFixed(0)}k against $${(eq / 1000).toFixed(0)}k equity — a ${ratio}x leverage ratio. The risk desk has flagged you for an intraday review. At Meridian, anything above 3x triggers a conversation. Above 5x triggers a forced reduction. The head of risk is on his way to your desk.`;
         },
         choices: [
             {
@@ -239,9 +230,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Your name is on the tape',
         context: () => {
             const absStock = Math.abs(_stockQty());
-            return `You\'re carrying ${absStock} shares — more than ${((absStock / ADV) * 100).toFixed(0)}% of average daily volume. ` +
-                'The prime broker\'s execution desk called to let you know that "the street knows." Counterparties are positioning around ' +
-                'your flow. Your entries and exits are being front-run. Every tick in your direction is cheaper; every tick against you is more expensive.';
+            return `You're carrying ${absStock} shares — more than ${((absStock / ADV) * 100).toFixed(0)}% of average daily volume. The prime broker's execution desk called to let you know that "the street knows." Counterparties are positioning around your flow. Your entries and exits are being front-run. Every tick in your direction is cheaper; every tick against you is more expensive.`;
         },
         choices: [
             {
@@ -274,10 +263,7 @@ export const PORTFOLIO_POPUPS = [
         context: (sim, world) => {
             const bondQty = _bondQty();
             const direction = bondQty > 0 ? 'long' : 'short';
-            return `You\'re ${direction} ${Math.abs(bondQty)} bonds with an FOMC meeting imminent. ` +
-                'The surveillance team has flagged the timing. They want documentation of your decision-making process — ' +
-                'when you initiated the position, what public information you used, and whether you\'ve had any contact with ' +
-                'Fed officials or their staff. Standard protocol, but the paperwork is a headache.';
+            return `You're ${direction} ${Math.abs(bondQty)} bonds with an FOMC meeting imminent. The surveillance team has flagged the timing. They want documentation of your decision-making process — when you initiated the position, what public information you used, and whether you've had any contact with Fed officials or their staff. Standard protocol, but the paperwork is a headache.`;
         },
         choices: [
             {
@@ -309,9 +295,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Analyst coverage intensifies before PNTH earnings',
         context: (sim) => {
             const pnth = _pnthQty();
-            return `Your ${pnth}-share PNTH position has caught the attention of the sellside. ` +
-                'Three analysts called this morning wanting to "compare notes." One casually mentioned an earnings whisper number ' +
-                'that\'s well above consensus. Another hinted at a contract announcement. The information is free — but is it clean?';
+            return `Your ${pnth}-share PNTH position has caught the attention of the sellside. Three analysts called this morning wanting to "compare notes." One casually mentioned an earnings whisper number that's well above consensus. Another hinted at a contract announcement. The information is free — but is it clean?`;
         },
         choices: [
             {
@@ -350,10 +334,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'The market is against you',
         context: (sim) => {
             const netDelta = computeNetDelta();
-            return `The index is at $${sim.S.toFixed(0)} — well above where you started shorting — and your delta is ` +
-                `${netDelta.toFixed(0)}. Every tick higher costs you. The PM next to you just booked his best quarter ever going long. ` +
-                'Your Bloomberg chat is full of unsolicited advice. The desk head walks past without making eye contact. ' +
-                'You\'re either early or wrong, and right now the P&L doesn\'t distinguish between the two.';
+            return `The index is at $${sim.S.toFixed(0)} — well above where you started shorting — and your delta is ${netDelta.toFixed(0)}. Every tick higher costs you. The PM next to you just booked his best quarter ever going long. Your Bloomberg chat is full of unsolicited advice. The desk head walks past without making eye contact. You're either early or wrong, and right now the P&L doesn't distinguish between the two.`;
         },
         choices: [
             {
@@ -393,9 +374,7 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `Your returns are up ${pct}% and the FT\'s markets desk wants an interview. "The Meridian Trader Who Bet Against ` +
-                'the Crowd" — that\'s their working headline. The PR team is excited. Your MD is cautiously supportive. But every trader ' +
-                'who\'s ever been profiled knows: the cover jinx is real. The moment the ink dries, the market gods come for you.';
+            return `Your returns are up ${pct}% and the FT's markets desk wants an interview. "The Meridian Trader Who Bet Against the Crowd" — that's their working headline. The PR team is excited. Your MD is cautiously supportive. But every trader who's ever been profiled knows: the cover jinx is real. The moment the ink dries, the market gods come for you.`;
         },
         choices: [
             {
@@ -427,9 +406,7 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const loss = ((1 - eq / INITIAL_CAPITAL) * 100).toFixed(0);
-            return `You\'re down ${loss}%. The risk committee has convened an emergency session. The CRO, general counsel, and your MD ` +
-                'are in the conference room. The conversation is short: explain the losses, present a plan, or face position limits. ' +
-                'The compliance officer is taking notes. HR is cc\'d on the meeting invite. This is not a drill.';
+            return `You're down ${loss}%. The risk committee has convened an emergency session. The CRO, general counsel, and your MD are in the conference room. The conversation is short: explain the losses, present a plan, or face position limits. The compliance officer is taking notes. HR is cc'd on the meeting invite. This is not a drill.`;
         },
         choices: [
             {
@@ -467,9 +444,7 @@ export const PORTFOLIO_POPUPS = [
         context: (sim, world) => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `A recession has been declared and you\'re up ${pct}%. Someone on Twitter found Meridian\'s 13F filing and ` +
-                'connected the dots. "Wall Street traders making millions while Main Street suffers" is trending. Your name isn\'t public — yet — ' +
-                'but the firm is fielding press calls. The PR team wants to know if you\'ll issue a statement. The desk is nervous.';
+            return `A recession has been declared and you're up ${pct}%. Someone on Twitter found Meridian's 13F filing and connected the dots. "Wall Street traders making millions while Main Street suffers" is trending. Your name isn't public — yet — but the firm is fielding press calls. The PR team wants to know if you'll issue a statement. The desk is nervous.`;
         },
         choices: [
             {
@@ -553,9 +528,7 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const swing = Math.abs(eq - portfolio.peakValue);
-            return `Your book just swung $${(swing / 1000).toFixed(1)}k in a single period. That\'s more than most PMs make in a quarter. ` +
-                'Compliance has flagged the activity for review. They\'re not accusing you of anything — yet — but the pattern of outsized ' +
-                'moves triggers their surveillance algorithms. Expect a call from the surveillance team and a formal review of your recent trades.';
+            return `Your book just swung $${(swing / 1000).toFixed(1)}k in a single period. That's more than most PMs make in a quarter. Compliance has flagged the activity for review. They're not accusing you of anything — yet — but the pattern of outsized moves triggers their surveillance algorithms. Expect a call from the surveillance team and a formal review of your recent trades.`;
         },
         choices: [
             {
@@ -589,9 +562,7 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `"I represent a multi-strategy fund that\'s building out its macro desk. Your track record — up ${pct}% net ` +
-                'over three quarters — is exactly what they\'re looking for. Guaranteed $2M first year, full P&L autonomy, and a ` +
-                '20% payout on everything above hurdle." The message arrives on your personal phone at 10pm. Flattering. Also suspicious timing.';
+            return `"I represent a multi-strategy fund that's building out its macro desk. Your track record — up ${pct}% net over three quarters — is exactly what they're looking for. Guaranteed $2M first year, full P&L autonomy, and a 20% payout on everything above hurdle." The message arrives on your personal phone at 10pm. Flattering. Also suspicious timing.`;
         },
         choices: [
             {
@@ -632,10 +603,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'The comeback kid',
         context: () => {
             const dd = (portfolio.maxDrawdown * 100).toFixed(0);
-            return `You were down ${dd}%. The risk committee had you on a watch list. Two analysts bet against your survival. ` +
-                'And now you\'ve clawed your way back to breakeven. The floor is buzzing. Your MD just walked past and squeezed your shoulder — ' +
-                'he never does that. The comeback says more about you than the drawdown ever did. ' +
-                'But the scars are real. Do you trade the same way, or has something changed?';
+            return `You were down ${dd}%. The risk committee had you on a watch list. Two analysts bet against your survival. And now you've clawed your way back to breakeven. The floor is buzzing. Your MD just walked past and squeezed your shoulder — he never does that. The comeback says more about you than the drawdown ever did. But the scars are real. Do you trade the same way, or has something changed?`;
         },
         choices: [
             {
@@ -672,10 +640,7 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `Up ${pct}%. For the first time, people on the floor know your name for the right reasons. ` +
-                'The head of trading mentioned you in the morning meeting. A sellside salesman sent a bottle of Macallan to your desk. ' +
-                'Your Bloomberg handle shows up in three different chat groups. You\'re no longer "the new kid" — you\'re "that trader ' +
-                'who called the move." Enjoy it. This is the moment that defines careers.';
+            return `Up ${pct}%. For the first time, people on the floor know your name for the right reasons. The head of trading mentioned you in the morning meeting. A sellside salesman sent a bottle of Macallan to your desk. Your Bloomberg handle shows up in three different chat groups. You're no longer "the new kid" — you're "that trader who called the move." Enjoy it. This is the moment that defines careers.`;
         },
         choices: [
             {
@@ -712,10 +677,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'A lobbyist wants to discuss "regulatory alignment"',
         context: (sim, world) => {
             const party = world.congress.senate.federalist >= 50 ? 'Federalist' : 'Farmer-Labor';
-            return `Campaign season is heating up and a K Street lobbyist has reached out. She represents a coalition of financial firms ` +
-                `concerned about the ${party} regulatory agenda. "We\'re not asking for a donation — we\'re asking for a seat at the table. ` +
-                'Your firm\'s market position gives you unique insight into how these regulations affect liquidity." ' +
-                'The subtext is clear: your money and your access are both on the menu.';
+            return `Campaign season is heating up and a K Street lobbyist has reached out. She represents a coalition of financial firms concerned about the ${party} regulatory agenda. "We're not asking for a donation — we're asking for a seat at the table. Your firm's market position gives you unique insight into how these regulations affect liquidity." The subtext is clear: your money and your access are both on the menu.`;
         },
         choices: [
             {
@@ -758,10 +720,7 @@ export const PORTFOLIO_POPUPS = [
         context: (sim, world) => {
             const fedSenate = world.congress.senate.federalist;
             const fedHouse = world.congress.house.federalist;
-            return `Midterm elections are imminent. The Federalists hold ${fedSenate} Senate seats and ${fedHouse} House seats. ` +
-                'Every PM on the floor is either hedging or speculating on the outcome. The vol surface is inverted — ` +
-                'short-dated puts are trading at a massive premium. Your book is exposed. Do you want to be positioned, or do you ' +
-                'want to be flat when the results come in?';
+            return `Midterm elections are imminent. The Federalists hold ${fedSenate} Senate seats and ${fedHouse} House seats. Every PM on the floor is either hedging or speculating on the outcome. The vol surface is inverted — short-dated puts are trading at a massive premium. Your book is exposed. Do you want to be positioned, or do you want to be flat when the results come in?`;
         },
         choices: [
             {
@@ -802,10 +761,7 @@ export const PORTFOLIO_POPUPS = [
         context: (sim) => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `The Barron administration is in its final weeks. Your total return stands at ${pct > 0 ? '+' : ''}${pct}%. ` +
-                'The transition team is already briefing the incoming President. Policy continuity is uncertain. ` +
-                'Your positions need to reflect the world that\'s coming, not the one that\'s ending. ' +
-                'How do you want to close out the Barron era?';
+            return `The Barron administration is in its final weeks. Your total return stands at ${pct > 0 ? '+' : ''}${pct}%. The transition team is already briefing the incoming President. Policy continuity is uncertain. Your positions need to reflect the world that's coming, not the one that's ending. How do you want to close out the Barron era?`;
         },
         choices: [
             {
@@ -844,10 +800,7 @@ export const PORTFOLIO_POPUPS = [
         context: (sim, world) => {
             const probeActive = world.investigations.okaforProbeStage > 0 ? 'Okafor probe' :
                                world.investigations.tanBowmanStory > 0 ? 'Bowman investigation' : 'ongoing federal investigation';
-            return `A college buddy who now works at a congressional staffer\'s office calls your personal cell. ` +
-                `"Listen, I probably shouldn\'t be telling you this, but the ${probeActive} is about to produce a surprise witness. ` +
-                'The market is going to move. Thought you should know." The line goes quiet. This is the moment every trader faces: ` +
-                'free money, or a career-ending mistake?';
+            return `A college buddy who now works at a congressional staffer's office calls your personal cell. "Listen, I probably shouldn't be telling you this, but the ${probeActive} is about to produce a surprise witness. The market is going to move. Thought you should know." The line goes quiet. This is the moment every trader faces: free money, or a career-ending mistake?`;
         },
         choices: [
             {
@@ -887,9 +840,7 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `The newswire picked up your desk\'s results: +${pct}%. Your name isn\'t in the story, but everyone on the street ` +
-                'knows who\'s driving the P&L. Two hedge fund managers sent congratulations. Your MD is using your returns in the ' +
-                'investor presentation. The question now: do you let the success speak for itself, or use the attention to build your brand?';
+            return `The newswire picked up your desk's results: +${pct}%. Your name isn't in the story, but everyone on the street knows who's driving the P&L. Two hedge fund managers sent congratulations. Your MD is using your returns in the investor presentation. The question now: do you let the success speak for itself, or use the attention to build your brand?`;
         },
         choices: [
             {
@@ -921,10 +872,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Profiting from geopolitical crisis draws scrutiny',
         context: (sim, world) => {
             const crisis = world.geopolitical.oilCrisis ? 'oil crisis' : 'Middle East escalation';
-            return `The ${crisis} is deepening. You\'re short and making money. An investigative journalist from ProPublica ` +
-                'is writing about "Wall Street winners in wartime." Your firm\'s compliance team received a FOIA request for communication records. ' +
-                'Nobody is accusing you of anything illegal — shorting during a crisis is perfectly legal — but the court of public opinion ' +
-                'operates by different rules.';
+            return `The ${crisis} is deepening. You're short and making money. An investigative journalist from ProPublica is writing about "Wall Street winners in wartime." Your firm's compliance team received a FOIA request for communication records. Nobody is accusing you of anything illegal — shorting during a crisis is perfectly legal — but the court of public opinion operates by different rules.`;
         },
         choices: [
             {
@@ -957,10 +905,7 @@ export const PORTFOLIO_POPUPS = [
         context: (sim) => {
             const bondQty = _bondQty();
             const dir = bondQty > 0 ? 'long' : 'short';
-            return `You\'re ${dir} ${Math.abs(bondQty)} bonds during an active Fed hiking cycle. Every FOMC meeting is a binary event for ` +
-                'your book. Compliance is requiring pre-trade documentation for all duration trades until the cycle ends. ' +
-                'Every trade needs a written rationale filed before execution. It\'s bureaucratic, but it\'s also protection if anyone ' +
-                'ever questions your timing.';
+            return `You're ${dir} ${Math.abs(bondQty)} bonds during an active Fed hiking cycle. Every FOMC meeting is a binary event for your book. Compliance is requiring pre-trade documentation for all duration trades until the cycle ends. Every trade needs a written rationale filed before execution. It's bureaucratic, but it's also protection if anyone ever questions your timing.`;
         },
         choices: [
             {
@@ -993,10 +938,7 @@ export const PORTFOLIO_POPUPS = [
         context: (sim, world) => {
             const party = world.election.barronApproval > 45 ? 'Federalist' : 'Farmer-Labor';
             const eq = _equity();
-            return `A ${party} senator\'s chief of staff called your office. There\'s a fundraising dinner next week — ` +
-                '$10,000 a plate — and they want Meridian represented. "The Senator values the perspective of market participants," ' +
-                'she says. Translation: they want your money and your implicit endorsement. Your P&L makes you attractive to both sides. ' +
-                `You have $${(eq / 1000).toFixed(0)}k in equity. A $10k dinner is a rounding error — but the political entanglement isn\'t.`;
+            return `A ${party} senator's chief of staff called your office. There's a fundraising dinner next week — $10,000 a plate — and they want Meridian represented. "The Senator values the perspective of market participants," she says. Translation: they want your money and your implicit endorsement. Your P&L makes you attractive to both sides. You have $${(eq / 1000).toFixed(0)}k in equity. A $10k dinner is a rounding error — but the political entanglement isn't.`;
         },
         choices: [
             {
@@ -1037,10 +979,7 @@ export const PORTFOLIO_POPUPS = [
         popup: true,
         headline: 'Analyst offers "channel check" data before earnings',
         context: () => {
-            return 'A well-known sellside analyst calls with what he calls a "channel check" — proprietary data on PNTH\'s enterprise pipeline. ' +
-                '"This isn\'t inside information," he insists. "It\'s mosaic theory. We assembled it from public supplier filings and ' +
-                'conference attendance logs." The data suggests earnings will beat by 8-12%. Your options book would benefit enormously ' +
-                'if the number is right. The analyst wants your commission flow in return.';
+            return `A well-known sellside analyst calls with what he calls a "channel check" — proprietary data on PNTH's enterprise pipeline. "This isn't inside information," he insists. "It's mosaic theory. We assembled it from public supplier filings and conference attendance logs." The data suggests earnings will beat by 8-12%. Your options book would benefit enormously if the number is right. The analyst wants your commission flow in return.`;
         },
         choices: [
             {
