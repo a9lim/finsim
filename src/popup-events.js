@@ -512,9 +512,7 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const loss = ((1 - eq / INITIAL_CAPITAL) * 100).toFixed(0);
-            return `Down ${loss}% in your first year. Your MD closes the glass door and sits across from you. ` +
-                '"Look, everyone has rough patches. But the partners are asking questions. I need to give them something. ` +
-                'What\'s your plan?" This is the conversation every junior trader dreads. Your answer defines the next six months.';
+            return `Down ${loss}% in your first year. Your MD closes the glass door and sits across from you. "Look, everyone has rough patches. But the partners are asking questions. I need to give them something. What's your plan?" This is the conversation every junior trader dreads. Your answer defines the next six months.`;
         },
         choices: [
             {
