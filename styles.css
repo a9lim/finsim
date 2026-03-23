@@ -379,15 +379,22 @@ main {
     font-family: var(--font-mono);
 }
 
-.pos-value {
+.pos-nums {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     flex-shrink: 0;
+}
+
+.pos-value {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--text-secondary);
+    font-size: 0.75em;
+    line-height: 1.2;
 }
 
 .pos-pnl {
-    flex-shrink: 0;
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
 }
@@ -988,13 +995,13 @@ main {
     white-space: nowrap;
 }
 .strategy-group-header .strategy-group-value {
-    flex-shrink: 0;
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     color: var(--text-secondary);
+    font-size: 0.75em;
+    line-height: 1.2;
 }
 .strategy-group-header .strategy-group-pnl {
-    flex-shrink: 0;
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
 }
