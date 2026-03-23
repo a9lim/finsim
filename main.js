@@ -524,11 +524,15 @@ function init() {
                 dirty = true;
             }
             if (isStrategy) {
+                // Invalidate caches so chart/summary reprice with current impact state
+                strategy._cache = null;
+                strategy._summaryCache = null;
                 rebuildStrategyDropdown($, chainSkeleton);
                 const stratPriced = _priceExpiry(_strategyExpiryIdx());
                 updateStrategySelectors($, stratPriced, sim.S, handleAddLeg, _buildStrategyPosMap());
                 updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
                 updateTimeSliderRange();
+                if (strategyLegs.length > 0) updateStrategyBuilder();
             }
         });
     });
