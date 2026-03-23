@@ -227,28 +227,43 @@ function init() {
     _toolbar.initSidebar($.panelToggle, $.sidebar, $.closePanel);
 
     // 8. Init keyboard shortcuts
+    var _shortcuts = [
+        { key: ' ',  label: 'Play / Pause', group: 'Simulation', action: () => togglePlay() },
+        { key: '.', label: 'Step forward',  group: 'Simulation', action: () => step() },
+        { key: 's', label: 'Strategy view',  group: 'View',       action: () => {
+            if (!$.sidebar.classList.contains('open')) {
+                _toolbar.toggleSidebar($.panelToggle, $.sidebar);
+            }
+            const tab = document.querySelector('[data-tab="strategy"]');
+            if (tab) tab.click();
+        } },
+        { key: 'b', label: 'Buy stock',      group: 'Trade',      action: () => handleBuyStock() },
+        { key: 't', label: 'Toggle sidebar',  group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); } },
+        { key: 'r', label: 'Reset',           group: 'Simulation', action: () => resetSim() },
+        { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
+        { key: '2', label: PRESETS[1].name,   group: 'Presets',    action: () => loadPreset(1) },
+        { key: '3', label: PRESETS[2].name,   group: 'Presets',    action: () => loadPreset(2) },
+        { key: '4', label: PRESETS[3].name,   group: 'Presets',    action: () => loadPreset(3) },
+        { key: '5', label: PRESETS[4].name,   group: 'Presets',    action: () => loadPreset(4) },
+        { key: '6', label: PRESETS[5].name,   group: 'Presets',    action: () => loadPreset(5) },
+        { key: '7', label: PRESETS[6].name,   group: 'Presets',    action: () => loadPreset(6) },
+    ];
+
     if (typeof initShortcuts !== 'undefined') {
-        initShortcuts([
-            { key: ' ',  label: 'Play / Pause', group: 'Simulation', action: () => togglePlay() },
-            { key: '.', label: 'Step forward',  group: 'Simulation', action: () => step() },
-            { key: 's', label: 'Strategy view',  group: 'View',       action: () => {
-                if (!$.sidebar.classList.contains('open')) {
-                    _toolbar.toggleSidebar($.panelToggle, $.sidebar);
-                }
-                const tab = document.querySelector('[data-tab="strategy"]');
-                if (tab) tab.click();
-            } },
-            { key: 'b', label: 'Buy stock',      group: 'Trade',      action: () => handleBuyStock() },
-            { key: 't', label: 'Toggle sidebar',  group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); } },
-            { key: 'r', label: 'Reset',           group: 'Simulation', action: () => resetSim() },
-            { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
-            { key: '2', label: PRESETS[1].name,   group: 'Presets',    action: () => loadPreset(1) },
-            { key: '3', label: PRESETS[2].name,   group: 'Presets',    action: () => loadPreset(2) },
-            { key: '4', label: PRESETS[3].name,   group: 'Presets',    action: () => loadPreset(3) },
-            { key: '5', label: PRESETS[4].name,   group: 'Presets',    action: () => loadPreset(4) },
-            { key: '6', label: PRESETS[5].name,   group: 'Presets',    action: () => loadPreset(5) },
-            { key: '7', label: PRESETS[6].name,   group: 'Presets',    action: () => loadPreset(6) },
-        ], { helpTitle: 'Shoals Keyboard Shortcuts' });
+        initShortcuts(_shortcuts, { helpTitle: 'Shoals Keyboard Shortcuts' });
+    }
+
+    if (typeof initAboutPanel === 'function') {
+        initAboutPanel({
+            title: 'Options Trading',
+            description: 'Options trading simulator with GBM, Merton jump-diffusion, and Heston stochastic volatility stock models. Build strategies with CRR binomial tree pricing and navigate narrative-driven market events.',
+            controls: [
+                { label: 'Buy stock', value: 'Click Buy button' },
+                { label: 'Place option', value: 'Configure in Strategy tab' },
+            ],
+            shortcuts: _shortcuts,
+            repo: 'https://github.com/a9lim/finsim',
+        });
     }
 
     // 9. Bind UI events
