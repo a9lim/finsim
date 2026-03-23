@@ -489,7 +489,7 @@ export function syncSettingsUI($, sim) {
  * @param {{ bid, ask }} bondBA
  * @param {object} posMap
  */
-export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posMap) {
+export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posMap, spot) {
     $.chainOverlayTable.textContent = '';
 
     if (!skeleton || skeleton.length === 0) {
@@ -502,6 +502,7 @@ export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posM
     }
 
     let selectedExpiry = 0;
+    let _sba = stockBA, _bba = bondBA, _pm = posMap, _sp = spot;
 
     function renderOverlay() {
         $.chainOverlayTable.textContent = '';
@@ -523,16 +524,21 @@ export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posM
 
         // Stock / Bond price table
         $.chainOverlayTable.appendChild(
-            buildStockBondTable(stockBA, bondBA, $._onChainCellClick, posMap)
+            buildStockBondTable(_sba, _bba, $._onChainCellClick, _pm)
         );
 
         const expiry = priceExpiry(selectedExpiry);
-        $.chainOverlayTable.appendChild(buildChainTable(expiry, false, posMap));
+        $.chainOverlayTable.appendChild(buildChainTable(expiry, false, _pm, _sp));
         if (!$.chainOverlayTable._chainClicksBound) {
             bindChainTableClicks($.chainOverlayTable, $._onChainCellClick);
             $.chainOverlayTable._chainClicksBound = true;
         }
     }
+
+    $._refreshChainOverlay = (newStockBA, newBondBA, newPosMap, newSpot) => {
+        _sba = newStockBA; _bba = newBondBA; _pm = newPosMap; _sp = newSpot;
+        renderOverlay();
+    };
 
     renderOverlay();
     $.chainOverlay.classList.remove('hidden');

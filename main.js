@@ -1416,7 +1416,7 @@ function openFullChain() {
     const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
     const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
     const bondBA = computeBidAsk(bondMid, displaySpot, vol);
-    showChainOverlay($, chainSkeleton, _priceExpiryGreeks, stockBA, bondBA, _buildPosMap());
+    showChainOverlay($, chainSkeleton, _priceExpiryGreeks, stockBA, bondBA, _buildPosMap(), displaySpot);
 }
 
 function handleTradeSubmit(data) {
@@ -1443,6 +1443,18 @@ function handleTradeSubmit(data) {
     chainDirty = true;
     updateUI();
     dirty = true;
+    _refreshChainOverlayIfOpen();
+}
+
+function _refreshChainOverlayIfOpen() {
+    if ($.chainOverlay.classList.contains('hidden') || !$._refreshChainOverlay) return;
+    const vol = market.sigma;
+    const displaySpot = sim.S + getStockTemporaryImpact();
+    const bondDte = _getTradeExpiryDay() - sim.day;
+    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
+    const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
+    const bondBA = computeBidAsk(bondMid, displaySpot, vol);
+    $._refreshChainOverlay(stockBA, bondBA, _buildPosMap(), displaySpot);
 }
 
 function handleLiquidate() {

@@ -7,6 +7,7 @@
    ===================================================== */
 
 import { fmtDte, fmtNum } from './format-helpers.js';
+import { modeledOI } from './price-impact.js';
 
 // ---------------------------------------------------------------------------
 // Internal chain table builders (DOM methods -- no text interpolation)
@@ -26,7 +27,7 @@ function _wrapPrice(td, text, posMap, type, strike, expiryDay) {
     if (qty) td.classList.add(qty > 0 ? 'pos-long' : 'pos-short');
 }
 
-function buildChainRow(row, expiry, isAtm, compact, posMap) {
+function buildChainRow(row, expiry, isAtm, compact, posMap, spot) {
     const tr = document.createElement('tr');
     tr.className = 'chain-row' + (isAtm ? ' atm-row' : '');
 
@@ -62,11 +63,14 @@ function buildChainRow(row, expiry, isAtm, compact, posMap) {
         tr.appendChild(strikeTd);
         tr.appendChild(putTd);
     } else {
+        const logSK = spot > 0 ? Math.log(spot / row.strike) : 0;
+        const callOI = Math.round(modeledOI('call', logSK, expiry.dte));
+        const putOI  = Math.round(modeledOI('put',  logSK, expiry.dte));
         const cellDefs = [
             { text: row.call.bid.toFixed(2) + ' / ' + row.call.ask.toFixed(2), cls: 'call-cell', type: 'call' },
-            { text: fmtNum(row.call.delta, 3), cls: 'chain-greek', type: null },
+            { text: String(callOI), cls: 'chain-greek', type: null },
             { text: String(row.strike),        cls: 'strike-cell' + (isAtm ? ' atm-strike' : ''), type: null },
-            { text: fmtNum(row.put.delta, 3),  cls: 'chain-greek', type: null },
+            { text: String(putOI),  cls: 'chain-greek', type: null },
             { text: row.put.bid.toFixed(2) + ' / ' + row.put.ask.toFixed(2), cls: 'put-cell', type: 'put' },
         ];
         for (const c of cellDefs) {
@@ -88,7 +92,7 @@ function buildChainRow(row, expiry, isAtm, compact, posMap) {
     return tr;
 }
 
-export function buildChainTable(expiry, compact, posMap) {
+export function buildChainTable(expiry, compact, posMap, spot) {
     const table = document.createElement('table');
     table.className = 'chain-tbl' + (compact ? '' : ' full-chain-tbl');
     table.setAttribute('role', 'grid');
@@ -97,7 +101,7 @@ export function buildChainTable(expiry, compact, posMap) {
     const headerRow = document.createElement('tr');
     const headers = compact
         ? ['Call', 'Strike', 'Put']
-        : ['Call', 'Call \u0394', 'Strike', 'Put \u0394', 'Put'];
+        : ['Call', 'Call OI', 'Strike', 'Put OI', 'Put'];
     for (const h of headers) {
         const th = document.createElement('th');
         th.className = 'chain-th';
@@ -110,7 +114,7 @@ export function buildChainTable(expiry, compact, posMap) {
     const tbody = document.createElement('tbody');
     const midStrike = expiry.options[Math.floor(expiry.options.length / 2)]?.strike;
     for (const row of expiry.options) {
-        tbody.appendChild(buildChainRow(row, expiry, row.strike === midStrike, compact, posMap));
+        tbody.appendChild(buildChainRow(row, expiry, row.strike === midStrike, compact, posMap, spot));
     }
     table.appendChild(tbody);
     return table;
