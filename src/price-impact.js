@@ -21,8 +21,8 @@ const _playerParamCaps = {
 };
 let _lastToastDay = -Infinity;
 
-/* ── per-strike option permanent impact (persists across days, decays) ── */
-// key = `${strike}_${expiryDay}`, value = accumulated price shift
+/* ── per-strike option permanent impact ── */
+// key = `${type}_${strike}_${expiryDay}`, value = accumulated price shift
 const _optionPermanentImpact = new Map();
 
 /* ── temporary impact (resets each substep, reflects intra-substep liquidity depletion) ── */
@@ -61,7 +61,7 @@ export function resetDailyVolume() {
  * Compute permanent + temporary impact for a stock or bond trade.
  * @param {number} qty  Signed quantity (positive=buy, negative=sell)
  * @param {number} sigma Current vol (Heston sqrt(v) for stock, sigmaR for bond)
- * @returns {{ permanent: number, temporary: number, fillAdjustment: number }}
+ * @returns {{ permanent: number, temporary: number }}
  */
 export function computeStockImpact(qty, sigma) {
     const absQty = Math.abs(qty);
@@ -73,7 +73,7 @@ export function computeStockImpact(qty, sigma) {
     const temp   = TEMP_COEFF * sigma * (2 * cumRef + absQty) / ADV * sign;
     // Update cumulative volume
     if (qty > 0) _cumStockBuy += absQty; else _cumStockSell += absQty;
-    return { permanent: perm, temporary: temp, fillAdjustment: temp };
+    return { permanent: perm, temporary: temp };
 }
 
 /**
@@ -93,7 +93,7 @@ export function modeledOI(moneyness, dte) {
  * @param {number} sigma     Current Heston vol
  * @param {number} moneyness abs(ln(S/K))
  * @param {number} dte       Days to expiry
- * @returns {{ permanent: number, temporary: number, fillAdjustment: number }}
+ * @returns {{ permanent: number, temporary: number }}
  */
 export function computeOptionImpact(qty, sigma, moneyness, dte, strike, expiryDay) {
     const absQty = Math.abs(qty);
@@ -108,7 +108,7 @@ export function computeOptionImpact(qty, sigma, moneyness, dte, strike, expiryDa
     const temp   = OPT_TEMP_COEFF * sigma * (2 * cumRef + absQty) / oi * sign;
     // Update cumulative
     if (qty > 0) cum.buy += absQty; else cum.sell += absQty;
-    return { permanent: perm, temporary: temp, fillAdjustment: temp };
+    return { permanent: perm, temporary: temp };
 }
 
 /**
@@ -132,8 +132,7 @@ export function computeDeltaHedgeImpact(optQty, delta, sigma) {
 }
 
 /**
- * Apply a permanent price shift to sim.S and track for recovery.
- * Call after every trade execution.
+ * Apply a permanent price shift to sim.S.
  */
 export function applyPermanentImpact(sim, shift) {
     if (Math.abs(shift) < 1e-8) return;
@@ -172,7 +171,6 @@ export function addOptionTemporaryImpact(type, strike, expiryDay, shift) {
 export function getOptionTemporaryImpact(type, strike, expiryDay) {
     return _optionTemporaryImpact.get(`${type}_${strike}_${expiryDay}`) || 0;
 }
-
 
 /* ── Layer 3: Parameter shifts from large exposure ── */
 

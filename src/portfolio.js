@@ -103,19 +103,21 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
         const impact = computeStockImpact(signedQty, currentVol);
         applyPermanentImpact(sim, impact.permanent);
         addStockTemporaryImpact(impact.temporary);
-        return Math.max(0.01, spreadFill + impact.fillAdjustment);
+        return Math.max(0.01, spreadFill + impact.temporary);
     } else {
         const moneyness = Math.abs(Math.log(currentPrice / strike));
         const dte = Math.max(1, (expiryDay || 0) - currentDay);
         const impact = computeOptionImpact(signedQty, currentVol, moneyness, dte, strike, expiryDay || 0);
         applyOptionPermanentImpact(type, strike, expiryDay || 0, impact.permanent);
         addOptionTemporaryImpact(type, strike, expiryDay || 0, impact.temporary);
-        const approxDelta = type === 'call'
-            ? Math.max(0.01, Math.min(0.99, 0.5 + 0.5 * Math.tanh(-moneyness * 3)))
-            : -Math.max(0.01, Math.min(0.99, 0.5 + 0.5 * Math.tanh(moneyness * 3)));
-        const hedgeShift = computeDeltaHedgeImpact(signedQty, approxDelta, currentVol);
+        const T = dte / TRADING_DAYS_PER_YEAR;
+        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+        const sigma = computeSkewSigma(sigEff, currentPrice, strike, T, market.rho, market.xi, market.kappa);
+        _gt = prepareGreekTrees(T, sim.r, sigma, sim.q, currentDay, _gt);
+        const delta = computeGreeksWithTrees(currentPrice, strike, type === 'put', _gt).delta;
+        const hedgeShift = computeDeltaHedgeImpact(signedQty, delta, currentVol);
         applyPermanentImpact(sim, hedgeShift);
-        return Math.max(0.01, spreadFill + impact.fillAdjustment);
+        return Math.max(0.01, spreadFill + impact.temporary);
     }
 }
 
