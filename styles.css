@@ -1001,7 +1001,6 @@ main {
     max-width: 520px;
     border-top: 3px solid var(--accent);
     transition: border-top-color 0.2s;
-    background: var(--bg-panel-solid);
 }
 .popup-tag {
     display: inline-block;
@@ -1039,9 +1038,6 @@ main {
     gap: 4px;
     padding: 12px 16px;
     border-radius: var(--radius-md);
-    background: var(--bg-panel-solid);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-sm);
     cursor: pointer;
     text-align: left;
     transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.1s;

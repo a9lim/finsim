@@ -1022,7 +1022,7 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
     $.popupChoices.textContent = '';
     choices.forEach((c, i) => {
         const btn = document.createElement('button');
-        btn.className = 'popup-choice-btn';
+        btn.className = 'popup-choice-btn glass';
         const lbl = document.createElement('span');
         lbl.className = 'popup-choice-label';
         lbl.textContent = c.label;
