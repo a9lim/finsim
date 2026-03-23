@@ -35,7 +35,7 @@ main.js               1805 lines  Orchestrator: DOM cache $, rAF loop, sub-step 
                                    live candle animation, camera, shortcuts, event wiring,
                                    strategy builder (with rollback), ExpiryManager, world state,
                                    executeWithRollback, selectable expiry resolution,
-                                   price impact overlays, popup queue, playerChoices/
+                                   Layer 3 param overlays, popup queue, playerChoices/
                                    impactHistory/quarterlyReviews tracking, rogue trading,
                                    declarative trade execution, compliance integration,
                                    insider tip scheduling
@@ -59,7 +59,8 @@ src/
                                    Tree reuse API for zero-alloc pricing. All pricing
                                    uses prepareTree+priceWithTree (no priceAmerican).
   chain.js              230 lines  ExpiryManager, generateStrikes(), buildChainSkeleton(),
-                                   priceChainExpiry() with reusable tree pool
+                                   priceChainExpiry() with reusable tree pool + per-strike
+                                   permanent/temporary impact applied to displayed prices
   portfolio.js         1070 lines  Signed-qty positions, market/limit/stop orders, netting
                                    (includes strategyName), cash/margin, borrow interest,
                                    dividends, option expiry, bid/ask spreads, slippage
@@ -85,10 +86,12 @@ src/
                                    6 fake). ~20 events have portfolioFlavor functions. Exports
                                    OFFLINE_EVENTS, PARAM_RANGES, getEventById().
   price-impact.js       283 lines  Almgren-Chriss price impact: permanent (sqrt) + temporary
-                                   (linear) components for stock and options. Modeled OI with
-                                   moneyness decay. Delta hedge feedback. Cumulative volume
-                                   tracking (no order-splitting exploit). Recovery drift.
-                                   Layer 3 parameter shifts. Impact toast generation.
+                                   (linear) components for stock and options. Per-strike
+                                   permanent + temporary impact tracking for chain display.
+                                   Modeled OI with moneyness + term-structure decay. Tree-
+                                   computed delta hedge feedback. Cumulative volume tracking
+                                   (no order-splitting exploit). Layer 3 parameter shifts.
+                                   Impact toast generation.
   compliance.js          91 lines  Compliance heat/credibility state. effectiveHeat(),
                                    onComplianceTriggered(), onComplianceChoice(),
                                    cooldownMultiplier(), thresholdMultiplier(), complianceTone()
@@ -117,8 +120,8 @@ src/
                                    localStorage CRUD (hash IDs, name collision enforcement),
                                    resolveLegs (with override expiry), formatLeg,
                                    computeNetCost (uses vol surface), legsToRelative, nextAutoName
-  position-value.js      88 lines  unitPrice() (uses vol surface for options),
-                                   computePositionValue(), computePositionPnl()
+  position-value.js      88 lines  unitPrice() (uses vol surface + per-strike impact
+                                   for options), computePositionValue(), computePositionPnl()
   chain-renderer.js     314 lines  Chain table DOM with event delegation: renderChainInto(),
                                    rebuildExpiryDropdown(), buildStockBondTable(), posKey()
   portfolio-renderer.js  363 lines  Portfolio display with DOM diffing, strategy group
@@ -134,7 +137,7 @@ main.js
   |- config.js             (constants, PRESETS)
   |- simulation.js         (imports config, history-buffer)
   |- market.js             (leaf module -- single-writer main.js, multiple readers)
-  |- chain.js              (imports pricing, portfolio, market, config)
+  |- chain.js              (imports pricing, portfolio, price-impact, market, config)
   |- portfolio.js          (imports pricing, market, config, position-value, price-impact)
   |- events.js             (imports config, world-state, event-pool)
   |- event-pool.js         (OFFLINE_EVENTS, PARAM_RANGES, getEventById)
@@ -147,11 +150,11 @@ main.js
   |- chart.js              (imports format-helpers, config; reads _PALETTE globals)
   |- strategy.js           (imports pricing, market, config)
   |- strategy-store.js     (imports pricing, portfolio, market, config)
-  |- ui.js                 (imports format-helpers, chain-renderer, portfolio, pricing, config)
+  |- ui.js                 (imports format-helpers, chain-renderer, portfolio, pricing, price-impact, config)
   |- chain-renderer.js     (imports format-helpers; reads _haptics globals)
   |- portfolio-renderer.js (imports position-value, format-helpers)
   |- format-helpers.js     (imports config)
-  |- position-value.js     (imports pricing, market, config)
+  |- position-value.js     (imports pricing, price-impact, market, config)
   |- reference.js          (data only)
   +- theme.js              (delegates to _toolbar)
 ```
@@ -160,7 +163,7 @@ main.js
 
 ### Sub-Step Streaming (playing)
 
-1. `frame()` applies recovery drift + param overlays, calls `sim.beginDay()`
+1. `frame()` applies param overlays, calls `sim.beginDay()`
 2. 16 sub-steps paced across tick interval. Each substep resets cumulative impact volume, then `sim.substep()` mutates partial bar in-place
 3. `chart.setLiveCandle(bar)` does smoothstep cubic interpolation between sub-step values
 4. `_onSubstep()`: checks pending orders, reprices visible chain expiry, updates portfolio/UI
@@ -205,13 +208,13 @@ Per-step Vasicek rate discounting. Discrete proportional dividends at `QUARTERLY
 
 Almgren-Chriss framework with permanent (information) + temporary (liquidity) components.
 
-**Stock slippage**: permanent `coeff * sigma * (sqrt((cum+qty)/ADV) - sqrt(cum/ADV))` shifts `sim.S` (information/price discovery, NOT in fill cost). Temporary `coeff * sigma * (2*cum + qty) / ADV` is the fill cost (liquidity, integral model). Cumulative volume tracked per substep — trades within the same substep batch; book refills between substeps. Fill prices clamped to $0.01 minimum.
+**Stock slippage**: permanent `coeff * sigma * (sqrt((cum+qty)/ADV) - sqrt(cum/ADV))` shifts `sim.S` (information/price discovery, truly permanent — no decay). Temporary `coeff * sigma * (2*cum + qty) / ADV` is the fill cost (liquidity, integral model) and shifts the displayed stock price for the current substep. Cumulative volume tracked per substep — trades within the same substep batch; book refills between substeps. Fill prices clamped to $0.01 minimum.
 
-**Options slippage**: same framework but scaled by `qty / modeledOI` instead of `qty / ADV`. Modeled OI drops exponentially with moneyness (`OI_MONEYNESS_DECAY = 4.0`) — deep OTM options have severe slippage. Market maker delta hedge creates secondary stock impact.
+**Options slippage**: same framework but scaled by `qty / modeledOI` instead of `qty / ADV`. Modeled OI = `OI_ATM_BASE * exp(-OI_MONEYNESS_DECAY * m²) * sqrt(63/dte)` — drops with moneyness (deep OTM = severe slippage) and increases for near-term expiries (front-month has most liquidity). Per-strike permanent impact tracked in `_optionPermanentImpact` map (keyed by `type_strike_expiryDay`), applied to chain display prices. Temporary impact tracked similarly, resets each substep. Market maker delta hedge (using tree-computed delta via `computeGreeksWithTrees`) creates secondary permanent stock impact.
 
 **Bonds**: spread only, no price impact (Vasicek-priced, deep market).
 
-**Recovery**: permanent stock impact recovers via mean-reverting drift overlay on `sim.mu` (half-life 3 days). Applied before `beginDay()`, removed after `finalizeDay()`.
+**Permanent impact does not decay** — it represents information/price discovery. Once the market learns from your trade, the price stays.
 
 **Layer 3**: large gross notional exposure (25/50/75/100% of ADV thresholds) shifts vol/drift parameters. Logarithmic scaling past 50%. Decays with half-life 5 days. Generates atmospheric impact toasts.
 
@@ -337,10 +340,10 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **Tree reuse**: every module owns reusable trees -- chain.js (`_rTree`/`_rGreekTrees`), portfolio.js (`_marginTree`/`_greekTrees`/`_gt`), position-value.js (`_tree`), strategy.js (`_entryTree` + per-leg `info.tree`), strategy-store.js (`_costTree`)
 - **Strategies in localStorage**: `shoals_strategies` key, hash-based IDs. Built-ins are const in `strategy-store.js`, never in localStorage. `currentStrategyHash` in main.js tracks loaded user strategy.
 - **Relative legs**: all saved strategies store `strikeOffset` / `dteOffset`, resolved at execution time via `resolveLegs()`.
-- **Price impact overlays**: `_recoveryDrift` and `_savedOverlays` applied before `beginDay()`, removed after `finalizeDay()`. Player param shifts tracked separately from event-caused shifts.
+- **Price impact overlays**: `_savedOverlays` (Layer 3 param shifts) applied before `beginDay()`, removed after `finalizeDay()`. Player param shifts tracked separately from event-caused shifts. Per-strike option impact (permanent + temporary) applied in `chain.js` and `position-value.js` to displayed/mark-to-market prices.
 - **Popup queue**: `_popupQueue` in main.js. Popups queued from `maybeFire()` and `evaluatePortfolioPopups()`. Processed at end-of-day and on overlay close. FIFO, one at a time.
 - **Player choices**: `playerChoices` map (flag → day) in main.js. Set by popup choice `playerFlag`. Read by epilogue and subsequent popup `trigger()` conditions.
-- **Cumulative volume**: `price-impact.js` tracks buy/sell volume per substep (stock, options per-strike, hedges). Resets each substep via `resetDailyVolume()`. Trades while paused (same substep) batch together. Both permanent (sqrt) and temporary (integral) components are split-proof. Permanent impact is NOT in fill cost — it's price discovery only.
+- **Cumulative volume**: `price-impact.js` tracks buy/sell volume per substep (stock, options per-strike, hedges). Resets each substep via `resetDailyVolume()` (also resets temporary impact). Trades while paused (same substep) batch together. Both permanent (sqrt) and temporary (integral) components are split-proof. Permanent impact is NOT in fill cost — it's price discovery only. Temporary impact IS the fill cost and is also displayed in chain/portfolio until substep resets.
 
 ## Gotchas
 
@@ -370,10 +373,11 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **`syncMarket` after `prepopulate`** -- must call `syncMarket(sim)` after `sim.prepopulate()` in both `init()` and `_resetCore()` or market params (v, kappa, theta, xi, rho) will be zero.
 - **`strategyBaseQty` on positions** -- set at first strategy execution, preserved through netting. Used by portfolio-renderer to compute execution multiplier vs per-unit leg quantities.
 - **`executeMarketOrder` takes `sim` first** -- signature is `(sim, type, side, qty, ...)`. All portfolio functions that execute trades (`closePosition`, `checkPendingOrders`, `processExpiry`, `liquidateAll`) also take `sim` as first parameter.
-- **`_fillPrice` includes slippage** -- signature is `(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay)`. Bonds skip slippage (spread only). Fills clamped to $0.01 minimum.
+- **`_fillPrice` includes slippage** -- signature is `(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay)`. Bonds skip slippage (spread only). Fills clamped to $0.01 minimum. For options, computes tree-based delta via `_gt` for the MM hedge (not an approximation).
 - **`showToast` takes `(message, duration)` only** -- duration is numeric milliseconds, NOT a severity string. No severity parameter exists.
 - **`scheduleFollowup` structure** -- must push `{ event, chainId, targetDay, weight, depth }` matching `_checkFollowups` format. Do NOT use `{ id, fireDay }`.
 - **Impact state must be reset** -- `resetImpactState()`, `resetPopupCooldowns()`, and `resetCompliance()` in `_resetCore()`. `resetDailyVolume()` at start of each substep in `frame()`. `resetPopupCooldowns()` also clears `_usedTips`.
+- **Permanent impact does not decay** -- stock permanent impact shifts `sim.S` forever. Option permanent impact accumulates in `_optionPermanentImpact` map forever. Only `resetImpactState()` clears them. Do NOT add decay — permanent impact is price discovery by design.
 - **Compliance triggers use notional, not delta** -- `_shortDirectionalNotional()` and `_longDirectionalNotional()` account for directional exposure (long put = short, short put = long). Do not use raw `qty` sign for directional classification.
 - **`close_short` is directional** -- closes short stock, short calls, AND long puts (all short-directional). Similarly `close_long` closes long stock, long calls, short puts.
 - **Compliance game over triggers epilogue** -- `_showComplianceTermination()` calls `_showEpilogue('compliance')`, not `_resetCore()`. The epilogue shows a "fired for cause" ending.
