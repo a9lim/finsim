@@ -6,7 +6,7 @@
    values. Used by portfolio.js and portfolio-renderer.js.
    ===================================================== */
 
-import { allocTree, prepareTree, priceWithTree, vasicekBondPrice } from './pricing.js';
+import { allocTree, prepareTree, priceWithTree, vasicekBondPrice, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
 import { market } from './market.js';
 
@@ -39,7 +39,11 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
         case 'put':
             if (dte <= 0 || vol <= 0) return Math.max(0, type === 'call' ? S - strike : strike - S);
             if (!_tree) _tree = allocTree();
-            prepareTree(dte, rate, vol, q, day, _tree);
+            {
+                const sigmaEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+                const sigma = computeSkewSigma(sigmaEff, S, strike, dte, market.rho, market.xi, market.kappa);
+                prepareTree(dte, rate, sigma, q, day, _tree);
+            }
             return priceWithTree(S, strike, type === 'put', _tree);
         default: return 0;
     }

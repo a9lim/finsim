@@ -17,7 +17,7 @@ import {
     MONEYNESS_SPREAD_WEIGHT,
 } from './config.js';
 
-import { allocTree, prepareTree, priceWithTree, allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
+import { allocTree, prepareTree, priceWithTree, allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
 import {
     computeStockImpact, computeOptionImpact,
     computeDeltaHedgeImpact, applyPermanentImpact,
@@ -87,28 +87,31 @@ export function resetPortfolio(capital) {
  * Almgren-Chriss market-impact slippage.
  */
 function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay) {
-    const ba = (type === 'call' || type === 'put')
-        ? computeOptionBidAsk(mid, currentPrice, strike, currentVol)
-        : computeBidAsk(mid, currentVol);
-    const spreadFill = side === 'long' ? ba.ask : ba.bid;
-
     const signedQty = side === 'long' ? qty : -qty;
 
     if (type === 'bond') {
-        // Bonds: spread only, no price impact (Vasicek-priced, deep market)
-        return spreadFill;
+        const ba = computeBidAsk(mid, currentVol);
+        return side === 'long' ? ba.ask : ba.bid;
     } else if (type === 'stock') {
+        const ba = computeBidAsk(mid, currentVol);
+        const spreadFill = side === 'long' ? ba.ask : ba.bid;
         const impact = computeStockImpact(signedQty, currentVol);
         applyPermanentImpact(sim, impact.permanent);
         return Math.max(0.01, spreadFill + impact.fillAdjustment);
     } else {
-        const moneyness = Math.abs(Math.log(currentPrice / strike));
+        // Options: use term-structure + skew vol for spread and impact
         const dte = Math.max(1, (expiryDay || 0) - currentDay);
-        const impact = computeOptionImpact(signedQty, currentVol, moneyness, dte, strike, expiryDay || 0);
+        const T = dte / TRADING_DAYS_PER_YEAR;
+        const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+        const sigma = computeSkewSigma(sigmaEff, currentPrice, strike, T, market.rho, market.xi, market.kappa);
+        const ba = computeOptionBidAsk(mid, currentPrice, strike, sigma);
+        const spreadFill = side === 'long' ? ba.ask : ba.bid;
+        const moneyness = Math.abs(Math.log(currentPrice / strike));
+        const impact = computeOptionImpact(signedQty, sigma, moneyness, dte, strike, expiryDay || 0);
         const approxDelta = type === 'call'
             ? Math.max(0.01, Math.min(0.99, 0.5 + 0.5 * Math.tanh(-moneyness * 3)))
             : -Math.max(0.01, Math.min(0.99, 0.5 + 0.5 * Math.tanh(moneyness * 3)));
-        const hedgeShift = computeDeltaHedgeImpact(signedQty, approxDelta, currentVol);
+        const hedgeShift = computeDeltaHedgeImpact(signedQty, approxDelta, sigma);
         applyPermanentImpact(sim, hedgeShift);
         return Math.max(0.01, spreadFill + impact.fillAdjustment);
     }
@@ -238,7 +241,9 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
             let optMid;
             if (dte > 0 && currentVol > 0) {
                 if (!_marginTree) _marginTree = allocTree();
-                prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
+                { const _se = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+                const _sv = computeSkewSigma(_se, currentPrice, strike, dte, market.rho, market.xi, market.kappa);
+                prepareTree(dte, currentRate, _sv, q, currentDay, _marginTree); }
                 optMid = priceWithTree(currentPrice, strike, type === 'put', _marginTree);
             } else {
                 optMid = Math.max(0, type === 'call' ? currentPrice - strike : strike - currentPrice);
@@ -296,7 +301,9 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
                 case 'call':
                 case 'put': {
                     if (!_marginTree) _marginTree = allocTree();
-                    prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
+                    { const _se = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+                const _sv = computeSkewSigma(_se, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
+                prepareTree(dte, currentRate, _sv, q, currentDay, _marginTree); }
                     const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
                     required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                     break;
@@ -910,7 +917,9 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
             case 'call':
             case 'put': {
                 if (!_marginTree) _marginTree = allocTree();
-                prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
+                { const _se = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+                const _sv = computeSkewSigma(_se, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
+                prepareTree(dte, currentRate, _sv, q, currentDay, _marginTree); }
                 const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
                 total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                 break;
@@ -962,7 +971,9 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
                 case 'call':
                 case 'put': {
                     if (!_marginTree) _marginTree = allocTree();
-                    prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
+                    { const _se = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+                const _sv = computeSkewSigma(_se, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
+                prepareTree(dte, currentRate, _sv, q, currentDay, _marginTree); }
                     const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
                     required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                     break;
