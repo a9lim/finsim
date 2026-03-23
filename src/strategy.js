@@ -689,47 +689,34 @@ export class StrategyRenderer {
         ctx.lineJoin  = 'round';
         ctx.lineCap   = 'round';
 
-        // Walk segments, splitting at zero crossings
-        let segStart = 0;
+        // Walk points, splitting into segments at zero crossings.
+        // Each segment is a single colour (up or down).
+        ctx.strokeStyle = pnls[0] >= 0 ? colorUp : colorDown;
+        ctx.beginPath();
+        ctx.moveTo(xToPixel(xs[0]), pnlToPixel(pnls[0]));
 
-        for (let i = 1; i <= xs.length; i++) {
-            const atEnd = i === xs.length;
-            const crossed = !atEnd && Math.sign(pnls[i]) !== Math.sign(pnls[i - 1])
+        for (let i = 1; i < xs.length; i++) {
+            const crossed = Math.sign(pnls[i]) !== Math.sign(pnls[i - 1])
                             && pnls[i - 1] !== 0 && pnls[i] !== 0;
 
-            if (atEnd || crossed) {
-                // Draw segment from segStart..i-1 (plus interpolated zero if crossing)
-                const segColor = pnls[segStart] >= 0 ? colorUp : colorDown;
-                ctx.strokeStyle = segColor;
-                ctx.beginPath();
-                for (let j = segStart; j <= (atEnd ? i - 1 : i - 1); j++) {
-                    const px = xToPixel(xs[j]);
-                    const py = pnlToPixel(pnls[j]);
-                    if (j === segStart) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-                }
-                if (crossed) {
-                    // Interpolate zero crossing and add as endpoint
-                    const t  = pnls[i - 1] / (pnls[i - 1] - pnls[i]);
-                    const zx = xs[i - 1] + t * (xs[i] - xs[i - 1]);
-                    ctx.lineTo(xToPixel(zx), pnlToPixel(0));
-                }
+            if (crossed) {
+                // Interpolate zero crossing
+                const t  = pnls[i - 1] / (pnls[i - 1] - pnls[i]);
+                const zx = xs[i - 1] + t * (xs[i] - xs[i - 1]);
+                const zPx = xToPixel(zx);
+                const zPy = pnlToPixel(0);
+                // Finish current segment at the crossing
+                ctx.lineTo(zPx, zPy);
                 ctx.stroke();
-
-                if (crossed) {
-                    // Start next segment from zero-crossing point
-                    segStart = i - 1; // Will be redrawn from crossing onward
-                    // Start the new segment colour at the interpolated zero
-                    const t  = pnls[i - 1] / (pnls[i - 1] - pnls[i]);
-                    const zx = xs[i - 1] + t * (xs[i] - xs[i - 1]);
-                    const nextColor = pnls[i] >= 0 ? colorUp : colorDown;
-                    ctx.strokeStyle = nextColor;
-                    ctx.beginPath();
-                    ctx.moveTo(xToPixel(zx), pnlToPixel(0));
-                    ctx.lineTo(xToPixel(xs[i]), pnlToPixel(pnls[i]));
-                    segStart = i;
-                }
+                // Start new segment from the crossing in the new colour
+                ctx.strokeStyle = pnls[i] >= 0 ? colorUp : colorDown;
+                ctx.beginPath();
+                ctx.moveTo(zPx, zPy);
             }
+
+            ctx.lineTo(xToPixel(xs[i]), pnlToPixel(pnls[i]));
         }
+        ctx.stroke();
 
         ctx.restore();
     }
