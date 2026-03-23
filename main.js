@@ -6,6 +6,7 @@
    ===================================================== */
 
 import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ADV, ROGUE_TRADING_THRESHOLD } from './src/config.js';
+import { fmtDollar } from './src/format-helpers.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
 import {
@@ -21,7 +22,7 @@ import {
     cacheDOMElements, bindEvents, updateChainDisplay,
     rebuildTradeDropdown, rebuildStrategyDropdown,
     updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateStockBondPrices,
-    syncSettingsUI, toggleStrategyView, showMarginCall, showFraudScreen, showRogueTrading, showChainOverlay,
+    syncSettingsUI, toggleStrategyView, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
     updateDynamicSections, updateEventLog, updateCongressDiagrams,
@@ -675,8 +676,66 @@ function _processPopupQueue() {
         if (choice.resultToast) {
             showToast(choice.resultToast, 4000);
         }
+        // Margin call actions
+        if (event._marginAction) {
+            const vol = market.sigma;
+            if (choice.playerFlag === 'margin_liquidated') {
+                liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                chainDirty = true;
+                updateUI();
+                if (portfolio.cash < sim.S) {
+                    _showGameOver('Forced liquidation left your account in deficit by '
+                        + fmtDollar(Math.abs(portfolio.cash))
+                        + '. Regulators have flagged the account for review.');
+                }
+            } else if (choice.playerFlag === 'margin_partial') {
+                // Close stock positions only
+                const stockPos = portfolio.positions.filter(p => p.type === 'stock');
+                for (const p of stockPos) {
+                    closePosition(sim, p.id, sim.S, vol, sim.r, sim.day, sim.q);
+                }
+                chainDirty = true;
+                updateUI();
+                // Re-check margin after partial liquidation
+                const recheck = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
+                if (recheck.triggered) {
+                    showToast('Still below margin. Full liquidation required.', 4000);
+                    liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                    chainDirty = true;
+                    updateUI();
+                    if (portfolio.cash < sim.S) {
+                        _showGameOver('Forced liquidation left your account in deficit.');
+                    }
+                }
+            }
+            if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
+        }
+        // Rogue trading / game over actions
+        if (event._gameOverAction) {
+            _resetCore(DEFAULT_PRESET);
+            loadPreset(DEFAULT_PRESET);
+        }
         dirty = true;
     }, popupCat, event.magnitude);
+}
+
+function _showGameOver(contextText) {
+    _popupQueue.unshift({
+        category: 'gameover',
+        magnitude: 'major',
+        headline: 'Rogue Trading Investigation',
+        context: contextText,
+        choices: [
+            {
+                label: 'Accept your fate',
+                desc: 'There is no way out. The investigation has begun.',
+                playerFlag: 'game_over',
+                resultToast: 'Your career at Meridian Capital is over.',
+            },
+        ],
+        _gameOverAction: true,
+    });
+    _processPopupQueue();
 }
 
 function _portfolioEquity() {
@@ -810,9 +869,8 @@ function _onDayComplete() {
     // Rogue trading check (before margin)
     const equity = _portfolioEquity();
     if (equity < portfolio.initialCapital * ROGUE_TRADING_THRESHOLD) {
-        showRogueTrading($, equity, portfolio.initialCapital);
-        playing = false;
-        updatePlayBtn($, playing);
+        const lossAmt = fmtDollar(Math.abs(portfolio.initialCapital - equity));
+        _showGameOver(`Meridian Capital's internal audit has uncovered ${lossAmt} in unauthorized losses on your desk. Bank security has been called. Your access has been revoked. The SEC has been notified.`);
         return;
     }
 
@@ -820,9 +878,29 @@ function _onDayComplete() {
     const margin = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
     if (margin.triggered) {
         portfolio.marginCallCount++;
-        playing = false;
-        updatePlayBtn($, playing);
-        showMarginCall($, margin);
+        const shortfall = margin.required - margin.equity;
+        _popupQueue.unshift({
+            category: 'margin',
+            magnitude: 'major',
+            headline: 'Margin Call',
+            context: `Portfolio equity ${fmtDollar(margin.equity)} is below the maintenance requirement of ${fmtDollar(margin.required)}. Shortfall: ${fmtDollar(shortfall)}. The risk desk is on the line.`,
+            choices: [
+                {
+                    label: 'Liquidate all positions',
+                    desc: 'Dump everything at market. Stop the bleeding.',
+                    playerFlag: 'margin_liquidated',
+                    resultToast: 'All positions liquidated.',
+                },
+                {
+                    label: 'Sell stock first',
+                    desc: 'Unload equity exposure, keep options book intact.',
+                    playerFlag: 'margin_partial',
+                    resultToast: 'Stock positions closed.',
+                },
+            ],
+            _marginAction: true,
+        });
+        _processPopupQueue();
     }
 
     // Auto-scroll: keep latest candle near right edge when playing
@@ -1264,7 +1342,9 @@ function handleLiquidate() {
     if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
 
     if (portfolio.cash < sim.S) {
-        showFraudScreen($, portfolio.cash);
+        _showGameOver('Following the forced liquidation of all positions, your account remains in deficit by '
+            + fmtDollar(Math.abs(portfolio.cash))
+            + '. Regulators have flagged the account for review.');
     } else {
         if (typeof showToast !== 'undefined') showToast('All positions liquidated.');
     }
