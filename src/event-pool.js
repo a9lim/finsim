@@ -925,11 +925,42 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 0.6,
         headline: 'PNTH CEO Gottlieb delivers blistering keynote: "We built Atlas to heal, not to kill. I will not let this company become a weapons factory"',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ceoIsGottlieb && world.pnth.boardDirks >= 6,
-        followups: [
-            { id: 'dirks_cnbc_rebuttal', mtth: 10, weight: 0.8 },
+        popup: true,
+        era: 'early',
+        context: (sim, world, portfolio) =>
+            'Gottlieb just went scorched earth at the Aspen Ideas keynote. He called the defense contracts "a betrayal of our founding mission" on live television. PNTH is selling off in after-hours as the Dirks faction scrambles to respond. Your desk\'s PNTH models are all flashing red. The schism is now public and irreversible.',
+        choices: [
+            {
+                label: 'Side with Gottlieb',
+                desc: 'Bet on the ethics pivot. If Gottlieb wins the board war, commercial revenue re-rates the stock.',
+                deltas: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+                effects: [
+                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
+                ],
+                followups: [{ id: 'dirks_cnbc_rebuttal', mtth: 10, weight: 0.8 }],
+                playerFlag: 'sided_with_gottlieb_keynote',
+                resultToast: 'You back the ethics play. If the commercial pivot works, you\'re early money.',
+            },
+            {
+                label: 'Fade the speech',
+                desc: 'CEOs grandstand all the time. Defense revenue is real. Buy the dip.',
+                deltas: { mu: -0.01, theta: 0.005, lambda: 0.2 },
+                effects: [],
+                followups: [{ id: 'dirks_cnbc_rebuttal', mtth: 8, weight: 0.9 }],
+                playerFlag: 'faded_gottlieb_keynote',
+                resultToast: 'You buy into the weakness. Defense contracts don\'t care about keynotes.',
+            },
+            {
+                label: 'Buy volatility',
+                desc: 'A public CEO-board war means violent swings either way. Load up on straddles.',
+                deltas: { mu: -0.015, theta: 0.02, lambda: 0.5, xi: 0.02 },
+                effects: [],
+                followups: [{ id: 'dirks_cnbc_rebuttal', mtth: 10, weight: 0.8 }],
+                playerFlag: 'bought_vol_gottlieb_keynote',
+                resultToast: 'You buy vol into the schism. The board war should keep realized vol elevated.',
+            },
         ],
     },
     {
@@ -937,12 +968,51 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Dirks fires back on CNBC: "Eugene is a brilliant engineer but a naive businessman. Defense contracts are our fastest-growing segment"',
-        params: { mu: 0.01, theta: 0.008, lambda: 0.2 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ceoIsGottlieb,
-        followups: [
-            { id: 'board_closed_session', mtth: 20, weight: 0.7 },
-            { id: 'kassis_caught_middle', mtth: 15, weight: 0.5 },
+        popup: true,
+        era: 'early',
+        context: (sim, world, portfolio) =>
+            'Dirks went on CNBC this morning and eviscerated Gottlieb on live television. She had the defense revenue numbers memorized -- $3.2 billion pipeline, 40% margins, Pentagon sole-source status. The anchors ate it up. PNTH is bouncing as defense bulls pile back in. The faction war is heating up and you need to pick a side.',
+        choices: [
+            {
+                label: 'Back Dirks',
+                desc: 'Defense revenue is real and growing. Dirks has the board math. Position for her winning.',
+                deltas: { mu: 0.02, theta: 0.008, lambda: 0.2 },
+                effects: [
+                    { path: 'pnth.boardDirks', op: 'add', value: 1 },
+                ],
+                followups: [
+                    { id: 'board_closed_session', mtth: 18, weight: 0.7 },
+                    { id: 'kassis_caught_middle', mtth: 12, weight: 0.5 },
+                ],
+                playerFlag: 'backed_dirks_rebuttal',
+                resultToast: 'You bet on the defense thesis. Dirks is playing to win.',
+            },
+            {
+                label: 'Stay neutral',
+                desc: 'Don\'t pick a side in a board war. Hedge and wait for the closed session outcome.',
+                deltas: { mu: 0.005, theta: 0.012, lambda: 0.3 },
+                effects: [],
+                followups: [
+                    { id: 'board_closed_session', mtth: 20, weight: 0.7 },
+                    { id: 'kassis_caught_middle', mtth: 15, weight: 0.5 },
+                ],
+                playerFlag: 'neutral_dirks_rebuttal',
+                resultToast: 'You sit on the fence. Smart or indecisive -- time will tell.',
+            },
+            {
+                label: 'Short the chaos',
+                desc: 'A public CEO-Chair war never ends well. Short into the dysfunction.',
+                deltas: { mu: -0.01, theta: 0.015, lambda: 0.4 },
+                effects: [],
+                followups: [
+                    { id: 'board_closed_session', mtth: 20, weight: 0.7 },
+                    { id: 'kassis_caught_middle', mtth: 15, weight: 0.5 },
+                ],
+                playerFlag: 'shorted_dirks_rebuttal',
+                resultToast: 'You short the dysfunction. Governance chaos is never bullish.',
+            },
         ],
     },
     {
@@ -950,13 +1020,52 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'PNTH board convenes emergency closed session; sources say "the room was nuclear" as Dirks and Gottlieb factions clash',
-        params: { mu: -0.01, theta: 0.01, lambda: 0.4 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ceoIsGottlieb,
-        followups: [
-            { id: 'gottlieb_stripped_oversight', mtth: 15, weight: 0.5 },
-            { id: 'dirks_blocked', mtth: 15, weight: 0.3 },
-            { id: 'board_compromise', mtth: 10, weight: 0.5 },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) => {
+            const dirksEdge = world.pnth.boardDirks > world.pnth.boardGottlieb;
+            return `PNTH's board just went into emergency closed session. Your source on the board says the vote count is tight${dirksEdge ? ' but leaning Dirks' : ''}. Whatever comes out of that room will move the stock 5% either direction. The options market is pricing a binary event.`;
+        },
+        choices: [
+            {
+                label: 'Bet on Dirks winning',
+                desc: 'She has institutional backing and the revenue numbers. Position for a Gottlieb ouster.',
+                deltas: { mu: 0.01, theta: 0.015, lambda: 0.5 },
+                effects: [],
+                followups: [
+                    { id: 'gottlieb_stripped_oversight', mtth: 12, weight: 0.6 },
+                    { id: 'board_compromise', mtth: 10, weight: 0.4 },
+                ],
+                playerFlag: 'bet_dirks_closed_session',
+                resultToast: 'You position for a Dirks victory. If Gottlieb gets stripped, the defense bulls run.',
+            },
+            {
+                label: 'Bet on compromise',
+                desc: 'Boards rarely go nuclear. The adults in the room will find middle ground.',
+                deltas: { mu: -0.005, theta: 0.008, lambda: 0.3 },
+                effects: [],
+                followups: [
+                    { id: 'board_compromise', mtth: 8, weight: 0.6 },
+                    { id: 'dirks_blocked', mtth: 15, weight: 0.3 },
+                ],
+                playerFlag: 'bet_compromise_closed_session',
+                resultToast: 'You bet on the adults prevailing. A compromise clears the governance overhang.',
+            },
+            {
+                label: 'Buy puts',
+                desc: 'Whatever the outcome, the uncertainty itself is destructive. Protect against a worst-case scenario.',
+                deltas: { mu: -0.02, theta: 0.02, lambda: 0.6 },
+                effects: [],
+                followups: [
+                    { id: 'gottlieb_stripped_oversight', mtth: 15, weight: 0.5 },
+                    { id: 'dirks_blocked', mtth: 15, weight: 0.3 },
+                    { id: 'board_compromise', mtth: 10, weight: 0.5 },
+                ],
+                playerFlag: 'bought_puts_closed_session',
+                resultToast: 'You buy downside protection. Whatever happens, you\'re hedged.',
+            },
         ],
     },
 
@@ -1006,13 +1115,49 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'CTO Kassis breaks silence in internal all-hands: "I didn\'t leave Google to build targeting systems." Standing ovation from engineers, cold stares from defense team',
-        params: { mu: -0.01, theta: 0.008 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ctoIsMira && world.pnth.ceoIsGottlieb,
-        followups: [
-            { id: 'kassis_sides_gottlieb', mtth: 20, weight: 0.4 },
-            { id: 'kassis_sides_dirks', mtth: 20, weight: 0.3 },
-            { id: 'kassis_quits', mtth: 20, weight: 0.3 },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'Kassis just went off-script at an all-hands and the video leaked within minutes. She\'s the most respected technologist at the company -- where she lands will swing the entire board war. Your PNTH analyst says this is the pivotal moment: Kassis picks a side, and the stock follows.',
+        choices: [
+            {
+                label: 'Bet she backs Gottlieb',
+                desc: 'That speech was a declaration. She\'ll side with ethics and take the engineers with her.',
+                deltas: { mu: -0.01, theta: 0.008 },
+                effects: [],
+                followups: [
+                    { id: 'kassis_sides_gottlieb', mtth: 15, weight: 0.6 },
+                    { id: 'kassis_quits', mtth: 25, weight: 0.3 },
+                ],
+                playerFlag: 'bet_kassis_gottlieb',
+                resultToast: 'You position for Kassis to back the ethics faction. If she does, Gottlieb\'s hand strengthens.',
+            },
+            {
+                label: 'Bet she flips to Dirks',
+                desc: 'Money talks. Dirks will show her the classified briefings and the RSU package.',
+                deltas: { mu: 0.005, theta: 0.01 },
+                effects: [],
+                followups: [
+                    { id: 'kassis_sides_dirks', mtth: 15, weight: 0.5 },
+                    { id: 'kassis_sides_gottlieb', mtth: 25, weight: 0.3 },
+                ],
+                playerFlag: 'bet_kassis_dirks',
+                resultToast: 'A contrarian call. If the Pentagon briefing flips her, the defense thesis is validated.',
+            },
+            {
+                label: 'Bet she quits',
+                desc: 'She\'s too principled for either side. CTO departure means brain drain and a selloff.',
+                deltas: { mu: -0.02, theta: 0.015, lambda: 0.3 },
+                effects: [],
+                followups: [
+                    { id: 'kassis_quits', mtth: 15, weight: 0.5 },
+                    { id: 'kassis_sides_gottlieb', mtth: 20, weight: 0.3 },
+                ],
+                playerFlag: 'bet_kassis_quits',
+                resultToast: 'You bet on a resignation. If Kassis walks, the talent exodus accelerates.',
+            },
         ],
     },
     {
@@ -1060,17 +1205,61 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'BREAKING: PNTH CEO Eugene Gottlieb resigns. In emotional letter to employees: "I built this company to make the world better. I no longer believe it will."',
-        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
         magnitude: 'major',
         when: (sim, world) => world.pnth.ceoIsGottlieb,
-        effects: (world) => {
-            world.pnth.ceoIsGottlieb = false;
-            world.pnth.boardGottlieb = Math.max(0, world.pnth.boardGottlieb - 1);
-            world.pnth.boardDirks = Math.min(10, world.pnth.boardDirks + 1);
-        },
-        followups: [
-            { id: 'successor_search', mtth: 20, weight: 0.8 },
-            { id: 'gottlieb_covenant_ai', mtth: 60, weight: 0.4 },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'Gottlieb just resigned. His letter to employees is circulating everywhere -- it reads like a eulogy for the company he founded. PNTH is halted pending news. When it reopens, it will gap violently. Dirks is already named interim CEO. The question is whether this clears the governance overhang or accelerates the unraveling.',
+        choices: [
+            {
+                label: 'Short the chaos',
+                desc: 'A founder resignation is catastrophic. Brain drain, customer defections, and a power vacuum.',
+                deltas: { mu: -0.08, theta: 0.04, lambda: 1.8, muJ: -0.05 },
+                effects: [
+                    { path: 'pnth.ceoIsGottlieb', op: 'set', value: false },
+                    { path: 'pnth.boardGottlieb', op: 'add', value: -1 },
+                    { path: 'pnth.boardDirks', op: 'add', value: 1 },
+                ],
+                followups: [
+                    { id: 'successor_search', mtth: 15, weight: 0.8 },
+                    { id: 'gottlieb_covenant_ai', mtth: 50, weight: 0.5 },
+                ],
+                playerFlag: 'shorted_gottlieb_resignation',
+                resultToast: 'You short into the founder exit. The talent exodus should follow.',
+            },
+            {
+                label: 'Buy the clearance',
+                desc: 'Gottlieb was the problem. Dirks in charge means defense revenue gets unlocked and the board war ends.',
+                deltas: { mu: -0.03, theta: 0.02, lambda: 1.0, muJ: -0.02 },
+                effects: [
+                    { path: 'pnth.ceoIsGottlieb', op: 'set', value: false },
+                    { path: 'pnth.boardGottlieb', op: 'add', value: -1 },
+                    { path: 'pnth.boardDirks', op: 'add', value: 1 },
+                ],
+                followups: [
+                    { id: 'successor_search', mtth: 20, weight: 0.8 },
+                    { id: 'gottlieb_covenant_ai', mtth: 60, weight: 0.4 },
+                ],
+                playerFlag: 'bought_gottlieb_resignation',
+                resultToast: 'You buy the governance reset. If Dirks can execute, the stock re-rates.',
+            },
+            {
+                label: 'Hedge and reassess',
+                desc: 'This changes the entire thesis. Flatten and rebuild your position from scratch.',
+                deltas: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.03 },
+                effects: [
+                    { path: 'pnth.ceoIsGottlieb', op: 'set', value: false },
+                    { path: 'pnth.boardGottlieb', op: 'add', value: -1 },
+                    { path: 'pnth.boardDirks', op: 'add', value: 1 },
+                ],
+                followups: [
+                    { id: 'successor_search', mtth: 20, weight: 0.8 },
+                    { id: 'gottlieb_covenant_ai', mtth: 60, weight: 0.4 },
+                ],
+                playerFlag: 'hedged_gottlieb_resignation',
+                resultToast: 'You flatten and wait. The new PNTH is a different company. Needs a fresh model.',
+            },
         ],
     },
     {
@@ -1102,6 +1291,12 @@ const PNTH_EVENTS = [
         params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.ceoIsGottlieb,
+        portfolioFlavor: (portfolio) => {
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (stockQty > 15) return 'Your long position needs a credible CEO pick. Dirks as interim is not what the market wanted.';
+            if (stockQty < -10) return 'Your short thesis just got another catalyst. An interim CEO search means months of uncertainty.';
+            return null;
+        },
     },
     {
         id: 'gottlieb_covenant_ai',
@@ -1130,6 +1325,12 @@ const PNTH_EVENTS = [
             { id: 'dirks_proxy_wins', mtth: 25, weight: 0.5 },
             { id: 'dirks_proxy_loses', mtth: 25, weight: 0.5 },
         ],
+        portfolioFlavor: (portfolio) => {
+            const totalQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (totalQty > 20) return 'As a large institutional holder, Meridian will get a proxy solicitation. Your vote could matter.';
+            if (totalQty < -10) return 'Your short position loves proxy fights -- months of uncertainty and governance headlines.';
+            return null;
+        },
     },
     {
         id: 'dirks_proxy_wins',
@@ -1175,15 +1376,55 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 0.5,
         headline: 'Crescent Capital discloses 8.1% stake in PNTH via 13D filing; demands board overhaul, threatens to nominate four independent directors',
-        params: { mu: 0.03, theta: 0.02, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.activistStakeRevealed && !world.pnth.acquired,
-        effects: (world) => {
-            world.pnth.activistStakeRevealed = true;
-        },
-        followups: [
-            { id: 'activist_board_seats', mtth: 35, weight: 0.6 },
-            { id: 'activist_buyback_demand', mtth: 20, weight: 0.4 },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'Crescent Capital just filed a 13D on PNTH -- 8.1% stake, accumulated quietly over three months. Their letter demands a full board overhaul and threatens a proxy contest. Activist involvement typically means a 20-30% re-rating as they push for buybacks, asset sales, or a take-private. But it also means months of uncertainty. The desk needs to decide whether to ride the activist wave or get ahead of it.',
+        choices: [
+            {
+                label: 'Ride the activist wave',
+                desc: 'Crescent always gets what they want. Go long for the buyback/breakup premium.',
+                deltas: { mu: 0.05, theta: 0.02, lambda: 0.4 },
+                effects: [
+                    { path: 'pnth.activistStakeRevealed', op: 'set', value: true },
+                ],
+                followups: [
+                    { id: 'activist_board_seats', mtth: 30, weight: 0.7 },
+                    { id: 'activist_buyback_demand', mtth: 15, weight: 0.5 },
+                ],
+                playerFlag: 'rode_activist_wave',
+                resultToast: 'You go long with the activist. If they force a buyback or sale, you profit handsomely.',
+            },
+            {
+                label: 'Sell into the pop',
+                desc: 'The 13D pop is free money. Sell into it -- the proxy fight will drag on for months.',
+                deltas: { mu: 0.02, theta: 0.015, lambda: 0.5 },
+                effects: [
+                    { path: 'pnth.activistStakeRevealed', op: 'set', value: true },
+                ],
+                followups: [
+                    { id: 'activist_board_seats', mtth: 35, weight: 0.6 },
+                    { id: 'activist_buyback_demand', mtth: 20, weight: 0.4 },
+                ],
+                playerFlag: 'sold_activist_pop',
+                resultToast: 'You take the 13D pop and reduce. Proxy fights are long and messy.',
+            },
+            {
+                label: 'Buy calls for takeout premium',
+                desc: 'An 8% activist stake often precedes a full takeover bid. Position for M&A upside.',
+                deltas: { mu: 0.04, theta: 0.025, lambda: 0.6 },
+                effects: [
+                    { path: 'pnth.activistStakeRevealed', op: 'set', value: true },
+                ],
+                followups: [
+                    { id: 'activist_board_seats', mtth: 35, weight: 0.6 },
+                    { id: 'activist_buyback_demand', mtth: 20, weight: 0.4 },
+                ],
+                playerFlag: 'bought_calls_activist',
+                resultToast: 'You buy OTM calls targeting a takeout. Levered upside if a bid materializes.',
+            },
         ],
     },
     {
@@ -1216,12 +1457,44 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 0.1,
         headline: 'BREAKING: Northvane Technologies launches $68B hostile bid for PNTH at 45% premium; "the internal dysfunction has created a generational buying opportunity"',
-        params: { mu: 0.08, theta: 0.04, lambda: 2.0 },
         magnitude: 'major',
         when: (sim, world) => (world.pnth.boardDirks <= 5 || (world.pnth.dojSuitFiled && world.pnth.whistleblowerFiled)) && !world.pnth.acquired,
-        effects: (world) => {
-            world.pnth.acquired = true;
-        },
+        popup: true,
+        era: 'late',
+        context: (sim, world, portfolio) =>
+            'Northvane just dropped a $68 billion hostile bid at a 45% premium. PNTH is halted limit-up. The board is in emergency session and the poison pill is being drafted. This is the biggest tech M&A event in years. The question is whether the deal closes, gets bumped higher, or gets blocked by regulators.',
+        choices: [
+            {
+                label: 'Merger arb -- buy the spread',
+                desc: 'Stock is trading 8% below offer. If the deal closes, that\'s free money.',
+                deltas: { mu: 0.06, theta: 0.02, lambda: 1.0 },
+                effects: [
+                    { path: 'pnth.acquired', op: 'set', value: true },
+                ],
+                playerFlag: 'merger_arb_hostile',
+                resultToast: 'You buy the arb spread. If the deal closes, you clip the premium. If it breaks, you eat the gap.',
+            },
+            {
+                label: 'Sell into the bid',
+                desc: 'Take the 45% premium and walk. Hostile deals get blocked by regulators more often than not.',
+                deltas: { mu: 0.04, theta: 0.03, lambda: 1.5 },
+                effects: [
+                    { path: 'pnth.acquired', op: 'set', value: true },
+                ],
+                playerFlag: 'sold_into_hostile_bid',
+                resultToast: 'You sell into the premium. No one ever went broke taking a 45% gain.',
+            },
+            {
+                label: 'Hold for a higher bid',
+                desc: 'Northvane is lowballing. A bidding war with other suitors could push the premium to 60%+.',
+                deltas: { mu: 0.10, theta: 0.05, lambda: 2.5 },
+                effects: [
+                    { path: 'pnth.acquired', op: 'set', value: true },
+                ],
+                playerFlag: 'held_for_higher_bid',
+                resultToast: 'You hold for a bump. Greedy, but bidding wars can get irrational.',
+            },
+        ],
     },
 
     // -- Both ousted (rare, requires multiple scandal flags) ---------------
@@ -1248,12 +1521,48 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 0.5,
         headline: 'The Continental reports VP Bowman held $4M in PNTH stock while lobbying Pentagon for Atlas AI contract; White House calls it "old news"',
-        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.senateProbeLaunched,
-        followups: [
-            { id: 'senate_investigation_opened', mtth: 30, weight: 0.5 },
-            { id: 'bowman_intervenes', mtth: 15, weight: 0.4 },
+        popup: true,
+        era: 'early',
+        context: (sim, world, portfolio) =>
+            'The Continental just broke that VP Bowman held $4M in PNTH stock while personally lobbying the Pentagon for the Atlas contract. The White House is dismissing it, but the optics are terrible. Corruption stories like this either die fast or snowball into subpoenas. Your PNTH exposure needs a decision.',
+        choices: [
+            {
+                label: 'Short the corruption risk',
+                desc: 'Where there\'s smoke, there\'s fire. If a Senate probe opens, PNTH drops 10%.',
+                deltas: { mu: -0.04, theta: 0.02, lambda: 0.7 },
+                effects: [],
+                followups: [
+                    { id: 'senate_investigation_opened', mtth: 25, weight: 0.6 },
+                ],
+                playerFlag: 'shorted_bowman_corruption',
+                resultToast: 'You short the corruption angle. If this escalates, you\'re well-positioned.',
+            },
+            {
+                label: 'Dismiss it',
+                desc: 'The White House says "old news" and they\'re probably right. Don\'t let politics drive your book.',
+                deltas: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+                effects: [],
+                followups: [
+                    { id: 'senate_investigation_opened', mtth: 35, weight: 0.4 },
+                    { id: 'bowman_intervenes', mtth: 15, weight: 0.5 },
+                ],
+                playerFlag: 'dismissed_bowman_report',
+                resultToast: 'You shrug it off. Political stories usually have a half-life of 48 hours.',
+            },
+            {
+                label: 'Hedge with puts',
+                desc: 'Buy cheap puts as insurance. If a probe opens, the premium will 5x overnight.',
+                deltas: { mu: -0.025, theta: 0.015, lambda: 0.5 },
+                effects: [],
+                followups: [
+                    { id: 'senate_investigation_opened', mtth: 30, weight: 0.5 },
+                    { id: 'bowman_intervenes', mtth: 15, weight: 0.4 },
+                ],
+                playerFlag: 'hedged_bowman_report',
+                resultToast: 'You buy tail protection. Cheap puts on corruption risk -- textbook risk management.',
+            },
         ],
     },
     {
@@ -1264,21 +1573,62 @@ const PNTH_EVENTS = [
         params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.02 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.militaryContractActive,
+        portfolioFlavor: (portfolio) => {
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (stockQty > 10) return 'Your long PNTH position is under pressure. An injunction would freeze the defense revenue stream.';
+            if (stockQty < -5) return 'Your short thesis is playing out. Surveillance lawsuits are kryptonite for government AI contractors.';
+            return null;
+        },
     },
     {
         id: 'senate_investigation_opened',
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Sen. Okafor opens formal Senate Intelligence Committee investigation into PNTH-Bowman ties; subpoenas issued for financial records',
-        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
         magnitude: 'major',
         when: (sim, world) => !world.pnth.senateProbeLaunched,
-        effects: (world) => {
-            world.pnth.senateProbeLaunched = true;
-            world.investigations.okaforProbeStage = Math.max(world.investigations.okaforProbeStage, 1);
-        },
-        followups: [
-            { id: 'congressional_hearing_pnth', mtth: 25, weight: 0.7 },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'Senator Okafor just opened a formal Intelligence Committee investigation into PNTH-White House ties. Subpoenas are going out for financial records -- including trading records from major institutional desks. Meridian compliance is already in a closed-door meeting. This is no longer a newspaper story; it\'s a congressional probe.',
+        choices: [
+            {
+                label: 'Cut all PNTH exposure',
+                desc: 'Compliance is going to force you to anyway. Get ahead of it and clear the book.',
+                deltas: { mu: -0.06, theta: 0.025, lambda: 1.0, muJ: -0.03 },
+                effects: [
+                    { path: 'pnth.senateProbeLaunched', op: 'set', value: true },
+                    { path: 'investigations.okaforProbeStage', op: 'set', value: 1 },
+                ],
+                followups: [{ id: 'congressional_hearing_pnth', mtth: 20, weight: 0.8 }],
+                playerFlag: 'cut_exposure_senate_probe',
+                resultToast: 'You clear the PNTH book. Compliance nods. Better safe than subpoenaed.',
+            },
+            {
+                label: 'Hold and lawyer up',
+                desc: 'Congressional probes take months. The stock is oversold on headline risk.',
+                deltas: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+                effects: [
+                    { path: 'pnth.senateProbeLaunched', op: 'set', value: true },
+                    { path: 'investigations.okaforProbeStage', op: 'set', value: 1 },
+                ],
+                followups: [{ id: 'congressional_hearing_pnth', mtth: 25, weight: 0.7 }],
+                playerFlag: 'held_through_senate_probe',
+                resultToast: 'You hold. Probes fizzle more often than they escalate. Maybe.',
+            },
+            {
+                label: 'Short into the investigation',
+                desc: 'Subpoenas mean discovery. Discovery means more headlines. More headlines mean more selling.',
+                deltas: { mu: -0.05, theta: 0.03, lambda: 1.2, muJ: -0.03 },
+                effects: [
+                    { path: 'pnth.senateProbeLaunched', op: 'set', value: true },
+                    { path: 'investigations.okaforProbeStage', op: 'set', value: 1 },
+                    { path: 'election.barronApproval', op: 'add', value: -3 },
+                ],
+                followups: [{ id: 'congressional_hearing_pnth', mtth: 20, weight: 0.8 }],
+                playerFlag: 'shorted_senate_probe',
+                resultToast: 'You add to your short. The discovery process will produce more bombshells.',
+            },
         ],
     },
     {
@@ -1291,6 +1641,13 @@ const PNTH_EVENTS = [
         when: (sim, world) => !world.pnth.dojSuitFiled && world.pnth.militaryContractActive,
         effects: (world) => {
             world.pnth.dojSuitFiled = true;
+        },
+        portfolioFlavor: (portfolio) => {
+            const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
+            if (hasOptions) return 'Your PNTH options just repriced violently. Antitrust litigation means elevated vol for months.';
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (stockQty > 10) return 'Your long equity position is bleeding on the DOJ headline. Antitrust suits take years.';
+            return null;
         },
     },
     {
@@ -1334,14 +1691,50 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'BREAKING: Senior PNTH engineer files SEC whistleblower complaint alleging company falsified safety testing on Atlas military modules',
-        params: { mu: -0.07, theta: 0.03, lambda: 1.5, muJ: -0.04 },
         magnitude: 'major',
         when: (sim, world) => !world.pnth.whistleblowerFiled,
-        effects: (world) => {
-            world.pnth.whistleblowerFiled = true;
-            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
-            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
-        },
+        popup: true,
+        era: 'late',
+        context: (sim, world, portfolio) =>
+            'A senior PNTH engineer just filed an SEC whistleblower complaint alleging the company falsified safety testing on Atlas military modules. If true, this is criminal fraud -- not just governance drama. The SEC will open a formal investigation and the DOJ could follow. PNTH is in freefall in pre-market. This could be an extinction-level event for the stock.',
+        choices: [
+            {
+                label: 'Go maximum short',
+                desc: 'Falsified safety data on military AI is a death sentence. This company is uninvestable.',
+                deltas: { mu: -0.09, theta: 0.04, lambda: 2.0, muJ: -0.05 },
+                effects: [
+                    { path: 'pnth.whistleblowerFiled', op: 'set', value: true },
+                    { path: 'pnth.boardDirks', op: 'add', value: -2 },
+                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
+                ],
+                playerFlag: 'max_short_whistleblower',
+                resultToast: 'You go full short. If the SEC confirms fraud, PNTH is done.',
+            },
+            {
+                label: 'Reduce and monitor',
+                desc: 'Whistleblower complaints get dismissed all the time. Don\'t panic-sell at the bottom.',
+                deltas: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.03 },
+                effects: [
+                    { path: 'pnth.whistleblowerFiled', op: 'set', value: true },
+                    { path: 'pnth.boardDirks', op: 'add', value: -1 },
+                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
+                ],
+                playerFlag: 'reduced_on_whistleblower',
+                resultToast: 'You reduce but don\'t panic. Many complaints go nowhere.',
+            },
+            {
+                label: 'Buy the fear',
+                desc: 'The market is pricing in a worst case. If the complaint is exaggerated, this is a generational buying opportunity.',
+                deltas: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02 },
+                effects: [
+                    { path: 'pnth.whistleblowerFiled', op: 'set', value: true },
+                    { path: 'pnth.boardDirks', op: 'add', value: -1 },
+                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
+                ],
+                playerFlag: 'bought_whistleblower_fear',
+                resultToast: 'You buy the panic. A huge bet that the complaint doesn\'t hold up.',
+            },
+        ],
     },
 
     // =====================================================================
@@ -1352,25 +1745,92 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'PNTH wins $3.2B Department of War contract for Atlas AI battlefield integration; largest defense AI award in history',
-        params: { mu: 0.06, theta: -0.01, lambda: -0.4 },
         magnitude: 'major',
         when: (sim, world) => !world.pnth.militaryContractActive && !world.pnth.acquired,
-        effects: (world) => {
-            world.pnth.militaryContractActive = true;
-            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
-        },
+        popup: true,
+        era: 'early',
+        context: (sim, world, portfolio) =>
+            'PNTH just won the biggest defense AI contract in history -- $3.2 billion for Atlas battlefield integration. The stock is gapping up 8% in pre-market. This validates the Dirks thesis entirely. But the ethics crowd is already organizing protests and the commercial pipeline could suffer as tech talent flees military work.',
+        choices: [
+            {
+                label: 'Add to longs',
+                desc: '$3.2B in guaranteed revenue changes the fundamental picture. Ride the defense tailwind.',
+                deltas: { mu: 0.08, theta: -0.015, lambda: -0.5 },
+                effects: [
+                    { path: 'pnth.militaryContractActive', op: 'set', value: true },
+                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+                ],
+                playerFlag: 'added_longs_defense_contract',
+                resultToast: 'You pile into the rally. $3.2B of revenue visibility is hard to argue with.',
+            },
+            {
+                label: 'Take profit on the gap',
+                desc: 'An 8% gap-up is a gift. Sell into strength and wait for the inevitable pullback.',
+                deltas: { mu: 0.04, theta: -0.005, lambda: -0.2 },
+                effects: [
+                    { path: 'pnth.militaryContractActive', op: 'set', value: true },
+                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+                ],
+                playerFlag: 'took_profit_defense_contract',
+                resultToast: 'You sell into the gap. Smart money doesn\'t chase opening prints.',
+            },
+            {
+                label: 'Sell calls against the position',
+                desc: 'The contract is priced in fast. Sell the vol spike and collect premium.',
+                deltas: { mu: 0.06, theta: -0.01, lambda: -0.4 },
+                effects: [
+                    { path: 'pnth.militaryContractActive', op: 'set', value: true },
+                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+                ],
+                playerFlag: 'sold_calls_defense_contract',
+                resultToast: 'You sell upside calls into the vol spike. Collecting premium on euphoria.',
+            },
+        ],
     },
     {
         id: 'defense_contract_cancelled',
         category: 'pnth',
         likelihood: 0.5,
         headline: 'Pentagon cancels PNTH Atlas contract citing "unresolved governance concerns"; $3.2B evaporates overnight. Dirks scrambles to save deal',
-        params: { mu: -0.05, theta: 0.02, lambda: 0.8, muJ: -0.03 },
         magnitude: 'major',
         when: (sim, world) => world.pnth.militaryContractActive,
-        effects: (world) => {
-            world.pnth.militaryContractActive = false;
-        },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'The Pentagon just cancelled the Atlas contract. $3.2 billion in revenue gone overnight on "unresolved governance concerns." Dirks is on the phone with the SecDef but the damage is done. PNTH is halted down 12% and the entire defense thesis just cratered. Your book is getting marked down in real time.',
+        choices: [
+            {
+                label: 'Panic sell',
+                desc: 'The entire bull case was the contract. Without it, PNTH is a governance disaster with no moat.',
+                deltas: { mu: -0.07, theta: 0.03, lambda: 1.2, muJ: -0.04 },
+                effects: [
+                    { path: 'pnth.militaryContractActive', op: 'set', value: false },
+                ],
+                playerFlag: 'panic_sold_contract_cancel',
+                resultToast: 'You hit the sell button. No contract, no thesis.',
+            },
+            {
+                label: 'Buy the overreaction',
+                desc: 'Contracts get reinstated. Dirks has Pentagon connections and the tech is irreplaceable.',
+                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.02 },
+                effects: [
+                    { path: 'pnth.militaryContractActive', op: 'set', value: false },
+                ],
+                playerFlag: 'bought_contract_cancel_dip',
+                resultToast: 'You buy the dip. Bold call -- but Dirks has come back from worse.',
+            },
+            {
+                label: 'Pivot to commercial thesis',
+                desc: 'The military contract was always the controversy. Without it, PNTH can focus on enterprise AI.',
+                deltas: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+                effects: [
+                    { path: 'pnth.militaryContractActive', op: 'set', value: false },
+                    { path: 'pnth.commercialMomentum', op: 'add', value: 1 },
+                ],
+                playerFlag: 'pivoted_commercial_thesis',
+                resultToast: 'You reframe the thesis. No defense baggage means a cleaner story for enterprise buyers.',
+            },
+        ],
     },
     {
         id: 'dhs_contract_renewal',
@@ -1618,16 +2078,74 @@ const PNTH_EARNINGS_EVENTS = [
             return base;
         },
         headline: 'PNTH crushes estimates: revenue +32% YoY, Atlas AI bookings up 60%. Raises full-year guidance. Stock surges after hours',
-        params: { mu: 0.04, theta: -0.01, lambda: -0.3, q: 0.002 },
         magnitude: 'moderate',
+        popup: true,
+        era: 'early',
+        context: (sim, world, portfolio) =>
+            'PNTH just smashed earnings -- revenue up 32% YoY, Atlas bookings up 60%, and they raised guidance for the full year. The stock is surging 9% after hours. The conference call was all victory laps. This is the kind of print that forces bears to cover and momentum buyers to chase.',
+        choices: [
+            {
+                label: 'Double down',
+                desc: 'This is the inflection point. Add to longs aggressively and ride the momentum.',
+                deltas: { mu: 0.06, theta: -0.015, lambda: -0.4, q: 0.003 },
+                effects: [],
+                playerFlag: 'doubled_down_strong_beat',
+                resultToast: 'You add size into the beat. Momentum is on your side.',
+            },
+            {
+                label: 'Sell into strength',
+                desc: 'The beat is priced in by morning. Sell the after-hours pop and rebuy on the pullback.',
+                deltas: { mu: 0.03, theta: -0.005, lambda: -0.2, q: 0.002 },
+                effects: [],
+                playerFlag: 'sold_strong_beat',
+                resultToast: 'You sell into the euphoria. Let the momentum chasers have it.',
+            },
+            {
+                label: 'Sell the vol crush',
+                desc: 'Post-earnings IV crush is guaranteed. Write straddles and collect the premium decay.',
+                deltas: { mu: 0.04, theta: -0.01, lambda: -0.3, q: 0.002, xi: -0.02 },
+                effects: [],
+                playerFlag: 'sold_vol_strong_beat',
+                resultToast: 'You sell vol into the crush. Earnings vol is always overpriced.',
+            },
+        ],
     },
     {
         id: 'pnth_earnings_beat_mild',
         category: 'pnth_earnings',
         likelihood: 2.0,
         headline: 'PNTH edges past consensus: EPS $1.42 vs $1.38 expected. Revenue in line. Guidance maintained. "Solid but unspectacular," says Barclays',
-        params: { mu: 0.02, theta: -0.005 },
         magnitude: 'minor',
+        popup: true,
+        era: 'early',
+        context: (sim, world, portfolio) =>
+            'PNTH cleared the bar but barely -- EPS beat by 3%, revenue in line, guidance maintained. The stock is up 2% after hours but fading. Barclays called it "solid but unspectacular." The real question is whether this is the start of a deceleration or just a clean quarter in a noisy tape.',
+        choices: [
+            {
+                label: 'Hold the position',
+                desc: 'A beat is a beat. Guidance maintained means no downside surprise. Stay the course.',
+                deltas: { mu: 0.02, theta: -0.005 },
+                effects: [],
+                playerFlag: 'held_mild_beat',
+                resultToast: 'You hold. Boring quarters are underrated.',
+            },
+            {
+                label: 'Trim and rotate',
+                desc: 'The easy money in PNTH is made. Trim here and redeploy capital elsewhere.',
+                deltas: { mu: 0.01, theta: -0.003 },
+                effects: [],
+                playerFlag: 'trimmed_mild_beat',
+                resultToast: 'You take some off the table. Mild beats don\'t warrant full conviction.',
+            },
+            {
+                label: 'Add on the pullback',
+                desc: 'A mild beat usually means a pullback tomorrow as momentum traders move on. Buy that dip.',
+                deltas: { mu: 0.025, theta: -0.008, xi: -0.01 },
+                effects: [],
+                playerFlag: 'added_mild_beat_pullback',
+                resultToast: 'You plan to add on the inevitable post-earnings drift. Patient money.',
+            },
+        ],
     },
     {
         id: 'pnth_earnings_inline',
@@ -1636,6 +2154,11 @@ const PNTH_EARNINGS_EVENTS = [
         headline: 'PNTH reports exactly in line with consensus; no guidance change. Conference call focused on governance questions rather than financials',
         params: { mu: 0.005, theta: 0.002 },
         magnitude: 'minor',
+        portfolioFlavor: (portfolio) => {
+            const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
+            if (hasOptions) return 'Inline earnings means IV crush on your options. Theta wins this round.';
+            return null;
+        },
     },
     {
         id: 'pnth_earnings_miss_mild',
@@ -1656,11 +2179,43 @@ const PNTH_EARNINGS_EVENTS = [
             return base;
         },
         headline: 'PNTH disaster quarter: revenue misses by 12%, operating loss widens, three major customers paused contracts. Guidance slashed. Dirks faces board questions',
-        params: { mu: -0.04, theta: 0.015, lambda: 0.6, muJ: -0.02, q: -0.002 },
         magnitude: 'moderate',
-        effects: (world) => {
-            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
-        },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) =>
+            'PNTH just reported a disaster quarter. Revenue missed by 12%, operating losses widened, three major customers paused contracts, and guidance was slashed. The stock is down 15% after hours. The conference call was a bloodbath -- analysts openly questioning whether the business model is broken. Dirks is reportedly facing an emergency board review.',
+        choices: [
+            {
+                label: 'Sell everything',
+                desc: 'This isn\'t a miss, it\'s a structural breakdown. Customers are fleeing. Get out.',
+                deltas: { mu: -0.06, theta: 0.02, lambda: 0.8, muJ: -0.03, q: -0.003 },
+                effects: [
+                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+                ],
+                playerFlag: 'sold_everything_bad_miss',
+                resultToast: 'You liquidate PNTH. The numbers were worse than the bear case.',
+            },
+            {
+                label: 'Hold for the bounce',
+                desc: 'A 15% drop on one quarter is overdone. Mean reversion trades work after earnings blowouts.',
+                deltas: { mu: -0.03, theta: 0.012, lambda: 0.4, muJ: -0.01, q: -0.002 },
+                effects: [
+                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+                ],
+                playerFlag: 'held_bad_miss',
+                resultToast: 'You hold through the carnage. Contrarian and painful.',
+            },
+            {
+                label: 'Average down aggressively',
+                desc: 'This is capitulation selling. When the conference call is this bad, the worst is usually priced in.',
+                deltas: { mu: -0.02, theta: 0.01, lambda: 0.3, q: -0.001 },
+                effects: [
+                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+                ],
+                playerFlag: 'averaged_down_bad_miss',
+                resultToast: 'You buy the blood. Either genius or reckless -- you\'ll know in a quarter.',
+            },
+        ],
     },
     {
         id: 'pnth_guidance_raise',
