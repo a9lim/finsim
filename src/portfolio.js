@@ -21,6 +21,8 @@ import { allocTree, prepareTree, priceWithTree, allocGreekTrees, prepareGreekTre
 import {
     computeStockImpact, computeOptionImpact,
     computeDeltaHedgeImpact, applyPermanentImpact,
+    applyOptionPermanentImpact,
+    addStockTemporaryImpact, addOptionTemporaryImpact,
 } from './price-impact.js';
 
 let _marginTree = null;
@@ -100,11 +102,14 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
     } else if (type === 'stock') {
         const impact = computeStockImpact(signedQty, currentVol);
         applyPermanentImpact(sim, impact.permanent);
+        addStockTemporaryImpact(impact.temporary);
         return Math.max(0.01, spreadFill + impact.fillAdjustment);
     } else {
         const moneyness = Math.abs(Math.log(currentPrice / strike));
         const dte = Math.max(1, (expiryDay || 0) - currentDay);
         const impact = computeOptionImpact(signedQty, currentVol, moneyness, dte, strike, expiryDay || 0);
+        applyOptionPermanentImpact(type, strike, expiryDay || 0, impact.permanent);
+        addOptionTemporaryImpact(type, strike, expiryDay || 0, impact.temporary);
         const approxDelta = type === 'call'
             ? Math.max(0.01, Math.min(0.99, 0.5 + 0.5 * Math.tanh(-moneyness * 3)))
             : -Math.max(0.01, Math.min(0.99, 0.5 + 0.5 * Math.tanh(moneyness * 3)));

@@ -40,6 +40,8 @@ import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
 import {
     resetImpactState, resetDailyVolume, computeRecoveryDrift,
+    decayOptionPermanentImpact,
+    getStockTemporaryImpact,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
     selectImpactToast,
@@ -553,6 +555,7 @@ function frame(now) {
             // Start a new day if enough time has passed since last tick
             if (now - lastTickTime >= tickInterval) {
                 _recoveryDrift = computeRecoveryDrift();
+                decayOptionPermanentImpact();
                 sim.mu += _recoveryDrift;
                 _savedOverlays = applyParamOverlays(sim);
                 sim.beginDay();
@@ -1081,6 +1084,7 @@ function updateUI(precomputedMargin) {
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     updateRateDisplay($, sim.r, rateHistory);
+    refreshTooltip();
     if (strategyMode && strategyLegs.length > 0) {
         updateStrategyBuilder();
     }
@@ -1398,10 +1402,11 @@ function handleChainCellClick(info) {
 function openFullChain() {
     if (playing) togglePlay();
     const vol = market.sigma;
+    const displaySpot = sim.S + getStockTemporaryImpact();
     const bondDte = _getTradeExpiryDay() - sim.day;
     const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
-    const stockBA = computeBidAsk(sim.S, sim.S, vol);
-    const bondBA = computeBidAsk(bondMid, sim.S, vol);
+    const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
+    const bondBA = computeBidAsk(bondMid, displaySpot, vol);
     showChainOverlay($, chainSkeleton, _priceExpiryGreeks, stockBA, bondBA, _buildPosMap());
 }
 

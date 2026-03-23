@@ -22,6 +22,15 @@ const _playerParamCaps = {
 };
 let _lastToastDay = -Infinity;
 
+/* ── per-strike option permanent impact (persists across days, decays) ── */
+// key = `${strike}_${expiryDay}`, value = accumulated price shift
+const _optionPermanentImpact = new Map();
+
+/* ── temporary impact (resets each substep, reflects intra-substep liquidity depletion) ── */
+let _stockTemporaryImpact = 0;
+// key = `${type}_${strike}_${expiryDay}`, value = accumulated temporary shift
+const _optionTemporaryImpact = new Map();
+
 /* ── cumulative volume tracking (resets each day) ── */
 let _cumStockBuy  = 0;   // shares bought this day
 let _cumStockSell = 0;   // shares sold this day
@@ -35,6 +44,7 @@ export function resetImpactState() {
     _unrecoveredImpact = 0;
     for (const k in _playerParamShifts) _playerParamShifts[k] = 0;
     _lastToastDay = -Infinity;
+    _optionPermanentImpact.clear();
     resetDailyVolume();
 }
 
@@ -43,6 +53,8 @@ export function resetDailyVolume() {
     _cumStockBuy = _cumStockSell = 0;
     _cumHedgeBuy = _cumHedgeSell = 0;
     _cumOption.clear();
+    _stockTemporaryImpact = 0;
+    _optionTemporaryImpact.clear();
 }
 
 /* ── Layer 1: Stock/Bond slippage ── */
@@ -130,6 +142,47 @@ export function applyPermanentImpact(sim, shift) {
     sim.S += shift;
     if (sim.S < 0.01) sim.S = 0.01;
     _unrecoveredImpact += shift;
+}
+
+/* ── Per-strike option permanent impact ── */
+
+export function applyOptionPermanentImpact(type, strike, expiryDay, shift) {
+    if (Math.abs(shift) < 1e-8) return;
+    const key = `${type}_${strike}_${expiryDay}`;
+    _optionPermanentImpact.set(key, (_optionPermanentImpact.get(key) || 0) + shift);
+}
+
+export function getOptionPermanentImpact(type, strike, expiryDay) {
+    return _optionPermanentImpact.get(`${type}_${strike}_${expiryDay}`) || 0;
+}
+
+/* ── Temporary impact (intra-substep, resets each substep) ── */
+
+export function addStockTemporaryImpact(shift) {
+    _stockTemporaryImpact += shift;
+}
+
+export function getStockTemporaryImpact() {
+    return _stockTemporaryImpact;
+}
+
+export function addOptionTemporaryImpact(type, strike, expiryDay, shift) {
+    if (Math.abs(shift) < 1e-8) return;
+    const key = `${type}_${strike}_${expiryDay}`;
+    _optionTemporaryImpact.set(key, (_optionTemporaryImpact.get(key) || 0) + shift);
+}
+
+export function getOptionTemporaryImpact(type, strike, expiryDay) {
+    return _optionTemporaryImpact.get(`${type}_${strike}_${expiryDay}`) || 0;
+}
+
+export function decayOptionPermanentImpact() {
+    const factor = 1 - Math.pow(0.5, 1 / RECOVERY_HALF_LIFE);
+    for (const [key, val] of _optionPermanentImpact) {
+        const decayed = val * (1 - factor);
+        if (Math.abs(decayed) < 1e-8) _optionPermanentImpact.delete(key);
+        else _optionPermanentImpact.set(key, decayed);
+    }
 }
 
 /* ── Recovery drift (called once per day) ── */
