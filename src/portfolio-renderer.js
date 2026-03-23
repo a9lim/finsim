@@ -86,7 +86,7 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
 function _buildOrderRow(order) {
     const typeLabel = posTypeLabel(order.type, order.side);
     const strikeStr = order.strike != null ? ' K' + order.strike : '';
-    const labelStr  = typeLabel + strikeStr + ' x' + fmtQty(order.qty) + ' ' + order.orderType + ' @ ' + fmtDollar(order.triggerPrice);
+    const labelStr  = typeLabel + strikeStr + ' x' + fmtQty(order.qty) + ' ' + order.orderType + ' @ $' + order.triggerPrice.toFixed(2);
 
     const row = document.createElement('div');
     row.className = 'data-row order-row stat-row';
