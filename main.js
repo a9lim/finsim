@@ -39,8 +39,8 @@ import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
 import {
-    resetImpactState, resetDailyVolume, computeRecoveryDrift,
-    decayOptionPermanentImpact,
+    resetImpactState, resetDailyVolume,
+    decayStockPermanentImpact, decayOptionPermanentImpact,
     getStockTemporaryImpact,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
@@ -87,7 +87,6 @@ let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
-let _recoveryDrift = 0;
 let _savedOverlays = {};
 
 const _popupQueue = [];
@@ -569,9 +568,8 @@ function frame(now) {
         if (!dayInProgress) {
             // Start a new day if enough time has passed since last tick
             if (now - lastTickTime >= tickInterval) {
-                _recoveryDrift = computeRecoveryDrift();
+                decayStockPermanentImpact(sim);
                 decayOptionPermanentImpact();
-                sim.mu += _recoveryDrift;
                 _savedOverlays = applyParamOverlays(sim);
                 sim.beginDay();
                 dayInProgress = true;
@@ -607,7 +605,6 @@ function frame(now) {
             // All sub-steps done — finalize the day
             if (sim.dayComplete) {
                 sim.finalizeDay();
-                sim.mu -= _recoveryDrift;
                 removeParamOverlays(sim, _savedOverlays);
                 dayInProgress = false;
                 syncMarket(sim);

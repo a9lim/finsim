@@ -185,19 +185,19 @@ export function decayOptionPermanentImpact() {
     }
 }
 
-/* ── Recovery drift (called once per day) ── */
+/* ── Stock permanent impact recovery (called once per day) ── */
 
 /**
- * Compute recovery drift overlay for sim.mu.
- * Also decays _unrecoveredImpact.
- * @returns {number} Drift overlay to add to sim.mu before beginDay()
+ * Decay unrecovered stock impact and apply directly to sim.S.
+ * Half-life of RECOVERY_HALF_LIFE days (e.g. +2 impact → +1 after 3 days).
  */
-export function computeRecoveryDrift() {
-    if (Math.abs(_unrecoveredImpact) < 1e-8) return 0;
+export function decayStockPermanentImpact(sim) {
+    if (Math.abs(_unrecoveredImpact) < 1e-8) { _unrecoveredImpact = 0; return; }
     const decayFrac = 1 - Math.pow(0.5, 1 / RECOVERY_HALF_LIFE);
-    const drift = -_unrecoveredImpact * decayFrac;
-    _unrecoveredImpact *= (1 - decayFrac);
-    return drift;
+    const recovery = _unrecoveredImpact * decayFrac;
+    sim.S -= recovery;
+    if (sim.S < 0.01) sim.S = 0.01;
+    _unrecoveredImpact -= recovery;
 }
 
 /* ── Layer 3: Parameter shifts from large exposure ── */
