@@ -156,6 +156,7 @@ export function bindEvents($, handlers) {
         onChainCellClick, onFullChainOpen, onExpiryChange,
         onTradeSubmit, onLiquidate,
         onLLMKeyChange, onLLMModelChange,
+        onChainClose, onTradeClose, onMarginClose,
     } = handlers;
 
     $.playBtn.addEventListener('click', onTogglePlay);
@@ -223,16 +224,17 @@ export function bindEvents($, handlers) {
     });
     $.fullChainLink.addEventListener('click', onFullChainOpen);
 
-    const _hideClass = (el) => () => el.classList.add('hidden');
-    initOverlayDismiss($.chainOverlay, $.chainOverlayClose, _hideClass($.chainOverlay));
+    const _hideClass = (el, afterHide) => () => { el.classList.add('hidden'); if (typeof afterHide === 'function') afterHide(); };
+    initOverlayDismiss($.chainOverlay, $.chainOverlayClose, _hideClass($.chainOverlay, onChainClose));
 
-    const closeTrade = _hideClass($.tradeDialog);
+    const closeTrade = _hideClass($.tradeDialog, onTradeClose);
     initOverlayDismiss($.tradeDialog, $.tradeDialogClose, closeTrade);
     $.tradeCancelBtn.addEventListener('click', closeTrade);
 
     $.marginCallLiquidate.addEventListener('click', () => {
         $.marginCallOverlay.classList.add('hidden');
         if (typeof onLiquidate === 'function') onLiquidate();
+        if (typeof onMarginClose === 'function') onMarginClose();
         if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
     });
     $.fraudReset.addEventListener('click', () => {

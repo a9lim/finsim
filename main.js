@@ -271,6 +271,9 @@ function init() {
         onFullChainOpen:  () => openFullChain(),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
+        onChainClose:     () => setTimeout(_processPopupQueue, 100),
+        onTradeClose:     () => setTimeout(_processPopupQueue, 100),
+        onMarginClose:    () => setTimeout(_processPopupQueue, 100),
         onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
         onStrategyExpiryChange: (idx) => {
             const pe = _priceExpiry(idx);
@@ -642,6 +645,7 @@ function _processPopupQueue() {
     if (!$.chainOverlay.classList.contains('hidden')) return;
     if (!$.tradeDialog.classList.contains('hidden')) return;
     if (!$.marginCallOverlay.classList.contains('hidden')) return;
+    if (!$.popupOverlay.classList.contains('hidden')) return;
 
     const event = _popupQueue.shift();
     playing = false;
