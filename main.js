@@ -649,7 +649,7 @@ function _processPopupQueue() {
 
     const event = _popupQueue.shift();
     playing = false;
-    _toolbar.updatePlayBtn(playing);
+    updatePlayBtn($, playing);
 
     const contextText = typeof event.context === 'function'
         ? event.context(sim, eventEngine?.world, portfolio)
