@@ -1532,7 +1532,7 @@ function updateStrategyBuilder() {
 // ---------------------------------------------------------------------------
 
 function _showEpilogue() {
-    const pages = generateEpilogue(eventEngine.world, sim, portfolio, eventEngine.eventLog);
+    const pages = generateEpilogue(eventEngine.world, sim, portfolio, eventEngine.eventLog, playerChoices, impactHistory, quarterlyReviews);
     let currentPage = 0;
 
     const overlay = document.getElementById('epilogue-overlay');
