@@ -87,31 +87,28 @@ export function resetPortfolio(capital) {
  * Almgren-Chriss market-impact slippage.
  */
 function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay) {
+    const ba = (type === 'call' || type === 'put')
+        ? computeOptionBidAsk(mid, currentPrice, strike, currentVol)
+        : computeBidAsk(mid, currentVol);
+    const spreadFill = side === 'long' ? ba.ask : ba.bid;
+
     const signedQty = side === 'long' ? qty : -qty;
 
     if (type === 'bond') {
-        const ba = computeBidAsk(mid, currentVol);
-        return side === 'long' ? ba.ask : ba.bid;
+        // Bonds: spread only, no price impact (Vasicek-priced, deep market)
+        return spreadFill;
     } else if (type === 'stock') {
-        const ba = computeBidAsk(mid, currentVol);
-        const spreadFill = side === 'long' ? ba.ask : ba.bid;
         const impact = computeStockImpact(signedQty, currentVol);
         applyPermanentImpact(sim, impact.permanent);
         return Math.max(0.01, spreadFill + impact.fillAdjustment);
     } else {
-        // Options: use term-structure + skew vol for spread and impact
-        const dte = Math.max(1, (expiryDay || 0) - currentDay);
-        const T = dte / TRADING_DAYS_PER_YEAR;
-        const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
-        const sigma = computeSkewSigma(sigmaEff, currentPrice, strike, T, market.rho, market.xi, market.kappa);
-        const ba = computeOptionBidAsk(mid, currentPrice, strike, sigma);
-        const spreadFill = side === 'long' ? ba.ask : ba.bid;
         const moneyness = Math.abs(Math.log(currentPrice / strike));
-        const impact = computeOptionImpact(signedQty, sigma, moneyness, dte, strike, expiryDay || 0);
+        const dte = Math.max(1, (expiryDay || 0) - currentDay);
+        const impact = computeOptionImpact(signedQty, currentVol, moneyness, dte, strike, expiryDay || 0);
         const approxDelta = type === 'call'
             ? Math.max(0.01, Math.min(0.99, 0.5 + 0.5 * Math.tanh(-moneyness * 3)))
             : -Math.max(0.01, Math.min(0.99, 0.5 + 0.5 * Math.tanh(moneyness * 3)));
-        const hedgeShift = computeDeltaHedgeImpact(signedQty, approxDelta, sigma);
+        const hedgeShift = computeDeltaHedgeImpact(signedQty, approxDelta, currentVol);
         applyPermanentImpact(sim, hedgeShift);
         return Math.max(0.01, spreadFill + impact.fillAdjustment);
     }
@@ -145,7 +142,8 @@ export function computeNetDelta() {
         const dte = p.expiryDay - market.day;
         if (dte <= 0) continue;
         const T = dte / TRADING_DAYS_PER_YEAR;
-        const sigma = computeEffectiveSigma(market.v, market.kappa, market.theta, market.xi, T, market.S, p.strike, market.rho);
+        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+        const sigma = computeSkewSigma(sigEff, market.S, p.strike, T, market.rho, market.xi, market.kappa);
         _gt = prepareGreekTrees(T, market.r, sigma, market.q, market.day, _gt);
         const greeks = computeGreeksWithTrees(market.S, p.strike, p.type === 'put', _gt);
         net += greeks.delta * p.qty;
@@ -161,7 +159,8 @@ export function computeGrossNotional() {
         const dte = p.expiryDay - market.day;
         if (dte <= 0) continue;
         const T = dte / TRADING_DAYS_PER_YEAR;
-        const sigma = computeEffectiveSigma(market.v, market.kappa, market.theta, market.xi, T, market.S, p.strike, market.rho);
+        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+        const sigma = computeSkewSigma(sigEff, market.S, p.strike, T, market.rho, market.xi, market.kappa);
         _gt = prepareGreekTrees(T, market.r, sigma, market.q, market.day, _gt);
         const greeks = computeGreeksWithTrees(market.S, p.strike, p.type === 'put', _gt);
         gross += Math.abs(greeks.delta * p.qty) * market.S;
@@ -241,9 +240,7 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
             let optMid;
             if (dte > 0 && currentVol > 0) {
                 if (!_marginTree) _marginTree = allocTree();
-                { const _se = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-                const _sv = computeSkewSigma(_se, currentPrice, strike, dte, market.rho, market.xi, market.kappa);
-                prepareTree(dte, currentRate, _sv, q, currentDay, _marginTree); }
+                prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
                 optMid = priceWithTree(currentPrice, strike, type === 'put', _marginTree);
             } else {
                 optMid = Math.max(0, type === 'call' ? currentPrice - strike : strike - currentPrice);
@@ -301,9 +298,9 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
                 case 'call':
                 case 'put': {
                     if (!_marginTree) _marginTree = allocTree();
-                    { const _se = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-                const _sv = computeSkewSigma(_se, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
-                prepareTree(dte, currentRate, _sv, q, currentDay, _marginTree); }
+                    const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+                    const sig = computeSkewSigma(sigEff, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
+                    prepareTree(dte, currentRate, sig, q, currentDay, _marginTree);
                     const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
                     required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                     break;
@@ -917,9 +914,7 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
             case 'call':
             case 'put': {
                 if (!_marginTree) _marginTree = allocTree();
-                { const _se = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-                const _sv = computeSkewSigma(_se, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
-                prepareTree(dte, currentRate, _sv, q, currentDay, _marginTree); }
+                prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
                 const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
                 total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                 break;
@@ -971,9 +966,9 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
                 case 'call':
                 case 'put': {
                     if (!_marginTree) _marginTree = allocTree();
-                    { const _se = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-                const _sv = computeSkewSigma(_se, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
-                prepareTree(dte, currentRate, _sv, q, currentDay, _marginTree); }
+                    const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+                    const sig = computeSkewSigma(sigEff, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
+                    prepareTree(dte, currentRate, sig, q, currentDay, _marginTree);
                     const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
                     required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                     break;
@@ -1057,9 +1052,11 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
             ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
             : 0;
         const isPut  = pos.type === 'put';
-        if (dte <= 0 || currentVol <= 0) continue;
+        if (dte <= 0 || market.v <= 0) continue;
+        const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+        const sig = computeSkewSigma(sigEff, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
         if (!_greekTrees) _greekTrees = allocGreekTrees();
-        prepareGreekTrees(dte, currentRate, currentVol, q, currentDay, _greekTrees);
+        prepareGreekTrees(dte, currentRate, sig, q, currentDay, _greekTrees);
         const greeks = computeGreeksWithTrees(currentPrice, pos.strike, isPut, _greekTrees);
 
         delta += w * greeks.delta;
