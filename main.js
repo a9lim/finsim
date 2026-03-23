@@ -48,6 +48,7 @@ import {
     resolveLegs, computeNetCost, legsToRelative, nextAutoName,
 } from './src/strategy-store.js';
 import { applyStructuredEffects } from './src/world-state.js';
+import { evaluatePortfolioPopups, resetPopupCooldowns } from './src/popup-events.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -738,6 +739,12 @@ function _onDayComplete() {
         }
     }
 
+    // Portfolio-triggered popup events
+    if (eventEngine) {
+        const portfolioPopups = evaluatePortfolioPopups(sim, eventEngine.world, portfolio, sim.day);
+        for (const pp of portfolioPopups) _popupQueue.push(pp);
+    }
+
     // Layer 3: update param shifts based on gross exposure
     const grossNotional = computeGrossNotional();
     const grossRatio = grossNotional / (market.S * ADV);
@@ -1015,6 +1022,7 @@ function _resetCore(index) {
     for (const k in playerChoices) delete playerChoices[k];
     impactHistory.length = 0;
     quarterlyReviews.length = 0;
+    resetPopupCooldowns();
     sim.reset(index);
     resetPortfolio();
     resetImpactState();
