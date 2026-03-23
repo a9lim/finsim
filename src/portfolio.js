@@ -247,7 +247,9 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
             let optMid;
             if (dte > 0 && currentVol > 0) {
                 if (!_marginTree) _marginTree = allocTree();
-                prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
+                const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+                const sig = computeSkewSigma(sigEff, currentPrice, strike, dte, market.rho, market.xi, market.kappa);
+                prepareTree(dte, currentRate, sig, q, currentDay, _marginTree);
                 optMid = priceWithTree(currentPrice, strike, type === 'put', _marginTree);
             } else {
                 optMid = Math.max(0, type === 'call' ? currentPrice - strike : strike - currentPrice);
@@ -921,7 +923,9 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
             case 'call':
             case 'put': {
                 if (!_marginTree) _marginTree = allocTree();
-                prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
+                const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+                const sig = computeSkewSigma(sigEff, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
+                prepareTree(dte, currentRate, sig, q, currentDay, _marginTree);
                 const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
                 total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
                 break;
