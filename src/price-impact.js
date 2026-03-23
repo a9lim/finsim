@@ -1,7 +1,7 @@
 import {
-    ADV, PERM_COEFF, TEMP_COEFF,
-    OPT_PERM_COEFF, OPT_TEMP_COEFF,
+    ADV, IMPACT_COEFF, OPT_IMPACT_COEFF,
     OI_ATM_BASE, OI_MONEYNESS_DECAY,
+    VOLUME_HALF_LIFE, INTRADAY_STEPS,
     PARAM_SHIFT_HALF_LIFE,
     IMPACT_TOAST_COOLDOWN,
     IMPACT_THRESHOLD_25, IMPACT_THRESHOLD_50,
@@ -10,9 +10,12 @@ import {
     MAX_PLAYER_XI_SHIFT, MAX_PLAYER_KAPPA_SHIFT,
     MAX_PLAYER_SIGMAR_SHIFT,
     EVENT_COUPLING_CAP,
+    TRADING_DAYS_PER_YEAR,
 } from './config.js';
+import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
+import { market } from './market.js';
 
-/* ── mutable state ── */
+/* ── Layer 3: parameter shifts from large exposure ── */
 const _playerParamShifts = { mu: 0, theta: 0, xi: 0, kappa: 0, sigmaR: 0 };
 const _playerParamCaps = {
     mu: MAX_PLAYER_MU_SHIFT, theta: MAX_PLAYER_THETA_SHIFT,
@@ -21,75 +24,84 @@ const _playerParamCaps = {
 };
 let _lastToastDay = -Infinity;
 
-/* ── per-strike option permanent impact ── */
-// key = `${type}_${strike}_${expiryDay}`, value = accumulated price shift
-const _optionPermanentImpact = new Map();
-
-/* ── temporary impact (resets each substep, reflects intra-substep liquidity depletion) ── */
-let _stockTemporaryImpact = 0;
-// key = `${type}_${strike}_${expiryDay}`, value = accumulated temporary shift
-const _optionTemporaryImpact = new Map();
-
-/* ── cumulative volume tracking (resets each day) ── */
-let _cumStockBuy  = 0;   // shares bought this day
-let _cumStockSell = 0;   // shares sold this day
-let _cumHedgeBuy  = 0;   // hedge shares bought this day
-let _cumHedgeSell = 0;   // hedge shares sold this day
-// Per-strike cumulative option volume: key = `${strike}_${expiryDay}`, value = { buy, sell }
+/* ── Decaying cumulative volume ── */
+let _cumStockBuy  = 0;
+let _cumStockSell = 0;
+// Per-strike: key = `${type}_${strike}_${expiryDay}`, value = { buy, sell }
 const _cumOption = new Map();
+
+/* ── Dynamic MM rehedging state ── */
+// Aggregate shares the MM currently holds to hedge player option positions.
+// Positive = long stock, negative = short stock.
+let _mmCurrentHedge = 0;
+// Reusable greek trees for MM delta computation
+let _mmGreekTrees = null;
 
 /* ── reset ── */
 export function resetImpactState() {
     for (const k in _playerParamShifts) _playerParamShifts[k] = 0;
     _lastToastDay = -Infinity;
-    _optionPermanentImpact.clear();
-    resetDailyVolume();
-}
-
-/** Reset cumulative volume — call at start of each substep. */
-export function resetDailyVolume() {
     _cumStockBuy = _cumStockSell = 0;
-    _cumHedgeBuy = _cumHedgeSell = 0;
     _cumOption.clear();
-    _stockTemporaryImpact = 0;
-    _optionTemporaryImpact.clear();
+    _mmCurrentHedge = 0;
 }
 
-/* ── Layer 1: Stock/Bond slippage ── */
+/* ── Decay cumulative volumes — call once per substep ── */
+
+const _volDecayFactor = Math.pow(0.5, 1 / (VOLUME_HALF_LIFE * INTRADAY_STEPS));
+
+export function decayImpactVolumes() {
+    _cumStockBuy  *= _volDecayFactor;
+    _cumStockSell *= _volDecayFactor;
+    if (_cumStockBuy  < 1e-6) _cumStockBuy  = 0;
+    if (_cumStockSell < 1e-6) _cumStockSell = 0;
+    for (const [key, cum] of _cumOption) {
+        cum.buy  *= _volDecayFactor;
+        cum.sell *= _volDecayFactor;
+        if (cum.buy < 1e-6 && cum.sell < 1e-6) _cumOption.delete(key);
+    }
+}
+
+/* ── Stock impact overlay (computed from decaying cumulative volume) ── */
 
 /**
- * Compute permanent + temporary impact for a stock or bond trade.
- * @param {number} qty  Signed quantity (positive=buy, negative=sell)
- * @param {number} sigma Current vol (Heston sqrt(v) for stock, sigmaR for bond)
- * @returns {{ permanent: number, temporary: number }}
+ * Get the current stock price impact overlay.
+ * @param {number} sigma  Current Heston vol (sqrt(v))
+ * @returns {number} Signed price shift to add to sim.S for display/valuation
  */
-export function computeStockImpact(qty, sigma) {
+export function getStockImpact(sigma) {
+    const buyImpact  = IMPACT_COEFF * sigma * Math.sqrt(_cumStockBuy  / ADV);
+    const sellImpact = IMPACT_COEFF * sigma * Math.sqrt(_cumStockSell / ADV);
+    return buyImpact - sellImpact;
+}
+
+/**
+ * Record a stock trade: updates cumulative volume and returns the marginal
+ * fill cost (the price penalty for this specific trade).
+ * @param {number} qty    Signed quantity (positive=buy, negative=sell)
+ * @param {number} sigma  Current Heston vol
+ * @returns {number} Signed fill cost adjustment
+ */
+export function recordStockTrade(qty, sigma) {
     const absQty = Math.abs(qty);
     const sign   = qty > 0 ? 1 : -1;
-    // Incremental permanent impact: cost of going from cumVol to cumVol+qty
     const cumRef = qty > 0 ? _cumStockBuy : _cumStockSell;
-    const perm   = PERM_COEFF * sigma * (Math.sqrt((cumRef + absQty) / ADV) - Math.sqrt(cumRef / ADV)) * sign;
-    // Average marginal cost over [cum, cum+qty]
-    const temp   = TEMP_COEFF * sigma * (2 * cumRef + absQty) / ADV * sign;
-    // Update cumulative volume
+    const cost   = IMPACT_COEFF * sigma * (Math.sqrt((cumRef + absQty) / ADV) - Math.sqrt(cumRef / ADV)) * sign;
     if (qty > 0) _cumStockBuy += absQty; else _cumStockSell += absQty;
-    return { permanent: perm, temporary: temp };
+    return cost;
 }
+
+/* ── Option impact overlay ── */
 
 /**
  * Compute modeled open interest for an option.
- * @param {string} type  'call' or 'put'
- * @param {number} logSK ln(S/K) — positive = call ITM / put OTM
- * @param {number} dte   Days to expiry
  */
 export function modeledOI(type, logSK, dte) {
     const absM = Math.abs(logSK);
-    // ITM options have sharply lower OI than OTM (traders close/exercise ITM)
     const isITM = (type === 'call' && logSK > 0) || (type === 'put' && logSK < 0);
     const decay = isITM
-        ? Math.exp(-OI_MONEYNESS_DECAY * 2.5 * absM * absM)  // steep ITM penalty
-        : Math.exp(-OI_MONEYNESS_DECAY * absM * absM);        // gentler OTM decay
-    // OTM puts get 1.5x OI boost (hedging demand)
+        ? Math.exp(-OI_MONEYNESS_DECAY * 2.5 * absM * absM)
+        : Math.exp(-OI_MONEYNESS_DECAY * absM * absM);
     const putSkew = (type === 'put' && !isITM) ? 1.5 : 1.0;
     return Math.max(1,
         OI_ATM_BASE * decay * putSkew
@@ -98,100 +110,82 @@ export function modeledOI(type, logSK, dte) {
 }
 
 /**
- * Compute permanent + temporary impact for an options trade.
+ * Get the current option impact overlay for a specific strike.
  * @param {string} type      'call' or 'put'
- * @param {number} qty       Signed quantity
+ * @param {number} strike    Strike price
+ * @param {number} expiryDay Expiry day
  * @param {number} sigma     Current Heston vol
- * @param {number} logSK     ln(S/K) — signed
+ * @param {number} logSK     ln(S/K)
  * @param {number} dte       Days to expiry
- * @returns {{ permanent: number, temporary: number }}
+ * @returns {number} Signed price shift
  */
-export function computeOptionImpact(type, qty, sigma, logSK, dte, strike, expiryDay) {
+export function getOptionImpact(type, strike, expiryDay, sigma, logSK, dte) {
+    const key = `${type}_${strike}_${expiryDay}`;
+    const cum = _cumOption.get(key);
+    if (!cum) return 0;
+    const oi = modeledOI(type, logSK, dte);
+    const buyImpact  = OPT_IMPACT_COEFF * sigma * Math.sqrt(cum.buy  / oi);
+    const sellImpact = OPT_IMPACT_COEFF * sigma * Math.sqrt(cum.sell / oi);
+    return buyImpact - sellImpact;
+}
+
+/**
+ * Record an option trade: updates cumulative volume and returns fill cost.
+ * @returns {number} Signed fill cost adjustment
+ */
+export function recordOptionTrade(type, qty, sigma, logSK, dte, strike, expiryDay) {
     const absQty = Math.abs(qty);
     const sign   = qty > 0 ? 1 : -1;
     const oi     = modeledOI(type, logSK, dte);
-    // Per-strike cumulative volume
-    const key = `${strike}_${expiryDay}`;
+    const key    = `${type}_${strike}_${expiryDay}`;
     let cum = _cumOption.get(key);
     if (!cum) { cum = { buy: 0, sell: 0 }; _cumOption.set(key, cum); }
     const cumRef = qty > 0 ? cum.buy : cum.sell;
-    const perm   = OPT_PERM_COEFF * sigma * (Math.sqrt((cumRef + absQty) / oi) - Math.sqrt(cumRef / oi)) * sign;
-    const temp   = OPT_TEMP_COEFF * sigma * (2 * cumRef + absQty) / oi * sign;
-    // Update cumulative
+    const cost   = OPT_IMPACT_COEFF * sigma * (Math.sqrt((cumRef + absQty) / oi) - Math.sqrt(cumRef / oi)) * sign;
     if (qty > 0) cum.buy += absQty; else cum.sell += absQty;
-    return { permanent: perm, temporary: temp };
+    return cost;
 }
+
+/* ── Dynamic market-maker rehedging ── */
 
 /**
- * Compute secondary stock impact from market-maker delta hedging.
- * @param {number} optQty  Signed option quantity (positive = player buys)
- * @param {number} delta   Option delta (positive for calls, negative for puts)
- * @param {number} sigma   Current Heston vol
- * @returns {number} Permanent stock price shift from hedge
+ * Recompute the MM's required delta hedge from the player's current option
+ * positions and record any incremental stock volume.
+ *
+ * Call once per substep (after stock price moves) so that delta changes
+ * from price movement generate hedging flow.
+ *
+ * @param {Object[]} positions  portfolio.positions array
  */
-export function computeDeltaHedgeImpact(optQty, delta, sigma) {
-    // MM takes opposite side then hedges: buys stock when player buys calls, sells when player buys puts
-    const hedgeQty = optQty * delta;
-    const absHedge = Math.abs(hedgeQty);
-    if (absHedge < 0.01) return 0;
-    const sign = hedgeQty > 0 ? 1 : -1;
-    // Incremental: hedge volume cumulates with other hedges this day
-    const cumRef = hedgeQty > 0 ? _cumHedgeBuy : _cumHedgeSell;
-    const impact = PERM_COEFF * sigma * (Math.sqrt((cumRef + absHedge) / ADV) - Math.sqrt(cumRef / ADV)) * sign;
-    if (hedgeQty > 0) _cumHedgeBuy += absHedge; else _cumHedgeSell += absHedge;
-    return impact;
-}
+export function rehedgeMM(positions) {
+    let requiredHedge = 0;
+    for (const p of positions) {
+        if (p.type !== 'call' && p.type !== 'put') continue;
+        const dte = p.expiryDay - market.day;
+        if (dte <= 0) continue;
+        const T = dte / TRADING_DAYS_PER_YEAR;
+        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+        const sigma = computeSkewSigma(sigEff, market.S, p.strike, T, market.rho, market.xi, market.kappa);
+        if (!_mmGreekTrees) _mmGreekTrees = allocGreekTrees();
+        prepareGreekTrees(T, market.r, sigma, market.q, market.day, _mmGreekTrees);
+        const delta = computeGreeksWithTrees(market.S, p.strike, p.type === 'put', _mmGreekTrees).delta;
+        // MM is short what player is long: hedges by buying delta*qty shares
+        requiredHedge += delta * p.qty;
+    }
 
-/**
- * Apply a permanent price shift to sim.S.
- */
-export function applyPermanentImpact(sim, shift) {
-    if (Math.abs(shift) < 1e-8) return;
-    sim.S += shift;
-    if (sim.S < 0.01) sim.S = 0.01;
-}
+    const diff = requiredHedge - _mmCurrentHedge;
+    const absDiff = Math.abs(diff);
+    if (absDiff < 0.01) return;
 
-/* ── Per-strike option permanent impact ── */
-
-export function applyOptionPermanentImpact(type, strike, expiryDay, shift) {
-    if (Math.abs(shift) < 1e-8) return;
-    const key = `${type}_${strike}_${expiryDay}`;
-    _optionPermanentImpact.set(key, (_optionPermanentImpact.get(key) || 0) + shift);
-}
-
-export function getOptionPermanentImpact(type, strike, expiryDay) {
-    return _optionPermanentImpact.get(`${type}_${strike}_${expiryDay}`) || 0;
-}
-
-/* ── Temporary impact (intra-substep, resets each substep) ── */
-
-export function addStockTemporaryImpact(shift) {
-    _stockTemporaryImpact += shift;
-}
-
-export function getStockTemporaryImpact() {
-    return _stockTemporaryImpact;
-}
-
-export function addOptionTemporaryImpact(type, strike, expiryDay, shift) {
-    if (Math.abs(shift) < 1e-8) return;
-    const key = `${type}_${strike}_${expiryDay}`;
-    _optionTemporaryImpact.set(key, (_optionTemporaryImpact.get(key) || 0) + shift);
-}
-
-export function getOptionTemporaryImpact(type, strike, expiryDay) {
-    return _optionTemporaryImpact.get(`${type}_${strike}_${expiryDay}`) || 0;
+    // Record the incremental hedge as stock volume
+    if (diff > 0) _cumStockBuy  += absDiff;
+    else           _cumStockSell += absDiff;
+    _mmCurrentHedge = requiredHedge;
 }
 
 /* ── Layer 3: Parameter shifts from large exposure ── */
 
-/**
- * Update Layer 3 parameter shifts based on gross notional exposure.
- * Called once per day from main.js.
- * @param {number} grossRatio  Gross notional / (ADV * S)
- */
 export function updateParamShifts(grossRatio) {
-    // Logarithmic scaling past 50%
     const effective = grossRatio <= IMPACT_THRESHOLD_50
         ? grossRatio
         : IMPACT_THRESHOLD_50 + Math.log(1 + grossRatio - IMPACT_THRESHOLD_50);
@@ -216,9 +210,6 @@ export function updateParamShifts(grossRatio) {
     }
 }
 
-/**
- * Decay existing parameter shifts. Called once per day.
- */
 export function decayParamShifts() {
     const factor = Math.pow(0.5, 1 / PARAM_SHIFT_HALF_LIFE);
     for (const k in _playerParamShifts) {
@@ -227,10 +218,6 @@ export function decayParamShifts() {
     }
 }
 
-/**
- * Apply parameter shift overlays to sim before beginDay().
- * Returns saved base values for removal after finalizeDay().
- */
 export function applyParamOverlays(sim) {
     const saved = {};
     for (const k in _playerParamShifts) {
@@ -241,22 +228,12 @@ export function applyParamOverlays(sim) {
     return saved;
 }
 
-/**
- * Remove parameter shift overlays from sim after finalizeDay().
- */
 export function removeParamOverlays(sim, saved) {
     for (const k in saved) sim[k] = saved[k];
 }
 
 /* ── Layer 2: Event coupling ── */
 
-/**
- * Compute event coupling factor based on player's net delta.
- * Scales event deltas by +/-EVENT_COUPLING_CAP.
- * @param {number} netDelta  Player's net delta exposure
- * @param {object} deltas    Event's param deltas (checks mu sign for direction)
- * @returns {number} Multiplier in [1-cap, 1+cap]
- */
 export function computeEventCoupling(netDelta, deltas) {
     if (!deltas || !deltas.mu || Math.abs(netDelta) < 1) return 1.0;
     const alignment = Math.sign(netDelta) * Math.sign(deltas.mu);
@@ -290,13 +267,6 @@ const _optionToastsExtreme = [
     'Options market makers scramble to adjust positions',
 ];
 
-/**
- * Select an impact toast if threshold crossed and cooldown elapsed.
- * @param {number} grossRatio   Gross notional / (ADV * S)
- * @param {string} instrument   'stock' | 'option'
- * @param {number} day          Current sim day
- * @returns {string|null}       Toast text or null
- */
 export function selectImpactToast(grossRatio, instrument, day) {
     if (day - _lastToastDay < IMPACT_TOAST_COOLDOWN) return null;
     let pool;

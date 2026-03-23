@@ -12,7 +12,7 @@ import { renderChainInto, rebuildExpiryDropdown, buildStockBondTable, buildChain
 import { vasicekBondPrice } from './pricing.js';
 import { BOND_FACE_VALUE, STRIKE_INTERVAL, STRIKE_RANGE } from './config.js';
 import { market } from './market.js';
-import { getStockTemporaryImpact } from './price-impact.js';
+import { getStockImpact } from './price-impact.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
 // ---------------------------------------------------------------------------
@@ -414,7 +414,7 @@ function _bidAskTip(mid, vol) {
  */
 export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, stratPosMap) {
     const dash = '\u2014';
-    const displaySpot = spot != null ? spot + getStockTemporaryImpact() : null;
+    const displaySpot = spot != null ? spot + getStockImpact(sigma) : null;
     const stockTxt = displaySpot != null ? displaySpot.toFixed(2) : dash;
     const stockTip = _bidAskTip(displaySpot, sigma);
 

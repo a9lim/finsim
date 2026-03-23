@@ -18,12 +18,7 @@ import {
 } from './config.js';
 
 import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
-import {
-    computeStockImpact, computeOptionImpact,
-    computeDeltaHedgeImpact, applyPermanentImpact,
-    applyOptionPermanentImpact,
-    addStockTemporaryImpact, addOptionTemporaryImpact,
-} from './price-impact.js';
+import { recordStockTrade, recordOptionTrade } from './price-impact.js';
 
 let _greekTrees = null;
 import { computePositionValue, unitPrice } from './position-value.js';
@@ -86,6 +81,10 @@ export function resetPortfolio(capital) {
 /**
  * Compute fill price for a buy or sell, accounting for bid/ask spread and
  * Almgren-Chriss market-impact slippage.
+ *
+ * Impact is recorded as cumulative volume (decays with half-life).
+ * No sim.S mutation — impact is an overlay. Delta hedging by MMs is
+ * handled dynamically by rehedgeMM() each substep.
  */
 function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay) {
     const ba = (type === 'call' || type === 'put')
@@ -96,27 +95,15 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
     const signedQty = side === 'long' ? qty : -qty;
 
     if (type === 'bond') {
-        // Bonds: spread only, no price impact (Vasicek-priced, deep market)
         return spreadFill;
     } else if (type === 'stock') {
-        const impact = computeStockImpact(signedQty, currentVol);
-        applyPermanentImpact(sim, impact.permanent);
-        addStockTemporaryImpact(impact.temporary);
-        return Math.max(0.01, spreadFill + impact.temporary);
+        const fillCost = recordStockTrade(signedQty, currentVol);
+        return Math.max(0.01, spreadFill + fillCost);
     } else {
         const logSK = Math.log(currentPrice / strike);
         const dte = Math.max(1, (expiryDay || 0) - currentDay);
-        const impact = computeOptionImpact(type, signedQty, currentVol, logSK, dte, strike, expiryDay || 0);
-        applyOptionPermanentImpact(type, strike, expiryDay || 0, impact.permanent);
-        addOptionTemporaryImpact(type, strike, expiryDay || 0, impact.temporary);
-        const T = dte / TRADING_DAYS_PER_YEAR;
-        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
-        const sigma = computeSkewSigma(sigEff, currentPrice, strike, T, market.rho, market.xi, market.kappa);
-        _gt = prepareGreekTrees(T, sim.r, sigma, sim.q, currentDay, _gt);
-        const delta = computeGreeksWithTrees(currentPrice, strike, type === 'put', _gt).delta;
-        const hedgeShift = computeDeltaHedgeImpact(signedQty, delta, currentVol);
-        applyPermanentImpact(sim, hedgeShift);
-        return Math.max(0.01, spreadFill + impact.temporary);
+        const fillCost = recordOptionTrade(type, signedQty, currentVol, logSK, dte, strike, expiryDay || 0);
+        return Math.max(0.01, spreadFill + fillCost);
     }
 }
 

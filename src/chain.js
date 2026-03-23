@@ -11,7 +11,7 @@
 import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT, OPTION_SPREAD_PCT, MONEYNESS_SPREAD_WEIGHT } from './config.js';
 import { allocTree, prepareTree, pricePairWithTree, allocGreekTrees, prepareGreekTrees, computeGreeksPairWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { computeOptionBidAsk } from './portfolio.js';
-import { getOptionPermanentImpact, getOptionTemporaryImpact } from './price-impact.js';
+import { getOptionImpact } from './price-impact.js';
 import { market } from './market.js';
 
 // ---------------------------------------------------------------------------
@@ -171,8 +171,9 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
             const sigma = computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa);
             prepareGreekTrees(T, r, sigma, q, currentDay, _rGreekTrees);
             const { call: callG, put: putG } = computeGreeksPairWithTrees(S, K, _rGreekTrees);
-            const callImp = getOptionPermanentImpact('call', K, expiry.day) + getOptionTemporaryImpact('call', K, expiry.day);
-            const putImp  = getOptionPermanentImpact('put',  K, expiry.day) + getOptionTemporaryImpact('put',  K, expiry.day);
+            const logSK = Math.log(S / K);
+            const callImp = getOptionImpact('call', K, expiry.day, sigma, logSK, expiry.dte);
+            const putImp  = getOptionImpact('put',  K, expiry.day, sigma, logSK, expiry.dte);
             const callMid = Math.max(0, callG.price + callImp);
             const putMid  = Math.max(0, putG.price + putImp);
             const callBA = computeOptionBidAsk(callMid, S, K, sigma);
@@ -205,8 +206,9 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
         prepareTree(T, r, sigma, q, currentDay, _rTree);
         const { call: callP, put: putP } = pricePairWithTree(S, K, _rTree);
 
-        const callImp = getOptionPermanentImpact('call', K, expiry.day) + getOptionTemporaryImpact('call', K, expiry.day);
-        const putImp  = getOptionPermanentImpact('put',  K, expiry.day) + getOptionTemporaryImpact('put',  K, expiry.day);
+        const logSK = Math.log(S / K);
+        const callImp = getOptionImpact('call', K, expiry.day, sigma, logSK, expiry.dte);
+        const putImp  = getOptionImpact('put',  K, expiry.day, sigma, logSK, expiry.dte);
         const callMid = Math.max(0, callP + callImp);
         const putMid  = Math.max(0, putP + putImp);
 

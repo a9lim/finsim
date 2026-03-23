@@ -39,8 +39,8 @@ import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
 import {
-    resetImpactState, resetDailyVolume,
-    getStockTemporaryImpact,
+    resetImpactState, decayImpactVolumes,
+    getStockImpact, rehedgeMM,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
     selectImpactToast,
@@ -592,15 +592,17 @@ function frame(now) {
             // Run any pending sub-steps
             let stepped = false;
             while (sim.substepsDone < targetSteps) {
-                resetDailyVolume();
                 sim.substep();
+                decayImpactVolumes();
+                syncMarket(sim);
+                rehedgeMM(portfolio.positions);
+                _onSubstepTick();
                 chart.setLiveCandle(sim._partial);
                 stepped = true;
             }
-            // Update sidebar & check orders after each substep batch
+            // UI update once per frame (repricing chain/sidebar is expensive)
             if (stepped) {
-                syncMarket(sim);
-                _onSubstep();
+                _onSubstepUI();
                 if (!strategyMode) dirty = true;
             }
             // All sub-steps done — finalize the day
@@ -631,8 +633,8 @@ function frame(now) {
     requestAnimationFrame(frame);
 }
 
-/** Called after each substep batch — lightweight sidebar + order updates. */
-function _onSubstep() {
+/** Called after each individual substep — orders, margin tracking, peak/drawdown. */
+function _onSubstepTick() {
     const vol = market.sigma;
 
     // Check pending orders at intraday price
@@ -645,10 +647,8 @@ function _onSubstep() {
         chainDirty = true;
     }
 
-    // Compute margin (equity + required) for display and peak/drawdown tracking
-    const substepMargin = checkMargin(sim.S, market.sigma, sim.r, sim.day, sim.q);
-
     // Track peak equity and drawdown for epilogue scorecard
+    const substepMargin = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
     if (eventEngine) {
         if (substepMargin.equity > portfolio.peakValue) portfolio.peakValue = substepMargin.equity;
         if (portfolio.peakValue > 0) {
@@ -656,8 +656,11 @@ function _onSubstep() {
             if (dd > portfolio.maxDrawdown) portfolio.maxDrawdown = dd;
         }
     }
+}
 
-    // Lightweight UI update: reprice visible expiry, update portfolio, rate
+/** Called once per frame after substep batch — reprices chain/sidebar. */
+function _onSubstepUI() {
+    const substepMargin = checkMargin(sim.S, market.sigma, sim.r, sim.day, sim.q);
     updateSubstepUI(substepMargin);
 }
 
@@ -1050,11 +1053,26 @@ function _onDayComplete() {
 function tick() {
     if (dayInProgress) {
         // Finish remaining sub-steps instantly
-        while (!sim.dayComplete) { resetDailyVolume(); sim.substep(); }
+        while (!sim.dayComplete) {
+            sim.substep();
+            decayImpactVolumes();
+            syncMarket(sim);
+            rehedgeMM(portfolio.positions);
+            _onSubstepTick();
+        }
         sim.finalizeDay();
         dayInProgress = false;
     } else {
-        sim.tick();
+        // Full day: beginDay + substeps + finalizeDay
+        sim.beginDay();
+        for (let i = 0; i < INTRADAY_STEPS; i++) {
+            sim.substep();
+            decayImpactVolumes();
+            syncMarket(sim);
+            rehedgeMM(portfolio.positions);
+            _onSubstepTick();
+        }
+        sim.finalizeDay();
     }
     // Snap the lerp to the final state (no animation for step)
     const last = sim.history.last();
@@ -1069,7 +1087,6 @@ function tick() {
         chart._lerp._targetHigh  = last.high;
         chart._lerp._targetLow   = last.low;
     }
-    syncMarket(sim);
     _onDayComplete();
 }
 
@@ -1232,9 +1249,12 @@ function step() {
 
     // Advance one substep
     sim.substep();
-    chart.setLiveCandle(sim._partial);
+    decayImpactVolumes();
     syncMarket(sim);
-    _onSubstep();
+    rehedgeMM(portfolio.positions);
+    _onSubstepTick();
+    chart.setLiveCandle(sim._partial);
+    _onSubstepUI();
 
     // If all substeps done, finalize the day
     if (sim.dayComplete) {
@@ -1419,7 +1439,7 @@ function handleChainCellClick(info) {
 function openFullChain() {
     if (playing) togglePlay();
     const vol = market.sigma;
-    const displaySpot = sim.S + getStockTemporaryImpact();
+    const displaySpot = sim.S + getStockImpact(market.sigma);
     const bondDte = _getTradeExpiryDay() - sim.day;
     const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
     const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
@@ -1457,7 +1477,7 @@ function handleTradeSubmit(data) {
 function _refreshChainOverlayIfOpen() {
     if ($.chainOverlay.classList.contains('hidden') || !$._refreshChainOverlay) return;
     const vol = market.sigma;
-    const displaySpot = sim.S + getStockTemporaryImpact();
+    const displaySpot = sim.S + getStockImpact(market.sigma);
     const bondDte = _getTradeExpiryDay() - sim.day;
     const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
     const stockBA = computeBidAsk(displaySpot, displaySpot, vol);

@@ -29,14 +29,13 @@ export const STOCKBOND_SPREAD_PCT = 0.001;  // 0.1% of mid price
 export const OPTION_SPREAD_PCT = 0.01;      // 1% of mid price
 export const MONEYNESS_SPREAD_WEIGHT = 0.05; // weight on |log(S/K)| for options
 
-// -- Price impact (Almgren-Chriss) --
+// -- Price impact (Almgren-Chriss with decaying cumulative volume) --
 export const ADV                    = 500;     // average daily volume (displayed as "500k")
-export const PERM_COEFF             = 0.10;    // permanent impact coefficient
-export const TEMP_COEFF             = 0.05;    // temporary impact coefficient
-export const OPT_PERM_COEFF         = 0.12;    // options permanent impact
-export const OPT_TEMP_COEFF         = 0.06;    // options temporary impact
+export const IMPACT_COEFF           = 0.10;    // stock impact coefficient (sqrt model)
+export const OPT_IMPACT_COEFF       = 0.12;    // options impact coefficient (sqrt model)
 export const OI_ATM_BASE            = 50;      // ATM open interest baseline (displayed as "50k")
 export const OI_MONEYNESS_DECAY     = 4.0;     // OI decay with moneyness
+export const VOLUME_HALF_LIFE       = 1;       // days for cumulative volume decay (applied per substep)
 export const PARAM_SHIFT_HALF_LIFE  = 5;       // days for Layer 3 param decay
 export const IMPACT_TOAST_COOLDOWN  = 10;      // days between impact toasts
 export const IMPACT_THRESHOLD_25    = 0.25;    // 25% ADV — mild vol uptick
