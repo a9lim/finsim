@@ -38,27 +38,11 @@ export function resetImpactState() {
     resetDailyVolume();
 }
 
-/** Reset cumulative volume — call at start of each day. */
+/** Reset cumulative volume — call at start of each substep. */
 export function resetDailyVolume() {
     _cumStockBuy = _cumStockSell = 0;
     _cumHedgeBuy = _cumHedgeSell = 0;
     _cumOption.clear();
-}
-
-/**
- * Decay cumulative volume each substep — order book replenishes over time.
- * Half-life of ~4 substeps (~4 hours). Call once per substep from main.js.
- */
-const _SUBSTEP_DECAY = Math.pow(0.5, 1 / 4);
-export function decaySubstepVolume() {
-    _cumStockBuy  *= _SUBSTEP_DECAY;
-    _cumStockSell *= _SUBSTEP_DECAY;
-    _cumHedgeBuy  *= _SUBSTEP_DECAY;
-    _cumHedgeSell *= _SUBSTEP_DECAY;
-    for (const cum of _cumOption.values()) {
-        cum.buy  *= _SUBSTEP_DECAY;
-        cum.sell *= _SUBSTEP_DECAY;
-    }
 }
 
 /* ── Layer 1: Stock/Bond slippage ── */

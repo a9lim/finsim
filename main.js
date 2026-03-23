@@ -546,7 +546,6 @@ function frame(now) {
         if (!dayInProgress) {
             // Start a new day if enough time has passed since last tick
             if (now - lastTickTime >= tickInterval) {
-                resetDailyVolume();
                 _recoveryDrift = computeRecoveryDrift();
                 sim.mu += _recoveryDrift;
                 _savedOverlays = applyParamOverlays(sim);
@@ -570,6 +569,7 @@ function frame(now) {
             // Run any pending sub-steps
             let stepped = false;
             while (sim.substepsDone < targetSteps) {
+                resetDailyVolume();
                 sim.substep();
                 chart.setLiveCandle(sim._partial);
                 stepped = true;
@@ -936,7 +936,7 @@ function _onDayComplete() {
 function tick() {
     if (dayInProgress) {
         // Finish remaining sub-steps instantly
-        while (!sim.dayComplete) sim.substep();
+        while (!sim.dayComplete) { resetDailyVolume(); sim.substep(); }
         sim.finalizeDay();
         dayInProgress = false;
     } else {
