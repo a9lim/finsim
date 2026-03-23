@@ -1569,8 +1569,7 @@ function _updateTradeCreditDebit() {
         const expiries = expiryMgr.update(sim.day);
         const overrideDay = strat.selectableExpiry ? _tradeExpiryDay() : null;
         const net = computeNetCost(strat.legs, sim.S, market.sigma, sim.r, sim.day, sim.q, expiries, overrideDay);
-        const mult = parseInt($.tradeQty?.value, 10) || 1;
-        updateCreditDebit($, net * mult);
+        updateCreditDebit($, net);
     } catch { updateCreditDebit($, null); }
 }
 
