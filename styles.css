@@ -890,6 +890,28 @@ main {
     margin-right: 8px;
 }
 
+.epilogue-timeline-row {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    align-items: start;
+}
+.epilogue-timeline-row:last-child { border-bottom: none; }
+.epilogue-timeline-day {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    padding-top: 2px;
+}
+.epilogue-timeline-text {
+    color: var(--text-secondary);
+}
+
 @media (max-width: 600px) {
     .epilogue-panel {
         max-width: 100%;
