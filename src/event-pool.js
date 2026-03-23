@@ -63,48 +63,9 @@ const FED_EVENTS = [
         headline: 'Hartley signals tightening bias: "The committee is prepared to act if inflation proves persistent"',
         magnitude: 'moderate',
         when: (sim, world) => sim.b < 0.15 && !world.fed.hartleyFired && !world.fed.hikeCycle,
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'Fed Chair Hartley just telegraphed a hawkish pivot at a Brookings panel. Bond futures are already selling off in after-hours. The desk expects a 25bps hike within two meetings. Your portfolio needs to be positioned before the street fully reprices.',
-        choices: [
-            {
-                label: 'Front-run the hike',
-                desc: 'Short bonds and reduce equity exposure ahead of tightening.',
-                deltas: { mu: -0.02, theta: 0.008, sigmaR: 0.002 },
-                effects: [
-                    { path: 'fed.hikeCycle', op: 'set', value: true },
-                    { path: 'fed.cutCycle', op: 'set', value: false },
-                ],
-                followups: [{ id: 'fed_25bps_hike', mtth: 28, weight: 0.8 }],
-                playerFlag: 'front_ran_hike_signal',
-                resultToast: 'You positioned short duration ahead of the crowd. The hike cycle is underway.',
-            },
-            {
-                label: 'Hold steady',
-                desc: 'Wait for confirmation before repositioning. The signal could be a bluff.',
-                deltas: { mu: -0.015, theta: 0.005, sigmaR: 0.001 },
-                effects: [
-                    { path: 'fed.hikeCycle', op: 'set', value: true },
-                    { path: 'fed.cutCycle', op: 'set', value: false },
-                ],
-                followups: [{ id: 'fed_25bps_hike', mtth: 32, weight: 0.7 }],
-                playerFlag: 'held_through_hike_signal',
-                resultToast: 'You wait for the actual hike. Markets drift lower on the hawkish rhetoric.',
-            },
-            {
-                label: 'Fade the signal',
-                desc: 'Buy the dip. Hartley has bluffed before and the economy is slowing.',
-                deltas: { mu: -0.01, theta: 0.003, sigmaR: 0.001 },
-                effects: [
-                    { path: 'fed.hikeCycle', op: 'set', value: true },
-                    { path: 'fed.cutCycle', op: 'set', value: false },
-                ],
-                followups: [{ id: 'fed_25bps_hike', mtth: 35, weight: 0.6 }],
-                playerFlag: 'faded_hike_signal',
-                resultToast: 'A contrarian bet. If Hartley follows through, you\'ll be offside.',
-            },
-        ],
+        params: { mu: -0.015, theta: 0.005, sigmaR: 0.001 },
+        effects: [ { path: 'fed.hikeCycle', op: 'set', value: true }, { path: 'fed.cutCycle', op: 'set', value: false }, ],
+        followups: [{ id: 'fed_25bps_hike', mtth: 32, weight: 0.7 }],
     },
     {
         id: 'fed_25bps_hike',
@@ -169,36 +130,7 @@ const FED_EVENTS = [
         headline: 'Fed slashes rates 50bps in emergency inter-meeting action; Hartley: "Extraordinary circumstances demand decisive response"',
         magnitude: 'major',
         when: (sim, world) => sim.b > -0.03,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'The Fed just announced an emergency 50bps inter-meeting cut. This is panic territory -- the last time the Fed acted between meetings was 2008. Futures are whipsawing. The desk needs to decide how to play the aftermath before Asia opens.',
-        choices: [
-            {
-                label: 'Ride the rally',
-                desc: 'Go long into the liquidity wave. Emergency cuts mean the Fed put is back.',
-                deltas: { mu: 0.05, theta: 0.01, b: -0.015, sigmaR: 0.004, lambda: 0.8 },
-                effects: [],
-                playerFlag: 'rode_emergency_cut_rally',
-                resultToast: 'You lean into the Fed put. Risk assets surge on the liquidity injection.',
-            },
-            {
-                label: 'Hedge the tail',
-                desc: 'The emergency cut signals something is broken. Buy protection.',
-                deltas: { mu: 0.03, theta: 0.02, b: -0.015, sigmaR: 0.006, lambda: 1.5 },
-                effects: [],
-                playerFlag: 'hedged_emergency_cut',
-                resultToast: 'You buy vol and puts. If the cut signals deeper trouble, you\'re covered.',
-            },
-            {
-                label: 'Sell into strength',
-                desc: 'Emergency cuts are a sign of desperation. Fade the pop and get defensive.',
-                deltas: { mu: 0.02, theta: 0.025, b: -0.015, sigmaR: 0.008, lambda: 1.2 },
-                effects: [],
-                playerFlag: 'faded_emergency_cut',
-                resultToast: 'You sell the relief rally. If markets realize the cut was desperation, you profit.',
-            },
-        ],
+        params: { mu: 0.03, theta: 0.02, b: -0.015, sigmaR: 0.006, lambda: 1.5 },
     },
 
     // -- QE restart ----------------------------------------------------------
@@ -209,42 +141,8 @@ const FED_EVENTS = [
         headline: 'Fed announces open-ended QE: $120B/month in Treasury and MBS purchases; "whatever it takes" language deployed',
         magnitude: 'major',
         when: (sim, world) => !world.fed.qeActive && sim.b < 0.02,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'The Fed just announced unlimited quantitative easing. Treasury and MBS purchases at $120 billion per month. The "whatever it takes" language means they\'re backstopping everything. This is the trade of the cycle -- but the question is whether it works or whether confidence is already broken.',
-        choices: [
-            {
-                label: 'Go all in on risk',
-                desc: 'The Fed is printing. Buy everything with a coupon and lever up.',
-                deltas: { mu: 0.06, theta: -0.02, b: -0.01, sigmaR: -0.004, lambda: -0.8, q: 0.003 },
-                effects: [
-                    { path: 'fed.qeActive', op: 'set', value: true },
-                ],
-                playerFlag: 'leveraged_into_qe',
-                resultToast: 'You load the boat on risk assets. If QE works, this is generational alpha.',
-            },
-            {
-                label: 'Play it measured',
-                desc: 'Add exposure but keep hedges. QE takes time to work through the system.',
-                deltas: { mu: 0.05, theta: -0.015, b: -0.01, sigmaR: -0.003, lambda: -0.5, q: 0.002 },
-                effects: [
-                    { path: 'fed.qeActive', op: 'set', value: true },
-                ],
-                playerFlag: 'measured_qe_positioning',
-                resultToast: 'You add risk gradually. A balanced approach to the liquidity wave.',
-            },
-            {
-                label: 'Sell into the sugar rush',
-                desc: 'QE is a sign of desperation. Position for the stimulus to fail.',
-                deltas: { mu: 0.03, theta: -0.005, b: -0.01, sigmaR: 0.002, lambda: 0.3, q: 0.001 },
-                effects: [
-                    { path: 'fed.qeActive', op: 'set', value: true },
-                ],
-                playerFlag: 'sold_into_qe',
-                resultToast: 'You stay defensive. If QE can\'t fix what\'s broken, the reckoning comes later.',
-            },
-        ],
+        params: { mu: 0.05, theta: -0.015, b: -0.01, sigmaR: -0.003, lambda: -0.5, q: 0.002 },
+        effects: [ { path: 'fed.qeActive', op: 'set', value: true }, ],
     },
 
     // -- Minutes leaks -------------------------------------------------------
@@ -299,45 +197,9 @@ const FED_EVENTS = [
         headline: 'Barron tells Fox Business: "I have the power to fire Hartley and I\'m seriously considering it." DOJ reviewing legal authority',
         magnitude: 'moderate',
         when: (sim, world) => world.election.barronApproval > 40 && !world.fed.hartleyFired,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Barron just threatened to fire the Fed Chair on live television. Constitutional scholars are split. If he follows through, it would be unprecedented -- and the market is already pricing in chaos. Rate vol is spiking. The desk needs a view on whether this is bluster or real.',
-        choices: [
-            {
-                label: 'Bet he does it',
-                desc: 'Buy rate vol and equity puts. If Barron fires Hartley, markets crash.',
-                deltas: { mu: -0.04, theta: 0.025, sigmaR: 0.01, lambda: 1.5 },
-                effects: [
-                    { path: 'fed.credibilityScore', op: 'add', value: -3 },
-                ],
-                followups: [{ id: 'barron_fires_hartley', mtth: 18, weight: 0.5 }],
-                playerFlag: 'bet_barron_fires_hartley',
-                resultToast: 'You position for the worst case. If Barron follows through, you\'re ready.',
-            },
-            {
-                label: 'Call the bluff',
-                desc: 'This is political theater. Fade the vol spike -- Barron won\'t cross that line.',
-                deltas: { mu: -0.02, theta: 0.015, sigmaR: 0.006, lambda: 0.8 },
-                effects: [
-                    { path: 'fed.credibilityScore', op: 'add', value: -3 },
-                ],
-                followups: [{ id: 'barron_fires_hartley', mtth: 30, weight: 0.2 }],
-                playerFlag: 'called_barron_bluff',
-                resultToast: 'You sell vol into the panic. Just bluster -- right?',
-            },
-            {
-                label: 'Flatten everything',
-                desc: 'Too much uncertainty. Cut risk across the board until it resolves.',
-                deltas: { mu: -0.03, theta: 0.02, sigmaR: 0.008, lambda: 1.0 },
-                effects: [
-                    { path: 'fed.credibilityScore', op: 'add', value: -3 },
-                ],
-                followups: [{ id: 'barron_fires_hartley', mtth: 25, weight: 0.3 }],
-                playerFlag: 'flattened_on_hartley_threat',
-                resultToast: 'You pull risk. Better to miss the move than get caught wrong-footed.',
-            },
-        ],
+        params: { mu: -0.02, theta: 0.015, sigmaR: 0.006, lambda: 0.8 },
+        effects: [ { path: 'fed.credibilityScore', op: 'add', value: -3 }, ],
+        followups: [{ id: 'barron_fires_hartley', mtth: 30, weight: 0.2 }],
     },
     {
         id: 'barron_fires_hartley',
@@ -346,63 +208,9 @@ const FED_EVENTS = [
         headline: 'BREAKING: Barron fires Fed Chair Hartley via executive order; constitutional crisis erupts as markets plunge',
         magnitude: 'major',
         when: (sim, world, congress) => congress.trifecta && world.fed.credibilityScore <= 4 && !world.fed.hartleyFired,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'It happened. Barron signed the executive order twenty minutes ago. Hartley has been removed as Fed Chair. S&P futures are limit-down, the dollar is cratering, and Treasury yields are spiking. Every desk on the street is scrambling. This is a once-in-a-career dislocation.',
-        choices: [
-            {
-                label: 'Buy the crash',
-                desc: 'This is capitulation. Institutions will be forced to cover. Go long into the panic.',
-                deltas: { mu: -0.02, theta: 0.04, sigmaR: 0.02, lambda: 2.5 },
-                effects: [
-                    { path: 'fed.hartleyFired', op: 'set', value: true },
-                    { path: 'fed.credibilityScore', op: 'set', value: 0 },
-                    { path: 'election.barronApproval', op: 'add', value: -10 },
-                ],
-                followups: [
-                    { id: 'markets_panic_hartley_fired', mtth: 3, weight: 0.7 },
-                    { id: 'vane_nominated', mtth: 10, weight: 0.8 },
-                    { id: 'scotus_hartley_case', mtth: 40, weight: 0.5 },
-                ],
-                playerFlag: 'bought_hartley_firing_crash',
-                resultToast: 'You buy into the abyss. Either a hero trade or career-ending.',
-            },
-            {
-                label: 'Sell everything',
-                desc: 'Fed independence is gone. This is systemic. Get to cash and wait.',
-                deltas: { mu: -0.05, theta: 0.05, sigmaR: 0.025, lambda: 3.5 },
-                effects: [
-                    { path: 'fed.hartleyFired', op: 'set', value: true },
-                    { path: 'fed.credibilityScore', op: 'set', value: 0 },
-                    { path: 'election.barronApproval', op: 'add', value: -10 },
-                ],
-                followups: [
-                    { id: 'markets_panic_hartley_fired', mtth: 3, weight: 0.95 },
-                    { id: 'vane_nominated', mtth: 10, weight: 0.8 },
-                    { id: 'scotus_hartley_case', mtth: 40, weight: 0.5 },
-                ],
-                playerFlag: 'sold_everything_hartley_fired',
-                resultToast: 'You liquidate. If the system is breaking, cash is the only safe haven.',
-            },
-            {
-                label: 'Load up on volatility',
-                desc: 'The direction is unclear but vol will stay elevated for weeks. Buy straddles.',
-                deltas: { mu: -0.04, theta: 0.05, sigmaR: 0.02, lambda: 3.0 },
-                effects: [
-                    { path: 'fed.hartleyFired', op: 'set', value: true },
-                    { path: 'fed.credibilityScore', op: 'set', value: 0 },
-                    { path: 'election.barronApproval', op: 'add', value: -10 },
-                ],
-                followups: [
-                    { id: 'markets_panic_hartley_fired', mtth: 3, weight: 0.9 },
-                    { id: 'vane_nominated', mtth: 10, weight: 0.8 },
-                    { id: 'scotus_hartley_case', mtth: 40, weight: 0.5 },
-                ],
-                playerFlag: 'bought_vol_hartley_fired',
-                resultToast: 'You buy vol across the curve. Constitutional crises don\'t resolve quickly.',
-            },
-        ],
+        params: { mu: -0.05, theta: 0.05, sigmaR: 0.025, lambda: 3.5 },
+        effects: [ { path: 'fed.hartleyFired', op: 'set', value: true }, { path: 'fed.credibilityScore', op: 'set', value: 0 }, { path: 'election.barronApproval', op: 'add', value: -10 }, ],
+        followups: [ { id: 'markets_panic_hartley_fired', mtth: 3, weight: 0.95 }, { id: 'vane_nominated', mtth: 10, weight: 0.8 }, { id: 'scotus_hartley_case', mtth: 40, weight: 0.5 }, ],
     },
     {
         id: 'markets_panic_hartley_fired',
@@ -495,60 +303,9 @@ const MACRO_EVENTS = [
         headline: 'Barron signs executive order imposing 25% tariffs on $200B of imports; "America will no longer be ripped off," he declares at signing ceremony',
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 0,
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'Barron just signed sweeping tariffs on $200B of imports live from the Oval Office. Futures are cratering — S&P down 2% and falling. Supply chain names are getting destroyed in after-hours. Beijing is expected to retaliate within days. The desk is scrambling: this is the opening shot of a trade war, and every macro book on the Street needs to reposition before Asia opens.',
-        choices: [
-            {
-                label: 'Go risk-off',
-                desc: 'Cut equity exposure and buy vol. Trade wars escalate before they de-escalate.',
-                deltas: { mu: -0.05, theta: 0.02, lambda: 1.0, muJ: -0.02, q: -0.001 },
-                effects: [
-                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 },
-                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                followups: [
-                    { id: 'trade_retaliation', mtth: 15, weight: 0.8 },
-                    { id: 'tariff_selloff', mtth: 3, weight: 0.7 },
-                ],
-                playerFlag: 'went_risk_off_tariffs',
-                resultToast: 'You de-risk into the tariff shock. If Beijing retaliates, you\'re positioned.',
-            },
-            {
-                label: 'Buy the overreaction',
-                desc: 'Tariffs are a negotiating tactic. Barron will cut a deal once markets punish him enough.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
-                effects: [
-                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 },
-                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                followups: [
-                    { id: 'trade_retaliation', mtth: 18, weight: 0.7 },
-                    { id: 'tariff_selloff', mtth: 3, weight: 0.5 },
-                ],
-                playerFlag: 'bought_tariff_dip',
-                resultToast: 'You buy the panic. If this is theater, you profit from the snap-back.',
-            },
-            {
-                label: 'Rotate to domestic',
-                desc: 'Tariffs hurt importers but help domestic producers. Sector rotation, not risk reduction.',
-                deltas: { mu: -0.04, theta: 0.018, lambda: 0.8, muJ: -0.015, q: -0.001 },
-                effects: [
-                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 },
-                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                followups: [
-                    { id: 'trade_retaliation', mtth: 15, weight: 0.8 },
-                    { id: 'tariff_selloff', mtth: 3, weight: 0.6 },
-                ],
-                playerFlag: 'rotated_domestic_tariffs',
-                resultToast: 'You rotate to domestic plays. Trade wars create winners and losers — pick the right side.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
+        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 }, { path: 'geopolitical.chinaRelations', op: 'add', value: -1 }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
+        followups: [ { id: 'trade_retaliation', mtth: 18, weight: 0.7 }, { id: 'tariff_selloff', mtth: 3, weight: 0.5 }, ],
     },
     {
         id: 'tariff_selloff',
@@ -565,55 +322,9 @@ const MACRO_EVENTS = [
         headline: 'Beijing retaliates with matching tariffs on U.S. agriculture and energy; Liang Wei\'s Zhaowei announces "strategic decoupling plan"',
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 1,
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'Beijing just dropped matching tariffs on U.S. agriculture and energy. Zhaowei\'s Liang Wei went on state television to announce a "strategic decoupling plan" — they\'re building parallel supply chains. Soybean futures are limit-down, energy names are tanking. This is no longer a negotiating tactic; it\'s an economic conflict. The desk needs to decide whether this escalates further or if we\'re near peak pain.',
-        choices: [
-            {
-                label: 'Escalation trade',
-                desc: 'This gets worse before it gets better. Add downside protection and go short global trade.',
-                deltas: { mu: -0.05, theta: 0.025, lambda: 1.0, muJ: -0.03 },
-                effects: [
-                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 },
-                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
-                ],
-                followups: [
-                    { id: 'zhaowei_ban', mtth: 25, weight: 0.7 },
-                ],
-                playerFlag: 'bet_on_escalation',
-                resultToast: 'You position for further escalation. If Barron bans Zhaowei next, you\'re ahead of the curve.',
-            },
-            {
-                label: 'Bet on de-escalation',
-                desc: 'Both sides feel the pain now. Back-channel talks will produce exemptions within weeks.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.01 },
-                effects: [
-                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 },
-                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
-                ],
-                followups: [
-                    { id: 'tariff_exemptions', mtth: 18, weight: 0.6 },
-                ],
-                playerFlag: 'bet_on_deescalation',
-                resultToast: 'You bet on diplomacy. If exemptions come through, the relief rally will be sharp.',
-            },
-            {
-                label: 'Play the spread',
-                desc: 'Long domestic producers, short importers. The winners and losers are clear — profit from dislocation.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
-                effects: [
-                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 },
-                    { path: 'geopolitical.chinaRelations', op: 'add', value: -1 },
-                ],
-                followups: [
-                    { id: 'zhaowei_ban', mtth: 30, weight: 0.5 },
-                    { id: 'tariff_exemptions', mtth: 20, weight: 0.4 },
-                ],
-                playerFlag: 'played_trade_war_spread',
-                resultToast: 'You play the relative value. Dislocation is a trader\'s best friend.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.01 },
+        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 }, { path: 'geopolitical.chinaRelations', op: 'add', value: -1 }, ],
+        followups: [ { id: 'tariff_exemptions', mtth: 18, weight: 0.6 }, ],
     },
     {
         id: 'zhaowei_ban',
@@ -671,48 +382,8 @@ const MACRO_EVENTS = [
         headline: 'Barron and Beijing announce "Phase One" trade deal framework; tariffs to be rolled back over 18 months. Barron: "The biggest deal in history, maybe ever"',
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 2 && world.geopolitical.tradeWarStage < 4,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'Barron and Beijing just announced a "Phase One" trade deal framework on the White House lawn. Tariffs will be rolled back over 18 months, and Barron is calling it "the biggest deal in history, maybe ever." Futures are ripping — S&P up 3% and climbing. The question is whether this deal has teeth or is just a photo op. The fine print is thin, and enforcement mechanisms are vague. Meridian\'s macro desk needs to decide: is the trade war over, or is this a ceasefire that collapses at the first provocation?',
-        choices: [
-            {
-                label: 'Full risk-on',
-                desc: 'The trade war is over. Load up on equities, close hedges, ride the relief rally.',
-                deltas: { mu: 0.06, theta: -0.025, lambda: -1.0, muJ: 0.015, q: 0.003 },
-                effects: [
-                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 },
-                    { path: 'geopolitical.chinaRelations', op: 'add', value: 2 },
-                    { path: 'election.barronApproval', op: 'add', value: 3 },
-                ],
-                playerFlag: 'went_risk_on_trade_deal',
-                resultToast: 'You go all-in on the deal. If it holds, the rally has legs for months.',
-            },
-            {
-                label: 'Cautious optimism',
-                desc: 'Take partial profits on hedges but keep some protection. Phase One deals have failed before.',
-                deltas: { mu: 0.04, theta: -0.015, lambda: -0.6, muJ: 0.008, q: 0.002 },
-                effects: [
-                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 },
-                    { path: 'geopolitical.chinaRelations', op: 'add', value: 2 },
-                    { path: 'election.barronApproval', op: 'add', value: 3 },
-                ],
-                playerFlag: 'cautious_on_trade_deal',
-                resultToast: 'You trim hedges but stay vigilant. Phase One is a start, not a finish.',
-            },
-            {
-                label: 'Sell the news',
-                desc: 'This deal is vapor — no enforcement, no specifics. Sell into the euphoria.',
-                deltas: { mu: 0.03, theta: -0.01, lambda: -0.4, muJ: 0.005, q: 0.001 },
-                effects: [
-                    { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 },
-                    { path: 'geopolitical.chinaRelations', op: 'add', value: 2 },
-                    { path: 'election.barronApproval', op: 'add', value: 3 },
-                ],
-                playerFlag: 'sold_trade_deal_news',
-                resultToast: 'You sell the rally. "Buy the rumor, sell the news" — the oldest play in the book.',
-            },
-        ],
+        params: { mu: 0.04, theta: -0.015, lambda: -0.6, muJ: 0.008, q: 0.002 },
+        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 }, { path: 'geopolitical.chinaRelations', op: 'add', value: 2 }, { path: 'election.barronApproval', op: 'add', value: 3 }, ],
     },
 
     // =====================================================================
@@ -923,42 +594,8 @@ const MACRO_EVENTS = [
         headline: 'OPEC+ announces surprise 2M barrel/day production cut; oil surges 18% in a single session. Energy costs ripple through supply chains',
         magnitude: 'major',
         when: (sim, world) => !world.geopolitical.oilCrisis,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'OPEC+ just blindsided the market with a 2M barrel/day production cut. Crude is up 18% and still climbing. Energy stocks are surging but everything else is getting crushed — airlines, transports, consumer discretionary. The supply shock feeds directly into inflation, which means the Fed is boxed in. This is a stagflation scare in real-time. Meridian\'s commodity desk is overwhelmed — every client wants a view.',
-        choices: [
-            {
-                label: 'Stagflation hedge',
-                desc: 'Go short equities, short bonds, position for higher rates and lower growth simultaneously.',
-                deltas: { mu: -0.06, theta: 0.035, lambda: 1.5, muJ: -0.03, b: 0.012, sigmaR: 0.008, q: -0.002 },
-                effects: [
-                    { path: 'geopolitical.oilCrisis', op: 'set', value: true },
-                ],
-                playerFlag: 'hedged_stagflation',
-                resultToast: 'You position for the worst case: growth slows while inflation rips. Classic stagflation trade.',
-            },
-            {
-                label: 'Buy the energy spike',
-                desc: 'Rotate into energy names. OPEC cuts tend to stick — the supply deficit will persist.',
-                deltas: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, b: 0.008, sigmaR: 0.006, q: -0.001 },
-                effects: [
-                    { path: 'geopolitical.oilCrisis', op: 'set', value: true },
-                ],
-                playerFlag: 'bought_energy_spike',
-                resultToast: 'You rotate into energy. If the cut holds, $100+ oil is coming.',
-            },
-            {
-                label: 'Fade the panic',
-                desc: 'OPEC members always cheat on quotas. The cut won\'t hold — buy the dip in broad equities.',
-                deltas: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.015, b: 0.006, sigmaR: 0.005 },
-                effects: [
-                    { path: 'geopolitical.oilCrisis', op: 'set', value: true },
-                ],
-                playerFlag: 'faded_opec_cut',
-                resultToast: 'You bet OPEC can\'t hold discipline. If members cheat, oil falls and equities recover.',
-            },
-        ],
+        params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, b: 0.008, sigmaR: 0.006, q: -0.001 },
+        effects: [ { path: 'geopolitical.oilCrisis', op: 'set', value: true }, ],
     },
     {
         id: 'energy_sanctions',
@@ -1019,45 +656,8 @@ const MACRO_EVENTS = [
         headline: 'NBER officially declares recession began two quarters ago; Barron blames "obstructionist Congress and a reckless Fed." Markets already priced most of it',
         magnitude: 'major',
         when: (sim, world) => sim.mu < -0.05 && sim.theta > 0.12 && !world.geopolitical.recessionDeclared,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'The NBER just made it official: the economy has been in recession for two quarters. Barron is blaming Congress and the Fed, but the damage is done — unemployment is rising, earnings estimates are collapsing, and credit spreads are blowing out. The question for Meridian\'s desk is whether the market has already priced this in. The declaration is lagging — smart money has been positioned for months. Is the bottom in, or is there more pain ahead?',
-        choices: [
-            {
-                label: 'Bottom-fish',
-                desc: 'The recession was priced months ago. NBER declarations are backward-looking — the recovery trade starts now.',
-                deltas: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02, b: -0.008, q: -0.003 },
-                effects: [
-                    { path: 'geopolitical.recessionDeclared', op: 'set', value: true },
-                    { path: 'election.barronApproval', op: 'add', value: -8 },
-                ],
-                playerFlag: 'bottom_fished_recession',
-                resultToast: 'You buy into the official declaration. If the worst is behind us, you caught the turn.',
-            },
-            {
-                label: 'Full defensive',
-                desc: 'The declaration is just the beginning. Earnings haven\'t fully cracked yet — go to cash and bonds.',
-                deltas: { mu: -0.07, theta: 0.035, lambda: 1.8, muJ: -0.05, b: -0.012, q: -0.005 },
-                effects: [
-                    { path: 'geopolitical.recessionDeclared', op: 'set', value: true },
-                    { path: 'election.barronApproval', op: 'add', value: -8 },
-                ],
-                playerFlag: 'went_full_defensive_recession',
-                resultToast: 'You hunker down. Cash is king in a recession — preservation over performance.',
-            },
-            {
-                label: 'Sell vol into capitulation',
-                desc: 'Vol is at panic levels. The VIX always mean-reverts. Sell premium and collect the fear premium.',
-                deltas: { mu: -0.05, theta: 0.025, lambda: 1.2, muJ: -0.03, b: -0.01, q: -0.004 },
-                effects: [
-                    { path: 'geopolitical.recessionDeclared', op: 'set', value: true },
-                    { path: 'election.barronApproval', op: 'add', value: -8 },
-                ],
-                playerFlag: 'sold_vol_recession',
-                resultToast: 'You sell fear. Implied vol is way above realized — if it normalizes, you profit handsomely.',
-            },
-        ],
+        params: { mu: -0.07, theta: 0.035, lambda: 1.8, muJ: -0.05, b: -0.012, q: -0.005 },
+        effects: [ { path: 'geopolitical.recessionDeclared', op: 'set', value: true }, { path: 'election.barronApproval', op: 'add', value: -8 }, ],
     },
     {
         id: 'sovereign_debt_scare',
@@ -1133,41 +733,9 @@ const PNTH_EVENTS = [
         headline: 'PNTH CEO Gottlieb delivers blistering keynote: "We built Atlas to heal, not to kill. I will not let this company become a weapons factory"',
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ceoIsGottlieb && world.pnth.boardDirks >= 6,
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'Gottlieb just went scorched earth at the Aspen Ideas keynote. He called the defense contracts "a betrayal of our founding mission" on live television. PNTH is selling off in after-hours as the Dirks faction scrambles to respond. Your desk\'s PNTH models are all flashing red. The schism is now public and irreversible.',
-        choices: [
-            {
-                label: 'Side with Gottlieb',
-                desc: 'Bet on the ethics pivot. If Gottlieb wins the board war, commercial revenue re-rates the stock.',
-                deltas: { mu: -0.02, theta: 0.01, lambda: 0.3 },
-                effects: [
-                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
-                ],
-                followups: [{ id: 'dirks_cnbc_rebuttal', mtth: 10, weight: 0.8 }],
-                playerFlag: 'sided_with_gottlieb_keynote',
-                resultToast: 'You back the ethics play. If the commercial pivot works, you\'re early money.',
-            },
-            {
-                label: 'Fade the speech',
-                desc: 'CEOs grandstand all the time. Defense revenue is real. Buy the dip.',
-                deltas: { mu: -0.01, theta: 0.005, lambda: 0.2 },
-                effects: [],
-                followups: [{ id: 'dirks_cnbc_rebuttal', mtth: 8, weight: 0.9 }],
-                playerFlag: 'faded_gottlieb_keynote',
-                resultToast: 'You buy into the weakness. Defense contracts don\'t care about keynotes.',
-            },
-            {
-                label: 'Buy volatility',
-                desc: 'A public CEO-board war means violent swings either way. Load up on straddles.',
-                deltas: { mu: -0.015, theta: 0.02, lambda: 0.5, xi: 0.02 },
-                effects: [],
-                followups: [{ id: 'dirks_cnbc_rebuttal', mtth: 10, weight: 0.8 }],
-                playerFlag: 'bought_vol_gottlieb_keynote',
-                resultToast: 'You buy vol into the schism. The board war should keep realized vol elevated.',
-            },
-        ],
+        params: { mu: -0.01, theta: 0.005, lambda: 0.2 },
+        effects: [ { path: 'pnth.boardGottlieb', op: 'add', value: 1 }, ],
+        followups: [{ id: 'dirks_cnbc_rebuttal', mtth: 8, weight: 0.9 }],
     },
     {
         id: 'dirks_cnbc_rebuttal',
@@ -1176,50 +744,9 @@ const PNTH_EVENTS = [
         headline: 'Dirks fires back on CNBC: "Eugene is a brilliant engineer but a naive businessman. Defense contracts are our fastest-growing segment"',
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ceoIsGottlieb,
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'Dirks went on CNBC this morning and eviscerated Gottlieb on live television. She had the defense revenue numbers memorized -- $3.2 billion pipeline, 40% margins, Pentagon sole-source status. The anchors ate it up. PNTH is bouncing as defense bulls pile back in. The faction war is heating up and you need to pick a side.',
-        choices: [
-            {
-                label: 'Back Dirks',
-                desc: 'Defense revenue is real and growing. Dirks has the board math. Position for her winning.',
-                deltas: { mu: 0.02, theta: 0.008, lambda: 0.2 },
-                effects: [
-                    { path: 'pnth.boardDirks', op: 'add', value: 1 },
-                ],
-                followups: [
-                    { id: 'board_closed_session', mtth: 18, weight: 0.7 },
-                    { id: 'kassis_caught_middle', mtth: 12, weight: 0.5 },
-                ],
-                playerFlag: 'backed_dirks_rebuttal',
-                resultToast: 'You bet on the defense thesis. Dirks is playing to win.',
-            },
-            {
-                label: 'Stay neutral',
-                desc: 'Don\'t pick a side in a board war. Hedge and wait for the closed session outcome.',
-                deltas: { mu: 0.005, theta: 0.012, lambda: 0.3 },
-                effects: [],
-                followups: [
-                    { id: 'board_closed_session', mtth: 20, weight: 0.7 },
-                    { id: 'kassis_caught_middle', mtth: 15, weight: 0.5 },
-                ],
-                playerFlag: 'neutral_dirks_rebuttal',
-                resultToast: 'You sit on the fence. Smart or indecisive -- time will tell.',
-            },
-            {
-                label: 'Short the chaos',
-                desc: 'A public CEO-Chair war never ends well. Short into the dysfunction.',
-                deltas: { mu: -0.01, theta: 0.015, lambda: 0.4 },
-                effects: [],
-                followups: [
-                    { id: 'board_closed_session', mtth: 20, weight: 0.7 },
-                    { id: 'kassis_caught_middle', mtth: 15, weight: 0.5 },
-                ],
-                playerFlag: 'shorted_dirks_rebuttal',
-                resultToast: 'You short the dysfunction. Governance chaos is never bullish.',
-            },
-        ],
+        params: { mu: 0.005, theta: 0.012, lambda: 0.3 },
+        effects: [ { path: 'pnth.boardDirks', op: 'add', value: 1 }, ],
+        followups: [ { id: 'board_closed_session', mtth: 20, weight: 0.7 }, { id: 'kassis_caught_middle', mtth: 15, weight: 0.5 }, ],
     },
     {
         id: 'board_closed_session',
@@ -1228,51 +755,8 @@ const PNTH_EVENTS = [
         headline: 'PNTH board convenes emergency closed session; sources say "the room was nuclear" as Dirks and Gottlieb factions clash',
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ceoIsGottlieb,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) => {
-            const dirksEdge = world.pnth.boardDirks > world.pnth.boardGottlieb;
-            return `PNTH's board just went into emergency closed session. Your source on the board says the vote count is tight${dirksEdge ? ' but leaning Dirks' : ''}. Whatever comes out of that room will move the stock 5% either direction. The options market is pricing a binary event.`;
-        },
-        choices: [
-            {
-                label: 'Bet on Dirks winning',
-                desc: 'She has institutional backing and the revenue numbers. Position for a Gottlieb ouster.',
-                deltas: { mu: 0.01, theta: 0.015, lambda: 0.5 },
-                effects: [],
-                followups: [
-                    { id: 'gottlieb_stripped_oversight', mtth: 12, weight: 0.6 },
-                    { id: 'board_compromise', mtth: 10, weight: 0.4 },
-                ],
-                playerFlag: 'bet_dirks_closed_session',
-                resultToast: 'You position for a Dirks victory. If Gottlieb gets stripped, the defense bulls run.',
-            },
-            {
-                label: 'Bet on compromise',
-                desc: 'Boards rarely go nuclear. The adults in the room will find middle ground.',
-                deltas: { mu: -0.005, theta: 0.008, lambda: 0.3 },
-                effects: [],
-                followups: [
-                    { id: 'board_compromise', mtth: 8, weight: 0.6 },
-                    { id: 'dirks_blocked', mtth: 15, weight: 0.3 },
-                ],
-                playerFlag: 'bet_compromise_closed_session',
-                resultToast: 'You bet on the adults prevailing. A compromise clears the governance overhang.',
-            },
-            {
-                label: 'Buy puts',
-                desc: 'Whatever the outcome, the uncertainty itself is destructive. Protect against a worst-case scenario.',
-                deltas: { mu: -0.02, theta: 0.02, lambda: 0.6 },
-                effects: [],
-                followups: [
-                    { id: 'gottlieb_stripped_oversight', mtth: 15, weight: 0.5 },
-                    { id: 'dirks_blocked', mtth: 15, weight: 0.3 },
-                    { id: 'board_compromise', mtth: 10, weight: 0.5 },
-                ],
-                playerFlag: 'bought_puts_closed_session',
-                resultToast: 'You buy downside protection. Whatever happens, you\'re hedged.',
-            },
-        ],
+        params: { mu: -0.005, theta: 0.008, lambda: 0.3 },
+        followups: [ { id: 'board_compromise', mtth: 8, weight: 0.6 }, { id: 'dirks_blocked', mtth: 15, weight: 0.3 }, ],
     },
 
     // -- Board closed session branches ------------------------------------
@@ -1323,48 +807,8 @@ const PNTH_EVENTS = [
         headline: 'CTO Kassis breaks silence in internal all-hands: "I didn\'t leave Google to build targeting systems." Standing ovation from engineers, cold stares from defense team',
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ctoIsMira && world.pnth.ceoIsGottlieb,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Kassis just went off-script at an all-hands and the video leaked within minutes. She\'s the most respected technologist at the company -- where she lands will swing the entire board war. Your PNTH analyst says this is the pivotal moment: Kassis picks a side, and the stock follows.',
-        choices: [
-            {
-                label: 'Bet she backs Gottlieb',
-                desc: 'That speech was a declaration. She\'ll side with ethics and take the engineers with her.',
-                deltas: { mu: -0.01, theta: 0.008 },
-                effects: [],
-                followups: [
-                    { id: 'kassis_sides_gottlieb', mtth: 15, weight: 0.6 },
-                    { id: 'kassis_quits', mtth: 25, weight: 0.3 },
-                ],
-                playerFlag: 'bet_kassis_gottlieb',
-                resultToast: 'You position for Kassis to back the ethics faction. If she does, Gottlieb\'s hand strengthens.',
-            },
-            {
-                label: 'Bet she flips to Dirks',
-                desc: 'Money talks. Dirks will show her the classified briefings and the RSU package.',
-                deltas: { mu: 0.005, theta: 0.01 },
-                effects: [],
-                followups: [
-                    { id: 'kassis_sides_dirks', mtth: 15, weight: 0.5 },
-                    { id: 'kassis_sides_gottlieb', mtth: 25, weight: 0.3 },
-                ],
-                playerFlag: 'bet_kassis_dirks',
-                resultToast: 'A contrarian call. If the Pentagon briefing flips her, the defense thesis is validated.',
-            },
-            {
-                label: 'Bet she quits',
-                desc: 'She\'s too principled for either side. CTO departure means brain drain and a selloff.',
-                deltas: { mu: -0.02, theta: 0.015, lambda: 0.3 },
-                effects: [],
-                followups: [
-                    { id: 'kassis_quits', mtth: 15, weight: 0.5 },
-                    { id: 'kassis_sides_gottlieb', mtth: 20, weight: 0.3 },
-                ],
-                playerFlag: 'bet_kassis_quits',
-                resultToast: 'You bet on a resignation. If Kassis walks, the talent exodus accelerates.',
-            },
-        ],
+        params: { mu: 0.005, theta: 0.01 },
+        followups: [ { id: 'kassis_sides_dirks', mtth: 15, weight: 0.5 }, { id: 'kassis_sides_gottlieb', mtth: 25, weight: 0.3 }, ],
     },
     {
         id: 'kassis_sides_gottlieb',
@@ -1413,60 +857,9 @@ const PNTH_EVENTS = [
         headline: 'BREAKING: PNTH CEO Eugene Gottlieb resigns. In emotional letter to employees: "I built this company to make the world better. I no longer believe it will."',
         magnitude: 'major',
         when: (sim, world) => world.pnth.ceoIsGottlieb,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Gottlieb just resigned. His letter to employees is circulating everywhere -- it reads like a eulogy for the company he founded. PNTH is halted pending news. When it reopens, it will gap violently. Dirks is already named interim CEO. The question is whether this clears the governance overhang or accelerates the unraveling.',
-        choices: [
-            {
-                label: 'Short the chaos',
-                desc: 'A founder resignation is catastrophic. Brain drain, customer defections, and a power vacuum.',
-                deltas: { mu: -0.08, theta: 0.04, lambda: 1.8, muJ: -0.05 },
-                effects: [
-                    { path: 'pnth.ceoIsGottlieb', op: 'set', value: false },
-                    { path: 'pnth.boardGottlieb', op: 'add', value: -1 },
-                    { path: 'pnth.boardDirks', op: 'add', value: 1 },
-                ],
-                followups: [
-                    { id: 'successor_search', mtth: 15, weight: 0.8 },
-                    { id: 'gottlieb_covenant_ai', mtth: 50, weight: 0.5 },
-                ],
-                playerFlag: 'shorted_gottlieb_resignation',
-                resultToast: 'You short into the founder exit. The talent exodus should follow.',
-            },
-            {
-                label: 'Buy the clearance',
-                desc: 'Gottlieb was the problem. Dirks in charge means defense revenue gets unlocked and the board war ends.',
-                deltas: { mu: -0.03, theta: 0.02, lambda: 1.0, muJ: -0.02 },
-                effects: [
-                    { path: 'pnth.ceoIsGottlieb', op: 'set', value: false },
-                    { path: 'pnth.boardGottlieb', op: 'add', value: -1 },
-                    { path: 'pnth.boardDirks', op: 'add', value: 1 },
-                ],
-                followups: [
-                    { id: 'successor_search', mtth: 20, weight: 0.8 },
-                    { id: 'gottlieb_covenant_ai', mtth: 60, weight: 0.4 },
-                ],
-                playerFlag: 'bought_gottlieb_resignation',
-                resultToast: 'You buy the governance reset. If Dirks can execute, the stock re-rates.',
-            },
-            {
-                label: 'Hedge and reassess',
-                desc: 'This changes the entire thesis. Flatten and rebuild your position from scratch.',
-                deltas: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.03 },
-                effects: [
-                    { path: 'pnth.ceoIsGottlieb', op: 'set', value: false },
-                    { path: 'pnth.boardGottlieb', op: 'add', value: -1 },
-                    { path: 'pnth.boardDirks', op: 'add', value: 1 },
-                ],
-                followups: [
-                    { id: 'successor_search', mtth: 20, weight: 0.8 },
-                    { id: 'gottlieb_covenant_ai', mtth: 60, weight: 0.4 },
-                ],
-                playerFlag: 'hedged_gottlieb_resignation',
-                resultToast: 'You flatten and wait. The new PNTH is a different company. Needs a fresh model.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.02, lambda: 1.0, muJ: -0.02 },
+        effects: [ { path: 'pnth.ceoIsGottlieb', op: 'set', value: false }, { path: 'pnth.boardGottlieb', op: 'add', value: -1 }, { path: 'pnth.boardDirks', op: 'add', value: 1 }, ],
+        followups: [ { id: 'successor_search', mtth: 20, weight: 0.8 }, { id: 'gottlieb_covenant_ai', mtth: 60, weight: 0.4 }, ],
     },
     {
         id: 'gottlieb_digs_in',
@@ -1584,54 +977,9 @@ const PNTH_EVENTS = [
         headline: 'Crescent Capital discloses 8.1% stake in PNTH via 13D filing; demands board overhaul, threatens to nominate four independent directors',
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.activistStakeRevealed && !world.pnth.acquired,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Crescent Capital just filed a 13D on PNTH -- 8.1% stake, accumulated quietly over three months. Their letter demands a full board overhaul and threatens a proxy contest. Activist involvement typically means a 20-30% re-rating as they push for buybacks, asset sales, or a take-private. But it also means months of uncertainty. The desk needs to decide whether to ride the activist wave or get ahead of it.',
-        choices: [
-            {
-                label: 'Ride the activist wave',
-                desc: 'Crescent always gets what they want. Go long for the buyback/breakup premium.',
-                deltas: { mu: 0.05, theta: 0.02, lambda: 0.4 },
-                effects: [
-                    { path: 'pnth.activistStakeRevealed', op: 'set', value: true },
-                ],
-                followups: [
-                    { id: 'activist_board_seats', mtth: 30, weight: 0.7 },
-                    { id: 'activist_buyback_demand', mtth: 15, weight: 0.5 },
-                ],
-                playerFlag: 'rode_activist_wave',
-                resultToast: 'You go long with the activist. If they force a buyback or sale, you profit handsomely.',
-            },
-            {
-                label: 'Sell into the pop',
-                desc: 'The 13D pop is free money. Sell into it -- the proxy fight will drag on for months.',
-                deltas: { mu: 0.02, theta: 0.015, lambda: 0.5 },
-                effects: [
-                    { path: 'pnth.activistStakeRevealed', op: 'set', value: true },
-                ],
-                followups: [
-                    { id: 'activist_board_seats', mtth: 35, weight: 0.6 },
-                    { id: 'activist_buyback_demand', mtth: 20, weight: 0.4 },
-                ],
-                playerFlag: 'sold_activist_pop',
-                resultToast: 'You take the 13D pop and reduce. Proxy fights are long and messy.',
-            },
-            {
-                label: 'Buy calls for takeout premium',
-                desc: 'An 8% activist stake often precedes a full takeover bid. Position for M&A upside.',
-                deltas: { mu: 0.04, theta: 0.025, lambda: 0.6 },
-                effects: [
-                    { path: 'pnth.activistStakeRevealed', op: 'set', value: true },
-                ],
-                followups: [
-                    { id: 'activist_board_seats', mtth: 35, weight: 0.6 },
-                    { id: 'activist_buyback_demand', mtth: 20, weight: 0.4 },
-                ],
-                playerFlag: 'bought_calls_activist',
-                resultToast: 'You buy OTM calls targeting a takeout. Levered upside if a bid materializes.',
-            },
-        ],
+        params: { mu: 0.02, theta: 0.015, lambda: 0.5 },
+        effects: [ { path: 'pnth.activistStakeRevealed', op: 'set', value: true }, ],
+        followups: [ { id: 'activist_board_seats', mtth: 35, weight: 0.6 }, { id: 'activist_buyback_demand', mtth: 20, weight: 0.4 }, ],
     },
     {
         id: 'activist_board_seats',
@@ -1665,42 +1013,8 @@ const PNTH_EVENTS = [
         headline: 'BREAKING: Northvane Technologies launches $68B hostile bid for PNTH at 45% premium; "the internal dysfunction has created a generational buying opportunity"',
         magnitude: 'major',
         when: (sim, world) => (world.pnth.boardDirks <= 5 || (world.pnth.dojSuitFiled && world.pnth.whistleblowerFiled)) && !world.pnth.acquired,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'Northvane just dropped a $68 billion hostile bid at a 45% premium. PNTH is halted limit-up. The board is in emergency session and the poison pill is being drafted. This is the biggest tech M&A event in years. The question is whether the deal closes, gets bumped higher, or gets blocked by regulators.',
-        choices: [
-            {
-                label: 'Merger arb -- buy the spread',
-                desc: 'Stock is trading 8% below offer. If the deal closes, that\'s free money.',
-                deltas: { mu: 0.06, theta: 0.02, lambda: 1.0 },
-                effects: [
-                    { path: 'pnth.acquired', op: 'set', value: true },
-                ],
-                playerFlag: 'merger_arb_hostile',
-                resultToast: 'You buy the arb spread. If the deal closes, you clip the premium. If it breaks, you eat the gap.',
-            },
-            {
-                label: 'Sell into the bid',
-                desc: 'Take the 45% premium and walk. Hostile deals get blocked by regulators more often than not.',
-                deltas: { mu: 0.04, theta: 0.03, lambda: 1.5 },
-                effects: [
-                    { path: 'pnth.acquired', op: 'set', value: true },
-                ],
-                playerFlag: 'sold_into_hostile_bid',
-                resultToast: 'You sell into the premium. No one ever went broke taking a 45% gain.',
-            },
-            {
-                label: 'Hold for a higher bid',
-                desc: 'Northvane is lowballing. A bidding war with other suitors could push the premium to 60%+.',
-                deltas: { mu: 0.10, theta: 0.05, lambda: 2.5 },
-                effects: [
-                    { path: 'pnth.acquired', op: 'set', value: true },
-                ],
-                playerFlag: 'held_for_higher_bid',
-                resultToast: 'You hold for a bump. Greedy, but bidding wars can get irrational.',
-            },
-        ],
+        params: { mu: 0.04, theta: 0.03, lambda: 1.5 },
+        effects: [ { path: 'pnth.acquired', op: 'set', value: true }, ],
     },
 
     // -- Both ousted (rare, requires multiple scandal flags) ---------------
@@ -1729,47 +1043,8 @@ const PNTH_EVENTS = [
         headline: 'The Continental reports VP Bowman held $4M in PNTH stock while lobbying Pentagon for Atlas AI contract; White House calls it "old news"',
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.senateProbeLaunched,
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'The Continental just broke that VP Bowman held $4M in PNTH stock while personally lobbying the Pentagon for the Atlas contract. The White House is dismissing it, but the optics are terrible. Corruption stories like this either die fast or snowball into subpoenas. Your PNTH exposure needs a decision.',
-        choices: [
-            {
-                label: 'Short the corruption risk',
-                desc: 'Where there\'s smoke, there\'s fire. If a Senate probe opens, PNTH drops 10%.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 0.7 },
-                effects: [],
-                followups: [
-                    { id: 'senate_investigation_opened', mtth: 25, weight: 0.6 },
-                ],
-                playerFlag: 'shorted_bowman_corruption',
-                resultToast: 'You short the corruption angle. If this escalates, you\'re well-positioned.',
-            },
-            {
-                label: 'Dismiss it',
-                desc: 'The White House says "old news" and they\'re probably right. Don\'t let politics drive your book.',
-                deltas: { mu: -0.02, theta: 0.01, lambda: 0.3 },
-                effects: [],
-                followups: [
-                    { id: 'senate_investigation_opened', mtth: 35, weight: 0.4 },
-                    { id: 'bowman_intervenes', mtth: 15, weight: 0.5 },
-                ],
-                playerFlag: 'dismissed_bowman_report',
-                resultToast: 'You shrug it off. Political stories usually have a half-life of 48 hours.',
-            },
-            {
-                label: 'Hedge with puts',
-                desc: 'Buy cheap puts as insurance. If a probe opens, the premium will 5x overnight.',
-                deltas: { mu: -0.025, theta: 0.015, lambda: 0.5 },
-                effects: [],
-                followups: [
-                    { id: 'senate_investigation_opened', mtth: 30, weight: 0.5 },
-                    { id: 'bowman_intervenes', mtth: 15, weight: 0.4 },
-                ],
-                playerFlag: 'hedged_bowman_report',
-                resultToast: 'You buy tail protection. Cheap puts on corruption risk -- textbook risk management.',
-            },
-        ],
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        followups: [ { id: 'senate_investigation_opened', mtth: 35, weight: 0.4 }, { id: 'bowman_intervenes', mtth: 15, weight: 0.5 }, ],
     },
     {
         id: 'aclu_lawsuit_surveillance',
@@ -1793,49 +1068,9 @@ const PNTH_EVENTS = [
         headline: 'Sen. Okafor opens formal Senate Intelligence Committee investigation into PNTH-Bowman ties; subpoenas issued for financial records',
         magnitude: 'major',
         when: (sim, world) => !world.pnth.senateProbeLaunched,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Senator Okafor just opened a formal Intelligence Committee investigation into PNTH-White House ties. Subpoenas are going out for financial records -- including trading records from major institutional desks. Meridian compliance is already in a closed-door meeting. This is no longer a newspaper story; it\'s a congressional probe.',
-        choices: [
-            {
-                label: 'Cut all PNTH exposure',
-                desc: 'Compliance is going to force you to anyway. Get ahead of it and clear the book.',
-                deltas: { mu: -0.06, theta: 0.025, lambda: 1.0, muJ: -0.03 },
-                effects: [
-                    { path: 'pnth.senateProbeLaunched', op: 'set', value: true },
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 1 },
-                ],
-                followups: [{ id: 'congressional_hearing_pnth', mtth: 20, weight: 0.8 }],
-                playerFlag: 'cut_exposure_senate_probe',
-                resultToast: 'You clear the PNTH book. Compliance nods. Better safe than subpoenaed.',
-            },
-            {
-                label: 'Hold and lawyer up',
-                desc: 'Congressional probes take months. The stock is oversold on headline risk.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
-                effects: [
-                    { path: 'pnth.senateProbeLaunched', op: 'set', value: true },
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 1 },
-                ],
-                followups: [{ id: 'congressional_hearing_pnth', mtth: 25, weight: 0.7 }],
-                playerFlag: 'held_through_senate_probe',
-                resultToast: 'You hold. Probes fizzle more often than they escalate. Maybe.',
-            },
-            {
-                label: 'Short into the investigation',
-                desc: 'Subpoenas mean discovery. Discovery means more headlines. More headlines mean more selling.',
-                deltas: { mu: -0.05, theta: 0.03, lambda: 1.2, muJ: -0.03 },
-                effects: [
-                    { path: 'pnth.senateProbeLaunched', op: 'set', value: true },
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 1 },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                followups: [{ id: 'congressional_hearing_pnth', mtth: 20, weight: 0.8 }],
-                playerFlag: 'shorted_senate_probe',
-                resultToast: 'You add to your short. The discovery process will produce more bombshells.',
-            },
-        ],
+        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+        effects: [ { path: 'pnth.senateProbeLaunched', op: 'set', value: true }, { path: 'investigations.okaforProbeStage', op: 'set', value: 1 }, ],
+        followups: [{ id: 'congressional_hearing_pnth', mtth: 25, weight: 0.7 }],
     },
     {
         id: 'doj_antitrust_suit',
@@ -1899,48 +1134,8 @@ const PNTH_EVENTS = [
         headline: 'BREAKING: Senior PNTH engineer files SEC whistleblower complaint alleging company falsified safety testing on Atlas military modules',
         magnitude: 'major',
         when: (sim, world) => !world.pnth.whistleblowerFiled,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'A senior PNTH engineer just filed an SEC whistleblower complaint alleging the company falsified safety testing on Atlas military modules. If true, this is criminal fraud -- not just governance drama. The SEC will open a formal investigation and the DOJ could follow. PNTH is in freefall in pre-market. This could be an extinction-level event for the stock.',
-        choices: [
-            {
-                label: 'Go maximum short',
-                desc: 'Falsified safety data on military AI is a death sentence. This company is uninvestable.',
-                deltas: { mu: -0.09, theta: 0.04, lambda: 2.0, muJ: -0.05 },
-                effects: [
-                    { path: 'pnth.whistleblowerFiled', op: 'set', value: true },
-                    { path: 'pnth.boardDirks', op: 'add', value: -2 },
-                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
-                ],
-                playerFlag: 'max_short_whistleblower',
-                resultToast: 'You go full short. If the SEC confirms fraud, PNTH is done.',
-            },
-            {
-                label: 'Reduce and monitor',
-                desc: 'Whistleblower complaints get dismissed all the time. Don\'t panic-sell at the bottom.',
-                deltas: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.03 },
-                effects: [
-                    { path: 'pnth.whistleblowerFiled', op: 'set', value: true },
-                    { path: 'pnth.boardDirks', op: 'add', value: -1 },
-                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
-                ],
-                playerFlag: 'reduced_on_whistleblower',
-                resultToast: 'You reduce but don\'t panic. Many complaints go nowhere.',
-            },
-            {
-                label: 'Buy the fear',
-                desc: 'The market is pricing in a worst case. If the complaint is exaggerated, this is a generational buying opportunity.',
-                deltas: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02 },
-                effects: [
-                    { path: 'pnth.whistleblowerFiled', op: 'set', value: true },
-                    { path: 'pnth.boardDirks', op: 'add', value: -1 },
-                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
-                ],
-                playerFlag: 'bought_whistleblower_fear',
-                resultToast: 'You buy the panic. A huge bet that the complaint doesn\'t hold up.',
-            },
-        ],
+        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.03 },
+        effects: [ { path: 'pnth.whistleblowerFiled', op: 'set', value: true }, { path: 'pnth.boardDirks', op: 'add', value: -1 }, { path: 'pnth.boardGottlieb', op: 'add', value: 1 }, ],
     },
 
     // =====================================================================
@@ -1953,45 +1148,8 @@ const PNTH_EVENTS = [
         headline: 'PNTH wins $3.2B Department of War contract for Atlas AI battlefield integration; largest defense AI award in history',
         magnitude: 'major',
         when: (sim, world) => !world.pnth.militaryContractActive && !world.pnth.acquired,
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'PNTH just won the biggest defense AI contract in history -- $3.2 billion for Atlas battlefield integration. The stock is gapping up 8% in pre-market. This validates the Dirks thesis entirely. But the ethics crowd is already organizing protests and the commercial pipeline could suffer as tech talent flees military work.',
-        choices: [
-            {
-                label: 'Add to longs',
-                desc: '$3.2B in guaranteed revenue changes the fundamental picture. Ride the defense tailwind.',
-                deltas: { mu: 0.08, theta: -0.015, lambda: -0.5 },
-                effects: [
-                    { path: 'pnth.militaryContractActive', op: 'set', value: true },
-                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
-                ],
-                playerFlag: 'added_longs_defense_contract',
-                resultToast: 'You pile into the rally. $3.2B of revenue visibility is hard to argue with.',
-            },
-            {
-                label: 'Take profit on the gap',
-                desc: 'An 8% gap-up is a gift. Sell into strength and wait for the inevitable pullback.',
-                deltas: { mu: 0.04, theta: -0.005, lambda: -0.2 },
-                effects: [
-                    { path: 'pnth.militaryContractActive', op: 'set', value: true },
-                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
-                ],
-                playerFlag: 'took_profit_defense_contract',
-                resultToast: 'You sell into the gap. Smart money doesn\'t chase opening prints.',
-            },
-            {
-                label: 'Sell calls against the position',
-                desc: 'The contract is priced in fast. Sell the vol spike and collect premium.',
-                deltas: { mu: 0.06, theta: -0.01, lambda: -0.4 },
-                effects: [
-                    { path: 'pnth.militaryContractActive', op: 'set', value: true },
-                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
-                ],
-                playerFlag: 'sold_calls_defense_contract',
-                resultToast: 'You sell upside calls into the vol spike. Collecting premium on euphoria.',
-            },
-        ],
+        params: { mu: 0.04, theta: -0.005, lambda: -0.2 },
+        effects: [ { path: 'pnth.militaryContractActive', op: 'set', value: true }, { path: 'pnth.commercialMomentum', op: 'add', value: -1 }, ],
     },
     {
         id: 'defense_contract_cancelled',
@@ -2000,43 +1158,8 @@ const PNTH_EVENTS = [
         headline: 'Pentagon cancels PNTH Atlas contract citing "unresolved governance concerns"; $3.2B evaporates overnight. Dirks scrambles to save deal',
         magnitude: 'major',
         when: (sim, world) => world.pnth.militaryContractActive,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'The Pentagon just cancelled the Atlas contract. $3.2 billion in revenue gone overnight on "unresolved governance concerns." Dirks is on the phone with the SecDef but the damage is done. PNTH is halted down 12% and the entire defense thesis just cratered. Your book is getting marked down in real time.',
-        choices: [
-            {
-                label: 'Panic sell',
-                desc: 'The entire bull case was the contract. Without it, PNTH is a governance disaster with no moat.',
-                deltas: { mu: -0.07, theta: 0.03, lambda: 1.2, muJ: -0.04 },
-                effects: [
-                    { path: 'pnth.militaryContractActive', op: 'set', value: false },
-                ],
-                playerFlag: 'panic_sold_contract_cancel',
-                resultToast: 'You hit the sell button. No contract, no thesis.',
-            },
-            {
-                label: 'Buy the overreaction',
-                desc: 'Contracts get reinstated. Dirks has Pentagon connections and the tech is irreplaceable.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.02 },
-                effects: [
-                    { path: 'pnth.militaryContractActive', op: 'set', value: false },
-                ],
-                playerFlag: 'bought_contract_cancel_dip',
-                resultToast: 'You buy the dip. Bold call -- but Dirks has come back from worse.',
-            },
-            {
-                label: 'Pivot to commercial thesis',
-                desc: 'The military contract was always the controversy. Without it, PNTH can focus on enterprise AI.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
-                effects: [
-                    { path: 'pnth.militaryContractActive', op: 'set', value: false },
-                    { path: 'pnth.commercialMomentum', op: 'add', value: 1 },
-                ],
-                playerFlag: 'pivoted_commercial_thesis',
-                resultToast: 'You reframe the thesis. No defense baggage means a cleaner story for enterprise buyers.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.02 },
+        effects: [ { path: 'pnth.militaryContractActive', op: 'set', value: false }, ],
     },
     {
         id: 'dhs_contract_renewal',
@@ -2285,36 +1408,7 @@ const PNTH_EARNINGS_EVENTS = [
         },
         headline: 'PNTH crushes estimates: revenue +32% YoY, Atlas AI bookings up 60%. Raises full-year guidance. Stock surges after hours',
         magnitude: 'moderate',
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'PNTH just smashed earnings -- revenue up 32% YoY, Atlas bookings up 60%, and they raised guidance for the full year. The stock is surging 9% after hours. The conference call was all victory laps. This is the kind of print that forces bears to cover and momentum buyers to chase.',
-        choices: [
-            {
-                label: 'Double down',
-                desc: 'This is the inflection point. Add to longs aggressively and ride the momentum.',
-                deltas: { mu: 0.06, theta: -0.015, lambda: -0.4, q: 0.003 },
-                effects: [],
-                playerFlag: 'doubled_down_strong_beat',
-                resultToast: 'You add size into the beat. Momentum is on your side.',
-            },
-            {
-                label: 'Sell into strength',
-                desc: 'The beat is priced in by morning. Sell the after-hours pop and rebuy on the pullback.',
-                deltas: { mu: 0.03, theta: -0.005, lambda: -0.2, q: 0.002 },
-                effects: [],
-                playerFlag: 'sold_strong_beat',
-                resultToast: 'You sell into the euphoria. Let the momentum chasers have it.',
-            },
-            {
-                label: 'Sell the vol crush',
-                desc: 'Post-earnings IV crush is guaranteed. Write straddles and collect the premium decay.',
-                deltas: { mu: 0.04, theta: -0.01, lambda: -0.3, q: 0.002, xi: -0.02 },
-                effects: [],
-                playerFlag: 'sold_vol_strong_beat',
-                resultToast: 'You sell vol into the crush. Earnings vol is always overpriced.',
-            },
-        ],
+        params: { mu: 0.03, theta: -0.005, lambda: -0.2, q: 0.002 },
     },
     {
         id: 'pnth_earnings_beat_mild',
@@ -2322,36 +1416,7 @@ const PNTH_EARNINGS_EVENTS = [
         likelihood: 2.0,
         headline: 'PNTH edges past consensus: EPS $1.42 vs $1.38 expected. Revenue in line. Guidance maintained. "Solid but unspectacular," says Barclays',
         magnitude: 'minor',
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'PNTH cleared the bar but barely -- EPS beat by 3%, revenue in line, guidance maintained. The stock is up 2% after hours but fading. Barclays called it "solid but unspectacular." The real question is whether this is the start of a deceleration or just a clean quarter in a noisy tape.',
-        choices: [
-            {
-                label: 'Hold the position',
-                desc: 'A beat is a beat. Guidance maintained means no downside surprise. Stay the course.',
-                deltas: { mu: 0.02, theta: -0.005 },
-                effects: [],
-                playerFlag: 'held_mild_beat',
-                resultToast: 'You hold. Boring quarters are underrated.',
-            },
-            {
-                label: 'Trim and rotate',
-                desc: 'The easy money in PNTH is made. Trim here and redeploy capital elsewhere.',
-                deltas: { mu: 0.01, theta: -0.003 },
-                effects: [],
-                playerFlag: 'trimmed_mild_beat',
-                resultToast: 'You take some off the table. Mild beats don\'t warrant full conviction.',
-            },
-            {
-                label: 'Add on the pullback',
-                desc: 'A mild beat usually means a pullback tomorrow as momentum traders move on. Buy that dip.',
-                deltas: { mu: 0.025, theta: -0.008, xi: -0.01 },
-                effects: [],
-                playerFlag: 'added_mild_beat_pullback',
-                resultToast: 'You plan to add on the inevitable post-earnings drift. Patient money.',
-            },
-        ],
+        params: { mu: 0.01, theta: -0.003 },
     },
     {
         id: 'pnth_earnings_inline',
@@ -2386,42 +1451,8 @@ const PNTH_EARNINGS_EVENTS = [
         },
         headline: 'PNTH disaster quarter: revenue misses by 12%, operating loss widens, three major customers paused contracts. Guidance slashed. Dirks faces board questions',
         magnitude: 'moderate',
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'PNTH just reported a disaster quarter. Revenue missed by 12%, operating losses widened, three major customers paused contracts, and guidance was slashed. The stock is down 15% after hours. The conference call was a bloodbath -- analysts openly questioning whether the business model is broken. Dirks is reportedly facing an emergency board review.',
-        choices: [
-            {
-                label: 'Sell everything',
-                desc: 'This isn\'t a miss, it\'s a structural breakdown. Customers are fleeing. Get out.',
-                deltas: { mu: -0.06, theta: 0.02, lambda: 0.8, muJ: -0.03, q: -0.003 },
-                effects: [
-                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
-                ],
-                playerFlag: 'sold_everything_bad_miss',
-                resultToast: 'You liquidate PNTH. The numbers were worse than the bear case.',
-            },
-            {
-                label: 'Hold for the bounce',
-                desc: 'A 15% drop on one quarter is overdone. Mean reversion trades work after earnings blowouts.',
-                deltas: { mu: -0.03, theta: 0.012, lambda: 0.4, muJ: -0.01, q: -0.002 },
-                effects: [
-                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
-                ],
-                playerFlag: 'held_bad_miss',
-                resultToast: 'You hold through the carnage. Contrarian and painful.',
-            },
-            {
-                label: 'Average down aggressively',
-                desc: 'This is capitulation selling. When the conference call is this bad, the worst is usually priced in.',
-                deltas: { mu: -0.02, theta: 0.01, lambda: 0.3, q: -0.001 },
-                effects: [
-                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
-                ],
-                playerFlag: 'averaged_down_bad_miss',
-                resultToast: 'You buy the blood. Either genius or reckless -- you\'ll know in a quarter.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.012, lambda: 0.4, muJ: -0.01, q: -0.002 },
+        effects: [ { path: 'pnth.commercialMomentum', op: 'add', value: -1 }, ],
     },
     {
         id: 'pnth_guidance_raise',
@@ -2463,36 +1494,7 @@ const SECTOR_EVENTS = [
         likelihood: 0.7,
         headline: 'AI regulation bill passes Congress with bipartisan support; mandates safety audits, licensing for frontier models. PNTH compliance costs estimated at $200M/year',
         magnitude: 'moderate',
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Congress just passed the AI Safety and Accountability Act with rare bipartisan support. Every frontier model now needs a federal safety audit before deployment, and licensing fees could cost PNTH $200M/year. The bill is a moat for incumbents who can afford compliance — but a sledgehammer for startups. PNTH stock is down 4% in after-hours, but the smart money is debating whether regulation actually helps the incumbents long-term.',
-        choices: [
-            {
-                label: 'Regulation is a moat',
-                desc: 'Only PNTH and a few others can afford compliance. Buy the dip — this kills competition.',
-                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2 },
-                effects: [],
-                playerFlag: 'regulation_is_moat',
-                resultToast: 'You buy the regulatory moat thesis. Compliance costs crush small players — PNTH wins by default.',
-            },
-            {
-                label: 'De-risk tech exposure',
-                desc: 'Regulatory regimes only tighten from here. Reduce sector exposure before the next shoe drops.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 0.6 },
-                effects: [],
-                playerFlag: 'derisked_on_regulation',
-                resultToast: 'You reduce tech exposure. Regulation is a ratchet — it only turns one way.',
-            },
-            {
-                label: 'Play the compliance trade',
-                desc: 'Long audit firms and compliance tech, short the unprepared. Someone profits from every regulation.',
-                deltas: { mu: -0.025, theta: 0.012, lambda: 0.4 },
-                effects: [],
-                playerFlag: 'played_compliance_trade',
-                resultToast: 'You position in the compliance ecosystem. Every new rule creates a new business.',
-            },
-        ],
+        params: { mu: -0.04, theta: 0.02, lambda: 0.6 },
     },
     {
         id: 'doj_antitrust_cloud',
@@ -2500,36 +1502,7 @@ const SECTOR_EVENTS = [
         likelihood: 0.6,
         headline: 'DOJ files antitrust suit against three major cloud providers alleging market allocation; enterprise AI contracts could be voided. Sector-wide repricing',
         magnitude: 'moderate',
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'The DOJ just filed a massive antitrust case alleging the three major cloud providers carved up the enterprise AI market between them. If the court agrees, existing contracts could be voided and PNTH\'s cloud partnerships are at risk. Cloud stocks are down 6-8% across the board. The case will take years to resolve, but the uncertainty is repricing the entire sector right now. Meridian\'s tech desk needs a view — is this a buying opportunity or the start of a structural re-rating?',
-        choices: [
-            {
-                label: 'Buy the antitrust dip',
-                desc: 'These cases take 3-5 years and usually settle. The selloff is overdone for a long-dated risk.',
-                deltas: { mu: -0.015, theta: 0.012, lambda: 0.3 },
-                effects: [],
-                playerFlag: 'bought_antitrust_dip',
-                resultToast: 'You buy the selloff. Antitrust cases move at glacial speed — the market will forget.',
-            },
-            {
-                label: 'Rotate out of cloud',
-                desc: 'Even if the case fails, the overhang will cap multiples for years. Move to less exposed names.',
-                deltas: { mu: -0.035, theta: 0.025, lambda: 0.7 },
-                effects: [],
-                playerFlag: 'rotated_out_of_cloud',
-                resultToast: 'You rotate away from cloud. The legal overhang will weigh on sentiment for quarters.',
-            },
-            {
-                label: 'Bet on PNTH independence',
-                desc: 'If the cloud oligopoly breaks, PNTH gets more negotiating power. Long PNTH, short cloud.',
-                deltas: { mu: -0.025, theta: 0.018, lambda: 0.5 },
-                effects: [],
-                playerFlag: 'bet_pnth_independence',
-                resultToast: 'You play the PNTH angle. A weaker cloud oligopoly means better terms for AI platforms.',
-            },
-        ],
+        params: { mu: -0.035, theta: 0.025, lambda: 0.7 },
     },
     {
         id: 'semiconductor_shortage',
@@ -2559,36 +1532,7 @@ const SECTOR_EVENTS = [
         likelihood: 0.6,
         headline: '500M user records exposed in breach at major social platform; Congress demands hearings, calls for data privacy legislation. Tech sentiment sours',
         magnitude: 'moderate',
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            '500 million user records just leaked from a major social platform — names, emails, SSNs, the full package. Congress is already scheduling hearings, and three privacy bills are being drafted simultaneously. Tech sentiment is toxic right now. The breach has nothing to do with AI or PNTH specifically, but the sector is selling off sympathetically. Privacy regulation could reshape data economics across the entire tech stack.',
-        choices: [
-            {
-                label: 'Buy the sympathetic selloff',
-                desc: 'PNTH isn\'t the one that got breached. The sector-wide selloff is indiscriminate — buy quality names.',
-                deltas: { mu: -0.015, theta: 0.01, lambda: 0.2 },
-                effects: [],
-                playerFlag: 'bought_breach_dip',
-                resultToast: 'You buy quality into the panic. The breach is someone else\'s problem — PNTH\'s security is best-in-class.',
-            },
-            {
-                label: 'Short the regulatory risk',
-                desc: 'Privacy legislation will hit ad-driven models hardest, but compliance costs spread everywhere.',
-                deltas: { mu: -0.03, theta: 0.02, lambda: 0.5 },
-                effects: [],
-                playerFlag: 'shorted_privacy_risk',
-                resultToast: 'You short into the privacy scare. New regulations mean new costs across the sector.',
-            },
-            {
-                label: 'Long cybersecurity',
-                desc: 'Every CISO just got emergency budget approval. Security spending surges after every major breach.',
-                deltas: { mu: -0.02, theta: 0.012, lambda: 0.3 },
-                effects: [],
-                playerFlag: 'went_long_cybersecurity',
-                resultToast: 'You go long security names. Fear is the best salesperson for cybersecurity products.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.02, lambda: 0.5 },
     },
     {
         id: 'tech_ipo_frenzy',
@@ -2612,36 +1556,7 @@ const SECTOR_EVENTS = [
         likelihood: 0.5,
         headline: 'Major cyberattack takes down power grid in three states; CISA attributes to state-sponsored actors. Congress fast-tracks cybersecurity spending bill',
         magnitude: 'moderate',
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Three states just went dark. A coordinated cyberattack took down the power grid in the Northeast, and CISA is attributing it to state-sponsored actors. Congress is fast-tracking a $50B cybersecurity spending bill. Markets are in shock — the attack exposes how vulnerable critical infrastructure really is. Defense and cybersecurity names are surging, but the broader market is selling off on the geopolitical escalation. This is both a threat and a massive spending catalyst.',
-        choices: [
-            {
-                label: 'Go long defense and cyber',
-                desc: 'This is a Sputnik moment for cybersecurity. Federal spending will surge — buy the beneficiaries.',
-                deltas: { mu: -0.015, theta: 0.01, lambda: 0.3 },
-                effects: [],
-                playerFlag: 'went_long_cyber_defense',
-                resultToast: 'You go long the defense response. Every attack is a budget increase for someone.',
-            },
-            {
-                label: 'Risk-off on escalation',
-                desc: 'State-sponsored attacks can escalate fast. If attribution leads to sanctions, markets sell off further.',
-                deltas: { mu: -0.035, theta: 0.02, lambda: 0.7 },
-                effects: [],
-                playerFlag: 'went_risk_off_cyber',
-                resultToast: 'You de-risk on geopolitical escalation. If this triggers a diplomatic crisis, there\'s more downside.',
-            },
-            {
-                label: 'Play PNTH\'s defense angle',
-                desc: 'Atlas AI is the government\'s best cyber defense tool. PNTH\'s defense contracts get priority after this.',
-                deltas: { mu: -0.02, theta: 0.012, lambda: 0.4 },
-                effects: [],
-                playerFlag: 'played_pnth_cyber_angle',
-                resultToast: 'You bet on PNTH\'s defense business. Atlas is the government\'s best weapon against cyber threats.',
-            },
-        ],
+        params: { mu: -0.035, theta: 0.02, lambda: 0.7 },
     },
     {
         id: 'ai_spending_forecast_up',
@@ -2666,42 +1581,8 @@ const SECTOR_EVENTS = [
         headline: 'Zhaowei\'s Qilin-4 model tops PNTH Atlas on three major AI benchmarks; Liang Wei: "The gap is closed." Western analysts skeptical of methodology',
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.acquired,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Zhaowei just dropped Qilin-4, and it\'s topping Atlas on three major benchmarks. Liang Wei held a press conference declaring "the gap is closed." PNTH is down 5% in pre-market, and the entire Western AI thesis is being questioned. Some analysts are skeptical of Zhaowei\'s methodology — the benchmarks may be gamed — but the optics are devastating. The geopolitical dimension makes this worse: if Chinese AI is competitive, the chip export controls look futile.',
-        choices: [
-            {
-                label: 'Sell PNTH, buy the dip later',
-                desc: 'The competitive moat just narrowed. Sell first, ask questions about methodology later.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.3 },
-                effects: [
-                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
-                ],
-                playerFlag: 'sold_pnth_on_zhaowei',
-                resultToast: 'You sell into the competitive scare. If Qilin-4 is real, PNTH\'s premium is unjustified.',
-            },
-            {
-                label: 'Buy the skepticism',
-                desc: 'Chinese benchmarks are routinely gamed. Atlas has real-world deployment — benchmarks don\'t matter.',
-                deltas: { mu: -0.01, theta: 0.005 },
-                effects: [
-                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
-                ],
-                playerFlag: 'dismissed_zhaowei_benchmarks',
-                resultToast: 'You bet against the benchmarks. If the methodology is flawed, PNTH recovers fast.',
-            },
-            {
-                label: 'Hedge with chip plays',
-                desc: 'Whether Zhaowei wins or not, the AI compute arms race intensifies. Long semiconductor names.',
-                deltas: { mu: -0.02, theta: 0.01, lambda: 0.1 },
-                effects: [
-                    { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
-                ],
-                playerFlag: 'hedged_with_chips',
-                resultToast: 'You go long the picks and shovels. Both sides of the AI race need chips.',
-            },
-        ],
+        params: { mu: -0.01, theta: 0.005 },
+        effects: [ { path: 'pnth.commercialMomentum', op: 'add', value: -1 }, ],
     },
     {
         id: 'zhaowei_beijing_summit',
@@ -2861,45 +1742,8 @@ const POLITICAL_EVENTS = [
         headline: 'BREAKING: Sen. Okafor announces presidential bid from the steps of the Capitol: "This administration has failed every test of leadership. I will not"',
         magnitude: 'moderate',
         when: (sim, world) => sim.day > 750 && !world.election.okaforRunning,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'Senator Okafor just announced her presidential bid live on the Capitol steps. The crowd is enormous. Polling has her within striking distance of Barron in key swing states. Markets hate uncertainty, and a competitive primary season means months of policy unpredictability. Meridian\'s political risk desk is already fielding calls from clients.',
-        choices: [
-            {
-                label: 'Position for volatility',
-                desc: 'A contested race means months of uncertainty. Buy vol and widen hedges.',
-                deltas: { mu: -0.02, theta: 0.015, lambda: 0.4 },
-                effects: [
-                    { path: 'election.okaforRunning', op: 'set', value: true },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                playerFlag: 'bought_vol_okafor_entry',
-                resultToast: 'You buy volatility into the race. Contested elections are vol machines.',
-            },
-            {
-                label: 'Lean pro-business',
-                desc: 'Okafor is anti-Wall Street. If she gains traction, defensives outperform. But Barron usually wins these fights.',
-                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2 },
-                effects: [
-                    { path: 'election.okaforRunning', op: 'set', value: true },
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                playerFlag: 'bet_on_barron_vs_okafor',
-                resultToast: 'You bet the incumbent advantage holds. Barron has survived worse.',
-            },
-            {
-                label: 'Donate to Okafor\'s campaign',
-                desc: 'A quiet max donation through Meridian\'s PAC. If she wins, you have a friend in the White House.',
-                deltas: { mu: -0.025, theta: 0.012, lambda: 0.5 },
-                effects: [
-                    { path: 'election.okaforRunning', op: 'set', value: true },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                playerFlag: 'donated_to_okafor',
-                resultToast: 'You hedge politically. The donation is legal, but compliance raises an eyebrow.',
-            },
-        ],
+        params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+        effects: [ { path: 'election.okaforRunning', op: 'set', value: true }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
     },
     {
         id: 'okafor_scandal',
@@ -2908,42 +1752,8 @@ const POLITICAL_EVENTS = [
         headline: 'Opposition research bombshell: Okafor\'s husband held Zhaowei stock while she chaired the Intelligence Committee. She calls it "a smear campaign"',
         magnitude: 'moderate',
         when: (sim, world) => world.election.okaforRunning || world.investigations.okaforProbeStage >= 1,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Oppo research just landed: Senator Okafor\'s husband traded Zhaowei stock while she had classified intelligence briefings on the company. It\'s front-page news. The irony is thick -- the anti-corruption crusader caught in a potential conflict of interest. Barron\'s surrogates are all over cable news. Markets are repricing the political landscape.',
-        choices: [
-            {
-                label: 'Bet on Barron recovery',
-                desc: 'This neutralizes Okafor\'s moral authority. Barron\'s agenda gets easier -- go risk-on.',
-                deltas: { mu: 0.03, theta: 0.005, lambda: -0.1 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 4 },
-                ],
-                playerFlag: 'bet_barron_on_okafor_scandal',
-                resultToast: 'You bet the scandal cripples Okafor\'s credibility. Barron stocks rally.',
-            },
-            {
-                label: 'Fade the noise',
-                desc: 'Scandals cut both ways. Okafor will survive this -- her base doesn\'t care about oppo.',
-                deltas: { mu: 0.015, theta: 0.008 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 2 },
-                ],
-                playerFlag: 'faded_okafor_scandal',
-                resultToast: 'You stay neutral. These stories burn bright and fade fast.',
-            },
-            {
-                label: 'Short the Zhaowei connection',
-                desc: 'If the committee investigates Zhaowei ties further, the whole sector takes heat.',
-                deltas: { mu: 0.02, theta: 0.012, lambda: 0.3 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 3 },
-                ],
-                playerFlag: 'shorted_zhaowei_on_scandal',
-                resultToast: 'You position against Zhaowei-linked exposure. If the probe widens, you profit.',
-            },
-        ],
+        params: { mu: 0.015, theta: 0.008 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: 2 }, ],
     },
 
     // =====================================================================
@@ -3003,36 +1813,7 @@ const POLITICAL_EVENTS = [
         headline: 'Government funding bill stalls as House Democrats refuse to pass Barron\'s defense spending increase; continuing resolution buys 45 days',
         magnitude: 'moderate',
         when: (sim, world, congress) => !congress.trifecta,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'The spending bill just died on the House floor. Farmer-Labor is refusing to pass Barron\'s 8% defense increase without domestic spending concessions. A continuing resolution buys 45 days, but the clock is ticking toward another shutdown standoff. Defense contractors are already pricing in delays. Meridian\'s government sector desk is asking for direction.',
-        choices: [
-            {
-                label: 'Short defense, long staples',
-                desc: 'Defense spending gets cut in CRs. Rotate into sectors that benefit from gridlock.',
-                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2 },
-                effects: [],
-                playerFlag: 'rotated_on_gridlock',
-                resultToast: 'You rotate sectors. CRs are bad for defense but gridlock keeps taxes low.',
-            },
-            {
-                label: 'Buy the CR dip',
-                desc: 'They always reach a deal eventually. The 45-day window is a buying opportunity.',
-                deltas: { mu: -0.008, theta: 0.003 },
-                effects: [],
-                playerFlag: 'bought_cr_dip',
-                resultToast: 'You buy the pullback. Congress always kicks the can -- might as well profit from it.',
-            },
-            {
-                label: 'Lobby for the deal',
-                desc: 'Meridian has connections on the Appropriations Committee. Push for a resolution that helps the book.',
-                deltas: { mu: -0.01, theta: 0.005, lambda: 0.1 },
-                effects: [],
-                playerFlag: 'lobbied_spending_deal',
-                resultToast: 'You work the phones. A staffer on Appropriations owes Meridian a favor.',
-            },
-        ],
+        params: { mu: -0.008, theta: 0.003 },
     },
     {
         id: 'budget_deal_passes',
@@ -3064,45 +1845,8 @@ const POLITICAL_EVENTS = [
         headline: 'Government shutdown looms as midnight deadline approaches; agencies prepare furlough notices. Markets pricing in 2-week disruption',
         magnitude: 'moderate',
         when: (sim, world, congress) => !congress.trifecta,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'It\'s 6pm and the government shuts down at midnight. Agency heads have sent furlough notices. The bond market is already jittery -- T-bill yields spiked 15bps in the last hour. Historically shutdowns last 5-16 days and shave 0.1-0.2% off quarterly GDP per week. The desk needs to be positioned before Asia opens.',
-        choices: [
-            {
-                label: 'Buy the shutdown',
-                desc: 'Shutdowns always end. The panic selling creates a textbook snap-back opportunity.',
-                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2, sigmaR: 0.002 },
-                effects: [],
-                followups: [
-                    { id: 'shutdown_resolved', mtth: 6, weight: 0.8 },
-                ],
-                playerFlag: 'bought_shutdown_dip',
-                resultToast: 'You buy the fear. Shutdowns are temporary -- the recovery is usually fast.',
-            },
-            {
-                label: 'Hedge and wait',
-                desc: 'Buy puts and reduce exposure. If it drags on past two weeks, GDP takes a real hit.',
-                deltas: { mu: -0.025, theta: 0.012, lambda: 0.4, sigmaR: 0.004 },
-                effects: [],
-                followups: [
-                    { id: 'shutdown_resolved', mtth: 10, weight: 0.6 },
-                ],
-                playerFlag: 'hedged_shutdown',
-                resultToast: 'You hedge into the shutdown. The protection costs carry but limits downside.',
-            },
-            {
-                label: 'Sell vol into the spike',
-                desc: 'Implied vol is way above realized. Write premium and collect theta while everyone panics.',
-                deltas: { mu: -0.02, theta: 0.015, lambda: 0.3, sigmaR: 0.003 },
-                effects: [],
-                followups: [
-                    { id: 'shutdown_resolved', mtth: 8, weight: 0.7 },
-                ],
-                playerFlag: 'sold_vol_shutdown',
-                resultToast: 'You sell premium into the spike. If the shutdown is short, you keep the theta.',
-            },
-        ],
+        params: { mu: -0.025, theta: 0.012, lambda: 0.4, sigmaR: 0.004 },
+        followups: [ { id: 'shutdown_resolved', mtth: 10, weight: 0.6 }, ],
     },
     {
         id: 'shutdown_resolved',
@@ -3119,42 +1863,8 @@ const POLITICAL_EVENTS = [
         headline: 'Barron proposes sweeping corporate tax cut from 21% to 15%; analysts project $400B revenue shortfall. Markets rally, bond bears growl',
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.trifecta,
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'Barron just proposed cutting the corporate rate from 21% to 15%. With a Federalist trifecta, this could actually pass. Analysts are projecting a $400B revenue shortfall, which means bonds sell off on supply fears, but equities are surging on the after-tax earnings boost. Every sell-side desk on the Street is revising EPS estimates upward. Meridian needs a view before the open.',
-        choices: [
-            {
-                label: 'Go all-in on equities',
-                desc: 'A 6-point tax cut is a direct EPS boost of ~8%. Buy everything with operating leverage.',
-                deltas: { mu: 0.04, theta: -0.008, b: 0.004, q: 0.003 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 3 },
-                ],
-                playerFlag: 'went_long_tax_cut',
-                resultToast: 'You go long the tax cut. If it passes, earnings estimates jump overnight.',
-            },
-            {
-                label: 'Short bonds, neutral equities',
-                desc: 'The deficit impact is huge. Rates have to rise on the supply overhang.',
-                deltas: { mu: 0.025, theta: -0.003, b: 0.005, q: 0.002 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 2 },
-                ],
-                playerFlag: 'shorted_bonds_tax_cut',
-                resultToast: 'You short duration. The Treasury is going to drown the market in paper.',
-            },
-            {
-                label: 'Fade it -- won\'t pass',
-                desc: 'Even with a trifecta, deficit hawks in the Senate will water it down. Sell the rally.',
-                deltas: { mu: 0.02, theta: -0.002, b: 0.002, q: 0.001 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 1 },
-                ],
-                playerFlag: 'faded_tax_cut_proposal',
-                resultToast: 'You sell the enthusiasm. Congress has a way of disappointing the market.',
-            },
-        ],
+        params: { mu: 0.025, theta: -0.003, b: 0.005, q: 0.002 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: 2 }, ],
     },
     {
         id: 'clay_opposition_rally',
@@ -3174,42 +1884,8 @@ const POLITICAL_EVENTS = [
         likelihood: 0.6,
         headline: 'Federal court blocks Barron executive order on media regulation; ruling calls it "a frontal assault on the First Amendment." DOJ will appeal',
         magnitude: 'moderate',
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'A federal judge just blocked Barron\'s media regulation executive order in a scorching 47-page opinion. The ruling is constitutionally significant -- it limits presidential authority over tech platforms. DOJ says they\'ll appeal to the circuit, which could take months. Media and tech stocks are rallying on the news, but the uncertainty over the appeal creates a wide range of outcomes.',
-        choices: [
-            {
-                label: 'Buy the court win',
-                desc: 'Deregulation is good for tech and media. The appeal will take months -- enjoy the tailwind.',
-                deltas: { mu: -0.005, theta: 0.003, sigmaR: 0.001 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                playerFlag: 'bought_court_block',
-                resultToast: 'You bet on judicial restraint. The courts keep blocking Barron\'s overreach.',
-            },
-            {
-                label: 'Hedge the appeal',
-                desc: 'If the circuit reverses, the whiplash will be violent. Buy protection.',
-                deltas: { mu: -0.015, theta: 0.008, sigmaR: 0.003 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                playerFlag: 'hedged_appeal',
-                resultToast: 'You hedge against the appeal. Constitutional fights are binary -- either way is dramatic.',
-            },
-            {
-                label: 'Ignore it',
-                desc: 'Courts block executive orders every month. This changes nothing fundamental.',
-                deltas: { mu: -0.01, theta: 0.005, sigmaR: 0.002 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                playerFlag: 'ignored_overreach_ruling',
-                resultToast: 'You shrug it off. The market will forget this ruling by next week.',
-            },
-        ],
+        params: { mu: -0.015, theta: 0.008, sigmaR: 0.003 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -2 }, ],
     },
 ];
 const INVESTIGATION_EVENTS = [
@@ -3223,57 +1899,9 @@ const INVESTIGATION_EVENTS = [
         headline: 'EXCLUSIVE (The Continental): Rachel Tan reveals VP Bowman held $4M in PNTH stock while personally lobbying Pentagon for Atlas contract. White House: "old news"',
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.tanBowmanStory === 0,
-        popup: true,
-        era: 'early',
-        context: (sim, world, portfolio) =>
-            'Rachel Tan just dropped a bombshell on The Continental: VP Bowman held $4M in PNTH stock while lobbying for the Atlas contract. The story is gaining traction fast. As a senior trader at Meridian Capital, you have significant PNTH-adjacent exposure across the desk. The question is how this plays out.',
-        choices: [
-            {
-                label: 'Front-run the fallout',
-                desc: 'Get ahead of the selling. Reduce exposure and short into the scandal.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 0.7 },
-                effects: [
-                    { path: 'investigations.tanBowmanStory', op: 'set', value: 1 },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                followups: [
-                    { id: 'bowman_denial', mtth: 3, weight: 0.9 },
-                    { id: 'tan_bowman_followup', mtth: 20, weight: 0.7 },
-                ],
-                playerFlag: 'front_ran_tan_story',
-                resultToast: 'You cut exposure fast. If there\'s more to come, you\'re positioned for it.',
-            },
-            {
-                label: 'Hold and monitor',
-                desc: 'Scandals come and go. Wait to see if this has legs before reacting.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5 },
-                effects: [
-                    { path: 'investigations.tanBowmanStory', op: 'set', value: 1 },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                followups: [
-                    { id: 'bowman_denial', mtth: 3, weight: 0.9 },
-                    { id: 'tan_bowman_followup', mtth: 25, weight: 0.6 },
-                ],
-                playerFlag: 'held_through_tan_initial',
-                resultToast: 'You wait it out. The White House says it\'s "old news" -- maybe they\'re right.',
-            },
-            {
-                label: 'Buy the dip',
-                desc: 'The market is overreacting. Political scandals rarely move fundamentals.',
-                deltas: { mu: -0.02, theta: 0.01, lambda: 0.3 },
-                effects: [
-                    { path: 'investigations.tanBowmanStory', op: 'set', value: 1 },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                followups: [
-                    { id: 'bowman_denial', mtth: 3, weight: 0.9 },
-                    { id: 'tan_bowman_followup', mtth: 25, weight: 0.6 },
-                ],
-                playerFlag: 'bought_tan_dip',
-                resultToast: 'You add risk into the weakness. If the scandal fizzles, you profit.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        effects: [ { path: 'investigations.tanBowmanStory', op: 'set', value: 1 }, { path: 'election.barronApproval', op: 'add', value: -3 }, ],
+        followups: [ { id: 'bowman_denial', mtth: 3, weight: 0.9 }, { id: 'tan_bowman_followup', mtth: 25, weight: 0.6 }, ],
     },
     {
         id: 'bowman_denial',
@@ -3296,57 +1924,9 @@ const INVESTIGATION_EVENTS = [
         headline: 'Tan follow-up: Bowman\'s "blind trust" traded PNTH options 48 hours before contract announcements. Trust manager: Dirks\'s former assistant. The blind trust wasn\'t blind',
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.tanBowmanStory === 1,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Tan\'s second story is worse. The "blind trust" was trading PNTH options with perfect timing -- and the trust manager worked for Andrea Dirks. This implicates both the VP and PNTH leadership. The compliance team at Meridian is already asking questions about the desk\'s PNTH exposure.',
-        choices: [
-            {
-                label: 'Dump PNTH-linked positions',
-                desc: 'This is escalating. Clear anything tied to PNTH before compliance forces you to.',
-                deltas: { mu: -0.05, theta: 0.025, lambda: 0.8, muJ: -0.03 },
-                effects: [
-                    { path: 'investigations.tanBowmanStory', op: 'set', value: 2 },
-                    { path: 'election.barronApproval', op: 'add', value: -5 },
-                ],
-                followups: [
-                    { id: 'doj_bowman_referral', mtth: 25, weight: 0.6 },
-                    { id: 'tan_bombshell_recording', mtth: 35, weight: 0.5 },
-                ],
-                playerFlag: 'dumped_pnth_on_followup',
-                resultToast: 'You clear PNTH exposure. Compliance nods approvingly.',
-            },
-            {
-                label: 'Stay the course',
-                desc: 'The market has already priced in the scandal. Further selling is a gift to shorts.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 0.6, muJ: -0.02 },
-                effects: [
-                    { path: 'investigations.tanBowmanStory', op: 'set', value: 2 },
-                    { path: 'election.barronApproval', op: 'add', value: -5 },
-                ],
-                followups: [
-                    { id: 'doj_bowman_referral', mtth: 30, weight: 0.5 },
-                    { id: 'tan_bombshell_recording', mtth: 40, weight: 0.4 },
-                ],
-                playerFlag: 'held_through_tan_followup',
-                resultToast: 'You hold your positions. The scandal deepens but maybe the bottom is in.',
-            },
-            {
-                label: 'Short the administration',
-                desc: 'This goes higher than Bowman. Position for maximum political fallout.',
-                deltas: { mu: -0.06, theta: 0.03, lambda: 1.0, muJ: -0.03 },
-                effects: [
-                    { path: 'investigations.tanBowmanStory', op: 'set', value: 2 },
-                    { path: 'election.barronApproval', op: 'add', value: -7 },
-                ],
-                followups: [
-                    { id: 'doj_bowman_referral', mtth: 20, weight: 0.7 },
-                    { id: 'tan_bombshell_recording', mtth: 30, weight: 0.6 },
-                ],
-                playerFlag: 'shorted_administration',
-                resultToast: 'You bet against the Barron administration. A bold call with big upside if you\'re right.',
-            },
-        ],
+        params: { mu: -0.04, theta: 0.02, lambda: 0.6, muJ: -0.02 },
+        effects: [ { path: 'investigations.tanBowmanStory', op: 'set', value: 2 }, { path: 'election.barronApproval', op: 'add', value: -5 }, ],
+        followups: [ { id: 'doj_bowman_referral', mtth: 30, weight: 0.5 }, { id: 'tan_bombshell_recording', mtth: 40, weight: 0.4 }, ],
     },
     {
         id: 'tan_bombshell_recording',
@@ -3355,54 +1935,9 @@ const INVESTIGATION_EVENTS = [
         headline: 'BOMBSHELL: Tan publishes recorded Bowman-Dirks phone call: "Just make sure the stock is in the trust before the announcement." Dirks: "Already done, Jay"',
         magnitude: 'major',
         when: (sim, world) => world.investigations.tanBowmanStory >= 2,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'The tape is out. Bowman and Dirks on a recorded line coordinating insider trades. There is no ambiguity. PNTH is in freefall in pre-market, the Dirks faction on the board is finished, and resignation talk is everywhere. Meridian\'s risk committee has called an emergency session.',
-        choices: [
-            {
-                label: 'Aggressive short',
-                desc: 'The tape is a kill shot. Load up on downside exposure before the full crash.',
-                deltas: { mu: -0.08, theta: 0.04, lambda: 2.0, muJ: -0.05 },
-                effects: [
-                    { path: 'investigations.tanBowmanStory', op: 'set', value: 3 },
-                    { path: 'election.barronApproval', op: 'add', value: -10 },
-                    { path: 'pnth.boardDirks', op: 'add', value: -1 },
-                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
-                ],
-                followups: [{ id: 'bowman_resigns', mtth: 12, weight: 0.7 }],
-                playerFlag: 'shorted_bombshell_tape',
-                resultToast: 'You go heavy short. The tape is undeniable -- this administration is wounded.',
-            },
-            {
-                label: 'Reduce and wait',
-                desc: 'Cut risk but don\'t bet the farm. The market could snap back on a resignation.',
-                deltas: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
-                effects: [
-                    { path: 'investigations.tanBowmanStory', op: 'set', value: 3 },
-                    { path: 'election.barronApproval', op: 'add', value: -8 },
-                    { path: 'pnth.boardDirks', op: 'add', value: -1 },
-                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
-                ],
-                followups: [{ id: 'bowman_resigns', mtth: 20, weight: 0.5 }],
-                playerFlag: 'reduced_on_bombshell',
-                resultToast: 'You de-risk. The tape changes everything but markets can be irrational.',
-            },
-            {
-                label: 'Buy the capitulation',
-                desc: 'Everyone is panic-selling. A resignation clears the decks and markets rally.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 1.0, muJ: -0.03 },
-                effects: [
-                    { path: 'investigations.tanBowmanStory', op: 'set', value: 3 },
-                    { path: 'election.barronApproval', op: 'add', value: -8 },
-                    { path: 'pnth.boardDirks', op: 'add', value: -1 },
-                    { path: 'pnth.boardGottlieb', op: 'add', value: 1 },
-                ],
-                followups: [{ id: 'bowman_resigns', mtth: 15, weight: 0.6 }],
-                playerFlag: 'bought_bombshell_capitulation',
-                resultToast: 'You buy into the panic. If Bowman resigns quickly, the market finds a floor.',
-            },
-        ],
+        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
+        effects: [ { path: 'investigations.tanBowmanStory', op: 'set', value: 3 }, { path: 'election.barronApproval', op: 'add', value: -8 }, { path: 'pnth.boardDirks', op: 'add', value: -1 }, { path: 'pnth.boardGottlieb', op: 'add', value: 1 }, ],
+        followups: [{ id: 'bowman_resigns', mtth: 20, weight: 0.5 }],
     },
     {
         id: 'tan_nsa_initial',
@@ -3444,42 +1979,8 @@ const INVESTIGATION_EVENTS = [
         headline: 'Sen. Okafor formally opens Intelligence Committee hearings into PNTH-White House ties; witness list includes current and former PNTH executives',
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.okaforProbeStage === 0 && world.pnth.senateProbeLaunched,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Senator Okafor has convened Intelligence Committee hearings on the PNTH-White House nexus. The witness list is aggressive -- current PNTH executives and former government officials. Meridian\'s legal team flagged that the committee may request trading records from major institutional desks.',
-        choices: [
-            {
-                label: 'Cooperate proactively',
-                desc: 'Reach out to the committee. Show Meridian has nothing to hide and build goodwill.',
-                deltas: { mu: -0.015, theta: 0.008, lambda: 0.3 },
-                effects: [
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 1 },
-                ],
-                playerFlag: 'cooperated_with_okafor',
-                resultToast: 'Meridian offers full cooperation. Okafor\'s staff takes note.',
-            },
-            {
-                label: 'Keep distance',
-                desc: 'Stay quiet and maintain positions. The hearings are political theater.',
-                deltas: { mu: -0.02, theta: 0.01, lambda: 0.4 },
-                effects: [
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 1 },
-                ],
-                playerFlag: 'distanced_from_hearings',
-                resultToast: 'You keep your head down. The hearings are someone else\'s problem -- for now.',
-            },
-            {
-                label: 'Position for escalation',
-                desc: 'Okafor doesn\'t open hearings unless she has the goods. Get defensive.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.6 },
-                effects: [
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 1 },
-                ],
-                playerFlag: 'positioned_for_probe_escalation',
-                resultToast: 'You hedge against a deeper investigation. If Okafor has more, you\'re ready.',
-            },
-        ],
+        params: { mu: -0.02, theta: 0.01, lambda: 0.4 },
+        effects: [ { path: 'investigations.okaforProbeStage', op: 'set', value: 1 }, ],
     },
     {
         id: 'okafor_subpoenas',
@@ -3488,42 +1989,8 @@ const INVESTIGATION_EVENTS = [
         headline: 'Okafor issues subpoenas for Bowman financial records and Dirks-Bowman communications; White House invokes executive privilege. Constitutional showdown looms',
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.okaforProbeStage >= 1,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Okafor issued subpoenas for Bowman\'s financials and the Dirks-Bowman communications. The White House is fighting it on executive privilege grounds. Legal analysts say this goes to the Supreme Court. Meanwhile, the committee staff contacted Meridian about providing anonymized trading data around key PNTH dates.',
-        choices: [
-            {
-                label: 'Provide the records',
-                desc: 'Comply voluntarily. If Meridian\'s trades are clean, transparency is the best defense.',
-                deltas: { mu: -0.025, theta: 0.012, lambda: 0.4 },
-                effects: [
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 2 },
-                ],
-                playerFlag: 'provided_subpoena_records',
-                resultToast: 'You hand over the records. Meridian\'s lawyers wince, but the data is clean.',
-            },
-            {
-                label: 'Push back through counsel',
-                desc: 'Have legal challenge the scope. Protect the desk\'s proprietary trading data.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5 },
-                effects: [
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 2 },
-                ],
-                playerFlag: 'challenged_subpoena_scope',
-                resultToast: 'Meridian\'s lawyers push back on scope. It buys time but draws attention.',
-            },
-            {
-                label: 'Quietly restructure the book',
-                desc: 'Before records are produced, clean up anything that could look suspicious in hindsight.',
-                deltas: { mu: -0.035, theta: 0.02, lambda: 0.6 },
-                effects: [
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 2 },
-                ],
-                playerFlag: 'restructured_before_subpoena',
-                resultToast: 'You quietly adjust positions. Nothing illegal -- but it doesn\'t look great.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        effects: [ { path: 'investigations.okaforProbeStage', op: 'set', value: 2 }, ],
     },
     {
         id: 'okafor_criminal_referral',
@@ -3532,45 +1999,8 @@ const INVESTIGATION_EVENTS = [
         headline: 'Okafor\'s committee votes 8-6 to refer Bowman to DOJ for criminal investigation; "The evidence of insider trading is overwhelming," she says',
         magnitude: 'major',
         when: (sim, world) => world.investigations.okaforProbeStage >= 2,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'The Intelligence Committee just voted to refer Bowman to the DOJ for criminal prosecution. Okafor called the evidence "overwhelming." This crosses the line from political theater to real legal jeopardy. Markets are digesting the news -- this could either be the climax of the scandal or just the beginning of a longer ordeal.',
-        choices: [
-            {
-                label: 'Position for indictment',
-                desc: 'A criminal referral usually leads to charges. Prepare for the next shoe to drop.',
-                deltas: { mu: -0.05, theta: 0.025, lambda: 1.0, muJ: -0.03 },
-                effects: [
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 3 },
-                    { path: 'election.barronApproval', op: 'add', value: -5 },
-                ],
-                playerFlag: 'positioned_for_indictment',
-                resultToast: 'You bet the DOJ acts. If charges come, the market will convulse again.',
-            },
-            {
-                label: 'Treat it as the climax',
-                desc: 'The worst is known. Markets price forward. Start buying the resolution.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
-                effects: [
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 3 },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                playerFlag: 'bought_referral_as_climax',
-                resultToast: 'You treat the referral as peak uncertainty. If it\'s priced in, the bottom is near.',
-            },
-            {
-                label: 'Stay neutral',
-                desc: 'Too many possible outcomes. Keep the book balanced until clarity emerges.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
-                effects: [
-                    { path: 'investigations.okaforProbeStage', op: 'set', value: 3 },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                playerFlag: 'stayed_neutral_on_referral',
-                resultToast: 'You wait for the DOJ\'s next move. No need to bet on the legal outcome.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
+        effects: [ { path: 'investigations.okaforProbeStage', op: 'set', value: 3 }, { path: 'election.barronApproval', op: 'add', value: -3 }, ],
     },
 
     // =====================================================================
@@ -3592,42 +2022,8 @@ const INVESTIGATION_EVENTS = [
         headline: 'BREAKING: VP Bowman resigns "to spend time with family and fight these baseless allegations." Barron: "Jay is a great patriot. Total witch hunt"',
         magnitude: 'major',
         when: (sim, world) => world.investigations.tanBowmanStory >= 2,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'Bowman just resigned. The letter went out ten minutes ago. Markets are whipsawing -- the initial drop reversed as traders price in "scandal resolution." The question is whether this is the end of the crisis or whether it drags Barron down further. Meridian needs a view.',
-        choices: [
-            {
-                label: 'Buy the resolution',
-                desc: 'The albatross is gone. Markets rally when uncertainty lifts. Go long.',
-                deltas: { mu: -0.01, theta: 0.015, lambda: 0.5, muJ: -0.01 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                playerFlag: 'bought_bowman_resignation',
-                resultToast: 'You buy the relief. If the scandal dies with Bowman\'s career, you profit.',
-            },
-            {
-                label: 'Sell the news',
-                desc: 'Resignations mean more indictments are coming. This isn\'t over.',
-                deltas: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.03 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -5 },
-                ],
-                playerFlag: 'sold_bowman_resignation',
-                resultToast: 'You sell the pop. Resignations are just the beginning of the legal process.',
-            },
-            {
-                label: 'Trade the volatility',
-                desc: 'Direction is uncertain but the swings will continue. Buy straddles.',
-                deltas: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                playerFlag: 'traded_vol_bowman_resignation',
-                resultToast: 'You buy volatility. VP resignations keep the news cycle hot for weeks.',
-            },
-        ],
+        params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.03 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -5 }, ],
     },
     {
         id: 'bowman_indicted',
@@ -3657,48 +2053,9 @@ const INVESTIGATION_EVENTS = [
         headline: 'House Speaker announces formal impeachment inquiry into President Barron; cites "abuse of power, obstruction, and complicity in corruption"',
         magnitude: 'major',
         when: (sim, world, congress) => !congress.fedControlsHouse && world.investigations.impeachmentStage === 0 && world.investigations.tanBowmanStory >= 2,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'The House Speaker just announced a formal impeachment inquiry. This is the first time in decades. Markets are selling off but the process will take months. The macro question is whether impeachment paralyzes policy or creates a buying opportunity once the uncertainty is bounded.',
-        choices: [
-            {
-                label: 'Hedge the macro',
-                desc: 'Impeachment means policy paralysis. Buy puts and reduce equity beta.',
-                deltas: { mu: -0.05, theta: 0.03, lambda: 1.2, muJ: -0.03, sigmaR: 0.006 },
-                effects: [
-                    { path: 'investigations.impeachmentStage', op: 'set', value: 1 },
-                    { path: 'election.barronApproval', op: 'add', value: -5 },
-                ],
-                followups: [{ id: 'impeachment_vote', mtth: 35, weight: 0.7 }],
-                playerFlag: 'hedged_impeachment',
-                resultToast: 'You buy protection. Constitutional crises suppress risk appetite for months.',
-            },
-            {
-                label: 'Lean into the process',
-                desc: 'Markets learned from history: impeachment rarely leads to removal. Stay long.',
-                deltas: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.015, sigmaR: 0.004 },
-                effects: [
-                    { path: 'investigations.impeachmentStage', op: 'set', value: 1 },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                followups: [{ id: 'impeachment_vote', mtth: 40, weight: 0.6 }],
-                playerFlag: 'leaned_into_impeachment',
-                resultToast: 'You stay long. History says impeachment is noise, not signal.',
-            },
-            {
-                label: 'Go to cash',
-                desc: 'This is uncharted political territory. Sit in cash until the dust settles.',
-                deltas: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, sigmaR: 0.005 },
-                effects: [
-                    { path: 'investigations.impeachmentStage', op: 'set', value: 1 },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                followups: [{ id: 'impeachment_vote', mtth: 40, weight: 0.6 }],
-                playerFlag: 'went_to_cash_impeachment',
-                resultToast: 'You flatten the book. Sometimes the best trade is no trade.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.015, sigmaR: 0.004 },
+        effects: [ { path: 'investigations.impeachmentStage', op: 'set', value: 1 }, { path: 'election.barronApproval', op: 'add', value: -3 }, ],
+        followups: [{ id: 'impeachment_vote', mtth: 40, weight: 0.6 }],
     },
     {
         id: 'impeachment_vote',
@@ -3737,46 +2094,8 @@ const COMPOUND_EVENTS = [
         headline: 'Military spending bill fails as Congress balks at deficit during recession; defense stocks crater. Barron blames "weak politicians who don\'t support the troops"',
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.mideastEscalation >= 2 && world.geopolitical.recessionDeclared,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) => {
-            const longStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty > 0).reduce((s, p) => s + p.qty, 0);
-            let ctx = 'The defense spending bill just died on the floor. Congress won\'t fund a war during a recession, and the market is punishing the entire defense sector. Barron is raging on social media, but the damage is done — fiscal policy is paralyzed.';
-            if (longStock > 10) ctx += ' Your long equity exposure is getting hammered on both fronts.';
-            return ctx;
-        },
-        choices: [
-            {
-                label: 'Go defensive',
-                desc: 'Rotate into bonds and reduce risk. This is a two-front crisis.',
-                deltas: { mu: -0.06, theta: 0.03, lambda: 1.5 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -5 },
-                ],
-                playerFlag: 'went_defensive_war_recession',
-                resultToast: 'You rotated to safety. The war-recession combo is dragging equities lower.',
-            },
-            {
-                label: 'Buy the capitulation',
-                desc: 'Peak pessimism is the time to buy. Congress will find the money eventually.',
-                deltas: { mu: -0.04, theta: 0.025, lambda: 1.0 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -5 },
-                ],
-                playerFlag: 'bought_war_recession_dip',
-                resultToast: 'A contrarian bet that the political gridlock breaks. Risky in a recession.',
-            },
-            {
-                label: 'Short the political chaos',
-                desc: 'The dysfunction is just getting started. Position for more downside.',
-                deltas: { mu: -0.07, theta: 0.04, lambda: 2.0 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -7 },
-                ],
-                playerFlag: 'shorted_war_recession',
-                resultToast: 'You\'re betting the political paralysis deepens. If Barron escalates, you profit.',
-            },
-        ],
+        params: { mu: -0.04, theta: 0.025, lambda: 1.0 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -5 }, ],
     },
     {
         id: 'compound_pnth_scandal_trade_war',
@@ -3812,43 +2131,7 @@ const COMPOUND_EVENTS = [
         headline: '"Worst week since 2008": margin calls cascade as institutional investors flee; regulators hold emergency session. Circuit breakers triggered three days running',
         magnitude: 'major',
         when: (sim, world) => world.fed.credibilityScore < 3 && world.geopolitical.recessionDeclared && sim.theta > 0.15,
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) => {
-            const netExposure = portfolio.positions.reduce((s, p) => {
-                if (p.type === 'stock') return s + p.qty;
-                if (p.type === 'call') return s + p.qty * 50;
-                if (p.type === 'put') return s - p.qty * 50;
-                return s;
-            }, 0);
-            let ctx = 'This is it. The Fed has no credibility, the economy is in recession, and vol is already elevated. Margin calls are cascading through the prime brokerage complex, institutional investors are panic-selling, and circuit breakers have tripped three days running. Regulators are in emergency session.';
-            if (netExposure > 0) ctx += ' You\'re net long into a full-blown meltdown.';
-            else if (netExposure < -10) ctx += ' Your short book is printing, but counterparty risk is rising fast.';
-            return ctx;
-        },
-        choices: [
-            {
-                label: 'Liquidate everything',
-                desc: 'Cash is king. Get flat and survive.',
-                deltas: { mu: -0.08, theta: 0.05, lambda: 3.0, muJ: -0.06, xi: 0.15, q: -0.005 },
-                playerFlag: 'liquidated_meltdown',
-                resultToast: 'You went to cash. The market is in free fall, but you\'re on the sidelines.',
-            },
-            {
-                label: 'Buy the blood',
-                desc: '"Be greedy when others are fearful." The greatest trades are made in moments like this.',
-                deltas: { mu: -0.06, theta: 0.04, lambda: 2.0, muJ: -0.04, xi: 0.1, q: -0.003 },
-                playerFlag: 'bought_meltdown',
-                resultToast: 'A legendary entry — or the beginning of catching a falling knife.',
-            },
-            {
-                label: 'Hedge the tail',
-                desc: 'Buy far OTM puts and wait. If this gets worse, your hedge pays off enormously.',
-                deltas: { mu: -0.07, theta: 0.05, lambda: 3.5, muJ: -0.07, xi: 0.2, q: -0.005 },
-                playerFlag: 'hedged_meltdown',
-                resultToast: 'You bought tail protection at crisis premiums. If the world ends, you\'re covered.',
-            },
-        ],
+        params: { mu: -0.06, theta: 0.04, lambda: 2.0, muJ: -0.04, xi: 0.1, q: -0.003 },
     },
     {
         id: 'compound_impeachment_war',
@@ -4060,57 +2343,9 @@ const CONGRESSIONAL_EVENTS = [
         headline: 'Rep. Calloway switches from Federalist to Farmer-Labor on House floor: "I can no longer support a party that has abandoned its principles"',
         magnitude: 'moderate',
         when: (sim, world) => world.congress.house.federalist >= 216 && world.election.barronApproval < 45,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'Rep. Calloway just switched parties on live television. The House majority is now razor-thin -- one more defection and the Federalists lose the gavel. This could cascade: two more moderates are reportedly "exploring options." Barron\'s legislative agenda, including the tax bill and deregulation package, is suddenly at risk. Markets are recalculating the probability of divided government.',
-        choices: [
-            {
-                label: 'Price in divided government',
-                desc: 'The majority is crumbling. Position for gridlock: lower vol, lower growth, status quo policy.',
-                deltas: { mu: -0.02, theta: 0.01, lambda: 0.3 },
-                effects: [
-                    { path: 'congress.house.federalist', op: 'add', value: -1 },
-                    { path: 'congress.house.farmerLabor', op: 'add', value: 1 },
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                followups: [
-                    { id: 'defection_fallout_fed', mtth: 8, weight: 0.7 },
-                ],
-                playerFlag: 'priced_divided_govt',
-                resultToast: 'You bet on gridlock. If more defections follow, you\'re ahead of the curve.',
-            },
-            {
-                label: 'Bet on party discipline',
-                desc: 'Calloway is a lone wolf. Leadership will lock down the caucus with committee threats.',
-                deltas: { mu: -0.01, theta: 0.005, lambda: 0.1 },
-                effects: [
-                    { path: 'congress.house.federalist', op: 'add', value: -1 },
-                    { path: 'congress.house.farmerLabor', op: 'add', value: 1 },
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                followups: [
-                    { id: 'defection_fallout_fed', mtth: 12, weight: 0.4 },
-                ],
-                playerFlag: 'bet_on_party_discipline',
-                resultToast: 'You bet leadership holds the line. Calloway is a one-off -- probably.',
-            },
-            {
-                label: 'Call Calloway\'s office',
-                desc: 'Meridian has a PAC. A newly independent congressman might appreciate some friends on Wall Street.',
-                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2 },
-                effects: [
-                    { path: 'congress.house.federalist', op: 'add', value: -1 },
-                    { path: 'congress.house.farmerLabor', op: 'add', value: 1 },
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                followups: [
-                    { id: 'defection_fallout_fed', mtth: 10, weight: 0.6 },
-                ],
-                playerFlag: 'courted_calloway',
-                resultToast: 'You reach out. Party-switchers need new donors. Meridian can be very friendly.',
-            },
-        ],
+        params: { mu: -0.01, theta: 0.005, lambda: 0.1 },
+        effects: [ { path: 'congress.house.federalist', op: 'add', value: -1 }, { path: 'congress.house.farmerLabor', op: 'add', value: 1 }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
+        followups: [ { id: 'defection_fallout_fed', mtth: 12, weight: 0.4 }, ],
     },
     {
         id: 'defection_fallout_fed',
@@ -4174,48 +2409,8 @@ const CONGRESSIONAL_EVENTS = [
         headline: 'Hard-right Federalist bloc files motion to vacate the chair; House Speaker faces confidence vote as party fractures over spending bill',
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.fedControlsHouse && world.congress.house.federalist <= 225,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'The hard-right Freedom Caucus just filed a motion to vacate the Speaker\'s chair. The vote is tomorrow. If the Speaker is ousted, the House will be paralyzed for days or weeks -- no votes, no bills, no confirmations. Last time this happened, markets sold off for two straight weeks. The bond market is already pricing in legislative paralysis.',
-        choices: [
-            {
-                label: 'Bet on chaos',
-                desc: 'The caucus is fractured. No one can get to 218. Buy puts and short duration.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.6 },
-                effects: [],
-                followups: [
-                    { id: 'speaker_ousted', mtth: 5, weight: 0.6 },
-                    { id: 'speaker_survives', mtth: 5, weight: 0.4 },
-                ],
-                playerFlag: 'bet_on_speaker_chaos',
-                resultToast: 'You bet the Speaker falls. If the House is leaderless, nothing passes.',
-            },
-            {
-                label: 'Bet on survival',
-                desc: 'Speakers always survive these stunts. Buy the dip before the relief rally.',
-                deltas: { mu: -0.015, theta: 0.005, lambda: 0.2 },
-                effects: [],
-                followups: [
-                    { id: 'speaker_survives', mtth: 5, weight: 0.6 },
-                    { id: 'speaker_ousted', mtth: 5, weight: 0.4 },
-                ],
-                playerFlag: 'bet_on_speaker_survival',
-                resultToast: 'You buy the dip. Motions to vacate are usually performative.',
-            },
-            {
-                label: 'Trade the binary',
-                desc: 'This is a coin flip. Buy straddles and profit from the resolution either way.',
-                deltas: { mu: -0.02, theta: 0.01, lambda: 0.4 },
-                effects: [],
-                followups: [
-                    { id: 'speaker_survives', mtth: 5, weight: 0.5 },
-                    { id: 'speaker_ousted', mtth: 5, weight: 0.5 },
-                ],
-                playerFlag: 'straddled_speaker_vote',
-                resultToast: 'You buy vol on the binary outcome. Either way, the move will be sharp.',
-            },
-        ],
+        params: { mu: -0.015, theta: 0.005, lambda: 0.2 },
+        followups: [ { id: 'speaker_survives', mtth: 5, weight: 0.6 }, { id: 'speaker_ousted', mtth: 5, weight: 0.4 }, ],
     },
     {
         id: 'speaker_survives',
@@ -4266,51 +2461,8 @@ const CONGRESSIONAL_EVENTS = [
         headline: 'Treasury warns of "extraordinary measures" as debt ceiling deadline looms; rating agencies put U.S. on negative watch. T-bill yields spike',
         magnitude: 'major',
         when: (sim, world, congress) => !congress.trifecta,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'The Treasury Secretary just announced "extraordinary measures" as the debt ceiling X-date approaches. Rating agencies have the U.S. on negative watch. T-bill yields inside the X-date window spiked 80bps in an hour. CDS on U.S. sovereign debt just hit an all-time high. This is the biggest macro event of the year. If the U.S. technically defaults -- even briefly -- the reverberations will be global. Meridian\'s risk committee wants the desk positioned before the weekend.',
-        choices: [
-            {
-                label: 'Buy the fear',
-                desc: 'They will never actually default. Buy the panic and collect the snap-back.',
-                deltas: { mu: -0.02, theta: 0.015, lambda: 0.5, sigmaR: 0.005, b: 0.003 },
-                effects: [],
-                followups: [
-                    { id: 'debt_ceiling_last_minute_deal', mtth: 12, weight: 0.7 },
-                    { id: 'debt_ceiling_clean_raise', mtth: 8, weight: 0.2 },
-                    { id: 'debt_ceiling_technical_default', mtth: 20, weight: 0.1 },
-                ],
-                playerFlag: 'bought_debt_ceiling_fear',
-                resultToast: 'You buy the panic. The U.S. has never defaulted and you don\'t think today is the day.',
-            },
-            {
-                label: 'Hedge for default',
-                desc: 'Even a technical default would be catastrophic. Buy protection on everything.',
-                deltas: { mu: -0.04, theta: 0.025, lambda: 1.2, sigmaR: 0.01, b: 0.008 },
-                effects: [],
-                followups: [
-                    { id: 'debt_ceiling_last_minute_deal', mtth: 18, weight: 0.5 },
-                    { id: 'debt_ceiling_technical_default', mtth: 15, weight: 0.3 },
-                    { id: 'debt_ceiling_clean_raise', mtth: 12, weight: 0.2 },
-                ],
-                playerFlag: 'hedged_debt_ceiling',
-                resultToast: 'You load up on protection. If they fumble this, the hedges will print.',
-            },
-            {
-                label: 'Short the curve',
-                desc: 'Whatever happens, the yield curve is going to steepen violently. Position for it.',
-                deltas: { mu: -0.03, theta: 0.02, lambda: 0.8, sigmaR: 0.008, b: 0.006 },
-                effects: [],
-                followups: [
-                    { id: 'debt_ceiling_last_minute_deal', mtth: 15, weight: 0.6 },
-                    { id: 'debt_ceiling_technical_default', mtth: 20, weight: 0.2 },
-                    { id: 'debt_ceiling_clean_raise', mtth: 10, weight: 0.2 },
-                ],
-                playerFlag: 'shorted_curve_debt_ceiling',
-                resultToast: 'You short the front end. The bill market is broken regardless of the outcome.',
-            },
-        ],
+        params: { mu: -0.04, theta: 0.025, lambda: 1.2, sigmaR: 0.01, b: 0.008 },
+        followups: [ { id: 'debt_ceiling_last_minute_deal', mtth: 18, weight: 0.5 }, { id: 'debt_ceiling_technical_default', mtth: 15, weight: 0.3 }, { id: 'debt_ceiling_clean_raise', mtth: 12, weight: 0.2 }, ],
     },
     {
         id: 'debt_ceiling_last_minute_deal',
@@ -4397,42 +2549,8 @@ const CONGRESSIONAL_EVENTS = [
         headline: 'Senate Majority Leader invokes nuclear option to eliminate legislative filibuster; major policy shifts now possible with bare 51-vote majority',
         magnitude: 'major',
         when: (sim, world, congress) => congress.fedControlsSenate && world.congress.senate.federalist >= 52,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'The Senate Majority Leader just nuked the legislative filibuster. This is historic -- it means Barron\'s entire agenda (tax cuts, deregulation, defense spending) can pass with a bare 51-vote majority. No more compromising with Farmer-Labor. Markets are violently repricing: equities surging on the pro-business agenda, bonds selling off on deficit fears. The policy regime just changed fundamentally.',
-        choices: [
-            {
-                label: 'Go full risk-on',
-                desc: 'Deregulation and tax cuts are coming unimpeded. Buy everything that benefits from Barron\'s agenda.',
-                deltas: { mu: -0.01, theta: 0.01, lambda: 0.3, sigmaR: 0.003 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 3 },
-                ],
-                playerFlag: 'went_risk_on_nuclear',
-                resultToast: 'You lean into the new regime. Barron can pass anything now.',
-            },
-            {
-                label: 'Hedge the pendulum',
-                desc: 'What the majority gives, the next majority takes away. This cuts both ways when power shifts.',
-                deltas: { mu: -0.025, theta: 0.02, lambda: 0.6, sigmaR: 0.005 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 2 },
-                ],
-                playerFlag: 'hedged_nuclear_pendulum',
-                resultToast: 'You hedge. The filibuster protected both sides. Now policy whipsaws with every election.',
-            },
-            {
-                label: 'Short bonds aggressively',
-                desc: 'No filibuster means no fiscal restraint. The deficit is about to explode. Dump duration.',
-                deltas: { mu: -0.015, theta: 0.012, lambda: 0.4, sigmaR: 0.006 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 2 },
-                ],
-                playerFlag: 'shorted_bonds_nuclear',
-                resultToast: 'You short bonds. Without the filibuster, there\'s no one to stop the spending.',
-            },
-        ],
+        params: { mu: -0.025, theta: 0.02, lambda: 0.6, sigmaR: 0.005 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: 2 }, ],
     },
     {
         id: 'senate_rejects_barron_nominee',
@@ -4496,42 +2614,8 @@ const CONGRESSIONAL_EVENTS = [
         headline: 'Barron\'s corporate tax reform passes both chambers: rate cut to 15%, repatriation holiday. Analysts project massive surge in shareholder returns',
         magnitude: 'major',
         when: (sim, world, congress) => congress.trifecta,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'It passed. Both chambers. Corporate rate goes from 21% to 15% with a one-time repatriation holiday at 8%. Trillions in offshore cash is about to flood back into U.S. markets. Every S&P 500 company just got an immediate after-tax earnings boost. The question is how much is already priced in -- and whether the deficit impact will hammer bonds.',
-        choices: [
-            {
-                label: 'Chase the momentum',
-                desc: 'This is a generational tax cut. Buy the rally and ride the buyback wave.',
-                deltas: { mu: 0.05, theta: -0.012, b: 0.004, q: 0.006 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 4 },
-                ],
-                playerFlag: 'chased_tax_reform_rally',
-                resultToast: 'You go long into the tax cut. Buybacks and special dividends are coming.',
-            },
-            {
-                label: 'Sell the news',
-                desc: 'The market priced this in weeks ago. Take profits while everyone else FOMO\'s in.',
-                deltas: { mu: 0.03, theta: -0.005, b: 0.002, q: 0.004 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 3 },
-                ],
-                playerFlag: 'sold_tax_reform_news',
-                resultToast: 'You take profits. The euphoria phase is usually the top.',
-            },
-            {
-                label: 'Play the repatriation',
-                desc: 'The real story is the cash repatriation. Go long dollar and short foreign equities.',
-                deltas: { mu: 0.04, theta: -0.008, b: 0.003, q: 0.005 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: 3 },
-                ],
-                playerFlag: 'played_repatriation',
-                resultToast: 'You position for the cash wave. Trillions flowing home means dollar strength.',
-            },
-        ],
+        params: { mu: 0.03, theta: -0.005, b: 0.002, q: 0.004 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: 3 }, ],
     },
     {
         id: 'capital_gains_tax_scare',
@@ -4540,42 +2624,8 @@ const CONGRESSIONAL_EVENTS = [
         headline: 'Senate Finance Committee floats doubling capital gains tax to 40%; wealthy investors front-run by locking in gains. Selling pressure intensifies',
         magnitude: 'moderate',
         when: (sim, world, congress) => !congress.trifecta,
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) =>
-            'The Senate Finance Committee just leaked a proposal to double the capital gains rate to 40%. It\'s a trial balloon, but wealthy investors are already locking in gains at the current rate. The selling pressure is accelerating -- every family office and HNW client is calling their broker. Meridian\'s prime brokerage desk reports record sell orders. The irony is that the selling itself might tank markets enough to kill the proposal politically.',
-        choices: [
-            {
-                label: 'Front-run the selling',
-                desc: 'If big money is liquidating, get ahead of the wave. Cut equity exposure now.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 0.7, q: -0.003 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -1 },
-                ],
-                playerFlag: 'front_ran_cap_gains_selling',
-                resultToast: 'You sell ahead of the wave. If the proposal gains traction, you dodged the worst.',
-            },
-            {
-                label: 'Buy the overreaction',
-                desc: 'This will never pass -- Barron will veto it. The selling is a gift.',
-                deltas: { mu: -0.02, theta: 0.008, lambda: 0.3, q: -0.001 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -1 },
-                ],
-                playerFlag: 'bought_cap_gains_overreaction',
-                resultToast: 'You buy the panic. Trial balloons rarely become law.',
-            },
-            {
-                label: 'Harvest your own gains',
-                desc: 'Regardless of what the market does, lock in gains at current rates before the window closes.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5, q: -0.002 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -1 },
-                ],
-                playerFlag: 'harvested_cap_gains',
-                resultToast: 'You lock in gains. Better to pay 20% now than risk 40% later.',
-            },
-        ],
+        params: { mu: -0.02, theta: 0.008, lambda: 0.3, q: -0.001 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -1 }, ],
     },
 ];
 const MIDTERM_EVENTS = [
@@ -4597,42 +2647,8 @@ const MIDTERM_EVENTS = [
         likelihood: 1.0,
         headline: 'Farmer-Labor elects new House Speaker; pledges immediate investigations into Barron administration. "Accountability starts now"',
         magnitude: 'moderate',
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'Farmer-Labor just elected a new House Speaker who promised "accountability from day one." Subpoenas are coming -- for the White House, for PNTH, possibly for trading firms with administration connections. Meridian\'s government affairs team is already flagging potential exposure. The new Speaker controls the legislative agenda, the committee chairs, and the investigation timeline. Barron\'s entire second-half agenda is dead on arrival.',
-        choices: [
-            {
-                label: 'Position for investigations',
-                desc: 'Subpoena power means hearings, headlines, and volatility. Buy protection.',
-                deltas: { mu: -0.04, theta: 0.02, lambda: 0.7 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                playerFlag: 'positioned_for_fl_investigations',
-                resultToast: 'You hedge for the coming subpoena storm. Investigation season is volatility season.',
-            },
-            {
-                label: 'Buy the gridlock',
-                desc: 'Divided government means no new regulation and no new taxes. That\'s bullish.',
-                deltas: { mu: -0.02, theta: 0.008, lambda: 0.3 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                playerFlag: 'bought_fl_gridlock',
-                resultToast: 'You go long gridlock. Markets love a Congress that can\'t do anything.',
-            },
-            {
-                label: 'Build a relationship',
-                desc: 'The new Speaker\'s chief of staff used to work at Goldman. Meridian knows people who know people.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                playerFlag: 'courted_fl_speaker',
-                resultToast: 'You reach out through back channels. It\'s always good to have friends in the majority.',
-            },
-        ],
+        params: { mu: -0.02, theta: 0.008, lambda: 0.3 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -2 }, ],
     },
     {
         id: 'midterm_lame_duck_barron',
@@ -4640,42 +2656,8 @@ const MIDTERM_EVENTS = [
         likelihood: 1.0,
         headline: 'Barron retreats to Mar-a-Lago after historic losses; agenda effectively dead. Aides describe him as "furious and isolated." Markets rally on gridlock',
         magnitude: 'major',
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'Historic wipeout. Barron lost the House by 30+ seats and the Senate is gone too. He\'s retreated to Mar-a-Lago and aides say he\'s "furious and isolated." His legislative agenda is dead. Markets are rallying hard on the gridlock trade -- no new regulation, no new taxes, no new spending. The question is whether a wounded, angry president lashes out with executive orders or accepts the new reality.',
-        choices: [
-            {
-                label: 'Ride the gridlock rally',
-                desc: 'A neutered president is the market\'s favorite president. Go max long.',
-                deltas: { mu: 0.05, theta: -0.025, lambda: -0.6, sigmaR: -0.004 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -10 },
-                ],
-                playerFlag: 'rode_lame_duck_rally',
-                resultToast: 'You go all-in on gridlock. A president who can\'t pass laws can\'t break things.',
-            },
-            {
-                label: 'Stay cautious',
-                desc: 'A cornered Barron is a dangerous Barron. He\'ll lash out with executive orders and tariffs.',
-                deltas: { mu: 0.03, theta: -0.01, lambda: -0.3, sigmaR: -0.002 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -8 },
-                ],
-                playerFlag: 'stayed_cautious_lame_duck',
-                resultToast: 'You stay hedged. Wounded presidents do unpredictable things.',
-            },
-            {
-                label: 'Short the executive overreach',
-                desc: 'Barron will go scorched-earth with executive orders. The courts will be overwhelmed.',
-                deltas: { mu: 0.02, theta: -0.005, lambda: -0.2, sigmaR: -0.001 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -8 },
-                ],
-                playerFlag: 'shorted_lame_duck_overreach',
-                resultToast: 'You bet on executive chaos. Barron never goes quietly.',
-            },
-        ],
+        params: { mu: 0.03, theta: -0.01, lambda: -0.3, sigmaR: -0.002 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -8 }, ],
     },
     {
         id: 'midterm_status_quo',
@@ -4691,42 +2673,8 @@ const MIDTERM_EVENTS = [
         likelihood: 1.0,
         headline: 'Farmer-Labor takes Senate majority by one seat; committee chairmanships flip. Okafor gains full subpoena power over Intelligence Committee',
         magnitude: 'moderate',
-        popup: true,
-        era: 'late',
-        context: (sim, world, portfolio) =>
-            'Farmer-Labor just flipped the Senate by a single seat. Every committee chairmanship changes hands. Senator Okafor now has full subpoena power as Intelligence Committee chair -- she can compel testimony from anyone in the Barron orbit. Judicial confirmations grind to a halt. Markets are digesting the implications: more investigations, fewer judges, but also fewer deficit-expanding bills.',
-        choices: [
-            {
-                label: 'Position for the subpoenas',
-                desc: 'Okafor will use her new power aggressively. PNTH and Barron allies are in the crosshairs.',
-                deltas: { mu: -0.03, theta: 0.015, lambda: 0.5 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -4 },
-                ],
-                playerFlag: 'positioned_for_senate_flip_subpoenas',
-                resultToast: 'You hedge for Okafor\'s investigations. She\'s been waiting for this gavel.',
-            },
-            {
-                label: 'Trade the confirmation freeze',
-                desc: 'No more Barron judges. No more regulatory appointees. The status quo is locked in.',
-                deltas: { mu: -0.015, theta: 0.008, lambda: 0.2 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -3 },
-                ],
-                playerFlag: 'traded_confirmation_freeze',
-                resultToast: 'You position for regulatory stasis. No new judges means no new precedents.',
-            },
-            {
-                label: 'Bet on compromise',
-                desc: 'Narrow majorities force compromise. Both sides need to deal. Buy the center.',
-                deltas: { mu: -0.01, theta: 0.005, lambda: 0.1 },
-                effects: [
-                    { path: 'election.barronApproval', op: 'add', value: -2 },
-                ],
-                playerFlag: 'bet_on_senate_compromise',
-                resultToast: 'You bet on bipartisanship. One-seat majorities make everyone a swing vote.',
-            },
-        ],
+        params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -3 }, ],
     },
 ];
 
@@ -5002,42 +2950,8 @@ const MARKET_EVENTS = [
         },
         headline: 'Repo market seizure: overnight rates spike to 8% as dealers hoard reserves; Fed forced into emergency operations',
         magnitude: 'major',
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) => {
-            const bondQty = portfolio.positions.filter(p => p.type === 'bond').reduce((s, p) => s + p.qty, 0);
-            const shortStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty < 0).reduce((s, p) => s + Math.abs(p.qty), 0);
-            let ctx = 'The overnight repo market just seized. Dealers are hoarding reserves, overnight rates spiked to 8%, and prime brokers are pulling credit lines. Every leveraged position on the street is suddenly more expensive to carry.';
-            if (bondQty > 5) ctx += ' Your long bond book is in the crossfire — credit spreads are blowing out.';
-            if (shortStock > 5) ctx += ' Your short stock borrows just got very expensive.';
-            return ctx;
-        },
-        choices: [
-            {
-                label: 'Raise cash',
-                desc: 'Sell liquid positions and hoard cash. Survive first, trade later.',
-                deltas: { mu: -0.05, theta: 0.035, lambda: 2.0, muJ: -0.04, borrowSpread: 0.8, q: -0.003 },
-                followups: [{ id: 'fed_emergency_repo', mtth: 3, weight: 0.8 }],
-                playerFlag: 'raised_cash_liquidity_crisis',
-                resultToast: 'You de-risked into the seizure. If the Fed steps in, you\'ll have dry powder.',
-            },
-            {
-                label: 'Provide liquidity',
-                desc: 'Buy the dislocation. Spreads this wide are a generational opportunity — if you can hold.',
-                deltas: { mu: -0.03, theta: 0.04, lambda: 2.5, muJ: -0.04, borrowSpread: 1.0, q: -0.003 },
-                followups: [{ id: 'fed_emergency_repo', mtth: 3, weight: 0.9 }],
-                playerFlag: 'provided_liquidity_crisis',
-                resultToast: 'You stepped in as a liquidity provider. High risk, but the spreads are extraordinary.',
-            },
-            {
-                label: 'Hedge and wait',
-                desc: 'Buy protection and sit tight. Let the plumbing sort itself out.',
-                deltas: { mu: -0.04, theta: 0.03, lambda: 1.5, muJ: -0.03, borrowSpread: 0.6, q: -0.002 },
-                followups: [{ id: 'fed_emergency_repo', mtth: 4, weight: 0.7 }],
-                playerFlag: 'hedged_liquidity_crisis',
-                resultToast: 'You bought protection and hunkered down. The market waits for the Fed.',
-            },
-        ],
+        params: { mu: -0.03, theta: 0.04, lambda: 2.5, muJ: -0.04, borrowSpread: 1.0, q: -0.003 },
+        followups: [{ id: 'fed_emergency_repo', mtth: 3, weight: 0.9 }],
     },
     {
         id: 'opex_vol_spike',
@@ -5069,37 +2983,7 @@ const MARKET_EVENTS = [
         },
         headline: 'Leveraged vol ETP liquidation cascade: inverse-VIX fund NAV collapses 90%, forced rebalancing hammers futures',
         magnitude: 'major',
-        popup: true,
-        era: 'mid',
-        context: (sim, world, portfolio) => {
-            const shortPuts = portfolio.positions.filter(p => p.type === 'put' && p.qty < 0).reduce((s, p) => s + Math.abs(p.qty), 0);
-            let ctx = 'An inverse-VIX ETN just blew up. NAV collapsed 90% in after-hours, and the issuer\'s forced rebalancing is about to slam vol futures at the open. Every short-vol position on the street is being repriced. The cascade is already underway.';
-            if (shortPuts > 0) ctx += ' You\'re short puts — this vol spike hits you directly.';
-            return ctx;
-        },
-        choices: [
-            {
-                label: 'Buy vol aggressively',
-                desc: 'Get long VIX exposure. The cascade will feed on itself before it burns out.',
-                deltas: { mu: -0.06, theta: 0.05, lambda: 3.5, muJ: -0.05, xi: 0.2, rho: -0.1 },
-                playerFlag: 'bought_vol_etp_cascade',
-                resultToast: 'You went long vol into the cascade. If it keeps feeding, you profit.',
-            },
-            {
-                label: 'Flatten and watch',
-                desc: 'Close vol-sensitive positions and wait for the dust to settle.',
-                deltas: { mu: -0.04, theta: 0.04, lambda: 2.5, muJ: -0.04, xi: 0.15, rho: -0.08 },
-                playerFlag: 'flattened_etp_cascade',
-                resultToast: 'You went flat. The cascade rages but your book is clean.',
-            },
-            {
-                label: 'Sell into the spike',
-                desc: 'Vol is overshooting. Sell premium at these levels — if you can stomach the risk.',
-                deltas: { mu: -0.05, theta: 0.06, lambda: 4.0, muJ: -0.06, xi: 0.25, rho: -0.12 },
-                playerFlag: 'sold_vol_etp_cascade',
-                resultToast: 'A bold short-vol bet at the peak of panic. The premiums are enormous — so is the risk.',
-            },
-        ],
+        params: { mu: -0.04, theta: 0.04, lambda: 2.5, muJ: -0.04, xi: 0.15, rho: -0.08 },
     },
     {
         id: 'margin_call_cascade',
