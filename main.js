@@ -38,7 +38,7 @@ import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
 import {
-    resetImpactState, computeRecoveryDrift,
+    resetImpactState, resetDailyVolume, computeRecoveryDrift,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
     selectImpactToast,
@@ -541,6 +541,7 @@ function frame(now) {
         if (!dayInProgress) {
             // Start a new day if enough time has passed since last tick
             if (now - lastTickTime >= tickInterval) {
+                resetDailyVolume();
                 _recoveryDrift = computeRecoveryDrift();
                 sim.mu += _recoveryDrift;
                 _savedOverlays = applyParamOverlays(sim);

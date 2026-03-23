@@ -98,17 +98,17 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
         const vol = type === 'bond' ? sim.sigmaR : currentVol;
         const impact = computeStockImpact(signedQty, vol);
         applyPermanentImpact(sim, impact.permanent);
-        return spreadFill + impact.fillAdjustment;
+        return Math.max(0.01, spreadFill + impact.fillAdjustment);
     } else {
         const moneyness = Math.abs(Math.log(currentPrice / strike));
         const dte = Math.max(1, (expiryDay || 0) - currentDay);
-        const impact = computeOptionImpact(signedQty, currentVol, moneyness, dte);
+        const impact = computeOptionImpact(signedQty, currentVol, moneyness, dte, strike, expiryDay || 0);
         const approxDelta = type === 'call'
             ? Math.max(0.01, Math.min(0.99, 0.5 + 0.5 * Math.tanh(-moneyness * 3)))
             : -Math.max(0.01, Math.min(0.99, 0.5 + 0.5 * Math.tanh(moneyness * 3)));
         const hedgeShift = computeDeltaHedgeImpact(signedQty, approxDelta, currentVol);
         applyPermanentImpact(sim, hedgeShift);
-        return spreadFill + impact.fillAdjustment;
+        return Math.max(0.01, spreadFill + impact.fillAdjustment);
     }
 }
 

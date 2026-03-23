@@ -22,11 +22,27 @@ const _playerParamCaps = {
 };
 let _lastToastDay = -Infinity;
 
+/* ── cumulative volume tracking (resets each day) ── */
+let _cumStockBuy  = 0;   // shares bought this day
+let _cumStockSell = 0;   // shares sold this day
+let _cumHedgeBuy  = 0;   // hedge shares bought this day
+let _cumHedgeSell = 0;   // hedge shares sold this day
+// Per-strike cumulative option volume: key = `${strike}_${expiryDay}`, value = { buy, sell }
+const _cumOption = new Map();
+
 /* ── reset ── */
 export function resetImpactState() {
     _unrecoveredImpact = 0;
     for (const k in _playerParamShifts) _playerParamShifts[k] = 0;
     _lastToastDay = -Infinity;
+    resetDailyVolume();
+}
+
+/** Reset cumulative volume — call at start of each day. */
+export function resetDailyVolume() {
+    _cumStockBuy = _cumStockSell = 0;
+    _cumHedgeBuy = _cumHedgeSell = 0;
+    _cumOption.clear();
 }
 
 /* ── Layer 1: Stock/Bond slippage ── */
@@ -40,8 +56,12 @@ export function resetImpactState() {
 export function computeStockImpact(qty, sigma) {
     const absQty = Math.abs(qty);
     const sign   = qty > 0 ? 1 : -1;
-    const perm   = PERM_COEFF * sigma * Math.sqrt(absQty / ADV) * sign;
+    // Incremental permanent impact: cost of going from cumVol to cumVol+qty
+    const cumRef = qty > 0 ? _cumStockBuy : _cumStockSell;
+    const perm   = PERM_COEFF * sigma * (Math.sqrt((cumRef + absQty) / ADV) - Math.sqrt(cumRef / ADV)) * sign;
     const temp   = TEMP_COEFF * sigma * (absQty / ADV) * sign;
+    // Update cumulative volume
+    if (qty > 0) _cumStockBuy += absQty; else _cumStockSell += absQty;
     return { permanent: perm, temporary: temp, fillAdjustment: perm + temp };
 }
 
@@ -64,12 +84,19 @@ export function modeledOI(moneyness, dte) {
  * @param {number} dte       Days to expiry
  * @returns {{ permanent: number, temporary: number, fillAdjustment: number }}
  */
-export function computeOptionImpact(qty, sigma, moneyness, dte) {
+export function computeOptionImpact(qty, sigma, moneyness, dte, strike, expiryDay) {
     const absQty = Math.abs(qty);
     const sign   = qty > 0 ? 1 : -1;
     const oi     = modeledOI(moneyness, dte);
-    const perm   = OPT_PERM_COEFF * sigma * Math.sqrt(absQty / oi) * sign;
+    // Per-strike cumulative volume
+    const key = `${strike}_${expiryDay}`;
+    let cum = _cumOption.get(key);
+    if (!cum) { cum = { buy: 0, sell: 0 }; _cumOption.set(key, cum); }
+    const cumRef = qty > 0 ? cum.buy : cum.sell;
+    const perm   = OPT_PERM_COEFF * sigma * (Math.sqrt((cumRef + absQty) / oi) - Math.sqrt(cumRef / oi)) * sign;
     const temp   = OPT_TEMP_COEFF * sigma * (absQty / oi) * sign;
+    // Update cumulative
+    if (qty > 0) cum.buy += absQty; else cum.sell += absQty;
     return { permanent: perm, temporary: temp, fillAdjustment: perm + temp };
 }
 
@@ -86,7 +113,11 @@ export function computeDeltaHedgeImpact(optQty, delta, sigma) {
     const absHedge = Math.abs(hedgeQty);
     if (absHedge < 0.01) return 0;
     const sign = hedgeQty > 0 ? 1 : -1;
-    return PERM_COEFF * sigma * Math.sqrt(absHedge / ADV) * sign;
+    // Incremental: hedge volume cumulates with other hedges this day
+    const cumRef = hedgeQty > 0 ? _cumHedgeBuy : _cumHedgeSell;
+    const impact = PERM_COEFF * sigma * (Math.sqrt((cumRef + absHedge) / ADV) - Math.sqrt(cumRef / ADV)) * sign;
+    if (hedgeQty > 0) _cumHedgeBuy += absHedge; else _cumHedgeSell += absHedge;
+    return impact;
 }
 
 /**
