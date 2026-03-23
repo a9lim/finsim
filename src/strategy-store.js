@@ -1,6 +1,6 @@
 // src/strategy-store.js
 import { computeBidAsk, computeOptionBidAsk } from './portfolio.js';
-import { priceWithTree, allocTree, prepareTree, vasicekBondPrice } from './pricing.js';
+import { priceWithTree, allocTree, prepareTree, vasicekBondPrice, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { market } from './market.js';
 import { BOND_FACE_VALUE } from './config.js';
 
@@ -232,10 +232,12 @@ export function computeNetCost(legs, S, vol, r, day, q, expiries, overrideExpiry
             ba = computeBidAsk(mid, market.sigmaR);
         } else {
             const T = Math.max((leg.expiryDay - day) / 252, 1/252);
-            prepareTree(T, r, vol, q, day, _costTree);
+            const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+            const sigma = computeSkewSigma(sigmaEff, S, leg.strike, T, market.rho, market.xi, market.kappa);
+            prepareTree(T, r, sigma, q, day, _costTree);
             const isPut = leg.type === 'put';
             mid = priceWithTree(S, leg.strike, isPut, _costTree);
-            ba = computeOptionBidAsk(mid, S, leg.strike, vol);
+            ba = computeOptionBidAsk(mid, S, leg.strike, sigma);
         }
         const fill = isLong ? ba.ask : ba.bid;
         net += (isLong ? fill : -fill) * absQty;
