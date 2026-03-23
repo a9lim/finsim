@@ -63,7 +63,7 @@ export function computeStockImpact(qty, sigma) {
     const temp   = TEMP_COEFF * sigma * (2 * cumRef + absQty) / ADV * sign;
     // Update cumulative volume
     if (qty > 0) _cumStockBuy += absQty; else _cumStockSell += absQty;
-    return { permanent: perm, temporary: temp, fillAdjustment: perm + temp };
+    return { permanent: perm, temporary: temp, fillAdjustment: temp };
 }
 
 /**
@@ -98,7 +98,7 @@ export function computeOptionImpact(qty, sigma, moneyness, dte, strike, expiryDa
     const temp   = OPT_TEMP_COEFF * sigma * (2 * cumRef + absQty) / oi * sign;
     // Update cumulative
     if (qty > 0) cum.buy += absQty; else cum.sell += absQty;
-    return { permanent: perm, temporary: temp, fillAdjustment: perm + temp };
+    return { permanent: perm, temporary: temp, fillAdjustment: temp };
 }
 
 /**
