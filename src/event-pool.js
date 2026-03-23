@@ -3735,12 +3735,48 @@ const COMPOUND_EVENTS = [
         category: 'compound',
         likelihood: 1.0,
         headline: 'Military spending bill fails as Congress balks at deficit during recession; defense stocks crater. Barron blames "weak politicians who don\'t support the troops"',
-        params: { mu: -0.06, theta: 0.03, lambda: 1.5 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.mideastEscalation >= 2 && world.geopolitical.recessionDeclared,
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
+        popup: true,
+        era: 'late',
+        context: (sim, world, portfolio) => {
+            const longStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty > 0).reduce((s, p) => s + p.qty, 0);
+            let ctx = 'The defense spending bill just died on the floor. Congress won\'t fund a war during a recession, and the market is punishing the entire defense sector. Barron is raging on social media, but the damage is done — fiscal policy is paralyzed.';
+            if (longStock > 10) ctx += ' Your long equity exposure is getting hammered on both fronts.';
+            return ctx;
         },
+        choices: [
+            {
+                label: 'Go defensive',
+                desc: 'Rotate into bonds and reduce risk. This is a two-front crisis.',
+                deltas: { mu: -0.06, theta: 0.03, lambda: 1.5 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -5 },
+                ],
+                playerFlag: 'went_defensive_war_recession',
+                resultToast: 'You rotated to safety. The war-recession combo is dragging equities lower.',
+            },
+            {
+                label: 'Buy the capitulation',
+                desc: 'Peak pessimism is the time to buy. Congress will find the money eventually.',
+                deltas: { mu: -0.04, theta: 0.025, lambda: 1.0 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -5 },
+                ],
+                playerFlag: 'bought_war_recession_dip',
+                resultToast: 'A contrarian bet that the political gridlock breaks. Risky in a recession.',
+            },
+            {
+                label: 'Short the political chaos',
+                desc: 'The dysfunction is just getting started. Position for more downside.',
+                deltas: { mu: -0.07, theta: 0.04, lambda: 2.0 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -7 },
+                ],
+                playerFlag: 'shorted_war_recession',
+                resultToast: 'You\'re betting the political paralysis deepens. If Barron escalates, you profit.',
+            },
+        ],
     },
     {
         id: 'compound_pnth_scandal_trade_war',
@@ -3753,6 +3789,11 @@ const COMPOUND_EVENTS = [
         effects: (world) => {
             world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
             world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
+        },
+        portfolioFlavor: (portfolio) => {
+            const longStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty > 0).reduce((s, p) => s + p.qty, 0);
+            if (longStock > 10) return 'Meridian\'s tech-heavy long book is feeling the geopolitical heat.';
+            return null;
         },
     },
     {
@@ -3769,9 +3810,45 @@ const COMPOUND_EVENTS = [
         category: 'compound',
         likelihood: 1.0,
         headline: '"Worst week since 2008": margin calls cascade as institutional investors flee; regulators hold emergency session. Circuit breakers triggered three days running',
-        params: { mu: -0.08, theta: 0.05, lambda: 3.0, muJ: -0.06, xi: 0.15, q: -0.005 },
         magnitude: 'major',
         when: (sim, world) => world.fed.credibilityScore < 3 && world.geopolitical.recessionDeclared && sim.theta > 0.15,
+        popup: true,
+        era: 'late',
+        context: (sim, world, portfolio) => {
+            const netExposure = portfolio.positions.reduce((s, p) => {
+                if (p.type === 'stock') return s + p.qty;
+                if (p.type === 'call') return s + p.qty * 50;
+                if (p.type === 'put') return s - p.qty * 50;
+                return s;
+            }, 0);
+            let ctx = 'This is it. The Fed has no credibility, the economy is in recession, and vol is already elevated. Margin calls are cascading through the prime brokerage complex, institutional investors are panic-selling, and circuit breakers have tripped three days running. Regulators are in emergency session.';
+            if (netExposure > 0) ctx += ' You\'re net long into a full-blown meltdown.';
+            else if (netExposure < -10) ctx += ' Your short book is printing, but counterparty risk is rising fast.';
+            return ctx;
+        },
+        choices: [
+            {
+                label: 'Liquidate everything',
+                desc: 'Cash is king. Get flat and survive.',
+                deltas: { mu: -0.08, theta: 0.05, lambda: 3.0, muJ: -0.06, xi: 0.15, q: -0.005 },
+                playerFlag: 'liquidated_meltdown',
+                resultToast: 'You went to cash. The market is in free fall, but you\'re on the sidelines.',
+            },
+            {
+                label: 'Buy the blood',
+                desc: '"Be greedy when others are fearful." The greatest trades are made in moments like this.',
+                deltas: { mu: -0.06, theta: 0.04, lambda: 2.0, muJ: -0.04, xi: 0.1, q: -0.003 },
+                playerFlag: 'bought_meltdown',
+                resultToast: 'A legendary entry — or the beginning of catching a falling knife.',
+            },
+            {
+                label: 'Hedge the tail',
+                desc: 'Buy far OTM puts and wait. If this gets worse, your hedge pays off enormously.',
+                deltas: { mu: -0.07, theta: 0.05, lambda: 3.5, muJ: -0.07, xi: 0.2, q: -0.005 },
+                playerFlag: 'hedged_meltdown',
+                resultToast: 'You bought tail protection at crisis premiums. If the world ends, you\'re covered.',
+            },
+        ],
     },
     {
         id: 'compound_impeachment_war',
@@ -4924,10 +5001,42 @@ const MARKET_EVENTS = [
             return base;
         },
         headline: 'Repo market seizure: overnight rates spike to 8% as dealers hoard reserves; Fed forced into emergency operations',
-        params: { mu: -0.05, theta: 0.035, lambda: 2.0, muJ: -0.04, borrowSpread: 0.8, q: -0.003 },
         magnitude: 'major',
-        followups: [
-            { id: 'fed_emergency_repo', mtth: 3, weight: 0.8 },
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) => {
+            const bondQty = portfolio.positions.filter(p => p.type === 'bond').reduce((s, p) => s + p.qty, 0);
+            const shortStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty < 0).reduce((s, p) => s + Math.abs(p.qty), 0);
+            let ctx = 'The overnight repo market just seized. Dealers are hoarding reserves, overnight rates spiked to 8%, and prime brokers are pulling credit lines. Every leveraged position on the street is suddenly more expensive to carry.';
+            if (bondQty > 5) ctx += ' Your long bond book is in the crossfire — credit spreads are blowing out.';
+            if (shortStock > 5) ctx += ' Your short stock borrows just got very expensive.';
+            return ctx;
+        },
+        choices: [
+            {
+                label: 'Raise cash',
+                desc: 'Sell liquid positions and hoard cash. Survive first, trade later.',
+                deltas: { mu: -0.05, theta: 0.035, lambda: 2.0, muJ: -0.04, borrowSpread: 0.8, q: -0.003 },
+                followups: [{ id: 'fed_emergency_repo', mtth: 3, weight: 0.8 }],
+                playerFlag: 'raised_cash_liquidity_crisis',
+                resultToast: 'You de-risked into the seizure. If the Fed steps in, you\'ll have dry powder.',
+            },
+            {
+                label: 'Provide liquidity',
+                desc: 'Buy the dislocation. Spreads this wide are a generational opportunity — if you can hold.',
+                deltas: { mu: -0.03, theta: 0.04, lambda: 2.5, muJ: -0.04, borrowSpread: 1.0, q: -0.003 },
+                followups: [{ id: 'fed_emergency_repo', mtth: 3, weight: 0.9 }],
+                playerFlag: 'provided_liquidity_crisis',
+                resultToast: 'You stepped in as a liquidity provider. High risk, but the spreads are extraordinary.',
+            },
+            {
+                label: 'Hedge and wait',
+                desc: 'Buy protection and sit tight. Let the plumbing sort itself out.',
+                deltas: { mu: -0.04, theta: 0.03, lambda: 1.5, muJ: -0.03, borrowSpread: 0.6, q: -0.002 },
+                followups: [{ id: 'fed_emergency_repo', mtth: 4, weight: 0.7 }],
+                playerFlag: 'hedged_liquidity_crisis',
+                resultToast: 'You bought protection and hunkered down. The market waits for the Fed.',
+            },
         ],
     },
     {
@@ -4959,8 +5068,38 @@ const MARKET_EVENTS = [
             return base;
         },
         headline: 'Leveraged vol ETP liquidation cascade: inverse-VIX fund NAV collapses 90%, forced rebalancing hammers futures',
-        params: { mu: -0.06, theta: 0.05, lambda: 3.5, muJ: -0.05, xi: 0.2, rho: -0.1 },
         magnitude: 'major',
+        popup: true,
+        era: 'mid',
+        context: (sim, world, portfolio) => {
+            const shortPuts = portfolio.positions.filter(p => p.type === 'put' && p.qty < 0).reduce((s, p) => s + Math.abs(p.qty), 0);
+            let ctx = 'An inverse-VIX ETN just blew up. NAV collapsed 90% in after-hours, and the issuer\'s forced rebalancing is about to slam vol futures at the open. Every short-vol position on the street is being repriced. The cascade is already underway.';
+            if (shortPuts > 0) ctx += ' You\'re short puts — this vol spike hits you directly.';
+            return ctx;
+        },
+        choices: [
+            {
+                label: 'Buy vol aggressively',
+                desc: 'Get long VIX exposure. The cascade will feed on itself before it burns out.',
+                deltas: { mu: -0.06, theta: 0.05, lambda: 3.5, muJ: -0.05, xi: 0.2, rho: -0.1 },
+                playerFlag: 'bought_vol_etp_cascade',
+                resultToast: 'You went long vol into the cascade. If it keeps feeding, you profit.',
+            },
+            {
+                label: 'Flatten and watch',
+                desc: 'Close vol-sensitive positions and wait for the dust to settle.',
+                deltas: { mu: -0.04, theta: 0.04, lambda: 2.5, muJ: -0.04, xi: 0.15, rho: -0.08 },
+                playerFlag: 'flattened_etp_cascade',
+                resultToast: 'You went flat. The cascade rages but your book is clean.',
+            },
+            {
+                label: 'Sell into the spike',
+                desc: 'Vol is overshooting. Sell premium at these levels — if you can stomach the risk.',
+                deltas: { mu: -0.05, theta: 0.06, lambda: 4.0, muJ: -0.06, xi: 0.25, rho: -0.12 },
+                playerFlag: 'sold_vol_etp_cascade',
+                resultToast: 'A bold short-vol bet at the peak of panic. The premiums are enormous — so is the risk.',
+            },
+        ],
     },
     {
         id: 'margin_call_cascade',
@@ -4974,6 +5113,12 @@ const MARKET_EVENTS = [
         headline: 'Prime brokers issue wave of margin calls across hedge fund complex; forced liquidation drives broad-based selling',
         params: { mu: -0.04, theta: 0.03, lambda: 2.5, muJ: -0.04, xi: 0.1, borrowSpread: 0.5, q: -0.002 },
         magnitude: 'major',
+        portfolioFlavor: (portfolio) => {
+            const shortQty = portfolio.positions.filter(p => p.qty < 0).reduce((s, p) => s + Math.abs(p.qty), 0);
+            if (shortQty > 5) return 'Meridian\'s prime broker is reviewing short borrows across the desk.';
+            if (portfolio.cash < 0) return 'The desk is running negative cash — margin calls hit close to home.';
+            return null;
+        },
     },
     {
         id: 'low_vol_grind',
