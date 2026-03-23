@@ -12,6 +12,10 @@ import {
 } from './config.js';
 import { computeNetDelta, computeGrossNotional, portfolio, portfolioValue } from './portfolio.js';
 import { market } from './market.js';
+import { unitPrice } from './position-value.js';
+import {
+    cooldownMultiplier, thresholdMultiplier, complianceTone,
+} from './compliance.js';
 
 const _cooldowns = {}; // id → last fired day
 
@@ -27,43 +31,90 @@ function _equity() {
     return portfolioValue(market.S, Math.sqrt(market.v), market.r, market.day, market.q);
 }
 
-function _stockQty() {
-    return portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+function _posPrice(p) {
+    return unitPrice(p.type, market.S, Math.sqrt(market.v), market.r, market.day, p.strike, p.expiryDay, market.q);
 }
 
-function _bondQty() {
-    return portfolio.positions.filter(p => p.type === 'bond').reduce((s, p) => s + p.qty, 0);
+function _absStockQty() {
+    return portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + Math.abs(p.qty), 0);
 }
 
-function _optionCount() {
-    return portfolio.positions.filter(p => p.type === 'call' || p.type === 'put').reduce((s, p) => s + Math.abs(p.qty), 0);
+function _shortDirectionalNotional() {
+    let total = 0;
+    for (const p of portfolio.positions) {
+        const price = _posPrice(p);
+        if (p.type === 'stock' && p.qty < 0) total += Math.abs(p.qty) * price;
+        else if (p.type === 'call' && p.qty < 0) total += Math.abs(p.qty) * price;
+        else if (p.type === 'put' && p.qty > 0) total += p.qty * price;
+    }
+    return total;
 }
 
-function _netShortQty() {
-    return portfolio.positions.filter(p => p.qty < 0).reduce((s, p) => s + p.qty, 0);
+function _longDirectionalNotional() {
+    let total = 0;
+    for (const p of portfolio.positions) {
+        const price = _posPrice(p);
+        if (p.type === 'stock' && p.qty > 0) total += p.qty * price;
+        else if (p.type === 'call' && p.qty > 0) total += p.qty * price;
+        else if (p.type === 'put' && p.qty < 0) total += Math.abs(p.qty) * price;
+    }
+    return total;
+}
+
+function _bondNotional() {
+    let total = 0;
+    for (const p of portfolio.positions) {
+        if (p.type === 'bond') total += Math.abs(p.qty) * _posPrice(p);
+    }
+    return total;
+}
+
+function _strikeNotional(strike) {
+    let total = 0;
+    for (const p of portfolio.positions) {
+        if ((p.type === 'call' || p.type === 'put') && p.strike === strike) {
+            total += Math.abs(p.qty) * _posPrice(p);
+        }
+    }
+    return total;
+}
+
+function _totalOptionsNotional() {
+    let total = 0;
+    for (const p of portfolio.positions) {
+        if (p.type === 'call' || p.type === 'put') {
+            total += Math.abs(p.qty) * _posPrice(p);
+        }
+    }
+    return total;
+}
+
+function _maxStrikeConcentration() {
+    const byStrike = {};
+    for (const p of portfolio.positions) {
+        if ((p.type === 'call' || p.type === 'put') && p.strike != null) {
+            byStrike[p.strike] = (byStrike[p.strike] || 0) + Math.abs(p.qty) * _posPrice(p);
+        }
+    }
+    let maxStrike = null, maxNotional = 0;
+    for (const k in byStrike) {
+        if (byStrike[k] > maxNotional) { maxNotional = byStrike[k]; maxStrike = +k; }
+    }
+    return { strike: maxStrike, notional: maxNotional };
+}
+
+function _netUncoveredUpside() {
+    let net = 0;
+    for (const p of portfolio.positions) {
+        if (p.type === 'stock' || p.type === 'call') net += p.qty;
+    }
+    return net;
 }
 
 function _anyInvestigationActive(world) {
     const inv = world.investigations;
     return inv.tanBowmanStory > 0 || inv.tanNsaStory > 0 ||
            inv.okaforProbeStage > 0 || inv.impeachmentStage > 0;
-}
-
-function _pnthQty() {
-    // Stock positions represent PNTH shares in this universe
-    return portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + Math.abs(p.qty), 0);
-}
-
-function _strikeConcentration() {
-    const counts = {};
-    for (const p of portfolio.positions) {
-        if ((p.type === 'call' || p.type === 'put') && p.strike != null) {
-            counts[p.strike] = (counts[p.strike] || 0) + Math.abs(p.qty);
-        }
-    }
-    let maxCount = 0;
-    for (const k in counts) if (counts[k] > maxCount) maxCount = counts[k];
-    return maxCount;
 }
 
 function _liveDay(day) {
@@ -83,8 +134,9 @@ export const PORTFOLIO_POPUPS = [
     {
         id: 'desk_compliance_short',
         trigger: (sim, world) => {
-            const netDelta = computeNetDelta();
-            return netDelta < -30 && _anyInvestigationActive(world);
+            const eq = _equity();
+            if (eq <= 0) return false;
+            return _shortDirectionalNotional() / eq > 0.30 * thresholdMultiplier() && _anyInvestigationActive(world);
         },
         cooldown: 200,
         popup: true,
@@ -121,8 +173,10 @@ export const PORTFOLIO_POPUPS = [
     {
         id: 'desk_suspicious_long',
         trigger: (sim, world) => {
-            const netDelta = computeNetDelta();
-            return netDelta > 40 && (world.geopolitical.tradeWarStage >= 2 || world.geopolitical.recessionDeclared);
+            const eq = _equity();
+            if (eq <= 0) return false;
+            return _longDirectionalNotional() / eq > 1.5 * thresholdMultiplier() &&
+                (world.geopolitical.tradeWarStage >= 2 || world.geopolitical.recessionDeclared);
         },
         cooldown: 250,
         popup: true,
@@ -151,13 +205,20 @@ export const PORTFOLIO_POPUPS = [
 
     {
         id: 'desk_strike_concentration',
-        trigger: () => _strikeConcentration() >= 15,
+        trigger: () => {
+            const totalOpt = _totalOptionsNotional();
+            if (totalOpt <= 0) return false;
+            const eq = _equity();
+            if (eq <= 0) return false;
+            const { notional } = _maxStrikeConcentration();
+            return notional / totalOpt > 0.50 && notional / eq > 0.10 * thresholdMultiplier();
+        },
         cooldown: 180,
         popup: true,
         headline: 'Market maker complains about single-strike concentration',
         context: () => {
-            const conc = _strikeConcentration();
-            return `You have ${conc} contracts concentrated at a single strike. The designated market maker for that series called the head of trading to complain about your flow. They're widening spreads on your name specifically and threatening to pull liquidity if you keep stacking.`;
+            const { strike, notional } = _maxStrikeConcentration();
+            return `You have $${(notional / 1000).toFixed(1)}k notional concentrated at the ${strike} strike. The designated market maker for that series called the head of trading to complain about your flow. They're widening spreads on your name specifically and threatening to pull liquidity if you keep stacking.`;
         },
         choices: [
             {
@@ -222,14 +283,14 @@ export const PORTFOLIO_POPUPS = [
     {
         id: 'desk_name_on_tape',
         trigger: () => {
-            const absStock = Math.abs(_stockQty());
+            const absStock = _absStockQty();
             return absStock > ADV * IMPACT_THRESHOLD_100;
         },
         cooldown: 200,
         popup: true,
         headline: 'Your name is on the tape',
         context: () => {
-            const absStock = Math.abs(_stockQty());
+            const absStock = _absStockQty();
             return `You're carrying ${absStock} shares — more than ${((absStock / ADV) * 100).toFixed(0)}% of average daily volume. The prime broker's execution desk called to let you know that "the street knows." Counterparties are positioning around your flow. Your entries and exits are being front-run. Every tick in your direction is cheaper; every tick against you is more expensive.`;
         },
         choices: [
@@ -251,19 +312,70 @@ export const PORTFOLIO_POPUPS = [
     },
 
     {
+        id: 'desk_unlimited_risk',
+        trigger: (sim) => {
+            const nuu = _netUncoveredUpside();
+            if (nuu >= 0) return false;
+            const eq = _equity();
+            if (eq <= 0) return false;
+            return Math.abs(nuu) * market.S / eq > 0.10 * thresholdMultiplier();
+        },
+        cooldown: 120,
+        popup: true,
+        headline: 'Risk desk flags unlimited upside exposure',
+        context: (sim) => {
+            const nuu = _netUncoveredUpside();
+            const tone = complianceTone();
+            const tonePrefix = tone === 'warm'
+                ? 'Routine check —'
+                : tone === 'pointed'
+                ? 'We\'ve talked about this before —'
+                : tone === 'final_warning'
+                ? 'This is your last warning —'
+                : '';
+            return `${tonePrefix} You have ${Math.abs(nuu)} units of net uncovered upside exposure — short stock or naked calls without offsetting longs. This is an unlimited-loss position. If the stock gaps up overnight, your losses have no ceiling. The risk desk requires either full closure or a hedge to cap the exposure.`;
+        },
+        choices: [
+            {
+                label: 'Close all short exposure',
+                desc: 'Close every position contributing to the unlimited risk.',
+                trades: [{ action: 'close_short' }],
+                complianceTier: 'full',
+                playerFlag: 'closed_unlimited_risk',
+                resultToast: 'Short exposure closed. Risk desk signs off.',
+            },
+            {
+                label: 'Hedge with stock',
+                desc: 'Buy enough shares to fully offset the uncovered upside.',
+                trades: [{ action: 'hedge_unlimited_risk' }],
+                complianceTier: 'partial',
+                playerFlag: 'hedged_unlimited_risk',
+                resultToast: 'Hedge placed. Unlimited risk neutralized.',
+            },
+            {
+                label: 'Push back',
+                desc: 'The position is sized appropriately for the thesis. You\'ll manage the risk.',
+                complianceTier: 'defiant',
+                playerFlag: 'defied_unlimited_risk',
+                resultToast: 'Risk desk notes your refusal. The file grows thicker.',
+            },
+        ],
+    },
+
+    {
         id: 'desk_bond_fomc',
         trigger: (sim, world) => {
-            const bondAbs = Math.abs(_bondQty());
-            return bondAbs >= 20 && !world.fed.hartleyFired;
+            const eq = _equity();
+            if (eq <= 0) return false;
+            return _bondNotional() / eq > 0.20 * thresholdMultiplier() && !world.fed.hartleyFired;
         },
         cooldown: 180,
         era: 'early',
         popup: true,
         headline: 'Compliance flags large bond position ahead of FOMC',
         context: (sim, world) => {
-            const bondQty = _bondQty();
-            const direction = bondQty > 0 ? 'long' : 'short';
-            return `You're ${direction} ${Math.abs(bondQty)} bonds with an FOMC meeting imminent. The surveillance team has flagged the timing. They want documentation of your decision-making process — when you initiated the position, what public information you used, and whether you've had any contact with Fed officials or their staff. Standard protocol, but the paperwork is a headache.`;
+            const bondNot = _bondNotional();
+            return `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure with an FOMC meeting imminent. The surveillance team has flagged the timing. They want documentation of your decision-making process — when you initiated the position, what public information you used, and whether you've had any contact with Fed officials or their staff. Standard protocol, but the paperwork is a headache.`;
         },
         choices: [
             {
@@ -286,16 +398,20 @@ export const PORTFOLIO_POPUPS = [
     {
         id: 'desk_pnth_earnings',
         trigger: (sim) => {
-            const pnth = _pnthQty();
+            const eq = _equity();
+            if (eq <= 0) return false;
+            const pnthNotional = portfolio.positions.filter(p => p.type === 'stock')
+                .reduce((s, p) => s + Math.abs(p.qty) * _posPrice(p), 0);
             const daysToEarnings = QUARTERLY_CYCLE - (sim.day % QUARTERLY_CYCLE);
-            return pnth >= 15 && daysToEarnings <= 10;
+            return pnthNotional / eq > 0.15 * thresholdMultiplier() && daysToEarnings <= 10;
         },
         cooldown: 150,
         popup: true,
         headline: 'Analyst coverage intensifies before PNTH earnings',
         context: (sim) => {
-            const pnth = _pnthQty();
-            return `Your ${pnth}-share PNTH position has caught the attention of the sellside. Three analysts called this morning wanting to "compare notes." One casually mentioned an earnings whisper number that's well above consensus. Another hinted at a contract announcement. The information is free — but is it clean?`;
+            const pnthNotional = portfolio.positions.filter(p => p.type === 'stock')
+                .reduce((s, p) => s + Math.abs(p.qty) * _posPrice(p), 0);
+            return `Your $${(pnthNotional / 1000).toFixed(1)}k PNTH position has caught the attention of the sellside. Three analysts called this morning wanting to "compare notes." One casually mentioned an earnings whisper number that's well above consensus. Another hinted at a contract announcement. The information is free — but is it clean?`;
         },
         choices: [
             {
@@ -863,9 +979,11 @@ export const PORTFOLIO_POPUPS = [
     {
         id: 'desk_crisis_profiteer',
         trigger: (sim, world) => {
+            const eq = _equity();
+            if (eq <= 0) return false;
             return (world.geopolitical.mideastEscalation >= 2 || world.geopolitical.oilCrisis) &&
-                   _equity() > INITIAL_CAPITAL * 1.1 &&
-                   computeNetDelta() < -5;
+                eq > INITIAL_CAPITAL * 1.1 &&
+                _shortDirectionalNotional() / eq > 0.15 * thresholdMultiplier();
         },
         cooldown: 300,
         popup: true,
@@ -895,17 +1013,17 @@ export const PORTFOLIO_POPUPS = [
     {
         id: 'desk_fomc_bond_compliance',
         trigger: (sim, world) => {
-            const bondAbs = Math.abs(_bondQty());
-            return bondAbs >= 10 && world.fed.hikeCycle;
+            const eq = _equity();
+            if (eq <= 0) return false;
+            return _bondNotional() / eq > 0.10 * thresholdMultiplier() && world.fed.hikeCycle;
         },
         cooldown: 200,
         era: 'mid',
         popup: true,
         headline: 'Compliance requires documentation on bond position during hiking cycle',
         context: (sim) => {
-            const bondQty = _bondQty();
-            const dir = bondQty > 0 ? 'long' : 'short';
-            return `You're ${dir} ${Math.abs(bondQty)} bonds during an active Fed hiking cycle. Every FOMC meeting is a binary event for your book. Compliance is requiring pre-trade documentation for all duration trades until the cycle ends. Every trade needs a written rationale filed before execution. It's bureaucratic, but it's also protection if anyone ever questions your timing.`;
+            const bondNot = _bondNotional();
+            return `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure during an active Fed hiking cycle. Every FOMC meeting is a binary event for your book. Compliance is requiring pre-trade documentation for all duration trades until the cycle ends. Every trade needs a written rationale filed before execution. It's bureaucratic, but it's also protection if anyone ever questions your timing.`;
         },
         choices: [
             {
@@ -972,7 +1090,7 @@ export const PORTFOLIO_POPUPS = [
         id: 'desk_analyst_info_edge',
         trigger: (sim) => {
             const daysToEarnings = QUARTERLY_CYCLE - (sim.day % QUARTERLY_CYCLE);
-            const optCount = _optionCount();
+            const optCount = portfolio.positions.filter(p => p.type === 'call' || p.type === 'put').reduce((s, p) => s + Math.abs(p.qty), 0);
             return daysToEarnings <= 15 && daysToEarnings >= 5 && optCount >= 5;
         },
         cooldown: 200,
@@ -1014,7 +1132,7 @@ export const PORTFOLIO_POPUPS = [
 export function evaluatePortfolioPopups(sim, world, portfolio, day) {
     const triggered = [];
     for (const pp of PORTFOLIO_POPUPS) {
-        if (_cooldowns[pp.id] && day - _cooldowns[pp.id] < pp.cooldown) continue;
+        if (_cooldowns[pp.id] && day - _cooldowns[pp.id] < pp.cooldown * cooldownMultiplier()) continue;
         if (pp.era === 'early' && _liveDay(day) > 500) continue;
         if (pp.era === 'mid'   && (_liveDay(day) < 500 || _liveDay(day) > 800)) continue;
         if (pp.era === 'late'  && _liveDay(day) < 800) continue;
