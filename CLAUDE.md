@@ -16,7 +16,7 @@ Do not manually test via browser automation. The user will test changes themselv
 
 ## Overview
 
-Shoals -- interactive options trading simulator. GBM stock with Merton jumps + Heston stochastic vol; Vasicek interest rates. American options priced via CRR binomial tree (128 steps) with term-structure vol, moneyness skew, per-step Vasicek rate discounting. Strategy builder, full options chain, portfolio/margin system, narrative event engine with political lore and epilogue.
+Shoals -- interactive options trading simulator set at **Meridian Capital**, a major investment bank. The player is a senior derivatives trader during the Barron administration. GBM stock with Merton jumps + Heston stochastic vol; Vasicek interest rates. American options priced via CRR binomial tree (128 steps) with term-structure vol, moneyness skew, per-step Vasicek rate discounting. Strategy builder, full options chain, portfolio/margin system, Almgren-Chriss price impact, narrative event engine with interactive popup decisions, political lore, reputation system, and 4-page epilogue.
 
 Zero dependencies -- vanilla HTML5/CSS3/JS with ES6 modules. No build step.
 
@@ -31,21 +31,24 @@ Serve from `a9lim.github.io/` -- shared files load via absolute paths (`/shared-
 ## File Map
 
 ```
-main.js               1472 lines  Orchestrator: DOM cache $, rAF loop, sub-step streaming,
+main.js               1622 lines  Orchestrator: DOM cache $, rAF loop, sub-step streaming,
                                    live candle animation, camera, shortcuts, event wiring,
                                    strategy builder (with rollback), ExpiryManager, world state,
-                                   executeWithRollback, selectable expiry resolution
-index.html              673 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs),
-                                   chain/trade/margin-call/reference/epilogue overlays, intro,
-                                   strategy save/load UI, trade-tab saved strategies section
-styles.css             1121 lines  Chain, positions, strategy, trade dialog, margin alert,
-                                   P&L/Greek colors, responsive breakpoints, strategy groups,
-                                   sim-input, credit/debit coloring
+                                   executeWithRollback, selectable expiry resolution,
+                                   price impact overlays, popup queue, playerChoices/
+                                   impactHistory/quarterlyReviews tracking, rogue trading
+index.html              729 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs),
+                                   chain/trade/margin-call/popup/reference/epilogue overlays,
+                                   intro (Meridian Capital framing), strategy save/load UI
+styles.css             1164 lines  Chain, positions, strategy, trade dialog, margin alert,
+                                   popup decision events, P&L/Greek colors, responsive
+                                   breakpoints, strategy groups, sim-input, credit/debit
 colors.js                59 lines  Financial color aliases (up/down/call/put/stock/bond/
                                    delta/gamma/theta/vega/rho), CSS var injection
 src/
-  config.js              74 lines  All constants (timing, instruments, margin, spreads, events,
-                                   rendering), PRESETS (5 static + 2 dynamic), DEFAULT_PRESET=5
+  config.js              97 lines  All constants (timing, instruments, margin, spreads, events,
+                                   rendering, price impact, rogue trading threshold),
+                                   PRESETS (5 static + 2 dynamic), DEFAULT_PRESET=5
   simulation.js         251 lines  GBM + Merton + Heston + Vasicek; beginDay()/substep()/
                                    finalizeDay() pipeline; prepopulate() reverse-backfill
   pricing.js            834 lines  CRR binomial tree: term-structure vol, moneyness skew,
@@ -55,24 +58,38 @@ src/
                                    uses prepareTree+priceWithTree (no priceAmerican).
   chain.js              230 lines  ExpiryManager, generateStrikes(), buildChainSkeleton(),
                                    priceChainExpiry() with reusable tree pool
-  portfolio.js         1009 lines  Signed-qty positions, market/limit/stop orders, netting
+  portfolio.js         1062 lines  Signed-qty positions, market/limit/stop orders, netting
                                    (includes strategyName), cash/margin, borrow interest,
-                                   dividends, option expiry, bid/ask spreads
+                                   dividends, option expiry, bid/ask spreads, slippage
+                                   integration, computeNetDelta(), computeGrossNotional()
   chart.js              728 lines  ChartRenderer: log Y-axis OHLC candles, live candle cubic
                                    interpolation, position markers, strike lines; shared-camera.js;
                                    uses resizeCanvasDPR() from shared-utils.js
   strategy.js           955 lines  StrategyRenderer: payoff P&L, Greek overlays, breakevens
                                    (analytical at expiry), input-keyed caching, tree-based
                                    per-leg entry values; uses resizeCanvasDPR()
-  ui.js                1056 lines  DOM binding, display updaters, overlay management;
+  ui.js                1119 lines  DOM binding, display updaters, overlay management;
                                    delegates to chain-renderer.js and portfolio-renderer.js.
-                                   Strategy dropdowns, credit/debit, built-in disable logic
-  events.js             457 lines  EventEngine: Poisson scheduler, MTTH followup chains, Fed
-                                   schedule, boredom boost, midterms. Re-exports PARAM_RANGES.
-  event-pool.js        3147 lines  ~370 curated offline events across 12 categories (Fed,
+                                   Strategy dropdowns, credit/debit, built-in disable logic,
+                                   showPopupEvent(), showRogueTrading()
+  events.js             529 lines  EventEngine: Poisson scheduler, MTTH followup chains, Fed
+                                   schedule, boredom boost, midterms. maybeFire() returns
+                                   { fired, popups }. Event coupling via _computeCoupling().
+                                   Era gating (early/mid/late). scheduleFollowup() public API.
+  event-pool.js        5226 lines  ~265 curated offline events across 12 categories (Fed,
                                    macro, sector, PNTH, congressional, investigation, political,
-                                   market, neutral, compound, midterm). Exports OFFLINE_EVENTS,
+                                   market, neutral, compound, midterm). ~57 events converted
+                                   to interactive popup format with player choices. ~20 events
+                                   have portfolioFlavor functions. Exports OFFLINE_EVENTS,
                                    PARAM_RANGES, getEventById(). World-state structured effects.
+  price-impact.js       282 lines  Almgren-Chriss price impact: permanent (sqrt) + temporary
+                                   (linear) components for stock and options. Modeled OI with
+                                   moneyness decay. Delta hedge feedback. Cumulative volume
+                                   tracking (no order-splitting exploit). Recovery drift.
+                                   Layer 3 parameter shifts. Impact toast generation.
+  popup-events.js      1029 lines  25 portfolio-triggered popup events. Trigger based on
+                                   portfolio state x world state (position size, P&L,
+                                   leverage, timing). Cooldown tracking. evaluatePortfolioPopups()
   world-state.js        170 lines  Mutable narrative state: congressional seats (Senate/House
                                    by party), PNTH board factions, geopolitical escalation,
                                    Fed credibility, investigations, election cycle.
@@ -80,12 +97,15 @@ src/
                                    WORLD_STATE_RANGES, applyStructuredEffects()
   llm.js                271 lines  LLMEventSource: Anthropic API via structured tool use,
                                    universe lore in system prompt, offline fallback
-  epilogue.js           449 lines  generateEpilogue(): 4-page narrative ending from world
-                                   state + portfolio + event log. Congressional diagrams,
-                                   financial scorecards. Triggered at TERM_END_DAY.
+  epilogue.js           561 lines  generateEpilogue(): 4-page narrative ending from world
+                                   state + portfolio + event log + playerChoices +
+                                   impactHistory + quarterlyReviews. Reputation synthesis
+                                   (Insider/Principled/Speculator/Survivor/Kingmaker/Ghost).
+                                   Congressional diagrams, financial scorecards.
   market.js              27 lines  Shared mutable market state + syncMarket(sim). Leaf module.
   history-buffer.js     103 lines  Ring buffer (capacity 252) for OHLC bars
-  format-helpers.js      59 lines  fmtDollar(), fmtNum(), pnlClass(), fmtDte(), fmtRelDay()
+  format-helpers.js      63 lines  fmtDollar() (appends "k"), fmtQty(), fmtNum(), pnlClass(),
+                                   fmtDte(), fmtRelDay()
   strategy-store.js    257 lines  Built-in strategy defs (8 presets, selectable expiry),
                                    localStorage CRUD (hash IDs, name collision enforcement),
                                    resolveLegs (with override expiry), formatLeg,
@@ -107,11 +127,13 @@ main.js
   |- simulation.js         (imports config, history-buffer)
   |- market.js             (leaf module -- single-writer main.js, multiple readers)
   |- chain.js              (imports pricing, portfolio, market, config)
-  |- portfolio.js          (imports pricing, market, config, position-value)
+  |- portfolio.js          (imports pricing, market, config, position-value, price-impact)
   |- events.js             (imports config, world-state, event-pool)
   |- event-pool.js         (OFFLINE_EVENTS, PARAM_RANGES, getEventById)
   |- llm.js                (imports events)
   |- world-state.js        (createWorldState, congressHelpers, applyStructuredEffects)
+  |- price-impact.js       (imports config)
+  |- popup-events.js       (imports config, portfolio)
   |- epilogue.js           (imports position-value, config)
   |- chart.js              (imports format-helpers, config; reads _PALETTE globals)
   |- strategy.js           (imports pricing, market, config)
@@ -129,11 +151,11 @@ main.js
 
 ### Sub-Step Streaming (playing)
 
-1. `frame()` calls `sim.beginDay()` -- pushes partial bar into `sim.history` by reference
+1. `frame()` resets daily volume, applies recovery drift + param overlays, calls `sim.beginDay()`
 2. 16 sub-steps paced across tick interval. Each `sim.substep()` mutates partial bar in-place
 3. `chart.setLiveCandle(bar)` does smoothstep cubic interpolation between sub-step values
 4. `_onSubstep()`: checks pending orders, reprices visible chain expiry, updates portfolio/UI
-5. After 16 sub-steps, `sim.finalizeDay()`. `_onDayComplete()`: borrow interest, expiry, dividends (quarterly), event engine, margin check, skeleton rebuild
+5. After 16 sub-steps, `sim.finalizeDay()`, overlays removed. `_onDayComplete()`: borrow interest, expiry, dividends (quarterly), quarterly review, rogue trading check, event engine (with coupling), Layer 3 param shifts, impact toasts, portfolio-triggered popups, popup queue processing, margin check, skeleton rebuild
 
 ### Bootstrap
 
@@ -170,6 +192,40 @@ Per-step Vasicek rate discounting. Discrete proportional dividends at `QUARTERLY
 
 **Spreads**: volatility-aware. `computeBidAsk` (stock/bond, uses `STOCKBOND_SPREAD_PCT` 0.1%) and `computeOptionBidAsk` (uses `OPTION_SPREAD_PCT` 1%, adds moneyness). Bond spreads use `sigmaR` (rate vol); stock/option spreads use Heston vol. Long fills at ask, short at bid.
 
+## Price Impact (The Desk)
+
+Almgren-Chriss framework with permanent (information) + temporary (liquidity) components.
+
+**Stock slippage**: `impact = coeff * sigma * sqrt(qty / ADV)` (permanent, shifts `sim.S`) + `coeff * sigma * (qty / ADV)` (temporary, fill-only). Cumulative volume tracked per day — incremental formula `sqrt(cum + qty) - sqrt(cum)` prevents order-splitting exploits. Fill prices clamped to $0.01 minimum.
+
+**Options slippage**: same framework but scaled by `qty / modeledOI` instead of `qty / ADV`. Modeled OI drops exponentially with moneyness (`OI_MONEYNESS_DECAY = 4.0`) — deep OTM options have severe slippage. Market maker delta hedge creates secondary stock impact.
+
+**Bonds**: spread only, no price impact (Vasicek-priced, deep market).
+
+**Recovery**: permanent stock impact recovers via mean-reverting drift overlay on `sim.mu` (half-life 3 days). Applied before `beginDay()`, removed after `finalizeDay()`.
+
+**Layer 3**: large gross notional exposure (25/50/75/100% of ADV thresholds) shifts vol/drift parameters. Logarithmic scaling past 50%. Decays with half-life 5 days. Generates atmospheric impact toasts.
+
+**Event coupling**: player's net delta amplifies/dampens event deltas by ±20% via `_computeCoupling()` inside `_fireEvent()`.
+
+## Popup Decision Events
+
+~57 narrative events + ~25 portfolio-triggered events present interactive choices that pause the simulation.
+
+**Narrative popups**: existing events in `event-pool.js` with `popup: true`, `era` tag, `context()` function, and `choices[]` array. Each choice has `deltas`, `effects` (applyStructuredEffects format), `followups`, `playerFlag`, and `resultToast`.
+
+**Portfolio-triggered popups** (`popup-events.js`): fire when portfolio state (position size, P&L, leverage) intersects world state (investigations, elections, crises). Each has `trigger(sim, world, portfolio)`, `cooldown` (60-300 days), and era gating.
+
+**Popup queue**: `_popupQueue` in main.js, processed at end-of-day and when blocking overlays close. Popups pause the sim, present choices, apply effects, record `playerFlag` in `playerChoices` map.
+
+**Era gating**: `early` (day ≤500), `mid` (500-800), `late` (≥800). Escalating stakes over the presidential term.
+
+**portfolioFlavor**: ~20 non-popup events have `portfolioFlavor(portfolio)` functions that append position-aware text to toast headlines.
+
+## Display Scaling
+
+All internal values (cash, quantities, prices, margin) remain at the original scale ($10,000 starting capital). The UI appends "k" to all displayed dollar amounts and quantities via `fmtDollar()` and `fmtQty()` in `format-helpers.js`. The player sees "$10,000k" = $10M. Pricing engine is completely untouched.
+
 ## Options Chain
 
 ATM = `round(S/5)*5`, 10 strikes each side (21 total). `ExpiryManager` maintains 8 rolling expiries on 63-day cycle.
@@ -190,13 +246,19 @@ ATM = `round(S/5)*5`, 10 strikes each side (21 total). `ExpiryManager` maintains
 
 **Expiry**: bonds at face ($100). Options closed at market value (intrinsic at DTE=0). If any expiring position belongs to a strategy, all remaining positions in that strategy are unwound at market value. Strategy display shows the minimum expiry across all legs.
 
+**Rogue trading**: if portfolio equity drops below 50% of starting capital (`ROGUE_TRADING_THRESHOLD`), game ends with arrest screen. Checked at end-of-day before margin check.
+
+**Quarterly reviews**: every `QUARTERLY_CYCLE` days during live trading. Compares P&L vs buy-and-hold benchmark. Flavor text varies by performance rating (strong/solid/underperform/poor). Pure atmosphere, no mechanical effect.
+
 **Strategy**: legs in `main.js` (`strategyLegs[]`). Execution via `executeWithRollback()` rolls back all legs on partial failure. Strategies persisted in localStorage via `strategy-store.js` with hash-based IDs, 8 built-in presets, selectable expiry toggle, and relative strike/DTE offsets. Trade tab has saved strategy dropdown with live credit/debit and qty multiplier.
 
 ## UI Architecture
 
 Floating glass panels over full-viewport canvas. Fixed topbar, right slide-in sidebar (4 tabs: Trade/Portfolio/Strategy/Settings), bottom pill bar.
 
-**Overlays**: chain (pauses sim), trade dialog (confirm button cloned each open), margin call, reference (KaTeX, 29 entries), epilogue (4-page narrative).
+**Overlays**: chain (pauses sim), trade dialog (confirm button cloned each open), margin call, popup decision (pauses sim, glass panel, choice buttons), reference (KaTeX, 29 entries), epilogue (4-page narrative).
+
+**Popup overlay**: uses `sim-overlay-panel glass` wrapper with `sim-overlay-body` inside. Headline, context paragraph, and choice buttons rendered via `showPopupEvent()`. Queue drains when blocking overlays close (deferred via `setTimeout`).
 
 **Custom events**: `shoals:closePosition`, `shoals:exerciseOption`, `shoals:cancelOrder`, `shoals:unwindStrategy` -- ui.js/portfolio-renderer.js -> main.js.
 
@@ -205,7 +267,7 @@ Floating glass panels over full-viewport canvas. Fixed topbar, right slide-in si
 ## Dynamic Regime
 
 Two dynamic presets use `EventEngine` (events.js) + event pool (event-pool.js):
-- **Offline** (preset 5, default): draws from 88 curated events via weighted random
+- **Offline** (preset 5, default): draws from curated events via weighted random
 - **LLM** (preset 6): Claude API generates batches, offline fallback on failure
 
 ### Event Scheduling
@@ -213,7 +275,7 @@ Two dynamic presets use `EventEngine` (events.js) + event pool (event-pool.js):
 - **Fed**: every ~32 days (with jitter). Excluded from Poisson pool.
 - **Non-Fed**: Poisson rate 1/30 with 8-15 day cooldown (effective ~1/41.5). Boredom boost after 3 minor events.
 - **PNTH earnings**: quarterly (~63 days with jitter)
-- **Followups**: MTTH chains, Poisson-sampled delay, recursive (max depth 5)
+- **Followups**: MTTH chains, Poisson-sampled delay, recursive (max depth 5). Public `scheduleFollowup()` for popup choice followups.
 - **Midterm elections**: live day 504, campaign season from live day 440. Term ends live day 1008. (Config constants add `HISTORY_CAPACITY` offset: e.g. `TERM_END_DAY = 252 + 1008 = 1260`.)
 
 ### World State
@@ -229,11 +291,11 @@ Events apply `structuredEffects` via `applyStructuredEffects()`, clamped to `WOR
 
 ### Lore
 
-President John Barron (Federalist, orange) vs Robin Clay (Farmer-Labor, green). VP Jay Bowman. Fed Chair Hayden Hartley. Palanthropic (PNTH): Chairwoman Andrea Dirks (pro-military) vs CEO Eugene Gottlieb (ethics). ~25 PNTH events with multi-step narrative chains. Event pool balanced (weighted avg mu/b deltas ~ 0).
+President John Barron (Federalist, orange) vs Robin Clay (Farmer-Labor, green). VP Jay Bowman. Fed Chair Hayden Hartley. Palanthropic (PNTH): Chairwoman Andrea Dirks (pro-military) vs CEO Eugene Gottlieb (ethics). ~25 PNTH events with multi-step narrative chains. Event pool balanced (weighted avg mu/b deltas ~ 0). Player is a senior trader at **Meridian Capital**.
 
 ### Epilogue
 
-`generateEpilogue()`: 4-page narrative from world state + portfolio + event log. Congressional diagrams, financial scorecards. Triggered at `TERM_END_DAY` (1008).
+`generateEpilogue(world, sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews)`: 4-page narrative from world state + portfolio + event log + player choices. Reputation synthesis (Insider/Principled/Speculator/Survivor/Kingmaker/Ghost) revealed on Page 4. Career arc from quarterly reviews, signature moment from impact history. Congressional diagrams, financial scorecards. Triggered at `TERM_END_DAY` (1008).
 
 ### LLM Integration
 
@@ -247,9 +309,13 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **`market` shared state**: single-writer (main.js via `syncMarket`), multiple readers
 - **Custom event bus**: `shoals:*` events from ui.js -> main.js
 - **Chain event delegation**: 3 listeners on container, not per-cell. Bound once (`_chainClicksBound`)
-- **Tree reuse**: every module owns reusable trees -- chain.js (`_rTree`/`_rGreekTrees`), portfolio.js (`_marginTree`/`_greekTrees`), position-value.js (`_tree`), strategy.js (`_entryTree` + per-leg `info.tree`), strategy-store.js (`_costTree`)
+- **Tree reuse**: every module owns reusable trees -- chain.js (`_rTree`/`_rGreekTrees`), portfolio.js (`_marginTree`/`_greekTrees`/`_gt`), position-value.js (`_tree`), strategy.js (`_entryTree` + per-leg `info.tree`), strategy-store.js (`_costTree`)
 - **Strategies in localStorage**: `shoals_strategies` key, hash-based IDs. Built-ins are const in `strategy-store.js`, never in localStorage. `currentStrategyHash` in main.js tracks loaded user strategy.
 - **Relative legs**: all saved strategies store `strikeOffset` / `dteOffset`, resolved at execution time via `resolveLegs()`.
+- **Price impact overlays**: `_recoveryDrift` and `_savedOverlays` applied before `beginDay()`, removed after `finalizeDay()`. Player param shifts tracked separately from event-caused shifts.
+- **Popup queue**: `_popupQueue` in main.js. Popups queued from `maybeFire()` and `evaluatePortfolioPopups()`. Processed at end-of-day and on overlay close. FIFO, one at a time.
+- **Player choices**: `playerChoices` map (flag → day) in main.js. Set by popup choice `playerFlag`. Read by epilogue and subsequent popup `trigger()` conditions.
+- **Cumulative volume**: `price-impact.js` tracks buy/sell volume per day (stock, options per-strike, hedges). Resets each day via `resetDailyVolume()`. Prevents order-splitting exploits on sqrt impact.
 
 ## Gotchas
 
@@ -261,7 +327,7 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **`portfolio` singleton** -- `resetPortfolio()` mutates in place. Never replace the reference.
 - **Chain table rebuilt every call** -- never cache cell refs. Delegation bound once, never re-bind.
 - **Trade dialog confirm cloned** on each open to avoid stacking listeners.
-- **`eventEngine` null in non-Dynamic** -- always guard. `maybeFire()` returns array (may be empty).
+- **`eventEngine` null in non-Dynamic** -- always guard. `maybeFire()` returns `{ fired, popups }`.
 - **Event deltas additive and clamped** to `PARAM_RANGES` -- never set absolute values.
 - **`_pendingFollowups` cleared on reset** -- switching presets drops scheduled followups.
 - **`_haptics` guard required** -- `if (typeof _haptics !== 'undefined')`. Modules may execute before global loads.
@@ -278,3 +344,9 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **Position netting includes `strategyName`** -- two strategies with the same type/strike/expiry but different names create separate positions.
 - **`syncMarket` after `prepopulate`** -- must call `syncMarket(sim)` after `sim.prepopulate()` in both `init()` and `_resetCore()` or market params (v, kappa, theta, xi, rho) will be zero.
 - **`strategyBaseQty` on positions** -- set at first strategy execution, preserved through netting. Used by portfolio-renderer to compute execution multiplier vs per-unit leg quantities.
+- **`executeMarketOrder` takes `sim` first** -- signature is `(sim, type, side, qty, ...)`. All portfolio functions that execute trades (`closePosition`, `checkPendingOrders`, `processExpiry`, `liquidateAll`) also take `sim` as first parameter.
+- **`_fillPrice` includes slippage** -- signature is `(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay)`. Bonds skip slippage (spread only). Fills clamped to $0.01 minimum.
+- **`showToast` takes `(message, duration)` only** -- duration is numeric milliseconds, NOT a severity string. No severity parameter exists.
+- **`scheduleFollowup` structure** -- must push `{ event, chainId, targetDay, weight, depth }` matching `_checkFollowups` format. Do NOT use `{ id, fireDay }`.
+- **Impact state must be reset** -- `resetImpactState()` and `resetPopupCooldowns()` in `_resetCore()`. `resetDailyVolume()` at start of each day in `frame()`.
+- **`fmtDollar` appends "k"** -- all displayed dollar values show institutional scale. Internal math unchanged.
