@@ -21,6 +21,7 @@ const _cooldowns = {}; // id → last fired day
 
 export function resetPopupCooldowns() {
     for (const k in _cooldowns) delete _cooldowns[k];
+    _usedTips.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +120,52 @@ function _anyInvestigationActive(world) {
 
 function _liveDay(day) {
     return day - HISTORY_CAPACITY;
+}
+
+// ---------------------------------------------------------------------------
+// Insider tip pool
+// ---------------------------------------------------------------------------
+
+const INSIDER_TIPS = [
+    {
+        hint: 'PNTH is going to raise the dividend at the next earnings call',
+        realEvent: 'tip_dividend_hike',
+        fakeEvent: 'tip_dividend_flat',
+    },
+    {
+        hint: 'the Fed is going to pause despite the hawkish rhetoric',
+        realEvent: 'tip_fed_pause',
+        fakeEvent: 'tip_fed_hike',
+    },
+    {
+        hint: 'a major defense contract announcement is coming within two weeks',
+        realEvent: 'tip_contract_win',
+        fakeEvent: 'tip_contract_loss',
+    },
+    {
+        hint: 'a big short position is about to unwind — something about a margin call',
+        realEvent: 'tip_short_squeeze',
+        fakeEvent: 'tip_squeeze_fizzle',
+    },
+    {
+        hint: 'earnings are going to blow out expectations by double digits',
+        realEvent: 'tip_earnings_beat',
+        fakeEvent: 'tip_earnings_miss',
+    },
+    {
+        hint: 'there\'s an acquisition offer coming — a foreign buyer',
+        realEvent: 'tip_acquisition_bid',
+        fakeEvent: 'tip_acquisition_denied',
+    },
+];
+
+const _usedTips = new Set();
+export function pickTip() {
+    const available = INSIDER_TIPS.filter(t => !_usedTips.has(t.hint));
+    const pool = available.length > 0 ? available : INSIDER_TIPS;
+    const tip = pool[Math.floor(Math.random() * pool.length)];
+    _usedTips.add(tip.hint);
+    return tip;
 }
 
 // ---------------------------------------------------------------------------
@@ -464,33 +511,22 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 150,
         popup: true,
-        headline: 'Analyst coverage intensifies before PNTH earnings',
-        context: (sim) => {
-            const pnthNotional = portfolio.positions.filter(p => p.type === 'stock')
-                .reduce((s, p) => s + Math.abs(p.qty) * _posPrice(p), 0);
-            return `Your $${(pnthNotional / 1000).toFixed(1)}k PNTH position has caught the attention of the sellside. Three analysts called this morning wanting to "compare notes." One casually mentioned an earnings whisper number that's well above consensus. Another hinted at a contract announcement. The information is free — but is it clean?`;
+        headline: 'Sellside salesman mentions "interesting flow" in PNTH options',
+        context: () => {
+            return 'A salesman from a bulge bracket calls your line. "Listen, I can\'t say much, but there\'s been some unusual activity in the PNTH options chain. Smart money is positioning ahead of the print. I think you\'d want to know." He trails off, waiting for you to bite.';
         },
         choices: [
             {
-                label: 'Listen politely, trade on your own analysis',
-                desc: 'Hear them out. Use only public information for your decisions.',
-                deltas: {},
+                label: 'Hang up',
+                desc: 'You don\'t trade on tips from salesmen.',
                 playerFlag: 'declined_analyst_color',
-                resultToast: 'You stay clean. The analysts move on to the next whale.',
+                resultToast: 'You stay clean. The salesman moves on.',
             },
             {
-                label: 'Press for details',
-                desc: 'The whisper number is valuable. Push for specifics.',
-                deltas: { xi: -0.01 },
-                playerFlag: 'pressed_analyst_color',
-                resultToast: 'You got the number. Whether it\'s right — and whether anyone noticed — remains to be seen.',
-            },
-            {
-                label: 'Cut the position before earnings',
-                desc: 'Binary risk isn\'t worth it. Flatten and re-enter after.',
-                deltas: { theta: -0.003 },
-                playerFlag: 'cut_before_earnings',
-                resultToast: 'You take the P&L and step aside. The analysts lose interest.',
+                label: 'Ask what he\'s hearing',
+                desc: 'The curiosity is killing you.',
+                playerFlag: 'pursued_pnth_tip',
+                _tipAction: true,
             },
         ],
     },
@@ -985,36 +1021,22 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 400,
         era: 'mid',
         popup: true,
-        headline: 'An old friend calls with a "tip"',
-        context: (sim, world) => {
-            const probeActive = world.investigations.okaforProbeStage > 0 ? 'Okafor probe' :
-                               world.investigations.tanBowmanStory > 0 ? 'Bowman investigation' : 'ongoing federal investigation';
-            return `A college buddy who now works at a congressional staffer's office calls your personal cell. "Listen, I probably shouldn't be telling you this, but the ${probeActive} is about to produce a surprise witness. The market is going to move. Thought you should know." The line goes quiet. This is the moment every trader faces: free money, or a career-ending mistake?`;
+        headline: 'An old contact reaches out',
+        context: () => {
+            return 'Your phone buzzes at 9pm. A college friend who works in government sends a vague text: "Hey — can we talk? I\'ve come across something that might interest you. Can\'t say more here." You haven\'t spoken in months. This is either nothing, or it\'s the kind of call that changes everything.';
         },
         choices: [
             {
-                label: 'Trade on it',
-                desc: 'This is the edge everyone claims to have. Use it.',
-                deltas: { mu: -0.01, xi: 0.02 },
-                playerFlag: 'traded_on_tip',
-                resultToast: 'You placed the trade. If anyone\'s listening, you just handed them the case.',
-            },
-            {
-                label: 'Decline and hang up',
-                desc: '"I can\'t hear this. Don\'t call me again."',
-                deltas: {},
+                label: 'Don\'t respond',
+                desc: 'Whatever this is, you don\'t want any part of it.',
                 playerFlag: 'declined_insider_tip',
-                resultToast: 'You did the right thing. The silence on the other end told you he understood.',
+                resultToast: 'You leave the text on read. Smart.',
             },
             {
-                label: 'Report to compliance',
-                desc: 'This isn\'t just unethical — it\'s a felony. Report it immediately.',
-                deltas: {},
-                effects: [
-                    { path: 'fed.credibilityScore', op: 'add', value: 1 },
-                ],
-                playerFlag: 'reported_insider_tip',
-                resultToast: 'Compliance opens a case. The SEC is notified. You may have just saved your career — and ended his.',
+                label: 'Call back',
+                desc: 'Curiosity wins. You step outside and dial.',
+                playerFlag: 'pursued_insider_tip',
+                _tipAction: true,
             },
         ],
     },
@@ -1176,36 +1198,29 @@ export const PORTFOLIO_POPUPS = [
         id: 'desk_analyst_info_edge',
         trigger: (sim) => {
             const daysToEarnings = QUARTERLY_CYCLE - (sim.day % QUARTERLY_CYCLE);
-            const optCount = portfolio.positions.filter(p => p.type === 'call' || p.type === 'put').reduce((s, p) => s + Math.abs(p.qty), 0);
-            return daysToEarnings <= 15 && daysToEarnings >= 5 && optCount >= 5;
+            const eq = _equity();
+            if (eq <= 0) return false;
+            const optNotional = _totalOptionsNotional();
+            return daysToEarnings <= 15 && daysToEarnings >= 5 && optNotional / eq >= 0.15;
         },
         cooldown: 200,
         popup: true,
-        headline: 'Analyst offers "channel check" data before earnings',
+        headline: 'A sellside analyst wants to meet for coffee',
         context: () => {
-            return `A well-known sellside analyst calls with what he calls a "channel check" — proprietary data on PNTH's enterprise pipeline. "This isn't inside information," he insists. "It's mosaic theory. We assembled it from public supplier filings and conference attendance logs." The data suggests earnings will beat by 8-12%. Your options book would benefit enormously if the number is right. The analyst wants your commission flow in return.`;
+            return 'A well-known analyst sends a cryptic message: "I have some data you\'ll want to see before the print. Not on Bloomberg, not in any filing. Coffee tomorrow? Just us." The invitation is casual. The implication is not.';
         },
         choices: [
             {
-                label: 'Use the channel check',
-                desc: 'It\'s mosaic theory — perfectly legal. Adjust your book accordingly.',
-                deltas: { xi: -0.005 },
-                playerFlag: 'used_channel_check',
-                resultToast: 'You adjusted your deltas based on the data. If the analyst is right, you\'re well positioned.',
-            },
-            {
-                label: 'Politely pass',
-                desc: 'The line between mosaic theory and material non-public information is thinner than analysts admit.',
-                deltas: {},
+                label: 'Politely decline',
+                desc: 'The line between mosaic theory and material non-public information is thin.',
                 playerFlag: 'passed_channel_check',
                 resultToast: 'You rely on your own analysis. The analyst sounds annoyed.',
             },
             {
-                label: 'Route commissions anyway',
-                desc: 'Keep the relationship without acting on the data. Analysts have long memories.',
-                deltas: {},
-                playerFlag: 'maintained_analyst_relationship',
-                resultToast: 'The analyst is happy. You didn\'t trade on it, but you kept the channel open.',
+                label: 'Take the meeting',
+                desc: 'Information is the currency of this business. Hear what he has.',
+                playerFlag: 'pursued_analyst_tip',
+                _tipAction: true,
             },
         ],
     },

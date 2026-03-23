@@ -49,12 +49,13 @@ import {
     resolveLegs, computeNetCost, legsToRelative, nextAutoName,
 } from './src/strategy-store.js';
 import { applyStructuredEffects } from './src/world-state.js';
-import { evaluatePortfolioPopups, resetPopupCooldowns } from './src/popup-events.js';
+import { evaluatePortfolioPopups, resetPopupCooldowns, pickTip } from './src/popup-events.js';
+import { getEventById } from './src/event-pool.js';
 import {
     compliance, resetCompliance, effectiveHeat,
     onComplianceTriggered, onComplianceChoice,
 } from './src/compliance.js';
-import { COMPLIANCE_GAME_OVER_HEAT } from './src/config.js';
+import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -752,6 +753,17 @@ function _processPopupQueue() {
             onComplianceChoice(choice.complianceTier);
             if (effectiveHeat() >= COMPLIANCE_GAME_OVER_HEAT) {
                 _showComplianceTermination();
+            }
+        }
+        // -- Insider tip scheduling --
+        if (choice._tipAction && eventEngine) {
+            const tip = pickTip();
+            const isReal = Math.random() < TIP_REAL_PROBABILITY;
+            const eventId = isReal ? tip.realEvent : tip.fakeEvent;
+            showToast(`"Word is ${tip.hint}."`, 6000);
+            eventEngine.scheduleFollowup({ id: eventId, mtth: 14 }, sim.day);
+            if (isReal) {
+                compliance.heat += 1;
             }
         }
         // Margin call actions
