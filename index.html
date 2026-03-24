@@ -12,7 +12,9 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://a9l.im/finsim">
     <meta property="og:site_name" content="Hayashinet">
-    <meta name="twitter:card" content="summary">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta property="og:image" content="https://a9l.im/finsim/og-image.png">
+    <meta name="twitter:image" content="https://a9l.im/finsim/og-image.png">
     <meta name="twitter:site" content="@a9_lim">
     <meta name="twitter:creator" content="@a9_lim">
     <meta name="author" content="Hayashi">
@@ -39,6 +41,7 @@
     <script src="/shared-touch.js"></script>
     <script src="/shared-info.js"></script>
     <script src="/shared-shortcuts.js"></script>
+    <script src="/shared-about.js"></script>
     <script src="/shared-sparkline.js"></script>
     <script src="/shared-tooltip.js"></script>
     <link rel="stylesheet" href="/shared-base.css">
@@ -94,8 +97,7 @@
         <div class="intro-content">
             <span class="intro-overline">Interactive Simulation</span>
             <h1 class="intro-title">Shoals<br><span class="intro-subtitle">Trading Simulator</span></h1>
-            <p class="intro-desc">Trade stocks, bonds, and options in a simulated market.<br>
-                Build strategies and manage risk in real time.</p>
+            <p class="intro-desc">You are a senior derivatives trader at Meridian Capital, one of the Street's most aggressive trading desks. President Barron has just taken office. The political landscape is volatile. Your mandate: generate returns. Your risk: everything.</p>
             <div class="intro-cards">
                 <div class="intro-card">
                     <div class="intro-card-icon">
@@ -192,6 +194,11 @@
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                 </svg>
             </button>
+            <button id="about-btn" class="tool-btn" aria-label="About" title="About">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+            </button>
             <button id="panel-toggle" class="tool-btn" aria-label="Toggle sidebar panel" aria-expanded="false">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line>
@@ -265,7 +272,7 @@
                         <div class="control-group">
                             <label for="trade-qty">
                                 <span>Quantity</span>
-                                <span class="slider-value" id="trade-qty-val">1</span>
+                                <span class="slider-value" id="trade-qty-val">1k</span>
                             </label>
                             <input type="range" id="trade-qty" min="1" max="100" step="1" value="1">
                         </div>
@@ -417,7 +424,7 @@
                         <div id="strategy-chain-table" class="chain-table">
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
-                        <p class="panel-hint trade-hint">Left-click: long &middot; Right-click: short &middot; Strategies save relative strikes &amp; expiries. Payoff <button class="info-trigger" type="button" data-info="payoff" aria-label="Info: Payoff Diagrams">?</button></p>
+                        <p class="panel-hint trade-hint">Strategies save relative strikes &amp; expiries. If selectable expiry is on, the strategy&rsquo;s expiry depends on the dropdown. Payoff <button class="info-trigger" type="button" data-info="payoff" aria-label="Info: Payoff Diagrams">?</button></p>
                         <div class="group-label">Legs</div>
                         <div id="strategy-legs-list" class="strategy-legs-list">
                             <p class="panel-hint">No legs added. Click buttons above to build a strategy.</p>
@@ -623,42 +630,15 @@
         </div>
     </div>
 
-    <!-- Margin Call Overlay -->
-    <div id="margin-call-overlay" class="sim-overlay hidden">
-        <div class="sim-overlay-panel glass margin-call-content">
-            <div class="margin-call-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-            </div>
-            <h2 class="margin-call-title">Margin Call</h2>
-            <div class="sim-overlay-body">
-                <p id="margin-call-msg" class="margin-call-message">Your account is below the maintenance margin requirement.</p>
-                <div class="trade-dialog-actions">
-                    <button id="margin-call-liquidate" class="ghost-btn margin-call-liquidate-btn">Liquidate All Positions</button>
-                </div>
-            </div>
+    <!-- Popup Decision Event Overlay -->
+    <div id="popup-event-overlay" class="sim-overlay hidden">
+      <div class="sim-overlay-panel glass popup-event-body">
+        <div class="sim-overlay-body">
+          <h2 id="popup-event-headline" class="popup-headline"></h2>
+          <p id="popup-event-context" class="popup-context"></p>
+          <div id="popup-event-choices" class="popup-choices"></div>
         </div>
-    </div>
-
-    <!-- Fraud / Game Over Overlay -->
-    <div id="fraud-overlay" class="sim-overlay hidden">
-        <div class="sim-overlay-panel glass fraud-content">
-            <div class="fraud-icon">
-                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
-                </svg>
-            </div>
-            <h2 class="fraud-title">Game Over</h2>
-            <p class="fraud-subtitle">U.S. District Court &mdash; Southern District of New York</p>
-            <div class="sim-overlay-body fraud-body">
-                <p id="fraud-msg" class="fraud-message"></p>
-            </div>
-            <div class="trade-dialog-actions">
-                <button id="fraud-reset" class="ghost-btn fraud-reset-btn">Start Over</button>
-            </div>
-        </div>
+      </div>
     </div>
 
     <!-- Epilogue Overlay -->

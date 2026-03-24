@@ -8,7 +8,8 @@
  * Exports: StrategyRenderer
  */
 
-import { allocTree, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
+import { allocTree, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
+import { unitPrice } from './position-value.js';
 import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
     STRATEGY_SAMPLES, STRATEGY_Y_PAD, STRATEGY_MARGIN,
@@ -141,40 +142,33 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
 
         const info = { type: leg.type, mult, T, rate, vol };
 
+        // Entry value via unitPrice (includes vol surface + price impact)
+        const K = leg.strike ?? entryS;
+        const entryExpiryDay = entryDay != null ? entryDay + Math.round(entryT * TRADING_DAYS_PER_YEAR) : null;
+        info.entryVal = unitPrice(leg.type, entryS, vol, rate, entryDay ?? 0, K, entryExpiryDay, q);
+
         switch (leg.type) {
             case 'call':
             case 'put': {
                 const isPut = leg.type === 'put';
-                const K = leg.strike ?? entryS;
-                // Term-structure vol + moneyness skew
+                // Term-structure vol + moneyness skew for evaluation tree
                 const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
                 const sigma = computeSkewSigma(sigmaEff, entryS, K, T, market.rho, market.xi, market.kappa);
-                // Entry vol: same skew at entry time
-                const entrySigmaEff = computeEffectiveSigma(market.v, entryT, market.kappa, market.theta, market.xi);
-                const entrySigma = computeSkewSigma(entrySigmaEff, entryS, K, entryT, market.rho, market.xi, market.kappa);
                 info.K = K;
                 info.isPut = isPut;
                 info.vol = sigma;
-                // Pre-prepare trees for entry and evaluation pricing
-                const entryTree = prepareTree(entryT, rate, entrySigma, q, entryDay);
-                info.entryVal = priceWithTree(entryS, K, isPut, entryTree);
                 info.q = q;
                 info.evalDay = evalDay;
-                // Avoids transparent cache thrashing when legs have different T.
                 info.tree = prepareTree(T, rate, sigma, q, evalDay);
-                info.greekTrees = null; // lazily prepared on first Greek request
+                info.greekTrees = null;
                 break;
             }
             case 'stock':
-                info.entryS = entryS;
+                info.entryS = info.entryVal; // unitPrice includes temporary impact
                 break;
             case 'bond':
-                info.entryVal = market.a >= 1e-8
-                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, entryT, market.a, market.b, market.sigmaR)
-                    : BOND_FACE_VALUE * Math.exp(-rate * entryT);
-                info.bondCurVal = market.a >= 1e-8
-                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, T, market.a, market.b, market.sigmaR)
-                    : BOND_FACE_VALUE * Math.exp(-rate * T);
+                info.bondCurVal = unitPrice('bond', entryS, vol, rate, evalDay ?? 0, null,
+                    entryDay != null ? entryDay + Math.round(T * TRADING_DAYS_PER_YEAR) : null, q);
                 break;
         }
         return info;
@@ -618,31 +612,10 @@ export class StrategyRenderer {
         const sign = (typeof leg.qty === 'number' && leg.qty < 0) ? -1
                    : (leg.side === 'short') ? -1 : 1;
         const qty  = Math.abs(leg.qty ?? 1);
-
-        switch (leg.type) {
-            case 'call':
-            case 'put': {
-                const isPut = leg.type === 'put';
-                const K     = leg.strike ?? spot;
-                const sigmaEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
-                const sigma = computeSkewSigma(sigmaEff, spot, K, T, market.rho, market.xi, market.kappa);
-                if (!this._entryTree) this._entryTree = allocTree();
-                prepareTree(T, rate, sigma, q, entryDay, this._entryTree);
-                const price = priceWithTree(spot, K, isPut, this._entryTree);
-                return price * qty * sign;
-            }
-            case 'stock':
-                // Entry cost for hypothetical stock position is spot * qty * sign
-                return spot * qty * sign;
-            case 'bond': {
-                const bVal = market.a >= 1e-8
-                    ? vasicekBondPrice(BOND_FACE_VALUE, rate, T, market.a, market.b, market.sigmaR)
-                    : BOND_FACE_VALUE * Math.exp(-rate * T);
-                return bVal * qty * sign;
-            }
-            default:
-                return 0;
-        }
+        const K = leg.strike ?? spot;
+        const expiryDay = entryDay != null ? entryDay + Math.round(T * TRADING_DAYS_PER_YEAR) : null;
+        const mid = unitPrice(leg.type, spot, vol, rate, entryDay ?? 0, K, expiryDay, q);
+        return mid * qty * sign;
     }
 
     // -----------------------------------------------------------------------
@@ -716,47 +689,34 @@ export class StrategyRenderer {
         ctx.lineJoin  = 'round';
         ctx.lineCap   = 'round';
 
-        // Walk segments, splitting at zero crossings
-        let segStart = 0;
+        // Walk points, splitting into segments at zero crossings.
+        // Each segment is a single colour (up or down).
+        ctx.strokeStyle = pnls[0] >= 0 ? colorUp : colorDown;
+        ctx.beginPath();
+        ctx.moveTo(xToPixel(xs[0]), pnlToPixel(pnls[0]));
 
-        for (let i = 1; i <= xs.length; i++) {
-            const atEnd = i === xs.length;
-            const crossed = !atEnd && Math.sign(pnls[i]) !== Math.sign(pnls[i - 1])
+        for (let i = 1; i < xs.length; i++) {
+            const crossed = Math.sign(pnls[i]) !== Math.sign(pnls[i - 1])
                             && pnls[i - 1] !== 0 && pnls[i] !== 0;
 
-            if (atEnd || crossed) {
-                // Draw segment from segStart..i-1 (plus interpolated zero if crossing)
-                const segColor = pnls[segStart] >= 0 ? colorUp : colorDown;
-                ctx.strokeStyle = segColor;
-                ctx.beginPath();
-                for (let j = segStart; j <= (atEnd ? i - 1 : i - 1); j++) {
-                    const px = xToPixel(xs[j]);
-                    const py = pnlToPixel(pnls[j]);
-                    if (j === segStart) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-                }
-                if (crossed) {
-                    // Interpolate zero crossing and add as endpoint
-                    const t  = pnls[i - 1] / (pnls[i - 1] - pnls[i]);
-                    const zx = xs[i - 1] + t * (xs[i] - xs[i - 1]);
-                    ctx.lineTo(xToPixel(zx), pnlToPixel(0));
-                }
+            if (crossed) {
+                // Interpolate zero crossing
+                const t  = pnls[i - 1] / (pnls[i - 1] - pnls[i]);
+                const zx = xs[i - 1] + t * (xs[i] - xs[i - 1]);
+                const zPx = xToPixel(zx);
+                const zPy = pnlToPixel(0);
+                // Finish current segment at the crossing
+                ctx.lineTo(zPx, zPy);
                 ctx.stroke();
-
-                if (crossed) {
-                    // Start next segment from zero-crossing point
-                    segStart = i - 1; // Will be redrawn from crossing onward
-                    // Start the new segment colour at the interpolated zero
-                    const t  = pnls[i - 1] / (pnls[i - 1] - pnls[i]);
-                    const zx = xs[i - 1] + t * (xs[i] - xs[i - 1]);
-                    const nextColor = pnls[i] >= 0 ? colorUp : colorDown;
-                    ctx.strokeStyle = nextColor;
-                    ctx.beginPath();
-                    ctx.moveTo(xToPixel(zx), pnlToPixel(0));
-                    ctx.lineTo(xToPixel(xs[i]), pnlToPixel(pnls[i]));
-                    segStart = i;
-                }
+                // Start new segment from the crossing in the new colour
+                ctx.strokeStyle = pnls[i] >= 0 ? colorUp : colorDown;
+                ctx.beginPath();
+                ctx.moveTo(zPx, zPy);
             }
+
+            ctx.lineTo(xToPixel(xs[i]), pnlToPixel(pnls[i]));
         }
+        ctx.stroke();
 
         ctx.restore();
     }

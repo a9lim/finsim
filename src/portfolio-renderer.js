@@ -6,8 +6,8 @@
    instead of rebuilding all position rows every day.
    ===================================================== */
 
-import { computePositionPnl } from './position-value.js';
-import { fmtDollar, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
+import { computePositionPnl, computePositionValue } from './position-value.js';
+import { fmtDollar, fmtQty, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
 
 // ---------------------------------------------------------------------------
 // Margin display formatter (pure function -- no portfolio access)
@@ -29,11 +29,12 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
     const absQty     = Math.abs(pos.qty);
     const typeLabel  = posTypeLabel(pos.type, pos.qty);
     const pnl        = computePositionPnl(pos, currentPrice, vol, rate, day, q);
+    const value      = computePositionValue(pos, currentPrice, vol, rate, day, q);
     const entryTotal = pos.entryPrice * absQty;
     const isOption   = pos.type === 'call' || pos.type === 'put';
     const strikeStr  = isOption && pos.strike != null ? ' K' + pos.strike : '';
     const expiryStr  = pos.expiryDay != null ? ' ' + fmtDte(pos.expiryDay - day) : '';
-    const labelStr   = typeLabel + strikeStr + expiryStr + ' x' + absQty;
+    const labelStr   = typeLabel + strikeStr + expiryStr + ' x' + fmtQty(absQty);
 
     const row = document.createElement('div');
     row.className = 'data-row pos-row stat-row';
@@ -43,10 +44,14 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
     labelEl.className = 'pos-label stat-label';
     labelEl.textContent = labelStr;
 
+    const valueEl = document.createElement('span');
+    valueEl.className = 'pos-value stat-value';
+    valueEl.textContent = fmtDollar(value);
+    valueEl.title = 'Entry ' + fmtDollar(entryTotal);
+
     const pnlEl = document.createElement('span');
     pnlEl.className = 'pos-pnl stat-value ' + pnlClass(pnl);
     pnlEl.textContent = fmtDollar(pnl);
-    pnlEl.title = 'Entry ' + fmtDollar(entryTotal);
 
     const actions = document.createElement('div');
     actions.className = 'pos-actions';
@@ -73,8 +78,13 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
         actions.appendChild(exBtn);
     }
 
+    const numCol = document.createElement('div');
+    numCol.className = 'pos-nums';
+    numCol.appendChild(pnlEl);
+    numCol.appendChild(valueEl);
+
     row.appendChild(labelEl);
-    row.appendChild(pnlEl);
+    row.appendChild(numCol);
     row.appendChild(actions);
     return row;
 }
@@ -86,7 +96,7 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
 function _buildOrderRow(order) {
     const typeLabel = posTypeLabel(order.type, order.side);
     const strikeStr = order.strike != null ? ' K' + order.strike : '';
-    const labelStr  = typeLabel + strikeStr + ' x' + order.qty + ' ' + order.orderType + ' @ ' + fmtDollar(order.triggerPrice);
+    const labelStr  = typeLabel + strikeStr + ' x' + fmtQty(order.qty) + ' ' + order.orderType + ' @ $' + order.triggerPrice.toFixed(2);
 
     const row = document.createElement('div');
     row.className = 'data-row order-row stat-row';
@@ -151,7 +161,10 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q
         const posId = String(pos.id);
         const existing = rowMap.get(posId);
         if (existing) {
-            // Update P&L in-place
+            // Update value and P&L in-place
+            const value = computePositionValue(pos, S, vol, rate, day, q);
+            const valueEl = existing.querySelector('.pos-value');
+            if (valueEl) valueEl.textContent = fmtDollar(value);
             const pnl = computePositionPnl(pos, S, vol, rate, day, q);
             const pnlEl = existing.querySelector('.pos-pnl');
             if (pnlEl) {
@@ -283,8 +296,9 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
 
         for (const name of strategyNames) {
             const groupPositions = portfolio.positions.filter(p => p.strategyName === name);
-            let totalPnl = 0;
+            let totalValue = 0, totalPnl = 0;
             for (const pos of groupPositions) {
+                totalValue += computePositionValue(pos, currentPrice, vol, rate, day, q);
                 totalPnl += computePositionPnl(pos, currentPrice, vol, rate, day, q);
             }
 
@@ -323,9 +337,18 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
                 nameEl.className = 'stat-label strategy-group-name';
                 header.appendChild(nameEl);
 
+                const numCol = document.createElement('div');
+                numCol.className = 'pos-nums';
+
                 const pnlEl = document.createElement('span');
                 pnlEl.className = 'stat-value strategy-group-pnl';
-                header.appendChild(pnlEl);
+                numCol.appendChild(pnlEl);
+
+                const valEl = document.createElement('span');
+                valEl.className = 'stat-value strategy-group-value';
+                numCol.appendChild(valEl);
+
+                header.appendChild(numCol);
 
                 const closeBtn = document.createElement('button');
                 closeBtn.className = 'ghost-btn pos-close-btn';
@@ -345,14 +368,16 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
                 $.strategyPositions.appendChild(group);
             }
 
-            // Update P/L and constituents
+            // Update value, P/L and constituents
+            const valEl = group.querySelector('.strategy-group-value');
+            if (valEl) valEl.textContent = fmtDollar(totalValue);
             const pnlEl = group.querySelector('.strategy-group-pnl');
             if (pnlEl) {
                 pnlEl.textContent = fmtDollar(totalPnl);
                 pnlEl.className = 'stat-value strategy-group-pnl ' + pnlClass(totalPnl);
             }
             const nameEl = group.querySelector('.strategy-group-name');
-            if (nameEl) nameEl.textContent = name + expiryStr + ' x' + mult;
+            if (nameEl) nameEl.textContent = name + expiryStr + ' x' + fmtQty(mult);
             const detail = group.querySelector('.strategy-group-detail');
             if (detail) detail.textContent = constituents;
         }

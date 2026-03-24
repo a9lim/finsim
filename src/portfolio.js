@@ -17,9 +17,9 @@ import {
     MONEYNESS_SPREAD_WEIGHT,
 } from './config.js';
 
-import { allocTree, prepareTree, priceWithTree, allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, vasicekBondPrice, vasicekDuration } from './pricing.js';
+import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
+import { recordStockTrade, recordOptionTrade } from './price-impact.js';
 
-let _marginTree = null;
 let _greekTrees = null;
 import { computePositionValue, unitPrice } from './position-value.js';
 import { market } from './market.js';
@@ -79,21 +79,32 @@ export function resetPortfolio(capital) {
 // ---------------------------------------------------------------------------
 
 /**
- * Compute fill price for a buy or sell, accounting for bid/ask spread on
- * options.
- * @param {string}  type      - 'stock'|'bond'|'call'|'put'
- * @param {string}  side      - 'long'|'short'
- * @param {number}  mid       - Mid/fair price
- * @param {number}  currentPrice
- * @param {number}  strike
- * @param {number}  currentVol
- * @returns {number} Fill price per unit
+ * Compute fill price for a buy or sell, accounting for bid/ask spread and
+ * Almgren-Chriss market-impact slippage.
+ *
+ * Impact is recorded as cumulative volume (decays with half-life).
+ * No sim.S mutation — impact is an overlay. Delta hedging by MMs is
+ * handled dynamically by rehedgeMM() each substep.
  */
-function _fillPrice(type, side, mid, currentPrice, strike, currentVol) {
+function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay) {
     const ba = (type === 'call' || type === 'put')
         ? computeOptionBidAsk(mid, currentPrice, strike, currentVol)
         : computeBidAsk(mid, currentVol);
-    return side === 'long' ? ba.ask : ba.bid;
+    const spreadFill = side === 'long' ? ba.ask : ba.bid;
+
+    const signedQty = side === 'long' ? qty : -qty;
+
+    if (type === 'bond') {
+        return spreadFill;
+    } else if (type === 'stock') {
+        const fillCost = recordStockTrade(signedQty, currentVol);
+        return Math.max(0.01, spreadFill + fillCost);
+    } else {
+        const logSK = Math.log(currentPrice / strike);
+        const dte = Math.max(1, (expiryDay || 0) - currentDay);
+        const fillCost = recordOptionTrade(type, signedQty, currentVol, logSK, dte, strike, expiryDay || 0);
+        return Math.max(0.01, spreadFill + fillCost);
+    }
 }
 
 /**
@@ -111,6 +122,43 @@ export function computeOptionBidAsk(mid, currentPrice, strike, currentVol) {
     const moneyness = Math.abs(Math.log(currentPrice / strike));
     const halfSpread = mid * OPTION_SPREAD_PCT * (1 + currentVol) + MONEYNESS_SPREAD_WEIGHT * moneyness;
     return { bid: Math.max(0, mid - halfSpread), ask: mid + halfSpread };
+}
+
+// Reusable greek trees bundle for delta computation
+let _gt = null;
+
+export function computeNetDelta() {
+    let net = 0;
+    for (const p of portfolio.positions) {
+        if (p.type === 'stock') { net += p.qty; continue; }
+        if (p.type === 'bond')  continue;
+        const dte = p.expiryDay - market.day;
+        if (dte <= 0) continue;
+        const T = dte / TRADING_DAYS_PER_YEAR;
+        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+        const sigma = computeSkewSigma(sigEff, market.S, p.strike, T, market.rho, market.xi, market.kappa);
+        _gt = prepareGreekTrees(T, market.r, sigma, market.q, market.day, _gt);
+        const greeks = computeGreeksWithTrees(market.S, p.strike, p.type === 'put', _gt);
+        net += greeks.delta * p.qty;
+    }
+    return net;
+}
+
+export function computeGrossNotional() {
+    let gross = 0;
+    for (const p of portfolio.positions) {
+        if (p.type === 'stock') { gross += Math.abs(p.qty) * market.S; continue; }
+        if (p.type === 'bond')  continue;
+        const dte = p.expiryDay - market.day;
+        if (dte <= 0) continue;
+        const T = dte / TRADING_DAYS_PER_YEAR;
+        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+        const sigma = computeSkewSigma(sigEff, market.S, p.strike, T, market.rho, market.xi, market.kappa);
+        _gt = prepareGreekTrees(T, market.r, sigma, market.q, market.day, _gt);
+        const greeks = computeGreeksWithTrees(market.S, p.strike, p.type === 'put', _gt);
+        gross += Math.abs(greeks.delta * p.qty) * market.S;
+    }
+    return gross;
 }
 
 /**
@@ -170,30 +218,11 @@ function _marginForShort(type, qty, fillPrice, currentPrice, currentVol, current
  * Compute maintenance margin for a single short position (proposed or actual).
  */
 function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q) {
-    switch (type) {
-        case 'stock':
-            return MAINTENANCE_MARGIN * currentPrice * absQty;
-        case 'bond': {
-            const dte = expiryDay != null
-                ? Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0) : 0;
-            return MAINTENANCE_MARGIN * vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR) * absQty;
-        }
-        case 'call':
-        case 'put': {
-            const dte = expiryDay != null
-                ? Math.max((expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0) : 0;
-            let optMid;
-            if (dte > 0 && currentVol > 0) {
-                if (!_marginTree) _marginTree = allocTree();
-                prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
-                optMid = priceWithTree(currentPrice, strike, type === 'put', _marginTree);
-            } else {
-                optMid = Math.max(0, type === 'call' ? currentPrice - strike : strike - currentPrice);
-            }
-            return Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
-        }
-        default: return 0;
+    const mid = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
+    if (type === 'call' || type === 'put') {
+        return Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
     }
+    return MAINTENANCE_MARGIN * mid * absQty;
 }
 
 /**
@@ -228,26 +257,11 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
 
         if (pos.qty < 0) {
             const absQty = Math.abs(pos.qty);
-            const dte = pos.expiryDay != null
-                ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
-                : 0;
-            switch (pos.type) {
-                case 'stock':
-                    required += MAINTENANCE_MARGIN * currentPrice * absQty;
-                    break;
-                case 'bond': {
-                    const bp = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR);
-                    required += MAINTENANCE_MARGIN * bp * absQty;
-                    break;
-                }
-                case 'call':
-                case 'put': {
-                    if (!_marginTree) _marginTree = allocTree();
-                    prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
-                    const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
-                    required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
-                    break;
-                }
+            const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
+            if (pos.type === 'call' || pos.type === 'put') {
+                required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
+            } else {
+                required += MAINTENANCE_MARGIN * mid * absQty;
             }
         }
     }
@@ -282,7 +296,7 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
  * @returns {Object|null} The position object (new or updated), or null if insufficient cash.
  */
 export function executeMarketOrder(
-    type, side, qty,
+    sim, type, side, qty,
     currentPrice, currentVol, currentRate, currentDay,
     strike, expiryDay, strategyName, q
 ) {
@@ -293,7 +307,7 @@ export function executeMarketOrder(
 
     const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
     const spreadVol = type === 'bond' ? market.sigmaR : currentVol;
-    const fill = _fillPrice(type, side, mid, currentPrice, strike, spreadVol);
+    const fill = _fillPrice(sim, type, side, qty, mid, currentPrice, strike, spreadVol, expiryDay || 0, currentDay);
 
     // Find existing position of same type+strike+expiry+strategy for netting
     const existingIdx = portfolio.positions.findIndex(p =>
@@ -524,7 +538,7 @@ export function cancelOrder(orderId) {
  *
  * @returns {Object[]} Array of filled position objects.
  */
-export function checkPendingOrders(currentPrice, currentVol, currentRate, currentDay, q) {
+export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, currentDay, q) {
     const filled = [];
     const remaining = [];
 
@@ -544,7 +558,7 @@ export function checkPendingOrders(currentPrice, currentVol, currentRate, curren
 
         if (triggered) {
             const pos = executeMarketOrder(
-                order.type, order.side, order.qty,
+                sim, order.type, order.side, order.qty,
                 currentPrice, currentVol, currentRate, currentDay,
                 order.strike, order.expiryDay, order.strategyName, q
             );
@@ -570,7 +584,7 @@ export function checkPendingOrders(currentPrice, currentVol, currentRate, curren
  *
  * @returns {boolean} true if position was found and closed.
  */
-export function closePosition(positionId, currentPrice, currentVol, currentRate, currentDay, q) {
+export function closePosition(sim, positionId, currentPrice, currentVol, currentRate, currentDay, q) {
     const idx = portfolio.positions.findIndex(p => p.id === positionId);
     if (idx === -1) return false;
 
@@ -580,10 +594,10 @@ export function closePosition(positionId, currentPrice, currentVol, currentRate,
     const spreadVol = pos.type === 'bond' ? market.sigmaR : currentVol;
 
     if (pos.qty > 0) {
-        const fill = _fillPrice(pos.type, 'short', mid, currentPrice, pos.strike, spreadVol);
+        const fill = _fillPrice(sim, pos.type, 'short', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay);
         portfolio.cash += fill * absQty;
     } else {
-        const fill = _fillPrice(pos.type, 'long', mid, currentPrice, pos.strike, spreadVol);
+        const fill = _fillPrice(sim, pos.type, 'long', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay);
         const returnedMargin = pos._reservedMargin ?? _marginForShort(
             pos.type, absQty, pos.entryPrice, currentPrice, currentVol,
             currentRate, currentDay, pos.strike, pos.expiryDay
@@ -755,7 +769,7 @@ export function processDividends(currentPrice, q) {
  * @param {number} q             - Dividend yield
  * @returns {{ expired: Object[], unwound: Object[] }}
  */
-export function processExpiry(expiryDay, currentPrice, currentDay, currentVol, currentRate, q) {
+export function processExpiry(sim, expiryDay, currentPrice, currentDay, currentVol, currentRate, q) {
     const expired = [];
     const expiredStrategies = new Set();
 
@@ -783,7 +797,7 @@ export function processExpiry(expiryDay, currentPrice, currentDay, currentVol, c
         if (pos.type !== 'call' && pos.type !== 'put') continue;
 
         // Close at market value (no auto-exercise)
-        closePosition(pos.id, currentPrice, currentVol, currentRate, currentDay, q);
+        closePosition(sim, pos.id, currentPrice, currentVol, currentRate, currentDay, q);
         expired.push(pos);
     }
 
@@ -793,7 +807,7 @@ export function processExpiry(expiryDay, currentPrice, currentDay, currentVol, c
         for (let i = portfolio.positions.length - 1; i >= 0; i--) {
             const pos = portfolio.positions[i];
             if (!pos.strategyName || !expiredStrategies.has(pos.strategyName)) continue;
-            closePosition(pos.id, currentPrice, currentVol, currentRate, currentDay, q);
+            closePosition(sim, pos.id, currentPrice, currentVol, currentRate, currentDay, q);
             unwound.push(pos);
         }
     }
@@ -839,29 +853,11 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
         if (pos.qty >= 0) continue; // Only short positions
 
         const absQty = Math.abs(pos.qty);
-        const dte = pos.expiryDay != null
-            ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
-            : 0;
-
-        switch (pos.type) {
-            case 'stock':
-                total += MAINTENANCE_MARGIN * currentPrice * absQty;
-                break;
-
-            case 'bond': {
-                const bondPrice = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR);
-                total += MAINTENANCE_MARGIN * bondPrice * absQty;
-                break;
-            }
-
-            case 'call':
-            case 'put': {
-                if (!_marginTree) _marginTree = allocTree();
-                prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
-                const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
-                total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
-                break;
-            }
+        const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
+        if (pos.type === 'call' || pos.type === 'put') {
+            total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
+        } else {
+            total += MAINTENANCE_MARGIN * mid * absQty;
         }
     }
 
@@ -894,26 +890,11 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
 
         if (pos.qty < 0) {
             const absQty = Math.abs(pos.qty);
-            const dte = pos.expiryDay != null
-                ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
-                : 0;
-            switch (pos.type) {
-                case 'stock':
-                    required += MAINTENANCE_MARGIN * currentPrice * absQty;
-                    break;
-                case 'bond': {
-                    const bondPrice = vasicekBondPrice(BOND_FACE_VALUE, currentRate, dte, market.a, market.b, market.sigmaR);
-                    required += MAINTENANCE_MARGIN * bondPrice * absQty;
-                    break;
-                }
-                case 'call':
-                case 'put': {
-                    if (!_marginTree) _marginTree = allocTree();
-                    prepareTree(dte, currentRate, currentVol, q, currentDay, _marginTree);
-                    const optMid = priceWithTree(currentPrice, pos.strike, pos.type === 'put', _marginTree);
-                    required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, optMid * absQty);
-                    break;
-                }
+            const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
+            if (pos.type === 'call' || pos.type === 'put') {
+                required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
+            } else {
+                required += MAINTENANCE_MARGIN * mid * absQty;
             }
         }
     }
@@ -933,10 +914,10 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
 /**
  * Close all open positions at current market prices.
  */
-export function liquidateAll(currentPrice, currentVol, currentRate, currentDay, q) {
+export function liquidateAll(sim, currentPrice, currentVol, currentRate, currentDay, q) {
     while (portfolio.positions.length > 0) {
         const pos = portfolio.positions[portfolio.positions.length - 1];
-        closePosition(pos.id, currentPrice, currentVol, currentRate, currentDay, q);
+        closePosition(sim, pos.id, currentPrice, currentVol, currentRate, currentDay, q);
     }
 }
 
@@ -993,9 +974,11 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
             ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
             : 0;
         const isPut  = pos.type === 'put';
-        if (dte <= 0 || currentVol <= 0) continue;
+        if (dte <= 0 || market.v <= 0) continue;
+        const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+        const sig = computeSkewSigma(sigEff, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
         if (!_greekTrees) _greekTrees = allocGreekTrees();
-        prepareGreekTrees(dte, currentRate, currentVol, q, currentDay, _greekTrees);
+        prepareGreekTrees(dte, currentRate, sig, q, currentDay, _greekTrees);
         const greeks = computeGreeksWithTrees(currentPrice, pos.strike, isPut, _greekTrees);
 
         delta += w * greeks.delta;

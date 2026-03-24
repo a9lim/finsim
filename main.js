@@ -5,7 +5,8 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ADV, ROGUE_TRADING_THRESHOLD } from './src/config.js';
+import { fmtDollar } from './src/format-helpers.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
 import {
@@ -13,7 +14,7 @@ import {
     chargeBorrowInterest, processDividends, checkMargin, aggregateGreeks,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
-    computeBidAsk,
+    computeBidAsk, computeNetDelta, computeGrossNotional,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -21,25 +22,41 @@ import {
     cacheDOMElements, bindEvents, updateChainDisplay,
     rebuildTradeDropdown, rebuildStrategyDropdown,
     updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateStockBondPrices,
-    syncSettingsUI, toggleStrategyView, showMarginCall, showFraudScreen, showChainOverlay,
+    syncSettingsUI, toggleStrategyView, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
     updateDynamicSections, updateEventLog, updateCongressDiagrams,
     refreshTooltip,
     updateStrategyDropdowns, updateCreditDebit,
+    showPopupEvent,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
 import { EventEngine } from './src/events.js';
 import { LLMEventSource } from './src/llm.js';
 import { generateEpilogue } from './src/epilogue.js';
-import { computePositionValue } from './src/position-value.js';
+import { computePositionValue, computePositionPnl } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
 import {
+    resetImpactState, decayImpactVolumes,
+    getStockImpact, rehedgeMM,
+    updateParamShifts, decayParamShifts,
+    applyParamOverlays, removeParamOverlays,
+    selectImpactToast,
+} from './src/price-impact.js';
+import {
     listStrategies, getStrategy, saveStrategy, deleteStrategy,
     resolveLegs, computeNetCost, legsToRelative, nextAutoName,
 } from './src/strategy-store.js';
+import { applyStructuredEffects } from './src/world-state.js';
+import { evaluatePortfolioPopups, resetPopupCooldowns, pickTip } from './src/popup-events.js';
+import { getEventById } from './src/event-pool.js';
+import {
+    compliance, resetCompliance, effectiveHeat,
+    onComplianceTriggered, onComplianceChoice,
+} from './src/compliance.js';
+import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -69,6 +86,12 @@ let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
+let _savedOverlays = {};
+
+const _popupQueue = [];
+const playerChoices = {};
+const impactHistory = [];
+const quarterlyReviews = [];
 
 // ---------------------------------------------------------------------------
 // Rate sparkline helpers
@@ -202,28 +225,43 @@ function init() {
     _toolbar.initSidebar($.panelToggle, $.sidebar, $.closePanel);
 
     // 8. Init keyboard shortcuts
+    var _shortcuts = [
+        { key: ' ',  label: 'Play / Pause', group: 'Simulation', action: () => togglePlay() },
+        { key: '.', label: 'Step forward',  group: 'Simulation', action: () => step() },
+        { key: 's', label: 'Strategy view',  group: 'View',       action: () => {
+            if (!$.sidebar.classList.contains('open')) {
+                _toolbar.toggleSidebar($.panelToggle, $.sidebar);
+            }
+            const tab = document.querySelector('[data-tab="strategy"]');
+            if (tab) tab.click();
+        } },
+        { key: 'b', label: 'Buy stock',      group: 'Trade',      action: () => handleBuyStock() },
+        { key: 't', label: 'Toggle sidebar',  group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); } },
+        { key: 'r', label: 'Reset',           group: 'Simulation', action: () => resetSim() },
+        { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
+        { key: '2', label: PRESETS[1].name,   group: 'Presets',    action: () => loadPreset(1) },
+        { key: '3', label: PRESETS[2].name,   group: 'Presets',    action: () => loadPreset(2) },
+        { key: '4', label: PRESETS[3].name,   group: 'Presets',    action: () => loadPreset(3) },
+        { key: '5', label: PRESETS[4].name,   group: 'Presets',    action: () => loadPreset(4) },
+        { key: '6', label: PRESETS[5].name,   group: 'Presets',    action: () => loadPreset(5) },
+        { key: '7', label: PRESETS[6].name,   group: 'Presets',    action: () => loadPreset(6) },
+    ];
+
     if (typeof initShortcuts !== 'undefined') {
-        initShortcuts([
-            { key: ' ',  label: 'Play / Pause', group: 'Simulation', action: () => togglePlay() },
-            { key: '.', label: 'Step forward',  group: 'Simulation', action: () => step() },
-            { key: 's', label: 'Strategy view',  group: 'View',       action: () => {
-                if (!$.sidebar.classList.contains('open')) {
-                    _toolbar.toggleSidebar($.panelToggle, $.sidebar);
-                }
-                const tab = document.querySelector('[data-tab="strategy"]');
-                if (tab) tab.click();
-            } },
-            { key: 'b', label: 'Buy stock',      group: 'Trade',      action: () => handleBuyStock() },
-            { key: 't', label: 'Toggle sidebar',  group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); } },
-            { key: 'r', label: 'Reset',           group: 'Simulation', action: () => resetSim() },
-            { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
-            { key: '2', label: PRESETS[1].name,   group: 'Presets',    action: () => loadPreset(1) },
-            { key: '3', label: PRESETS[2].name,   group: 'Presets',    action: () => loadPreset(2) },
-            { key: '4', label: PRESETS[3].name,   group: 'Presets',    action: () => loadPreset(3) },
-            { key: '5', label: PRESETS[4].name,   group: 'Presets',    action: () => loadPreset(4) },
-            { key: '6', label: PRESETS[5].name,   group: 'Presets',    action: () => loadPreset(5) },
-            { key: '7', label: PRESETS[6].name,   group: 'Presets',    action: () => loadPreset(6) },
-        ], { helpTitle: 'Shoals Keyboard Shortcuts' });
+        initShortcuts(_shortcuts, { helpTitle: 'Shoals Keyboard Shortcuts' });
+    }
+
+    if (typeof initAboutPanel === 'function') {
+        initAboutPanel({
+            title: 'Options Trading',
+            description: 'Options trading simulator with GBM, Merton jump-diffusion, and Heston stochastic volatility stock models. Build strategies with CRR binomial tree pricing and navigate narrative-driven market events.',
+            controls: [
+                { label: 'Buy stock', value: 'Click Buy button' },
+                { label: 'Place option', value: 'Configure in Strategy tab' },
+            ],
+            shortcuts: _shortcuts,
+            repo: 'https://github.com/a9lim/finsim',
+        });
     }
 
     // 9. Bind UI events
@@ -255,6 +293,9 @@ function init() {
         onFullChainOpen:  () => openFullChain(),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
         onLiquidate:      () => handleLiquidate(),
+        onChainClose:     () => setTimeout(_processPopupQueue, 100),
+        onTradeClose:     () => setTimeout(_processPopupQueue, 100),
+        onMarginClose:    () => setTimeout(_processPopupQueue, 100),
         onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
         onStrategyExpiryChange: (idx) => {
             const pe = _priceExpiry(idx);
@@ -282,6 +323,23 @@ function init() {
                 }
             }
             dirty = true;
+        },
+        onSelectableExpiryChange: (checked) => {
+            if (checked && strategyLegs.length > 0) {
+                const newDay = _strategyExpiryDay();
+                if (newDay != null) {
+                    for (const leg of strategyLegs) {
+                        if (leg.type !== 'stock') {
+                            leg.expiryDay = newDay;
+                            leg._refDay = sim.day;
+                        }
+                    }
+                    strategy.resetRange(sim.S, strategyLegs);
+                    updateStrategyBuilder();
+                    updateTimeSliderRange();
+                    dirty = true;
+                }
+            }
         },
         onSaveStrategy:   () => handleSaveStrategy(),
         onDeleteStrategy:  () => handleDeleteStrategy(),
@@ -320,7 +378,7 @@ function init() {
     document.addEventListener('shoals:closePosition', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
-            const ok = closePosition(id, sim.S, market.sigma, sim.r, sim.day, sim.q);
+            const ok = closePosition(sim, id, sim.S, market.sigma, sim.r, sim.day, sim.q);
             if (ok && typeof showToast !== 'undefined') showToast('Position closed.');
             chainDirty = true;
             updateUI();
@@ -357,7 +415,7 @@ function init() {
         const positions = portfolio.positions.filter(p => p.strategyName === name);
         let closed = 0;
         for (const pos of [...positions]) {
-            if (closePosition(pos.id, sim.S, market.sigma, sim.r, sim.day, sim.q)) closed++;
+            if (closePosition(sim, pos.id, sim.S, market.sigma, sim.r, sim.day, sim.q)) closed++;
         }
         if (closed > 0) {
             if (typeof showToast !== 'undefined') showToast('Unwound "' + name + '" (' + closed + ' position' + (closed > 1 ? 's' : '') + ').');
@@ -483,11 +541,15 @@ function init() {
                 dirty = true;
             }
             if (isStrategy) {
+                // Invalidate caches so chart/summary reprice with current impact state
+                strategy._cache = null;
+                strategy._summaryCache = null;
                 rebuildStrategyDropdown($, chainSkeleton);
                 const stratPriced = _priceExpiry(_strategyExpiryIdx());
                 updateStrategySelectors($, stratPriced, sim.S, handleAddLeg, _buildStrategyPosMap());
                 updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
                 updateTimeSliderRange();
+                if (strategyLegs.length > 0) updateStrategyBuilder();
             }
         });
     });
@@ -526,6 +588,7 @@ function frame(now) {
         if (!dayInProgress) {
             // Start a new day if enough time has passed since last tick
             if (now - lastTickTime >= tickInterval) {
+                _savedOverlays = applyParamOverlays(sim);
                 sim.beginDay();
                 dayInProgress = true;
                 // Advance by tickInterval (not now) to avoid drift; clamp
@@ -547,18 +610,22 @@ function frame(now) {
             let stepped = false;
             while (sim.substepsDone < targetSteps) {
                 sim.substep();
+                decayImpactVolumes();
+                syncMarket(sim);
+                rehedgeMM(portfolio.positions);
+                _onSubstepTick();
                 chart.setLiveCandle(sim._partial);
                 stepped = true;
             }
-            // Update sidebar & check orders after each substep batch
+            // UI update once per frame (repricing chain/sidebar is expensive)
             if (stepped) {
-                syncMarket(sim);
-                _onSubstep();
+                _onSubstepUI();
                 if (!strategyMode) dirty = true;
             }
             // All sub-steps done — finalize the day
             if (sim.dayComplete) {
                 sim.finalizeDay();
+                removeParamOverlays(sim, _savedOverlays);
                 dayInProgress = false;
                 syncMarket(sim);
                 _onDayComplete();
@@ -583,24 +650,22 @@ function frame(now) {
     requestAnimationFrame(frame);
 }
 
-/** Called after each substep batch — lightweight sidebar + order updates. */
-function _onSubstep() {
+/** Called after each individual substep — orders, margin tracking, peak/drawdown. */
+function _onSubstepTick() {
     const vol = market.sigma;
 
     // Check pending orders at intraday price
-    const filledOrders = checkPendingOrders(sim.S, vol, sim.r, sim.day, sim.q);
+    const filledOrders = checkPendingOrders(sim, sim.S, vol, sim.r, sim.day, sim.q);
     for (const pos of filledOrders) {
         if (typeof showToast !== 'undefined') {
             const side = pos.qty > 0 ? 'Bought' : 'Sold';
-            showToast(side + ' ' + Math.abs(pos.qty) + ' ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
+            showToast(side + ' ' + Math.abs(pos.qty) + 'k ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
         }
         chainDirty = true;
     }
 
-    // Compute margin (equity + required) for display and peak/drawdown tracking
-    const substepMargin = checkMargin(sim.S, market.sigma, sim.r, sim.day, sim.q);
-
     // Track peak equity and drawdown for epilogue scorecard
+    const substepMargin = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
     if (eventEngine) {
         if (substepMargin.equity > portfolio.peakValue) portfolio.peakValue = substepMargin.equity;
         if (portfolio.peakValue > 0) {
@@ -608,12 +673,221 @@ function _onSubstep() {
             if (dd > portfolio.maxDrawdown) portfolio.maxDrawdown = dd;
         }
     }
+}
 
-    // Lightweight UI update: reprice visible expiry, update portfolio, rate
+/** Called once per frame after substep batch — reprices chain/sidebar. */
+function _onSubstepUI() {
+    const substepMargin = checkMargin(sim.S, market.sigma, sim.r, sim.day, sim.q);
     updateSubstepUI(substepMargin);
 }
 
 /** Called after all 16 sub-steps complete — runs portfolio/chain/margin checks. */
+function _processPopupQueue() {
+    if (_popupQueue.length === 0) return;
+    // Don't show if another overlay is open
+    if (!$.chainOverlay.classList.contains('hidden')) return;
+    if (!$.tradeDialog.classList.contains('hidden')) return;
+    if (!$.popupOverlay.classList.contains('hidden')) return;
+
+    const event = _popupQueue.shift();
+    playing = false;
+    updatePlayBtn($, playing);
+
+    const contextText = typeof event.context === 'function'
+        ? event.context(sim, eventEngine?.world, portfolio)
+        : event.context || '';
+
+    const popupCat = event.category || (event.id && event.id.startsWith('desk_') ? 'desk' : '');
+    // Compliance pre-processing: check profitability since last review
+    if (event.choices && event.choices.some(c => c.complianceTier)) {
+        onComplianceTriggered(_portfolioEquity(), sim.day);
+    }
+    showPopupEvent($, event.headline, contextText, event.choices, (idx) => {
+        const choice = event.choices[idx];
+        if (choice.deltas && eventEngine) {
+            eventEngine.applyDeltas(sim, choice.deltas);
+        }
+        if (choice.effects && eventEngine) {
+            applyStructuredEffects(eventEngine.world, choice.effects);
+        }
+        if (choice.playerFlag) {
+            playerChoices[choice.playerFlag] = sim.day;
+        }
+        if (choice.followups && eventEngine) {
+            for (const fu of choice.followups) {
+                eventEngine.scheduleFollowup(fu, sim.day);
+            }
+        }
+        if (choice.resultToast) {
+            showToast(choice.resultToast, 4000);
+        }
+        // -- Declarative trade execution --
+        if (choice.trades) {
+            const vol = market.sigma;
+            const snapshot = [...portfolio.positions];
+            let closed = 0;
+            let pnlSum = 0;
+            for (const trade of choice.trades) {
+                let targets;
+                if (trade.action === 'close_all') {
+                    for (const p of snapshot) {
+                        pnlSum += computePositionPnl(p, sim.S, vol, sim.r, sim.day, sim.q);
+                    }
+                    liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                    closed = snapshot.length;
+                    break;
+                } else if (trade.action === 'close_type') {
+                    targets = snapshot.filter(p => p.type === trade.type);
+                } else if (trade.action === 'close_short') {
+                    targets = snapshot.filter(p =>
+                        (p.type === 'stock' && p.qty < 0) ||
+                        (p.type === 'call' && p.qty < 0) ||
+                        (p.type === 'put' && p.qty > 0)
+                    );
+                } else if (trade.action === 'close_long') {
+                    targets = snapshot.filter(p =>
+                        (p.type === 'stock' && p.qty > 0) ||
+                        (p.type === 'call' && p.qty > 0) ||
+                        (p.type === 'put' && p.qty < 0)
+                    );
+                } else if (trade.action === 'close_options') {
+                    targets = snapshot.filter(p => p.type === 'call' || p.type === 'put');
+                } else if (trade.action === 'hedge_unlimited_risk') {
+                    let nuu = 0;
+                    for (const p of portfolio.positions) {
+                        if (p.type === 'stock' || p.type === 'call') nuu += p.qty;
+                    }
+                    if (nuu < 0) {
+                        const hedgeQty = Math.abs(nuu);
+                        executeMarketOrder(
+                            sim, 'stock', 'long', hedgeQty,
+                            sim.S, vol, sim.r, sim.day,
+                            undefined, undefined, undefined, sim.q
+                        );
+                        showToast(`Hedge placed: bought ${hedgeQty} shares at market.`, 4000);
+                    }
+                    continue;
+                }
+                if (targets) {
+                    for (const p of targets) {
+                        pnlSum += computePositionPnl(p, sim.S, vol, sim.r, sim.day, sim.q);
+                        if (closePosition(sim, p.id, sim.S, vol, sim.r, sim.day, sim.q)) {
+                            closed++;
+                        }
+                    }
+                }
+            }
+            if (closed > 0) {
+                const sign = pnlSum >= 0 ? '+' : '';
+                showToast(`Closed ${closed} position${closed > 1 ? 's' : ''}. P&L: ${sign}${fmtDollar(pnlSum)}`, 4000);
+                chainDirty = true;
+                updateUI();
+            }
+        }
+        // -- Compliance tier processing --
+        if (choice.complianceTier) {
+            onComplianceChoice(choice.complianceTier);
+            if (effectiveHeat() >= COMPLIANCE_GAME_OVER_HEAT) {
+                _showComplianceTermination();
+            }
+        }
+        // -- Insider tip scheduling --
+        if (choice._tipAction && eventEngine) {
+            const tip = pickTip();
+            const isReal = Math.random() < TIP_REAL_PROBABILITY;
+            const eventId = isReal ? tip.realEvent : tip.fakeEvent;
+            showToast(`"Word is ${tip.hint}."`, 6000);
+            eventEngine.scheduleFollowup({ id: eventId, mtth: 14 }, sim.day);
+            if (isReal) {
+                compliance.heat += 1;
+            }
+        }
+        // Margin call actions
+        if (event._marginAction) {
+            const vol = market.sigma;
+            if (choice.playerFlag === 'margin_liquidated') {
+                liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                chainDirty = true;
+                updateUI();
+                if (portfolio.cash < sim.S) {
+                    _showGameOver('Forced liquidation left your account in deficit by '
+                        + fmtDollar(Math.abs(portfolio.cash))
+                        + '. Regulators have flagged the account for review.');
+                }
+            } else if (choice.playerFlag === 'margin_partial') {
+                // Close stock positions only
+                const stockPos = portfolio.positions.filter(p => p.type === 'stock');
+                for (const p of stockPos) {
+                    closePosition(sim, p.id, sim.S, vol, sim.r, sim.day, sim.q);
+                }
+                chainDirty = true;
+                updateUI();
+                // Re-check margin after partial liquidation
+                const recheck = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
+                if (recheck.triggered) {
+                    showToast('Still below margin. Full liquidation required.', 4000);
+                    liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                    chainDirty = true;
+                    updateUI();
+                    if (portfolio.cash < sim.S) {
+                        _showGameOver('Forced liquidation left your account in deficit.');
+                    }
+                }
+            }
+            if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
+        }
+        // Rogue trading / game over actions
+        if (event._gameOverAction) {
+            _resetCore(DEFAULT_PRESET);
+            loadPreset(DEFAULT_PRESET);
+        }
+        dirty = true;
+    }, popupCat, event.magnitude);
+}
+
+function _showGameOver(contextText) {
+    _popupQueue.unshift({
+        category: 'gameover',
+        magnitude: 'major',
+        headline: 'Rogue Trading Investigation',
+        context: contextText,
+        choices: [
+            {
+                label: 'Accept your fate',
+                desc: 'There is no way out. The investigation has begun.',
+                playerFlag: 'game_over',
+                resultToast: 'Your career at Meridian Capital is over.',
+            },
+        ],
+        _gameOverAction: true,
+    });
+    _processPopupQueue();
+}
+
+function _showComplianceTermination() {
+    playing = false;
+    updatePlayBtn($, playing);
+    playerChoices['compliance_terminated'] = sim.day;
+    _showEpilogue('compliance');
+}
+
+function _portfolioEquity() {
+    let equity = portfolio.cash;
+    for (const p of portfolio.positions) {
+        equity += computePositionValue(p, sim.S, market.sigma, sim.r, sim.day, sim.q);
+    }
+    return equity;
+}
+
+function _recordImpact(day, direction, magnitude, context) {
+    if (Math.abs(magnitude) < 0.5) return;
+    impactHistory.push({ day, direction, magnitude, context });
+    if (impactHistory.length > 15) {
+        impactHistory.sort((a, b) => Math.abs(b.magnitude) - Math.abs(a.magnitude));
+        impactHistory.length = 15;
+    }
+}
+
 function _onDayComplete() {
     const vol = market.sigma;
 
@@ -634,7 +908,33 @@ function _onDayComplete() {
         }
     }
 
-    const { expired, unwound } = processExpiry(sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
+    // Quarterly desk review (live trading only)
+    if (sim.day > HISTORY_CAPACITY && sim.day % QUARTERLY_CYCLE === 0) {
+        const buyHoldPnl = (sim.S - 100) * (portfolio.initialCapital / 100);
+        const actualPnl = _portfolioEquity() - portfolio.initialCapital;
+        const vsBenchmark = actualPnl - buyHoldPnl;
+        let rating;
+        if (vsBenchmark > portfolio.initialCapital * 0.1) rating = 'strong';
+        else if (vsBenchmark > 0) rating = 'solid';
+        else if (vsBenchmark > -portfolio.initialCapital * 0.1) rating = 'underperform';
+        else rating = 'poor';
+
+        quarterlyReviews.push({ day: sim.day, pnl: actualPnl, vsBenchmark, rating });
+
+        const texts = {
+            strong: 'Quarterly Desk Review: Meridian\'s risk committee notes exceptional returns.',
+            solid: 'Quarterly Desk Review: Solid quarter. Book within risk parameters.',
+            underperform: 'Quarterly Desk Review: Returns lag benchmark. Risk committee requests position summary.',
+            poor: 'Quarterly Desk Review: Managing Director Liu wants a meeting about your book.',
+        };
+        let text = texts[rating];
+        if (playerChoices.cooperated_sec || playerChoices.silent_sec || playerChoices.accepted_insider_tip) {
+            text += ' The SEC inquiry hasn\'t helped perception of the desk.';
+        }
+        showToast(text, rating === 'poor' ? 8000 : 5000);
+    }
+
+    const { expired, unwound } = processExpiry(sim, sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
     if (unwound.length > 0) {
         const names = [...new Set(unwound.map(p => p.strategyName))];
         for (const name of names) {
@@ -654,34 +954,86 @@ function _onDayComplete() {
 
     // Fire dynamic events
     if (eventEngine) {
-        const events = eventEngine.maybeFire(sim, sim.day);
-        if (events.length > 0) {
+        const netDelta = computeNetDelta();
+        const { fired, popups } = eventEngine.maybeFire(sim, sim.day, netDelta);
+        for (const ev of popups) _popupQueue.push(ev);
+        if (fired.length > 0) {
             sim.recomputeK();
             syncMarket(sim);
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
             updateCongressDiagrams($, eventEngine.world);
             if (typeof showToast !== 'undefined') {
-                for (let i = 0; i < events.length; i++) {
-                    const ev = events[i];
+                for (let i = 0; i < fired.length; i++) {
+                    const ev = fired[i];
+                    let headline = ev.headline;
+                    if (ev.portfolioFlavor) {
+                        const flavor = ev.portfolioFlavor(portfolio);
+                        if (flavor) headline += ' ' + flavor;
+                    }
                     const duration = ev.magnitude === 'major' ? 8000
                         : ev.magnitude === 'moderate' ? 5000 : 3000;
-                    setTimeout(function() { showToast(ev.headline, duration); }, i * 1500);
+                    setTimeout(function() { showToast(headline, duration); }, i * 1500);
                 }
             }
         }
     }
 
+    // Portfolio-triggered popup events
+    if (eventEngine) {
+        const portfolioPopups = evaluatePortfolioPopups(sim, eventEngine.world, portfolio, sim.day);
+        for (const pp of portfolioPopups) _popupQueue.push(pp);
+    }
+
+    // Layer 3: update param shifts based on gross exposure
+    const grossNotional = computeGrossNotional();
+    const grossRatio = grossNotional / (market.S * ADV);
+    updateParamShifts(grossRatio);
+    decayParamShifts();
+
+    // Impact toast
+    const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
+    const toast = selectImpactToast(grossRatio, hasOptions ? 'option' : 'stock', sim.day);
+    if (toast) showToast(toast, 3000);
+
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     chainDirty = true;
+
+    // Rogue trading check (before margin)
+    const equity = _portfolioEquity();
+    if (equity < portfolio.initialCapital * ROGUE_TRADING_THRESHOLD) {
+        const lossAmt = fmtDollar(Math.abs(portfolio.initialCapital - equity));
+        _showGameOver(`Meridian Capital's internal audit has uncovered ${lossAmt} in unauthorized losses on your desk. Bank security has been called. Your access has been revoked. The SEC has been notified.`);
+        return;
+    }
 
     // Check margin
     const margin = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
     if (margin.triggered) {
         portfolio.marginCallCount++;
-        playing = false;
-        updatePlayBtn($, playing);
-        showMarginCall($, margin);
+        const shortfall = margin.required - margin.equity;
+        _popupQueue.unshift({
+            category: 'margin',
+            magnitude: 'major',
+            headline: 'Margin Call',
+            context: `Portfolio equity ${fmtDollar(margin.equity)} is below the maintenance requirement of ${fmtDollar(margin.required)}. Shortfall: ${fmtDollar(shortfall)}. The risk desk is on the line.`,
+            choices: [
+                {
+                    label: 'Liquidate all positions',
+                    desc: 'Dump everything at market. Stop the bleeding.',
+                    playerFlag: 'margin_liquidated',
+                    resultToast: 'All positions liquidated.',
+                },
+                {
+                    label: 'Sell stock first',
+                    desc: 'Unload equity exposure, keep options book intact.',
+                    playerFlag: 'margin_partial',
+                    resultToast: 'Stock positions closed.',
+                },
+            ],
+            _marginAction: true,
+        });
+        _processPopupQueue();
     }
 
     // Auto-scroll: keep latest candle near right edge when playing
@@ -706,6 +1058,8 @@ function _onDayComplete() {
 
     updateUI(margin);
     dirty = true;
+
+    _processPopupQueue();
 }
 
 // ---------------------------------------------------------------------------
@@ -716,11 +1070,26 @@ function _onDayComplete() {
 function tick() {
     if (dayInProgress) {
         // Finish remaining sub-steps instantly
-        while (!sim.dayComplete) sim.substep();
+        while (!sim.dayComplete) {
+            sim.substep();
+            decayImpactVolumes();
+            syncMarket(sim);
+            rehedgeMM(portfolio.positions);
+            _onSubstepTick();
+        }
         sim.finalizeDay();
         dayInProgress = false;
     } else {
-        sim.tick();
+        // Full day: beginDay + substeps + finalizeDay
+        sim.beginDay();
+        for (let i = 0; i < INTRADAY_STEPS; i++) {
+            sim.substep();
+            decayImpactVolumes();
+            syncMarket(sim);
+            rehedgeMM(portfolio.positions);
+            _onSubstepTick();
+        }
+        sim.finalizeDay();
     }
     // Snap the lerp to the final state (no animation for step)
     const last = sim.history.last();
@@ -735,7 +1104,6 @@ function tick() {
         chart._lerp._targetHigh  = last.high;
         chart._lerp._targetLow   = last.low;
     }
-    syncMarket(sim);
     _onDayComplete();
 }
 
@@ -763,6 +1131,10 @@ function updateUI(precomputedMargin) {
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     updateRateDisplay($, sim.r, rateHistory);
+    refreshTooltip();
+    if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
+        _updateTradeCreditDebit();
+    }
     if (strategyMode && strategyLegs.length > 0) {
         updateStrategyBuilder();
     }
@@ -894,9 +1266,12 @@ function step() {
 
     // Advance one substep
     sim.substep();
-    chart.setLiveCandle(sim._partial);
+    decayImpactVolumes();
     syncMarket(sim);
-    _onSubstep();
+    rehedgeMM(portfolio.positions);
+    _onSubstepTick();
+    chart.setLiveCandle(sim._partial);
+    _onSubstepUI();
 
     // If all substeps done, finalize the day
     if (sim.dayComplete) {
@@ -931,8 +1306,16 @@ function decycleSpeed() {
 function _resetCore(index) {
     document.getElementById('epilogue-overlay')?.classList.add('hidden');
     document.getElementById('fraud-overlay')?.classList.add('hidden');
+    document.getElementById('popup-event-overlay')?.classList.add('hidden');
+    _popupQueue.length = 0;
+    for (const k in playerChoices) delete playerChoices[k];
+    impactHistory.length = 0;
+    quarterlyReviews.length = 0;
+    resetPopupCooldowns();
+    resetCompliance();
     sim.reset(index);
     resetPortfolio();
+    resetImpactState();
     sim.prepopulate();
     syncMarket(sim);
     _initRateHistory();
@@ -1022,11 +1405,12 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
     const vol = market.sigma;
     const orderType = _getOrderType();
     if (orderType === 'market') {
-        const pos = executeMarketOrder(type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q);
+        const pos = executeMarketOrder(sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q);
         if (pos) {
             const label = side === 'short' ? 'Shorted' : 'Bought';
-            if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + ' ' + type + ' at $' + pos.fillPrice.toFixed(2));
+            if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + 'k ' + type + ' at $' + pos.fillPrice.toFixed(2));
             if (typeof _haptics !== 'undefined') _haptics.trigger('success');
+            if (type === 'stock') _recordImpact(sim.day, side === 'long' ? 1 : -1, qty, 'Stock trade');
         } else {
             if (typeof showToast !== 'undefined') showToast('Insufficient margin.');
             if (typeof _haptics !== 'undefined') _haptics.trigger('error');
@@ -1034,12 +1418,13 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
     } else {
         const triggerPrice = _getTriggerPrice();
         placePendingOrder(type, side, qty, orderType, triggerPrice, strike, expiryDay);
-        if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' order placed for ' + qty + ' ' + type + '.');
+        if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' order placed for ' + qty + 'k ' + type + '.');
         if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
     }
     chainDirty = true;
     updateUI();
     dirty = true;
+    _refreshChainOverlayIfOpen();
 }
 
 function handleBuyStock() {
@@ -1071,11 +1456,12 @@ function handleChainCellClick(info) {
 function openFullChain() {
     if (playing) togglePlay();
     const vol = market.sigma;
+    const displaySpot = sim.S + getStockImpact(market.sigma);
     const bondDte = _getTradeExpiryDay() - sim.day;
     const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
-    const stockBA = computeBidAsk(sim.S, sim.S, vol);
-    const bondBA = computeBidAsk(bondMid, sim.S, vol);
-    showChainOverlay($, chainSkeleton, _priceExpiryGreeks, stockBA, bondBA, _buildPosMap());
+    const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
+    const bondBA = computeBidAsk(bondMid, displaySpot, vol);
+    showChainOverlay($, chainSkeleton, _priceExpiryGreeks, stockBA, bondBA, _buildPosMap(), displaySpot);
 }
 
 function handleTradeSubmit(data) {
@@ -1084,10 +1470,10 @@ function handleTradeSubmit(data) {
 
     if (orderType === 'market') {
         const pos = executeMarketOrder(
-            type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q
+            sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q
         );
         if (pos) {
-            if (typeof showToast !== 'undefined') showToast('Order filled: ' + type + ' x' + qty);
+            if (typeof showToast !== 'undefined') showToast('Order filled: ' + type + ' x' + qty + 'k');
             if (typeof _haptics !== 'undefined') _haptics.trigger('success');
         } else {
             if (typeof showToast !== 'undefined') showToast('Order failed — insufficient margin.');
@@ -1102,18 +1488,32 @@ function handleTradeSubmit(data) {
     chainDirty = true;
     updateUI();
     dirty = true;
+    _refreshChainOverlayIfOpen();
+}
+
+function _refreshChainOverlayIfOpen() {
+    if ($.chainOverlay.classList.contains('hidden') || !$._refreshChainOverlay) return;
+    const vol = market.sigma;
+    const displaySpot = sim.S + getStockImpact(market.sigma);
+    const bondDte = _getTradeExpiryDay() - sim.day;
+    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
+    const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
+    const bondBA = computeBidAsk(bondMid, displaySpot, vol);
+    $._refreshChainOverlay(stockBA, bondBA, _buildPosMap(), displaySpot);
 }
 
 function handleLiquidate() {
     const vol = market.sigma;
-    liquidateAll(sim.S, vol, sim.r, sim.day, sim.q);
+    liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
     chainDirty = true;
     updateUI();
     dirty = true;
     if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
 
     if (portfolio.cash < sim.S) {
-        showFraudScreen($, portfolio.cash);
+        _showGameOver('Following the forced liquidation of all positions, your account remains in deficit by '
+            + fmtDollar(Math.abs(portfolio.cash))
+            + '. Regulators have flagged the account for review.');
     } else {
         if (typeof showToast !== 'undefined') showToast('All positions liquidated.');
     }
@@ -1215,7 +1615,7 @@ function handleSaveStrategy() {
     updateStrategyBuilder();
 }
 
-function executeWithRollback(resolvedLegs, strategyName) {
+function executeWithRollback(resolvedLegs, strategyName, execMult) {
     const savedCash = portfolio.cash;
     const savedPositions = portfolio.positions.map(p => ({ ...p }));
     const savedClosedBorrowCost = portfolio.closedBorrowCost;
@@ -1229,11 +1629,12 @@ function executeWithRollback(resolvedLegs, strategyName) {
         const side = leg.qty < 0 ? 'short' : 'long';
         const absQty = Math.abs(leg.qty);
         const pos = executeMarketOrder(
-            leg.type, side, absQty, sim.S, market.sigma, sim.r, sim.day,
+            sim, leg.type, side, absQty, sim.S, market.sigma, sim.r, sim.day,
             leg.strike, leg.expiryDay, strategyName, sim.q
         );
         if (pos) {
             if (!pos.strategyBaseQty) pos.strategyBaseQty = leg._baseQty || absQty;
+            pos._fillCost = pos.fillPrice * absQty * (side === 'long' ? 1 : -1);
             results.push(pos);
         } else {
             failed = true;
@@ -1252,7 +1653,12 @@ function executeWithRollback(resolvedLegs, strategyName) {
         if (typeof showToast !== 'undefined') showToast('Strategy failed (leg ' + (results.length + 1) + ' rejected) \u2014 all legs unwound.');
         if (typeof _haptics !== 'undefined') _haptics.trigger('error');
     } else if (results.length > 0) {
-        if (typeof showToast !== 'undefined') showToast('Executed ' + results.length + ' leg(s).');
+        const netDebit = results.reduce((sum, r) => sum + r._fillCost, 0);
+        const mult = execMult || 1;
+        const perUnit = Math.abs(netDebit / mult);
+        const verb = netDebit > 0 ? 'at' : 'for credit';
+        const name = strategyName + 's';
+        if (typeof showToast !== 'undefined') showToast('Executed ' + mult + 'k ' + name + ' ' + verb + ' $' + perUnit.toFixed(2));
         if (typeof _haptics !== 'undefined') _haptics.trigger('success');
     }
     chainDirty = true;
@@ -1327,7 +1733,7 @@ function handleTradeExecStrategy() {
     const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
     const mult = parseInt($.tradeQty?.value, 10) || 1;
     const scaled = resolved.map(l => ({ ...l, _baseQty: Math.abs(l.qty), qty: l.qty * mult }));
-    executeWithRollback(scaled, strat.name);
+    executeWithRollback(scaled, strat.name, mult);
 }
 
 function _updateTradeCreditDebit() {
@@ -1339,8 +1745,7 @@ function _updateTradeCreditDebit() {
         const expiries = expiryMgr.update(sim.day);
         const overrideDay = strat.selectableExpiry ? _tradeExpiryDay() : null;
         const net = computeNetCost(strat.legs, sim.S, market.sigma, sim.r, sim.day, sim.q, expiries, overrideDay);
-        const mult = parseInt($.tradeQty?.value, 10) || 1;
-        updateCreditDebit($, net * mult);
+        updateCreditDebit($, net);
     } catch { updateCreditDebit($, null); }
 }
 
@@ -1385,8 +1790,8 @@ function updateStrategyBuilder() {
 // Epilogue overlay controller
 // ---------------------------------------------------------------------------
 
-function _showEpilogue() {
-    const pages = generateEpilogue(eventEngine.world, sim, portfolio, eventEngine.eventLog);
+function _showEpilogue(terminationReason = null) {
+    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason);
     let currentPage = 0;
 
     const overlay = document.getElementById('epilogue-overlay');
