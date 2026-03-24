@@ -527,7 +527,7 @@ export class StrategyRenderer {
      */
     computeSummary(legs, spot, vol, rate, dte, evalDay, entryDay, q) {
         if (!legs || legs.length === 0) {
-            return { maxProfit: 0, maxLoss: 0, breakevens: [], netCost: 0 };
+            return { maxProfit: 0, maxLoss: 0, breakevens: [], netCost: 0, greeks: { delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 } };
         }
 
         const sumKey = _cacheKey(legs, vol, rate, evalDay, entryDay, dte, (spot * 100 | 0) + ',' + (q * 1e6 | 0) + ',' + _modelKey());
@@ -595,7 +595,19 @@ export class StrategyRenderer {
         const pnls = samplePts.map(S => _pnlAt(S));
         const breakevens = _zeroCrossings(xs, pnls);
 
-        const result = { maxProfit, maxLoss, breakevens, netCost };
+        // Aggregate Greeks at current spot
+        const infos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q);
+        const greeks = { delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 };
+        for (const info of infos) {
+            const g = _legGreeksFast(info, spot);
+            greeks.delta += g.delta;
+            greeks.gamma += g.gamma;
+            greeks.theta += g.theta;
+            greeks.vega  += g.vega;
+            greeks.rho   += g.rho;
+        }
+
+        const result = { maxProfit, maxLoss, breakevens, netCost, greeks };
         this._summaryCache = { key: sumKey, result };
         return result;
     }

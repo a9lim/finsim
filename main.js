@@ -86,6 +86,7 @@ let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
+let portfolioHistory = null; // sparkline ring buffer for portfolio value
 let _savedOverlays = {};
 
 const _popupQueue = [];
@@ -103,6 +104,14 @@ function _initRateHistory() {
     for (let d = h.minDay; d <= h.maxDay; d++) {
         const bar = h.get(d);
         if (bar) pushSparkSample(rateHistory, bar.r);
+    }
+}
+
+function _initPortfolioHistory() {
+    portfolioHistory = createSparkHistory(HISTORY_CAPACITY);
+    // Start with initial capital for the prepopulated history period
+    for (let d = 0; d < HISTORY_CAPACITY; d++) {
+        pushSparkSample(portfolioHistory, portfolio.initialCapital);
     }
 }
 
@@ -445,6 +454,7 @@ function init() {
     sim.prepopulate();
     syncMarket(sim);
     _initRateHistory();
+    _initPortfolioHistory();
     chart.dayOrigin = sim.day;
 
     // 14. Build initial chain and update UI
@@ -1056,6 +1066,9 @@ function _onDayComplete() {
         lastSpot = sim.S;
     }
 
+    // Record portfolio value for sparkline
+    if (portfolioHistory) pushSparkSample(portfolioHistory, _portfolioEquity());
+
     updateUI(margin);
     dirty = true;
 
@@ -1128,7 +1141,7 @@ function updateUI(precomputedMargin) {
         }
         chainDirty = false;
     }
-    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q);
+    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q, portfolioHistory);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     updateRateDisplay($, sim.r, rateHistory);
     refreshTooltip();
@@ -1159,7 +1172,7 @@ function updateSubstepUI(marginInfo) {
     }
 
     // Portfolio mark-to-market
-    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, marginInfo, sim.q);
+    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, marginInfo, sim.q, portfolioHistory);
     if (activeTab === 'portfolio') {
         updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     }
@@ -1319,6 +1332,7 @@ function _resetCore(index) {
     sim.prepopulate();
     syncMarket(sim);
     _initRateHistory();
+    _initPortfolioHistory();
     chart.dayOrigin = sim.day;
     dayInProgress = false;
     chart._lerp.day = -1;
