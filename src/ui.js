@@ -12,6 +12,7 @@ import { renderChainInto, rebuildExpiryDropdown, buildStockBondTable, buildChain
 import { vasicekBondPrice } from './pricing.js';
 import { BOND_FACE_VALUE, STRIKE_INTERVAL, STRIKE_RANGE } from './config.js';
 import { market } from './market.js';
+import { getStockImpact } from './price-impact.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
 // ---------------------------------------------------------------------------
@@ -93,12 +94,10 @@ export function cacheDOMElements($) {
     $.tradeConfirmBtn     = document.getElementById('trade-confirm-btn');
     $.tradeCancelBtn      = document.getElementById('trade-cancel-btn');
     $.tradeDialogClose    = document.getElementById('trade-dialog-close');
-    $.marginCallOverlay   = document.getElementById('margin-call-overlay');
-    $.marginCallMsg       = document.getElementById('margin-call-msg');
-    $.marginCallLiquidate = document.getElementById('margin-call-liquidate');
-    $.fraudOverlay        = document.getElementById('fraud-overlay');
-    $.fraudMsg            = document.getElementById('fraud-msg');
-    $.fraudReset          = document.getElementById('fraud-reset');
+    $.popupOverlay   = document.getElementById('popup-event-overlay');
+    $.popupHeadline  = document.getElementById('popup-event-headline');
+    $.popupContext   = document.getElementById('popup-event-context');
+    $.popupChoices   = document.getElementById('popup-event-choices');
     $.introScreen = document.getElementById('intro-screen');
     $.introStart  = document.getElementById('intro-start');
     $.strategyLegsList = document.getElementById('strategy-legs-list');
@@ -152,6 +151,7 @@ export function bindEvents($, handlers) {
         onChainCellClick, onFullChainOpen, onExpiryChange,
         onTradeSubmit, onLiquidate,
         onLLMKeyChange, onLLMModelChange,
+        onChainClose, onTradeClose, onMarginClose,
     } = handlers;
 
     $.playBtn.addEventListener('click', onTogglePlay);
@@ -219,28 +219,18 @@ export function bindEvents($, handlers) {
     });
     $.fullChainLink.addEventListener('click', onFullChainOpen);
 
-    const _hideClass = (el) => () => el.classList.add('hidden');
-    initOverlayDismiss($.chainOverlay, $.chainOverlayClose, _hideClass($.chainOverlay));
+    const _hideClass = (el, afterHide) => () => { el.classList.add('hidden'); if (typeof afterHide === 'function') afterHide(); };
+    initOverlayDismiss($.chainOverlay, $.chainOverlayClose, _hideClass($.chainOverlay, onChainClose));
 
-    const closeTrade = _hideClass($.tradeDialog);
+    const closeTrade = _hideClass($.tradeDialog, onTradeClose);
     initOverlayDismiss($.tradeDialog, $.tradeDialogClose, closeTrade);
     $.tradeCancelBtn.addEventListener('click', closeTrade);
-
-    $.marginCallLiquidate.addEventListener('click', () => {
-        $.marginCallOverlay.classList.add('hidden');
-        if (typeof onLiquidate === 'function') onLiquidate();
-        if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
-    });
-    $.fraudReset.addEventListener('click', () => {
-        $.fraudOverlay.classList.add('hidden');
-        if (typeof onReset === 'function') onReset();
-    });
 
     $._onChainCellClick = onChainCellClick;
     $._onTradeSubmit    = onTradeSubmit;
 
     // Trade tab qty slider
-    if ($.tradeQty) _forms.bindSlider($.tradeQty, $.tradeQtyVal);
+    if ($.tradeQty) _forms.bindSlider($.tradeQty, $.tradeQtyVal, null, v => v + 'k');
 
     // Trade tab expiry dropdown
     if ($.tradeExpiry) {
@@ -257,6 +247,15 @@ export function bindEvents($, handlers) {
         $.strategyExpiry.addEventListener('change', () => {
             if (typeof handlers.onStrategyExpiryChange === 'function') {
                 handlers.onStrategyExpiryChange(parseInt($.strategyExpiry.value, 10));
+            }
+        });
+    }
+
+    // Selectable expiry toggle -- override legs when turned on
+    if ($.selectableExpiryToggle) {
+        $.selectableExpiryToggle.addEventListener('change', () => {
+            if (typeof handlers.onSelectableExpiryChange === 'function') {
+                handlers.onSelectableExpiryChange($.selectableExpiryToggle.checked);
             }
         });
     }
@@ -424,8 +423,9 @@ function _bidAskTip(mid, vol) {
  */
 export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, stratPosMap) {
     const dash = '\u2014';
-    const stockTxt = spot != null ? spot.toFixed(2) : dash;
-    const stockTip = _bidAskTip(spot, sigma);
+    const displaySpot = spot != null ? spot + getStockImpact(sigma) : null;
+    const stockTxt = displaySpot != null ? displaySpot.toFixed(2) : dash;
+    const stockTip = _bidAskTip(displaySpot, sigma);
 
     // Trade tab bond: from trade expiry dropdown
     const tradeIdx = parseInt($.tradeExpiry?.value, 10);
@@ -498,7 +498,7 @@ export function syncSettingsUI($, sim) {
  * @param {{ bid, ask }} bondBA
  * @param {object} posMap
  */
-export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posMap) {
+export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posMap, spot) {
     $.chainOverlayTable.textContent = '';
 
     if (!skeleton || skeleton.length === 0) {
@@ -511,6 +511,7 @@ export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posM
     }
 
     let selectedExpiry = 0;
+    let _sba = stockBA, _bba = bondBA, _pm = posMap, _sp = spot;
 
     function renderOverlay() {
         $.chainOverlayTable.textContent = '';
@@ -532,90 +533,25 @@ export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posM
 
         // Stock / Bond price table
         $.chainOverlayTable.appendChild(
-            buildStockBondTable(stockBA, bondBA, $._onChainCellClick, posMap)
+            buildStockBondTable(_sba, _bba, $._onChainCellClick, _pm)
         );
 
         const expiry = priceExpiry(selectedExpiry);
-        $.chainOverlayTable.appendChild(buildChainTable(expiry, false, posMap));
+        $.chainOverlayTable.appendChild(buildChainTable(expiry, false, _pm, _sp));
         if (!$.chainOverlayTable._chainClicksBound) {
             bindChainTableClicks($.chainOverlayTable, $._onChainCellClick);
             $.chainOverlayTable._chainClicksBound = true;
         }
     }
 
+    $._refreshChainOverlay = (newStockBA, newBondBA, newPosMap, newSpot) => {
+        _sba = newStockBA; _bba = newBondBA; _pm = newPosMap; _sp = newSpot;
+        renderOverlay();
+    };
+
     renderOverlay();
     $.chainOverlay.classList.remove('hidden');
     if (typeof _haptics !== 'undefined') _haptics.trigger('light');
-}
-
-// ---------------------------------------------------------------------------
-// showMarginCall
-// ---------------------------------------------------------------------------
-
-export function showMarginCall($, marginInfo) {
-    const { equity, required } = marginInfo;
-    const shortfall = required - equity;
-    const msg = $.marginCallMsg;
-    msg.textContent = '';
-    const frag = document.createDocumentFragment();
-    frag.appendChild(document.createTextNode('Portfolio equity '));
-    const eq = document.createElement('strong');
-    eq.textContent = fmtDollar(equity);
-    frag.appendChild(eq);
-    frag.appendChild(document.createTextNode(' is below the maintenance requirement of '));
-    const req = document.createElement('strong');
-    req.textContent = fmtDollar(required);
-    frag.appendChild(req);
-    frag.appendChild(document.createTextNode('. Shortfall: '));
-    const sf = document.createElement('strong');
-    sf.className = 'margin-alert';
-    sf.textContent = fmtDollar(shortfall);
-    frag.appendChild(sf);
-    frag.appendChild(document.createTextNode('.'));
-    msg.appendChild(frag);
-    $.marginCallOverlay.classList.remove('hidden');
-    if (typeof _haptics !== 'undefined') _haptics.trigger('error');
-}
-
-export function showFraudScreen($, equity) {
-    const loss = fmtDollar(Math.abs(equity));
-    $.fraudMsg.textContent = '';
-    const frag = document.createDocumentFragment();
-
-    const p1 = document.createElement('p');
-    p1.className = 'fraud-message';
-    p1.textContent = 'Following the forced liquidation of all positions, your account '
-        + 'remains in deficit by ' + loss + '. Regulators have flagged the account for '
-        + 'review.';
-    frag.appendChild(p1);
-
-    const p2 = document.createElement('p');
-    p2.className = 'fraud-message';
-    p2.textContent = 'After a brief but enthusiastic investigation, a federal grand jury has '
-        + 'returned indictments on the following charges:';
-    const c1 = document.createElement('span');
-    c1.className = 'fraud-charge';
-    c1.textContent = '18 U.S.C. \u00A7 1348 \u2014 Securities Fraud';
-    p2.appendChild(c1);
-    const c2 = document.createElement('span');
-    c2.className = 'fraud-charge';
-    c2.textContent = '26 U.S.C. \u00A7 7201 \u2014 Tax Evasion';
-    p2.appendChild(c2);
-    frag.appendChild(p2);
-
-    const p3 = document.createElement('p');
-    p3.className = 'fraud-message';
-    p3.textContent = 'You have been sentenced to 25 years at a minimum-security federal '
-        + 'correctional facility. Your broker sends their regards.';
-    const sent = document.createElement('span');
-    sent.className = 'fraud-sentence';
-    sent.textContent = 'Better luck next time.';
-    p3.appendChild(sent);
-    frag.appendChild(p3);
-
-    $.fraudMsg.appendChild(frag);
-    $.fraudOverlay.classList.remove('hidden');
-    if (typeof _haptics !== 'undefined') _haptics.trigger('error');
 }
 
 // ---------------------------------------------------------------------------
@@ -718,7 +654,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
             const fmtVal = (v) => {
                 if (v === Infinity) return '\u221E';
                 if (v === -Infinity) return '-\u221E';
-                return fmtDollar(v);
+                return (v < 0 ? '-' : '') + Math.abs(v).toFixed(2);
             };
             const items = [
                 { label: summary.netCost < 0 ? 'Net Credit' : 'Net Debit', value: fmtVal(Math.abs(summary.netCost)), cls: summary.netCost < 0 ? 'pnl-up' : 'pnl-down' },
@@ -728,7 +664,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
             if (summary.breakevens.length > 0) {
                 items.push({
                     label: 'Breakeven' + (summary.breakevens.length > 1 ? 's' : ''),
-                    value: summary.breakevens.map(b => '$' + b.toFixed(2)).join(', '),
+                    value: summary.breakevens.map(b => b.toFixed(2)).join(', '),
                     cls: '',
                 });
             }
@@ -789,7 +725,7 @@ export function updateCreditDebit($, netCost) {
     }
     const isCredit = netCost < 0;
     const label = isCredit ? 'Net Credit' : 'Net Debit';
-    const value = '$' + Math.abs(netCost).toFixed(2);
+    const value = Math.abs(netCost).toFixed(2);
     $.strategyCreditDebit.querySelector('.stat-label').textContent = label;
     $.strategyNetCost.textContent = value;
     $.strategyNetCost.className = 'stat-value ' + (isCredit ? 'pnl-up' : 'pnl-down');
@@ -799,12 +735,10 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
     const row = document.createElement('div');
     row.className = 'leg-row stat-row';
 
-    // Label: "Long CALL K105 12d" or "Short STOCK" etc.
+    // Label: "L:CALL ATM+5 3mo" matching portfolio format
     const label = document.createElement('span');
     label.className = 'stat-label';
-    const isShort = leg.qty < 0;
-    const sideStr = isShort ? 'Short' : 'Long';
-    let desc = sideStr + ' ' + leg.type.toUpperCase();
+    let desc = posTypeLabel(leg.type, leg.qty);
     if (leg.strike != null) {
         const atm = Math.round((leg._refS || 100) / 5) * 5;
         const offset = leg.strike - atm;
@@ -812,12 +746,8 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
     }
     if (leg.expiryDay != null) {
         const expiry = skeleton ? skeleton.find(e => e.day === leg.expiryDay) : null;
-        if (expiry) {
-            desc += ' ' + expiry.dte + 'd';
-        } else {
-            const refDay = leg._refDay || 0;
-            desc += ' ' + Math.max(1, leg.expiryDay - refDay) + 'd';
-        }
+        const dte = expiry ? expiry.dte : Math.max(1, leg.expiryDay - (leg._refDay || 0));
+        desc += ' ' + fmtDte(dte);
     }
     label.textContent = desc;
 
@@ -1053,4 +983,83 @@ export function updateCongressDiagrams($, world) {
     const houseTotal = h.federalist + h.farmerLabor;
     _drawParliament($.houseDiagram, houseSegs, houseTotal);
     _updateLegend($.houseLegend, houseSegs, 218);
+}
+
+const _popupCategoryMeta = {
+    fed:            { label: 'Federal Reserve',    color: 'var(--ext-blue)' },
+    investigation:  { label: 'Investigation',      color: 'var(--ext-red)' },
+    pnth:           { label: 'Palanthropic',       color: 'var(--ext-purple)' },
+    pnth_earnings:  { label: 'PNTH Earnings',      color: 'var(--ext-purple)' },
+    congressional:  { label: 'Congress',            color: 'var(--ext-indigo)' },
+    political:      { label: 'Political',           color: 'var(--ext-orange)' },
+    midterm:        { label: 'Election',            color: 'var(--ext-rose)' },
+    macro:          { label: 'Macro',               color: 'var(--ext-cyan)' },
+    sector:         { label: 'Sector',              color: 'var(--ext-lime)' },
+    market:         { label: 'Markets',             color: 'var(--ext-yellow)' },
+    compound:       { label: 'Crisis',              color: 'var(--ext-red)' },
+    desk:           { label: 'Meridian Capital',    color: 'var(--accent)' },
+    margin:         { label: 'Margin Call',         color: 'var(--down)' },
+    gameover:       { label: 'Game Over',           color: 'var(--ext-red)' },
+};
+
+export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude) {
+    // Category badge + accent color
+    const meta = _popupCategoryMeta[category] || _popupCategoryMeta.desk;
+    const panel = $.popupOverlay.querySelector('.sim-overlay-panel');
+    panel.style.borderTopColor = meta.color;
+
+    // Magnitude-based backdrop
+    if (magnitude === 'major') {
+        $.popupOverlay.style.background = 'rgba(0,0,0,0.55)';
+        $.popupOverlay.style.backdropFilter = 'blur(8px) saturate(1.2)';
+    } else {
+        $.popupOverlay.style.background = '';
+        $.popupOverlay.style.backdropFilter = '';
+    }
+
+    // Category tag
+    let tag = $.popupOverlay.querySelector('.popup-tag');
+    if (!tag) {
+        tag = document.createElement('span');
+        tag.className = 'popup-tag';
+        $.popupHeadline.parentNode.insertBefore(tag, $.popupHeadline);
+    }
+    tag.textContent = meta.label;
+    tag.style.color = meta.color;
+    tag.style.borderColor = meta.color;
+
+    $.popupHeadline.textContent = headline;
+    $.popupContext.textContent = context;
+    $.popupChoices.textContent = '';
+    choices.forEach((c, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'popup-choice-btn';
+        const lbl = document.createElement('span');
+        lbl.className = 'popup-choice-label';
+        lbl.textContent = c.label;
+        const desc = document.createElement('span');
+        desc.className = 'popup-choice-desc';
+        desc.textContent = c.desc;
+        btn.appendChild(lbl);
+        btn.appendChild(desc);
+        btn.addEventListener('click', () => {
+            $.popupOverlay.classList.add('hidden');
+            // Clean up inline styles
+            panel.style.borderTopColor = '';
+            $.popupOverlay.style.background = '';
+            $.popupOverlay.style.backdropFilter = '';
+            onChoice(i);
+        });
+        $.popupChoices.appendChild(btn);
+    });
+    $.popupOverlay.classList.remove('hidden');
+    if (typeof _haptics !== 'undefined') _haptics.trigger(magnitude === 'major' ? 'medium' : 'light');
+}
+
+export function hidePopupEvent($) {
+    $.popupOverlay.classList.add('hidden');
+}
+
+export function isPopupVisible($) {
+    return !$.popupOverlay.classList.contains('hidden');
 }

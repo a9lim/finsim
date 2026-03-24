@@ -11,6 +11,7 @@
 import { STRIKE_INTERVAL, STRIKE_RANGE, TRADING_DAYS_PER_YEAR, QUARTERLY_CYCLE, EXPIRY_COUNT, OPTION_SPREAD_PCT, MONEYNESS_SPREAD_WEIGHT } from './config.js';
 import { allocTree, prepareTree, pricePairWithTree, allocGreekTrees, prepareGreekTrees, computeGreeksPairWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { computeOptionBidAsk } from './portfolio.js';
+import { getOptionImpact } from './price-impact.js';
 import { market } from './market.js';
 
 // ---------------------------------------------------------------------------
@@ -170,14 +171,19 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
             const sigma = computeSkewSigma(sigmaEff, S, K, T, market.rho, market.xi, market.kappa);
             prepareGreekTrees(T, r, sigma, q, currentDay, _rGreekTrees);
             const { call: callG, put: putG } = computeGreeksPairWithTrees(S, K, _rGreekTrees);
-            const callBA = computeOptionBidAsk(callG.price, S, K, sigma);
-            const putBA  = computeOptionBidAsk(putG.price,  S, K, sigma);
+            const logSK = Math.log(S / K);
+            const callImp = getOptionImpact('call', K, expiry.day, sigma, logSK, expiry.dte);
+            const putImp  = getOptionImpact('put',  K, expiry.day, sigma, logSK, expiry.dte);
+            const callMid = Math.max(0, callG.price + callImp);
+            const putMid  = Math.max(0, putG.price + putImp);
+            const callBA = computeOptionBidAsk(callMid, S, K, sigma);
+            const putBA  = computeOptionBidAsk(putMid,  S, K, sigma);
             return {
                 strike: K,
-                call: { price: callG.price, delta: callG.delta, gamma: callG.gamma,
+                call: { price: callMid, delta: callG.delta, gamma: callG.gamma,
                          theta: callG.theta, vega: callG.vega, rho: callG.rho,
                          bid: Math.max(0, callBA.bid), ask: callBA.ask },
-                put:  { price: putG.price, delta: putG.delta, gamma: putG.gamma,
+                put:  { price: putMid, delta: putG.delta, gamma: putG.gamma,
                          theta: putG.theta, vega: putG.vega, rho: putG.rho,
                          bid: Math.max(0, putBA.bid), ask: putBA.ask },
             };
@@ -200,14 +206,20 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
         prepareTree(T, r, sigma, q, currentDay, _rTree);
         const { call: callP, put: putP } = pricePairWithTree(S, K, _rTree);
 
+        const logSK = Math.log(S / K);
+        const callImp = getOptionImpact('call', K, expiry.day, sigma, logSK, expiry.dte);
+        const putImp  = getOptionImpact('put',  K, expiry.day, sigma, logSK, expiry.dte);
+        const callMid = Math.max(0, callP + callImp);
+        const putMid  = Math.max(0, putP + putImp);
+
         // Inline bid/ask (mirrors computeOptionBidAsk from portfolio.js;
         // avoids 2 object allocations per strike in the hot substep path).
         // SYNC: if the spread formula in portfolio.js changes, update here too.
         const moneyness = Math.abs(Math.log(S / K));
         const spreadBase = OPTION_SPREAD_PCT * (1 + sigma);
         const moneynessAdj = MONEYNESS_SPREAD_WEIGHT * moneyness;
-        const cHalf = callP * spreadBase + moneynessAdj;
-        const pHalf = putP * spreadBase + moneynessAdj;
+        const cHalf = callMid * spreadBase + moneynessAdj;
+        const pHalf = putMid * spreadBase + moneynessAdj;
 
         let opt = _rOptions[si];
         if (!opt) {
@@ -220,11 +232,11 @@ export function priceChainExpiry(S, v, r, expiry, greeks, q) {
         }
         opt.strike = K;
         const c = opt.call;
-        c.price = callP; c.delta = 0; c.gamma = 0; c.theta = 0; c.vega = 0; c.rho = 0;
-        c.bid = Math.max(0, callP - cHalf); c.ask = callP + cHalf;
+        c.price = callMid; c.delta = 0; c.gamma = 0; c.theta = 0; c.vega = 0; c.rho = 0;
+        c.bid = Math.max(0, callMid - cHalf); c.ask = callMid + cHalf;
         const p = opt.put;
-        p.price = putP; p.delta = 0; p.gamma = 0; p.theta = 0; p.vega = 0; p.rho = 0;
-        p.bid = Math.max(0, putP - pHalf); p.ask = putP + pHalf;
+        p.price = putMid; p.delta = 0; p.gamma = 0; p.theta = 0; p.vega = 0; p.rho = 0;
+        p.bid = Math.max(0, putMid - pHalf); p.ask = putMid + pHalf;
     }
     return _rResult;
 }

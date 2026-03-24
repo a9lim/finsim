@@ -7,7 +7,7 @@
    =================================================== */
 
 import { computePositionValue } from './position-value.js';
-import { INITIAL_CAPITAL } from './config.js';
+import { INITIAL_CAPITAL, HISTORY_CAPACITY } from './config.js';
 
 // -- HTML helpers -------------------------------------------------------------
 
@@ -39,9 +39,58 @@ function _pctAbs(n) {
     return (n * 100).toFixed(1) + '%';
 }
 
+// -- Reputation synthesis -----------------------------------------------------
+
+function _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, portfolio) {
+    const flags = Object.keys(playerChoices);
+    const scores = { insider: 0, principled: 0, speculator: 0, survivor: 0, kingmaker: 0, ghost: 0 };
+
+    // Insider
+    if (flags.includes('accepted_insider_tip')) scores.insider += 3;
+    if (flags.includes('used_analyst_hint'))    scores.insider += 2;
+    if (flags.includes('tipped_bowman'))        scores.insider += 2;
+    if (flags.includes('desk_accepted_tip'))    scores.insider += 3;
+    if (flags.includes('desk_used_channel'))    scores.insider += 2;
+
+    // Principled
+    if (flags.includes('reported_insider_tip'))  scores.principled += 3;
+    if (flags.includes('cooperated_sec'))        scores.principled += 2;
+    if (flags.includes('donated_relief'))        scores.principled += 2;
+    if (flags.includes('desk_reported_tip'))     scores.principled += 3;
+    if (flags.includes('declined_fundraiser'))   scores.principled += 1;
+
+    // Speculator
+    if (impactHistory.length >= 10) scores.speculator += 3;
+    else if (impactHistory.length >= 5) scores.speculator += 2;
+
+    // Survivor
+    if (quarterlyReviews.length > 0) {
+        const allSmall = quarterlyReviews.every(r =>
+            Math.abs(r.vsBenchmark) < portfolio.initialCapital * 0.1
+        );
+        if (allSmall && quarterlyReviews.every(r => r.pnl >= 0)) scores.survivor += 3;
+    }
+
+    // Kingmaker
+    if (flags.includes('donated_barron') || flags.includes('donated_fl')) scores.kingmaker += 2;
+    if (flags.includes('met_okafor_aide'))   scores.kingmaker += 2;
+    if (flags.includes('gave_interview'))    scores.kingmaker += 1;
+    if (flags.includes('desk_attended_fundraiser')) scores.kingmaker += 2;
+
+    // Ghost
+    if (flags.length <= 2) scores.ghost += 4;
+    else if (flags.length <= 4) scores.ghost += 2;
+
+    let best = 'ghost', bestScore = 0;
+    for (const [k, v] of Object.entries(scores)) {
+        if (v > bestScore) { bestScore = v; best = k; }
+    }
+    return best;
+}
+
 // -- Page 1: The Election -----------------------------------------------------
 
-function _pageElection(world) {
+function _pageElection(world, playerChoices) {
     const result = world.election.presidentialResult;
     const mid = world.election.midtermResult;
     const okafor = world.election.okaforRunning;
@@ -150,12 +199,24 @@ function _pageElection(world) {
             break;
     }
 
+    // Meridian Capital references based on player choices
+    if (playerChoices.cooperated_sec) {
+        body += _p('When the SEC came calling, the trader at Meridian cooperated \u2014 Bowman\u2019s lawyers would later call them \u201cthe one who opened the door.\u201d');
+    } else if (playerChoices.silent_sec) {
+        body += _p('The Meridian desk said nothing when the SEC knocked. In the end, it didn\u2019t matter \u2014 they had enough without them.');
+    }
+    if (playerChoices.donated_barron) {
+        body += _p('Campaign finance records would later show a donation from a Meridian Capital executive to the Federalist Party.');
+    } else if (playerChoices.donated_fl) {
+        body += _p('A quiet donation to the Farmer-Labor campaign would surface in post-election filings.');
+    }
+
     return { title: 'The Election', body };
 }
 
 // -- Page 2: The Fate of Palanthropic ----------------------------------------
 
-function _pagePNTH(world) {
+function _pagePNTH(world, playerChoices) {
     const p = world.pnth;
     const inv = world.investigations;
     let body = '';
@@ -238,12 +299,19 @@ function _pagePNTH(world) {
         }
     }
 
+    // Player involvement in Okafor hearings
+    if (playerChoices.okafor_cooperated || playerChoices.met_okafor_aide || playerChoices.gave_interview) {
+        body += _p('The Okafor hearings produced one memorable witness \u2014 a Meridian derivatives trader whose testimony helped unravel the Bowman connection.');
+    } else if (playerChoices.okafor_distanced) {
+        body += _p('When subpoenas flew, one trader at Meridian kept their head down and their records clean.');
+    }
+
     return { title: 'The Fate of Palanthropic', body };
 }
 
 // -- Page 3: The World -------------------------------------------------------
 
-function _pageWorld(world, sim) {
+function _pageWorld(world, sim, impactHistory) {
     const geo = world.geopolitical;
     const fed = world.fed;
     let body = '';
@@ -334,12 +402,22 @@ function _pageWorld(world, sim) {
         body += _p('Four years of whiplash had left the economy in a place that defied easy characterization. The headline numbers were respectable: positive growth, moderate inflation, unemployment within historical norms. But the averages concealed enormous divergence. The sectors aligned with government spending\u2014defense, intelligence, infrastructure\u2014boomed. The sectors exposed to trade disruption and regulatory uncertainty languished. It was an economy shaped by political choices, for better and for worse.');
     }
 
+    // Trading footprint
+    if (impactHistory.length > 0) {
+        const netDirection = impactHistory.reduce((sum, h) => sum + h.direction, 0);
+        if (netDirection < -2) {
+            body += _p('Analysts would later point to sustained institutional selling pressure that accelerated the inevitable.');
+        } else if (netDirection > 2) {
+            body += _p('Some believers held through the storm, their conviction rewarded \u2014 or punished.');
+        }
+    }
+
     return { title: 'The World', body };
 }
 
 // -- Page 4: Your Legacy -----------------------------------------------------
 
-function _pageLegacy(sim, portfolio, eventLog) {
+function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason = null) {
     // Compute equity
     let equity = portfolio.cash;
     for (const pos of portfolio.positions) {
@@ -367,8 +445,48 @@ function _pageLegacy(sim, portfolio, eventLog) {
 
     let body = '';
 
+    // -- Compliance termination ----------------------------------------------
+    if (terminationReason === 'compliance') {
+        body += _h3('Terminated for Cause');
+        body += _p('Your tenure at Meridian Capital ended not with a market catastrophe, but with a compliance file thick enough to serve as a doorstop. Repeated defiance of risk limits and regulatory directives left the firm no choice. The official termination letter cited "persistent non-compliance with internal risk management policies." The unofficial version was simpler: you didn\'t know when to listen.');
+    }
+
+    // -- Reputation reveal ---------------------------------------------------
+    const reputation = _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, portfolio);
+    const reputationLines = {
+        insider:    'In the end, they called you <em>The Insider</em> \u2014 someone who always seemed to know just a little too much.',
+        principled: 'In the end, they called you <em>The Principled</em> \u2014 proof that you could win without selling your soul.',
+        speculator: 'In the end, they called you <em>The Speculator</em> \u2014 a force of nature that moved markets and didn\'t look back.',
+        survivor:   'In the end, they called you <em>The Survivor</em> \u2014 steady hands in a storm that broke everyone else.',
+        kingmaker:  'In the end, they called you <em>The Kingmaker</em> \u2014 a trader whose choices echoed far beyond the trading floor.',
+        ghost:      'In the end, no one called you anything at all. One trader at Meridian made a fortune and left no fingerprints.',
+    };
+    body += `<div class="epilogue-rating">${reputationLines[reputation]}</div>`;
+
+    // -- Career arc from quarterly reviews ------------------------------------
+    if (quarterlyReviews.length > 0) {
+        const strongCount = quarterlyReviews.filter(r => r.rating === 'strong').length;
+        const poorCount = quarterlyReviews.filter(r => r.rating === 'poor').length;
+        if (strongCount > poorCount * 2) {
+            body += _p('Quarter after quarter of exceptional returns. The risk committee stopped asking questions and started asking for allocation advice. Meridian\u2019s derivatives desk became the model other desks measured themselves against.');
+        } else if (poorCount > strongCount) {
+            body += _p('A slow descent the risk committee watched with growing unease. Each quarterly review brought tighter limits, pointed questions, the particular humiliation of explaining losses to people who had never placed a trade. The desk survived, but only because someone upstairs still believed in second chances.');
+        } else {
+            body += _p('Uneven \u2014 flashes of brilliance interrupted by mediocrity. The quarterly reviews told the story of a trader who could read the market but couldn\u2019t always resist it. Some quarters the P&L sang. Others it whispered apologies. Meridian kept the desk open because the ceiling was worth the floor.');
+        }
+    }
+
+    // -- Signature moment from impact history ---------------------------------
+    if (impactHistory.length > 0) {
+        const biggest = impactHistory.reduce((a, b) => Math.abs(a.magnitude) > Math.abs(b.magnitude) ? a : b);
+        const dayLabel = biggest.day - HISTORY_CAPACITY;
+        const direction = biggest.direction > 0 ? 'buying' : 'selling';
+        body += _p(`On day ${dayLabel}, a burst of institutional ${direction} pressure preceded what came next. The compliance logs would show a single desk, a single trader, and a position size that made the back office call upstairs. Whether it was conviction or recklessness depended on what happened after.`);
+    }
+
     body += `<div class="epilogue-rating">${rating}</div>`;
 
+    // -- Financial scorecard --------------------------------------------------
     body += _statSection('Portfolio Performance', [
         ['Final Value', _dollar(equity)],
         ['Total P&L', `${_dollar(totalPnl)} (${_pct(pnlPct)})`],
@@ -393,7 +511,7 @@ function _pageLegacy(sim, portfolio, eventLog) {
         body += _h3('Timeline Highlights');
         for (const evt of highlights) {
             const dayLabel = `Day ${evt.day}`;
-            body += `<div class="stat-row"><span class="epilogue-highlight-day">${dayLabel}</span><span>${evt.headline}</span></div>`;
+            body += `<div class="epilogue-timeline-row"><span class="epilogue-timeline-day">${dayLabel}</span><span class="epilogue-timeline-text">${evt.headline}</span></div>`;
         }
     }
 
@@ -439,11 +557,11 @@ function _absDeltaSum(evt) {
 
 // -- Main export --------------------------------------------------------------
 
-export function generateEpilogue(world, sim, portfolio, eventLog) {
+export function generateEpilogue(world, sim, portfolio, eventLog, playerChoices = {}, impactHistory = [], quarterlyReviews = [], terminationReason = null) {
     return [
-        _pageElection(world),
-        _pagePNTH(world),
-        _pageWorld(world, sim),
-        _pageLegacy(sim, portfolio, eventLog),
+        _pageElection(world, playerChoices),
+        _pagePNTH(world, playerChoices),
+        _pageWorld(world, sim, impactHistory),
+        _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason),
     ];
 }

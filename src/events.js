@@ -12,6 +12,7 @@ import {
     NON_FED_COOLDOWN_MIN, NON_FED_COOLDOWN_MAX, FED_MEETING_JITTER,
     BOREDOM_THRESHOLD, TERM_END_DAY,
     PNTH_EARNINGS_INTERVAL, PNTH_EARNINGS_JITTER,
+    ADV, EVENT_COUPLING_CAP,
 } from './config.js';
 
 import { createWorldState, congressHelpers, applyStructuredEffects } from './world-state.js';
@@ -66,11 +67,24 @@ export class EventEngine {
 
     /**
      * Called each completed trading day. May fire event(s).
-     * Returns an array of fired event log entries (may be empty).
+     * Returns { fired: [...logEntries], popups: [...queuedEvents] }.
      */
-    maybeFire(sim, day) {
+    maybeFire(sim, day, netDelta = 0) {
+        this._currentDay = day;
+        const empty = { fired: [], popups: [] };
+
         // Epilogue already fired -- no more events
-        if (this._epilogueFired) return [];
+        if (this._epilogueFired) return empty;
+
+        // Helper: partition _fireEvent results into fired/popups
+        const _partition = (results) => {
+            const fired = [], popups = [];
+            for (const r of results) {
+                if (r && r.queued) popups.push(r.event);
+                else if (r) fired.push(r);
+            }
+            return { fired, popups };
+        };
 
         // 1. Check pulses in array order
         for (const pulse of this._pulses) {
@@ -85,42 +99,42 @@ export class EventEngine {
                     const eligible = this._filterEligible(this._pools[pulse.poolKey], sim);
                     if (eligible.length > 0) {
                         const event = this._weightedPick(eligible, sim);
-                        return [this._fireEvent(event, sim, day, 0)];
+                        return _partition([this._fireEvent(event, sim, day, 0, netDelta)]);
                     }
                     // No eligible event -- skip, already rescheduled
                 }
             } else if (pulse.type === 'fixed') {
                 if (day >= pulse.day && !pulse.fired) {
                     pulse.fired = true;
-                    return this[pulse.handler](sim, day);
+                    return _partition(this[pulse.handler](sim, day, netDelta));
                 }
             }
         }
 
         // 2. Check pending followups
-        const firedFollowups = this._checkFollowups(sim, day);
-        if (firedFollowups.length > 0) return firedFollowups;
+        const firedFollowups = this._checkFollowups(sim, day, netDelta);
+        if (firedFollowups.length > 0) return _partition(firedFollowups);
 
         // 3. Random draw with cooldown
         if (this._randomCooldown > 0) {
             this._randomCooldown--;
-            return [];
+            return empty;
         }
 
-        if (Math.random() >= NON_FED_POISSON_RATE) return [];
+        if (Math.random() >= NON_FED_POISSON_RATE) return empty;
 
         // 4. Draw from appropriate source
         const event = this.source === 'llm'
             ? this._drawLLM(sim)
             : this._drawRandom(sim);
 
-        if (!event) return [];
+        if (!event) return empty;
 
         // Set cooldown after successful random draw
         this._randomCooldown = NON_FED_COOLDOWN_MIN +
             Math.floor(Math.random() * (NON_FED_COOLDOWN_MAX - NON_FED_COOLDOWN_MIN + 1));
 
-        return [this._fireEvent(event, sim, day, 0)];
+        return _partition([this._fireEvent(event, sim, day, 0, netDelta)]);
     }
 
     /** Kick off initial LLM batch fetch. */
@@ -207,9 +221,33 @@ export class EventEngine {
 
     // -- Internal ---------------------------------------------------------
 
-    _fireEvent(event, sim, day, depth) {
-        // Apply simulation parameter deltas
-        this.applyDeltas(sim, event.params);
+    _fireEvent(event, sim, day, depth, netDelta = 0) {
+        // If popup event, queue for player choice instead of applying immediately
+        if (event.popup && event.choices) {
+            const coupling = this._computeCoupling(netDelta, event.params);
+            const queuedEvent = { ...event };
+            if (coupling !== 1.0) {
+                queuedEvent.choices = event.choices.map(c => ({
+                    ...c,
+                    deltas: c.deltas ? Object.fromEntries(
+                        Object.entries(c.deltas).map(([k, v]) => [k, v * coupling])
+                    ) : null,
+                }));
+            }
+            this.eventLog.push({ day, headline: event.headline, magnitude: event.magnitude || 'moderate', params: null });
+            if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
+            return { queued: true, event: queuedEvent };
+        }
+
+        // Non-popup: apply deltas with coupling
+        const coupling = this._computeCoupling(netDelta, event.params);
+        if (event.params && coupling !== 1.0) {
+            const scaled = {};
+            for (const k in event.params) scaled[k] = event.params[k] * coupling;
+            this.applyDeltas(sim, scaled);
+        } else {
+            this.applyDeltas(sim, event.params);
+        }
 
         // Apply world state effects
         if (typeof event.effects === 'function') {
@@ -252,7 +290,7 @@ export class EventEngine {
         return logEntry;
     }
 
-    _checkFollowups(sim, day) {
+    _checkFollowups(sim, day, netDelta = 0) {
         const ready = [];
         const remaining = [];
         for (const pf of this._pendingFollowups) {
@@ -287,7 +325,7 @@ export class EventEngine {
             if (!event) continue;
             if (event.when && !event.when(sim, this.world, congress)) continue;
 
-            fired.push(this._fireEvent(event, sim, day, picked.depth));
+            fired.push(this._fireEvent(event, sim, day, picked.depth, netDelta));
         }
         return fired;
     }
@@ -316,8 +354,16 @@ export class EventEngine {
     }
 
     _filterEligible(pool, sim) {
+        const day = this._currentDay;
         const congress = congressHelpers(this.world);
-        return pool.filter(ev => !ev.when || ev.when(sim, this.world, congress));
+        return pool.filter(ev => {
+            if (ev.era) {
+                if (ev.era === 'early' && day > 500) return false;
+                if (ev.era === 'mid' && (day < 500 || day > 800)) return false;
+                if (ev.era === 'late' && day < 800) return false;
+            }
+            return !ev.when || ev.when(sim, this.world, congress);
+        });
     }
 
     _drawRandom(sim) {
@@ -355,17 +401,17 @@ export class EventEngine {
 
     // -- Fixed pulse handlers ---------------------------------------------
 
-    _onCampaignSeason(sim, day) {
+    _onCampaignSeason(sim, day, netDelta = 0) {
         return [this._fireEvent({
             id: 'midterm_campaign_season',
             category: 'political',
             headline: 'Campaign season heats up as midterm elections approach; Barron barnstorms for Federalist candidates nationwide',
             params: { theta: 0.01 },
             magnitude: 'moderate',
-        }, sim, day, 0)];
+        }, sim, day, 0, netDelta)];
     }
 
-    _onMidterm(sim, day) {
+    _onMidterm(sim, day, netDelta = 0) {
         const w = this.world;
         let score = w.election.barronApproval;
 
@@ -431,7 +477,33 @@ export class EventEngine {
         w.election.midtermComplete = true;
         w.election.midtermResult = result;
 
-        return [this._fireEvent(event, sim, day, 0)];
+        return [this._fireEvent(event, sim, day, 0, netDelta)];
+    }
+
+    // -- Coupling ---------------------------------------------------------
+
+    _computeCoupling(netDelta, deltas) {
+        if (!deltas || !deltas.mu || Math.abs(netDelta) < 1) return 1.0;
+        const alignment = Math.sign(netDelta) * Math.sign(deltas.mu);
+        const magnitude = Math.min(1, Math.abs(netDelta) / (ADV * 0.5));
+        return 1 + alignment * magnitude * EVENT_COUPLING_CAP;
+    }
+
+    // -- Public followup scheduling ---------------------------------------
+
+    scheduleFollowup(followup, fromDay) {
+        const id = typeof followup === 'string' ? followup : followup.id;
+        const mtth = typeof followup === 'object' ? (followup.mtth ?? 20) : 20;
+        const delay = Math.max(1, Math.round(mtth + (Math.random() - 0.5) * mtth * 0.3));
+        const event = getEventById(id);
+        if (!event) return;
+        this._pendingFollowups.push({
+            event,
+            chainId: 'choice_' + fromDay + '_' + id,
+            targetDay: fromDay + delay,
+            weight: 1,
+            depth: 1,
+        });
     }
 
     // -- Timing helpers ---------------------------------------------------

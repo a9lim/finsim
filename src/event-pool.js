@@ -31,6 +31,11 @@ const FED_EVENTS = [
         params: { mu: 0.01, theta: -0.003 },
         magnitude: 'minor',
         when: (sim, world) => !world.fed.hartleyFired,
+        portfolioFlavor: (portfolio) => {
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (stockQty > 20) return 'Your long equity book catches a bid on the dovish hold.';
+            return null;
+        },
     },
     {
         id: 'fed_hold_unanimous',
@@ -56,13 +61,11 @@ const FED_EVENTS = [
         category: 'fed',
         likelihood: 0.8,
         headline: 'Hartley signals tightening bias: "The committee is prepared to act if inflation proves persistent"',
-        params: { mu: -0.015, theta: 0.005, sigmaR: 0.001 },
         magnitude: 'moderate',
         when: (sim, world) => sim.b < 0.15 && !world.fed.hartleyFired && !world.fed.hikeCycle,
-        effects: (world) => { world.fed.hikeCycle = true; world.fed.cutCycle = false; },
-        followups: [
-            { id: 'fed_25bps_hike', mtth: 32, weight: 0.7 },
-        ],
+        params: { mu: -0.015, theta: 0.005, sigmaR: 0.001 },
+        effects: [ { path: 'fed.hikeCycle', op: 'set', value: true }, { path: 'fed.cutCycle', op: 'set', value: false }, ],
+        followups: [{ id: 'fed_25bps_hike', mtth: 32, weight: 0.7 }],
     },
     {
         id: 'fed_25bps_hike',
@@ -76,6 +79,12 @@ const FED_EVENTS = [
             { id: 'fed_second_hike', mtth: 32, weight: 0.5 },
             { id: 'fed_housing_pause', mtth: 45, weight: 0.3 },
         ],
+        portfolioFlavor: (portfolio) => {
+            const bondQty = portfolio.positions.filter(p => p.type === 'bond').reduce((s, p) => s + p.qty, 0);
+            if (bondQty > 5) return 'Your long bond book is taking a hit as yields reprice higher.';
+            if (bondQty < -5) return 'Your short bond position is printing. Duration paid off.';
+            return null;
+        },
     },
     {
         id: 'fed_second_hike',
@@ -119,9 +128,9 @@ const FED_EVENTS = [
         category: 'fed',
         likelihood: 0.6,
         headline: 'Fed slashes rates 50bps in emergency inter-meeting action; Hartley: "Extraordinary circumstances demand decisive response"',
-        params: { mu: 0.04, theta: 0.015, b: -0.015, sigmaR: 0.005, lambda: 1.0 },
         magnitude: 'major',
         when: (sim, world) => sim.b > -0.03,
+        params: { mu: 0.03, theta: 0.02, b: -0.015, sigmaR: 0.006, lambda: 1.5 },
     },
 
     // -- QE restart ----------------------------------------------------------
@@ -130,10 +139,10 @@ const FED_EVENTS = [
         category: 'fed',
         likelihood: 0.3,
         headline: 'Fed announces open-ended QE: $120B/month in Treasury and MBS purchases; "whatever it takes" language deployed',
-        params: { mu: 0.05, theta: -0.015, b: -0.01, sigmaR: -0.003, lambda: -0.5, q: 0.002 },
         magnitude: 'major',
         when: (sim, world) => !world.fed.qeActive && sim.b < 0.02,
-        effects: (world) => { world.fed.qeActive = true; },
+        params: { mu: 0.05, theta: -0.015, b: -0.01, sigmaR: -0.003, lambda: -0.5, q: 0.002 },
+        effects: [ { path: 'fed.qeActive', op: 'set', value: true }, ],
     },
 
     // -- Minutes leaks -------------------------------------------------------
@@ -186,34 +195,22 @@ const FED_EVENTS = [
         category: 'fed',
         likelihood: 0.5,
         headline: 'Barron tells Fox Business: "I have the power to fire Hartley and I\'m seriously considering it." DOJ reviewing legal authority',
-        params: { mu: -0.03, theta: 0.02, sigmaR: 0.008, lambda: 1.0 },
         magnitude: 'moderate',
         when: (sim, world) => world.election.barronApproval > 40 && !world.fed.hartleyFired,
-        effects: (world) => {
-            world.fed.credibilityScore = Math.max(0, world.fed.credibilityScore - 3);
-        },
-        followups: [
-            { id: 'barron_fires_hartley', mtth: 25, weight: 0.3 },
-        ],
+        params: { mu: -0.02, theta: 0.015, sigmaR: 0.006, lambda: 0.8 },
+        effects: [ { path: 'fed.credibilityScore', op: 'add', value: -3 }, ],
+        followups: [{ id: 'barron_fires_hartley', mtth: 30, weight: 0.2 }],
     },
     {
         id: 'barron_fires_hartley',
         category: 'fed',
         likelihood: 0.15,
         headline: 'BREAKING: Barron fires Fed Chair Hartley via executive order; constitutional crisis erupts as markets plunge',
-        params: { mu: -0.04, theta: 0.05, sigmaR: 0.02, lambda: 3.0 },
         magnitude: 'major',
         when: (sim, world, congress) => congress.trifecta && world.fed.credibilityScore <= 4 && !world.fed.hartleyFired,
-        effects: (world) => {
-            world.fed.hartleyFired = true;
-            world.fed.credibilityScore = 0;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 10);
-        },
-        followups: [
-            { id: 'markets_panic_hartley_fired', mtth: 3, weight: 0.9 },
-            { id: 'vane_nominated', mtth: 10, weight: 0.8 },
-            { id: 'scotus_hartley_case', mtth: 40, weight: 0.5 },
-        ],
+        params: { mu: -0.05, theta: 0.05, sigmaR: 0.025, lambda: 3.5 },
+        effects: [ { path: 'fed.hartleyFired', op: 'set', value: true }, { path: 'fed.credibilityScore', op: 'set', value: 0 }, { path: 'election.barronApproval', op: 'add', value: -10 }, ],
+        followups: [ { id: 'markets_panic_hartley_fired', mtth: 3, weight: 0.95 }, { id: 'vane_nominated', mtth: 10, weight: 0.8 }, { id: 'scotus_hartley_case', mtth: 40, weight: 0.5 }, ],
     },
     {
         id: 'markets_panic_hartley_fired',
@@ -222,6 +219,11 @@ const FED_EVENTS = [
         headline: 'Global sell-off accelerates: S&P futures limit-down overnight; Treasury yields spike 40bps as foreign central banks scramble',
         params: { mu: -0.06, theta: 0.04, lambda: 2.0, muJ: -0.05, sigmaR: 0.01 },
         magnitude: 'major',
+        portfolioFlavor: (portfolio) => {
+            const totalQty = portfolio.positions.reduce((s, p) => s + Math.abs(p.qty), 0);
+            if (totalQty > 10) return 'Your book is getting crushed in the sell-off. Risk management is calling.';
+            return null;
+        },
     },
     {
         id: 'vane_nominated',
@@ -299,18 +301,11 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 0.5,
         headline: 'Barron signs executive order imposing 25% tariffs on $200B of imports; "America will no longer be ripped off," he declares at signing ceremony',
-        params: { mu: -0.05, theta: 0.02, lambda: 1.0, muJ: -0.02, q: -0.001 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 0,
-        effects: (world) => {
-            world.geopolitical.tradeWarStage = 1;
-            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
-        },
-        followups: [
-            { id: 'trade_retaliation', mtth: 15, weight: 0.8 },
-            { id: 'tariff_selloff', mtth: 3, weight: 0.6 },
-        ],
+        params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
+        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 }, { path: 'geopolitical.chinaRelations', op: 'add', value: -1 }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
+        followups: [ { id: 'trade_retaliation', mtth: 18, weight: 0.7 }, { id: 'tariff_selloff', mtth: 3, weight: 0.5 }, ],
     },
     {
         id: 'tariff_selloff',
@@ -325,17 +320,11 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 1.0,
         headline: 'Beijing retaliates with matching tariffs on U.S. agriculture and energy; Liang Wei\'s Zhaowei announces "strategic decoupling plan"',
-        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 1,
-        effects: (world) => {
-            world.geopolitical.tradeWarStage = 2;
-            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
-        },
-        followups: [
-            { id: 'zhaowei_ban', mtth: 30, weight: 0.6 },
-            { id: 'tariff_exemptions', mtth: 20, weight: 0.4 },
-        ],
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.01 },
+        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 }, { path: 'geopolitical.chinaRelations', op: 'add', value: -1 }, ],
+        followups: [ { id: 'tariff_exemptions', mtth: 18, weight: 0.6 }, ],
     },
     {
         id: 'zhaowei_ban',
@@ -361,6 +350,13 @@ const MACRO_EVENTS = [
         params: { mu: -0.08, theta: 0.04, lambda: 2.0, muJ: -0.05, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 3 && world.geopolitical.chinaRelations <= -2,
+        portfolioFlavor: (portfolio) => {
+            const putQty = portfolio.positions.filter(p => p.type === 'put').reduce((s, p) => s + p.qty, 0);
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (putQty < -3) return 'Your short put book is getting crushed as the rare earth embargo sends vol through the roof.';
+            if (stockQty > 10) return 'Your long equity position is bleeding as the supply chain seizure ripples through every sector.';
+            return null;
+        },
     },
     {
         id: 'tariff_exemptions',
@@ -384,14 +380,10 @@ const MACRO_EVENTS = [
             return base;
         },
         headline: 'Barron and Beijing announce "Phase One" trade deal framework; tariffs to be rolled back over 18 months. Barron: "The biggest deal in history, maybe ever"',
-        params: { mu: 0.05, theta: -0.02, lambda: -0.8, muJ: 0.01, q: 0.002 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 2 && world.geopolitical.tradeWarStage < 4,
-        effects: (world) => {
-            world.geopolitical.tradeWarStage = 4;
-            world.geopolitical.chinaRelations = Math.min(3, world.geopolitical.chinaRelations + 2);
-            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
-        },
+        params: { mu: 0.04, theta: -0.015, lambda: -0.6, muJ: 0.008, q: 0.002 },
+        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 }, { path: 'geopolitical.chinaRelations', op: 'add', value: 2 }, { path: 'election.barronApproval', op: 'add', value: 3 }, ],
     },
 
     // =====================================================================
@@ -436,6 +428,13 @@ const MACRO_EVENTS = [
         headline: 'Oil prices surge 12% as strikes threaten Strait shipping lanes; energy stocks rally but consumer discretionary tanks',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.004 },
         magnitude: 'moderate',
+        portfolioFlavor: (portfolio) => {
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
+            if (stockQty > 10) return 'Your long equity book is taking heat as energy costs crush margins across the board.';
+            if (hasOptions) return 'Your options book is getting re-marked as implied vol spikes on the oil shock.';
+            return null;
+        },
     },
     {
         id: 'mideast_ground_deployment',
@@ -593,12 +592,10 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 0.35,
         headline: 'OPEC+ announces surprise 2M barrel/day production cut; oil surges 18% in a single session. Energy costs ripple through supply chains',
-        params: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.03, b: 0.01, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
         when: (sim, world) => !world.geopolitical.oilCrisis,
-        effects: (world) => {
-            world.geopolitical.oilCrisis = true;
-        },
+        params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, b: 0.008, sigmaR: 0.006, q: -0.001 },
+        effects: [ { path: 'geopolitical.oilCrisis', op: 'set', value: true }, ],
     },
     {
         id: 'energy_sanctions',
@@ -620,6 +617,12 @@ const MACRO_EVENTS = [
         params: { mu: -0.02, theta: 0.01, b: 0.004, sigmaR: 0.003 },
         magnitude: 'moderate',
         when: (sim) => sim.b < 0.12,
+        portfolioFlavor: (portfolio) => {
+            const bondQty = portfolio.positions.filter(p => p.type === 'bond').reduce((s, p) => s + p.qty, 0);
+            if (bondQty > 5) return 'Your long bond book is getting hammered as rate-cut expectations evaporate on the hot CPI print.';
+            if (bondQty < -5) return 'Your short duration trade is paying off nicely as inflation re-accelerates.';
+            return null;
+        },
     },
     {
         id: 'cpi_surprise_low',
@@ -651,13 +654,10 @@ const MACRO_EVENTS = [
         category: 'macro',
         likelihood: 1.0,
         headline: 'NBER officially declares recession began two quarters ago; Barron blames "obstructionist Congress and a reckless Fed." Markets already priced most of it',
-        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04, b: -0.01, q: -0.005 },
         magnitude: 'major',
         when: (sim, world) => sim.mu < -0.05 && sim.theta > 0.12 && !world.geopolitical.recessionDeclared,
-        effects: (world) => {
-            world.geopolitical.recessionDeclared = true;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 8);
-        },
+        params: { mu: -0.07, theta: 0.035, lambda: 1.8, muJ: -0.05, b: -0.012, q: -0.005 },
+        effects: [ { path: 'geopolitical.recessionDeclared', op: 'set', value: true }, { path: 'election.barronApproval', op: 'add', value: -8 }, ],
     },
     {
         id: 'sovereign_debt_scare',
@@ -731,39 +731,32 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 0.6,
         headline: 'PNTH CEO Gottlieb delivers blistering keynote: "We built Atlas to heal, not to kill. I will not let this company become a weapons factory"',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ceoIsGottlieb && world.pnth.boardDirks >= 6,
-        followups: [
-            { id: 'dirks_cnbc_rebuttal', mtth: 10, weight: 0.8 },
-        ],
+        params: { mu: -0.01, theta: 0.005, lambda: 0.2 },
+        effects: [ { path: 'pnth.boardGottlieb', op: 'add', value: 1 }, ],
+        followups: [{ id: 'dirks_cnbc_rebuttal', mtth: 8, weight: 0.9 }],
     },
     {
         id: 'dirks_cnbc_rebuttal',
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Dirks fires back on CNBC: "Eugene is a brilliant engineer but a naive businessman. Defense contracts are our fastest-growing segment"',
-        params: { mu: 0.01, theta: 0.008, lambda: 0.2 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ceoIsGottlieb,
-        followups: [
-            { id: 'board_closed_session', mtth: 20, weight: 0.7 },
-            { id: 'kassis_caught_middle', mtth: 15, weight: 0.5 },
-        ],
+        params: { mu: 0.005, theta: 0.012, lambda: 0.3 },
+        effects: [ { path: 'pnth.boardDirks', op: 'add', value: 1 }, ],
+        followups: [ { id: 'board_closed_session', mtth: 20, weight: 0.7 }, { id: 'kassis_caught_middle', mtth: 15, weight: 0.5 }, ],
     },
     {
         id: 'board_closed_session',
         category: 'pnth',
         likelihood: 1.0,
         headline: 'PNTH board convenes emergency closed session; sources say "the room was nuclear" as Dirks and Gottlieb factions clash',
-        params: { mu: -0.01, theta: 0.01, lambda: 0.4 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ceoIsGottlieb,
-        followups: [
-            { id: 'gottlieb_stripped_oversight', mtth: 15, weight: 0.5 },
-            { id: 'dirks_blocked', mtth: 15, weight: 0.3 },
-            { id: 'board_compromise', mtth: 10, weight: 0.5 },
-        ],
+        params: { mu: -0.005, theta: 0.008, lambda: 0.3 },
+        followups: [ { id: 'board_compromise', mtth: 8, weight: 0.6 }, { id: 'dirks_blocked', mtth: 15, weight: 0.3 }, ],
     },
 
     // -- Board closed session branches ------------------------------------
@@ -812,14 +805,10 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'CTO Kassis breaks silence in internal all-hands: "I didn\'t leave Google to build targeting systems." Standing ovation from engineers, cold stares from defense team',
-        params: { mu: -0.01, theta: 0.008 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.ctoIsMira && world.pnth.ceoIsGottlieb,
-        followups: [
-            { id: 'kassis_sides_gottlieb', mtth: 20, weight: 0.4 },
-            { id: 'kassis_sides_dirks', mtth: 20, weight: 0.3 },
-            { id: 'kassis_quits', mtth: 20, weight: 0.3 },
-        ],
+        params: { mu: 0.005, theta: 0.01 },
+        followups: [ { id: 'kassis_sides_dirks', mtth: 15, weight: 0.5 }, { id: 'kassis_sides_gottlieb', mtth: 25, weight: 0.3 }, ],
     },
     {
         id: 'kassis_sides_gottlieb',
@@ -866,18 +855,11 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'BREAKING: PNTH CEO Eugene Gottlieb resigns. In emotional letter to employees: "I built this company to make the world better. I no longer believe it will."',
-        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
         magnitude: 'major',
         when: (sim, world) => world.pnth.ceoIsGottlieb,
-        effects: (world) => {
-            world.pnth.ceoIsGottlieb = false;
-            world.pnth.boardGottlieb = Math.max(0, world.pnth.boardGottlieb - 1);
-            world.pnth.boardDirks = Math.min(10, world.pnth.boardDirks + 1);
-        },
-        followups: [
-            { id: 'successor_search', mtth: 20, weight: 0.8 },
-            { id: 'gottlieb_covenant_ai', mtth: 60, weight: 0.4 },
-        ],
+        params: { mu: -0.03, theta: 0.02, lambda: 1.0, muJ: -0.02 },
+        effects: [ { path: 'pnth.ceoIsGottlieb', op: 'set', value: false }, { path: 'pnth.boardGottlieb', op: 'add', value: -1 }, { path: 'pnth.boardDirks', op: 'add', value: 1 }, ],
+        followups: [ { id: 'successor_search', mtth: 20, weight: 0.8 }, { id: 'gottlieb_covenant_ai', mtth: 60, weight: 0.4 }, ],
     },
     {
         id: 'gottlieb_digs_in',
@@ -908,6 +890,12 @@ const PNTH_EVENTS = [
         params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.ceoIsGottlieb,
+        portfolioFlavor: (portfolio) => {
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (stockQty > 15) return 'Your long position needs a credible CEO pick. Dirks as interim is not what the market wanted.';
+            if (stockQty < -10) return 'Your short thesis just got another catalyst. An interim CEO search means months of uncertainty.';
+            return null;
+        },
     },
     {
         id: 'gottlieb_covenant_ai',
@@ -936,6 +924,12 @@ const PNTH_EVENTS = [
             { id: 'dirks_proxy_wins', mtth: 25, weight: 0.5 },
             { id: 'dirks_proxy_loses', mtth: 25, weight: 0.5 },
         ],
+        portfolioFlavor: (portfolio) => {
+            const totalQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (totalQty > 20) return 'As a large institutional holder, Meridian will get a proxy solicitation. Your vote could matter.';
+            if (totalQty < -10) return 'Your short position loves proxy fights -- months of uncertainty and governance headlines.';
+            return null;
+        },
     },
     {
         id: 'dirks_proxy_wins',
@@ -981,16 +975,11 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 0.5,
         headline: 'Crescent Capital discloses 8.1% stake in PNTH via 13D filing; demands board overhaul, threatens to nominate four independent directors',
-        params: { mu: 0.03, theta: 0.02, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.activistStakeRevealed && !world.pnth.acquired,
-        effects: (world) => {
-            world.pnth.activistStakeRevealed = true;
-        },
-        followups: [
-            { id: 'activist_board_seats', mtth: 35, weight: 0.6 },
-            { id: 'activist_buyback_demand', mtth: 20, weight: 0.4 },
-        ],
+        params: { mu: 0.02, theta: 0.015, lambda: 0.5 },
+        effects: [ { path: 'pnth.activistStakeRevealed', op: 'set', value: true }, ],
+        followups: [ { id: 'activist_board_seats', mtth: 35, weight: 0.6 }, { id: 'activist_buyback_demand', mtth: 20, weight: 0.4 }, ],
     },
     {
         id: 'activist_board_seats',
@@ -1022,12 +1011,10 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 0.1,
         headline: 'BREAKING: Northvane Technologies launches $68B hostile bid for PNTH at 45% premium; "the internal dysfunction has created a generational buying opportunity"',
-        params: { mu: 0.08, theta: 0.04, lambda: 2.0 },
         magnitude: 'major',
         when: (sim, world) => (world.pnth.boardDirks <= 5 || (world.pnth.dojSuitFiled && world.pnth.whistleblowerFiled)) && !world.pnth.acquired,
-        effects: (world) => {
-            world.pnth.acquired = true;
-        },
+        params: { mu: 0.04, theta: 0.03, lambda: 1.5 },
+        effects: [ { path: 'pnth.acquired', op: 'set', value: true }, ],
     },
 
     // -- Both ousted (rare, requires multiple scandal flags) ---------------
@@ -1054,13 +1041,10 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 0.5,
         headline: 'The Continental reports VP Bowman held $4M in PNTH stock while lobbying Pentagon for Atlas AI contract; White House calls it "old news"',
-        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.senateProbeLaunched,
-        followups: [
-            { id: 'senate_investigation_opened', mtth: 30, weight: 0.5 },
-            { id: 'bowman_intervenes', mtth: 15, weight: 0.4 },
-        ],
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        followups: [ { id: 'senate_investigation_opened', mtth: 35, weight: 0.4 }, { id: 'bowman_intervenes', mtth: 15, weight: 0.5 }, ],
     },
     {
         id: 'aclu_lawsuit_surveillance',
@@ -1070,22 +1054,23 @@ const PNTH_EVENTS = [
         params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.02 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.militaryContractActive,
+        portfolioFlavor: (portfolio) => {
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (stockQty > 10) return 'Your long PNTH position is under pressure. An injunction would freeze the defense revenue stream.';
+            if (stockQty < -5) return 'Your short thesis is playing out. Surveillance lawsuits are kryptonite for government AI contractors.';
+            return null;
+        },
     },
     {
         id: 'senate_investigation_opened',
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Sen. Okafor opens formal Senate Intelligence Committee investigation into PNTH-Bowman ties; subpoenas issued for financial records',
-        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
         magnitude: 'major',
         when: (sim, world) => !world.pnth.senateProbeLaunched,
-        effects: (world) => {
-            world.pnth.senateProbeLaunched = true;
-            world.investigations.okaforProbeStage = Math.max(world.investigations.okaforProbeStage, 1);
-        },
-        followups: [
-            { id: 'congressional_hearing_pnth', mtth: 25, weight: 0.7 },
-        ],
+        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
+        effects: [ { path: 'pnth.senateProbeLaunched', op: 'set', value: true }, { path: 'investigations.okaforProbeStage', op: 'set', value: 1 }, ],
+        followups: [{ id: 'congressional_hearing_pnth', mtth: 25, weight: 0.7 }],
     },
     {
         id: 'doj_antitrust_suit',
@@ -1097,6 +1082,13 @@ const PNTH_EVENTS = [
         when: (sim, world) => !world.pnth.dojSuitFiled && world.pnth.militaryContractActive,
         effects: (world) => {
             world.pnth.dojSuitFiled = true;
+        },
+        portfolioFlavor: (portfolio) => {
+            const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
+            if (hasOptions) return 'Your PNTH options just repriced violently. Antitrust litigation means elevated vol for months.';
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (stockQty > 10) return 'Your long equity position is bleeding on the DOJ headline. Antitrust suits take years.';
+            return null;
         },
     },
     {
@@ -1140,14 +1132,10 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'BREAKING: Senior PNTH engineer files SEC whistleblower complaint alleging company falsified safety testing on Atlas military modules',
-        params: { mu: -0.07, theta: 0.03, lambda: 1.5, muJ: -0.04 },
         magnitude: 'major',
         when: (sim, world) => !world.pnth.whistleblowerFiled,
-        effects: (world) => {
-            world.pnth.whistleblowerFiled = true;
-            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
-            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
-        },
+        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.03 },
+        effects: [ { path: 'pnth.whistleblowerFiled', op: 'set', value: true }, { path: 'pnth.boardDirks', op: 'add', value: -1 }, { path: 'pnth.boardGottlieb', op: 'add', value: 1 }, ],
     },
 
     // =====================================================================
@@ -1158,25 +1146,20 @@ const PNTH_EVENTS = [
         category: 'pnth',
         likelihood: 1.0,
         headline: 'PNTH wins $3.2B Department of War contract for Atlas AI battlefield integration; largest defense AI award in history',
-        params: { mu: 0.06, theta: -0.01, lambda: -0.4 },
         magnitude: 'major',
         when: (sim, world) => !world.pnth.militaryContractActive && !world.pnth.acquired,
-        effects: (world) => {
-            world.pnth.militaryContractActive = true;
-            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
-        },
+        params: { mu: 0.04, theta: -0.005, lambda: -0.2 },
+        effects: [ { path: 'pnth.militaryContractActive', op: 'set', value: true }, { path: 'pnth.commercialMomentum', op: 'add', value: -1 }, ],
     },
     {
         id: 'defense_contract_cancelled',
         category: 'pnth',
         likelihood: 0.5,
         headline: 'Pentagon cancels PNTH Atlas contract citing "unresolved governance concerns"; $3.2B evaporates overnight. Dirks scrambles to save deal',
-        params: { mu: -0.05, theta: 0.02, lambda: 0.8, muJ: -0.03 },
         magnitude: 'major',
         when: (sim, world) => world.pnth.militaryContractActive,
-        effects: (world) => {
-            world.pnth.militaryContractActive = false;
-        },
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.02 },
+        effects: [ { path: 'pnth.militaryContractActive', op: 'set', value: false }, ],
     },
     {
         id: 'dhs_contract_renewal',
@@ -1424,16 +1407,16 @@ const PNTH_EARNINGS_EVENTS = [
             return base;
         },
         headline: 'PNTH crushes estimates: revenue +32% YoY, Atlas AI bookings up 60%. Raises full-year guidance. Stock surges after hours',
-        params: { mu: 0.04, theta: -0.01, lambda: -0.3, q: 0.002 },
         magnitude: 'moderate',
+        params: { mu: 0.03, theta: -0.005, lambda: -0.2, q: 0.002 },
     },
     {
         id: 'pnth_earnings_beat_mild',
         category: 'pnth_earnings',
         likelihood: 2.0,
         headline: 'PNTH edges past consensus: EPS $1.42 vs $1.38 expected. Revenue in line. Guidance maintained. "Solid but unspectacular," says Barclays',
-        params: { mu: 0.02, theta: -0.005 },
         magnitude: 'minor',
+        params: { mu: 0.01, theta: -0.003 },
     },
     {
         id: 'pnth_earnings_inline',
@@ -1442,6 +1425,11 @@ const PNTH_EARNINGS_EVENTS = [
         headline: 'PNTH reports exactly in line with consensus; no guidance change. Conference call focused on governance questions rather than financials',
         params: { mu: 0.005, theta: 0.002 },
         magnitude: 'minor',
+        portfolioFlavor: (portfolio) => {
+            const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
+            if (hasOptions) return 'Inline earnings means IV crush on your options. Theta wins this round.';
+            return null;
+        },
     },
     {
         id: 'pnth_earnings_miss_mild',
@@ -1462,11 +1450,9 @@ const PNTH_EARNINGS_EVENTS = [
             return base;
         },
         headline: 'PNTH disaster quarter: revenue misses by 12%, operating loss widens, three major customers paused contracts. Guidance slashed. Dirks faces board questions',
-        params: { mu: -0.04, theta: 0.015, lambda: 0.6, muJ: -0.02, q: -0.002 },
         magnitude: 'moderate',
-        effects: (world) => {
-            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
-        },
+        params: { mu: -0.03, theta: 0.012, lambda: 0.4, muJ: -0.01, q: -0.002 },
+        effects: [ { path: 'pnth.commercialMomentum', op: 'add', value: -1 }, ],
     },
     {
         id: 'pnth_guidance_raise',
@@ -1507,16 +1493,16 @@ const SECTOR_EVENTS = [
         category: 'sector',
         likelihood: 0.7,
         headline: 'AI regulation bill passes Congress with bipartisan support; mandates safety audits, licensing for frontier models. PNTH compliance costs estimated at $200M/year',
-        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
+        params: { mu: -0.04, theta: 0.02, lambda: 0.6 },
     },
     {
         id: 'doj_antitrust_cloud',
         category: 'sector',
         likelihood: 0.6,
         headline: 'DOJ files antitrust suit against three major cloud providers alleging market allocation; enterprise AI contracts could be voided. Sector-wide repricing',
-        params: { mu: -0.03, theta: 0.02, lambda: 0.6 },
         magnitude: 'moderate',
+        params: { mu: -0.035, theta: 0.025, lambda: 0.7 },
     },
     {
         id: 'semiconductor_shortage',
@@ -1525,6 +1511,12 @@ const SECTOR_EVENTS = [
         headline: 'TSMC warns of 16-week lead times on advanced nodes; AI chip allocations cut 30%. PNTH scrambles for alternative supply',
         params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
         magnitude: 'minor',
+        portfolioFlavor: (portfolio) => {
+            const callQty = portfolio.positions.filter(p => p.type === 'call').reduce((s, p) => s + p.qty, 0);
+            if (callQty > 3) return 'Your long call positions are losing value as the chip shortage clouds the growth outlook.';
+            if (callQty < -3) return 'Your short calls are benefiting from the supply disruption dragging on the sector.';
+            return null;
+        },
     },
     {
         id: 'semiconductor_glut',
@@ -1539,8 +1531,8 @@ const SECTOR_EVENTS = [
         category: 'sector',
         likelihood: 0.6,
         headline: '500M user records exposed in breach at major social platform; Congress demands hearings, calls for data privacy legislation. Tech sentiment sours',
-        params: { mu: -0.025, theta: 0.015, lambda: 0.4 },
         magnitude: 'moderate',
+        params: { mu: -0.03, theta: 0.02, lambda: 0.5 },
     },
     {
         id: 'tech_ipo_frenzy',
@@ -1563,8 +1555,8 @@ const SECTOR_EVENTS = [
         category: 'sector',
         likelihood: 0.5,
         headline: 'Major cyberattack takes down power grid in three states; CISA attributes to state-sponsored actors. Congress fast-tracks cybersecurity spending bill',
-        params: { mu: -0.025, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
+        params: { mu: -0.035, theta: 0.02, lambda: 0.7 },
     },
     {
         id: 'ai_spending_forecast_up',
@@ -1587,12 +1579,10 @@ const SECTOR_EVENTS = [
         category: 'sector',
         likelihood: 0.8,
         headline: 'Zhaowei\'s Qilin-4 model tops PNTH Atlas on three major AI benchmarks; Liang Wei: "The gap is closed." Western analysts skeptical of methodology',
-        params: { mu: -0.02, theta: 0.01 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.acquired,
-        effects: (world) => {
-            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
-        },
+        params: { mu: -0.01, theta: 0.005 },
+        effects: [ { path: 'pnth.commercialMomentum', op: 'add', value: -1 }, ],
     },
     {
         id: 'zhaowei_beijing_summit',
@@ -1626,6 +1616,12 @@ const SECTOR_EVENTS = [
         headline: 'Tech layoffs accelerate: 40,000 cuts announced this month across six major firms. "Efficiency era" rhetoric masks slowing growth',
         params: { mu: -0.015, theta: 0.008 },
         magnitude: 'minor',
+        portfolioFlavor: (portfolio) => {
+            const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
+            if (stockQty > 10) return 'Your long equity book winces at the layoff headlines — "efficiency" is code for slowing revenue growth.';
+            if (stockQty < -5) return 'Your short equity position benefits as the layoff wave signals the growth cycle is turning.';
+            return null;
+        },
     },
 
     // -- Dividend / corporate payout events --------------------------------
@@ -1744,25 +1740,20 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 0.7,
         headline: 'BREAKING: Sen. Okafor announces presidential bid from the steps of the Capitol: "This administration has failed every test of leadership. I will not"',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
         magnitude: 'moderate',
         when: (sim, world) => sim.day > 750 && !world.election.okaforRunning,
-        effects: (world) => {
-            world.election.okaforRunning = true;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
-        },
+        params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+        effects: [ { path: 'election.okaforRunning', op: 'set', value: true }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
     },
     {
         id: 'okafor_scandal',
         category: 'political',
         likelihood: 0.5,
         headline: 'Opposition research bombshell: Okafor\'s husband held Zhaowei stock while she chaired the Intelligence Committee. She calls it "a smear campaign"',
-        params: { mu: 0.02, theta: 0.008 },
         magnitude: 'moderate',
         when: (sim, world) => world.election.okaforRunning || world.investigations.okaforProbeStage >= 1,
-        effects: (world) => {
-            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
-        },
+        params: { mu: 0.015, theta: 0.008 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: 2 }, ],
     },
 
     // =====================================================================
@@ -1820,9 +1811,9 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 1.0,
         headline: 'Government funding bill stalls as House Democrats refuse to pass Barron\'s defense spending increase; continuing resolution buys 45 days',
-        params: { mu: -0.01, theta: 0.005 },
-        magnitude: 'minor',
+        magnitude: 'moderate',
         when: (sim, world, congress) => !congress.trifecta,
+        params: { mu: -0.008, theta: 0.003 },
     },
     {
         id: 'budget_deal_passes',
@@ -1832,6 +1823,12 @@ const POLITICAL_EVENTS = [
         params: { mu: 0.02, theta: -0.005, b: 0.002 },
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.trifecta,
+        portfolioFlavor: (portfolio) => {
+            const bondQty = portfolio.positions.filter(p => p.type === 'bond').reduce((s, p) => s + p.qty, 0);
+            if (bondQty > 5) return 'Your long bond book winces as $1.4T in new spending means more Treasury supply.';
+            if (bondQty < -5) return 'Your short bond position benefits as the spending bill pushes yields higher.';
+            return null;
+        },
     },
     {
         id: 'bipartisan_infrastructure',
@@ -1846,12 +1843,10 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 0.8,
         headline: 'Government shutdown looms as midnight deadline approaches; agencies prepare furlough notices. Markets pricing in 2-week disruption',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.3, sigmaR: 0.003 },
         magnitude: 'moderate',
         when: (sim, world, congress) => !congress.trifecta,
-        followups: [
-            { id: 'shutdown_resolved', mtth: 8, weight: 0.7 },
-        ],
+        params: { mu: -0.025, theta: 0.012, lambda: 0.4, sigmaR: 0.004 },
+        followups: [ { id: 'shutdown_resolved', mtth: 10, weight: 0.6 }, ],
     },
     {
         id: 'shutdown_resolved',
@@ -1866,12 +1861,10 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 0.6,
         headline: 'Barron proposes sweeping corporate tax cut from 21% to 15%; analysts project $400B revenue shortfall. Markets rally, bond bears growl',
-        params: { mu: 0.03, theta: -0.005, b: 0.003, q: 0.002 },
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.trifecta,
-        effects: (world) => {
-            world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
-        },
+        params: { mu: 0.025, theta: -0.003, b: 0.005, q: 0.002 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: 2 }, ],
     },
     {
         id: 'clay_opposition_rally',
@@ -1890,11 +1883,9 @@ const POLITICAL_EVENTS = [
         category: 'political',
         likelihood: 0.6,
         headline: 'Federal court blocks Barron executive order on media regulation; ruling calls it "a frontal assault on the First Amendment." DOJ will appeal',
-        params: { mu: -0.01, theta: 0.005, sigmaR: 0.002 },
-        magnitude: 'minor',
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
-        },
+        magnitude: 'moderate',
+        params: { mu: -0.015, theta: 0.008, sigmaR: 0.003 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -2 }, ],
     },
 ];
 const INVESTIGATION_EVENTS = [
@@ -1906,17 +1897,11 @@ const INVESTIGATION_EVENTS = [
         category: 'investigation',
         likelihood: 0.7,
         headline: 'EXCLUSIVE (The Continental): Rachel Tan reveals VP Bowman held $4M in PNTH stock while personally lobbying Pentagon for Atlas contract. White House: "old news"',
-        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.tanBowmanStory === 0,
-        effects: (world) => {
-            world.investigations.tanBowmanStory = 1;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
-        },
-        followups: [
-            { id: 'bowman_denial', mtth: 3, weight: 0.9 },
-            { id: 'tan_bowman_followup', mtth: 25, weight: 0.6 },
-        ],
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        effects: [ { path: 'investigations.tanBowmanStory', op: 'set', value: 1 }, { path: 'election.barronApproval', op: 'add', value: -3 }, ],
+        followups: [ { id: 'bowman_denial', mtth: 3, weight: 0.9 }, { id: 'tan_bowman_followup', mtth: 25, weight: 0.6 }, ],
     },
     {
         id: 'bowman_denial',
@@ -1926,41 +1911,33 @@ const INVESTIGATION_EVENTS = [
         params: { mu: 0.01, theta: 0.005 },
         magnitude: 'minor',
         when: (sim, world) => world.investigations.tanBowmanStory >= 1,
+        portfolioFlavor: (portfolio) => {
+            const shortQty = portfolio.positions.filter(p => p.type === 'stock' && p.qty < 0).reduce((s, p) => s + p.qty, 0);
+            if (shortQty < -10) return 'Short sellers groan as Bowman\'s denial sparks a relief rally.';
+            return null;
+        },
     },
     {
         id: 'tan_bowman_followup',
         category: 'investigation',
         likelihood: 1.0,
         headline: 'Tan follow-up: Bowman\'s "blind trust" traded PNTH options 48 hours before contract announcements. Trust manager: Dirks\'s former assistant. The blind trust wasn\'t blind',
-        params: { mu: -0.04, theta: 0.02, lambda: 0.6, muJ: -0.02 },
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.tanBowmanStory === 1,
-        effects: (world) => {
-            world.investigations.tanBowmanStory = 2;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
-        },
-        followups: [
-            { id: 'doj_bowman_referral', mtth: 30, weight: 0.5 },
-            { id: 'tan_bombshell_recording', mtth: 40, weight: 0.4 },
-        ],
+        params: { mu: -0.04, theta: 0.02, lambda: 0.6, muJ: -0.02 },
+        effects: [ { path: 'investigations.tanBowmanStory', op: 'set', value: 2 }, { path: 'election.barronApproval', op: 'add', value: -5 }, ],
+        followups: [ { id: 'doj_bowman_referral', mtth: 30, weight: 0.5 }, { id: 'tan_bombshell_recording', mtth: 40, weight: 0.4 }, ],
     },
     {
         id: 'tan_bombshell_recording',
         category: 'investigation',
         likelihood: 1.0,
         headline: 'BOMBSHELL: Tan publishes recorded Bowman-Dirks phone call: "Just make sure the stock is in the trust before the announcement." Dirks: "Already done, Jay"',
-        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
         magnitude: 'major',
         when: (sim, world) => world.investigations.tanBowmanStory >= 2,
-        effects: (world) => {
-            world.investigations.tanBowmanStory = 3;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 8);
-            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
-            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
-        },
-        followups: [
-            { id: 'bowman_resigns', mtth: 20, weight: 0.5 },
-        ],
+        params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
+        effects: [ { path: 'investigations.tanBowmanStory', op: 'set', value: 3 }, { path: 'election.barronApproval', op: 'add', value: -8 }, { path: 'pnth.boardDirks', op: 'add', value: -1 }, { path: 'pnth.boardGottlieb', op: 'add', value: 1 }, ],
+        followups: [{ id: 'bowman_resigns', mtth: 20, weight: 0.5 }],
     },
     {
         id: 'tan_nsa_initial',
@@ -2000,37 +1977,30 @@ const INVESTIGATION_EVENTS = [
         category: 'investigation',
         likelihood: 0.8,
         headline: 'Sen. Okafor formally opens Intelligence Committee hearings into PNTH-White House ties; witness list includes current and former PNTH executives',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.4 },
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.okaforProbeStage === 0 && world.pnth.senateProbeLaunched,
-        effects: (world) => {
-            world.investigations.okaforProbeStage = 1;
-        },
+        params: { mu: -0.02, theta: 0.01, lambda: 0.4 },
+        effects: [ { path: 'investigations.okaforProbeStage', op: 'set', value: 1 }, ],
     },
     {
         id: 'okafor_subpoenas',
         category: 'investigation',
         likelihood: 1.0,
         headline: 'Okafor issues subpoenas for Bowman financial records and Dirks-Bowman communications; White House invokes executive privilege. Constitutional showdown looms',
-        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.okaforProbeStage >= 1,
-        effects: (world) => {
-            world.investigations.okaforProbeStage = Math.max(2, world.investigations.okaforProbeStage);
-        },
+        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
+        effects: [ { path: 'investigations.okaforProbeStage', op: 'set', value: 2 }, ],
     },
     {
         id: 'okafor_criminal_referral',
         category: 'investigation',
         likelihood: 1.0,
         headline: 'Okafor\'s committee votes 8-6 to refer Bowman to DOJ for criminal investigation; "The evidence of insider trading is overwhelming," she says',
-        params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
         magnitude: 'major',
         when: (sim, world) => world.investigations.okaforProbeStage >= 2,
-        effects: (world) => {
-            world.investigations.okaforProbeStage = 3;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
-        },
+        params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
+        effects: [ { path: 'investigations.okaforProbeStage', op: 'set', value: 3 }, { path: 'election.barronApproval', op: 'add', value: -3 }, ],
     },
 
     // =====================================================================
@@ -2050,12 +2020,10 @@ const INVESTIGATION_EVENTS = [
         category: 'investigation',
         likelihood: 0.8,
         headline: 'BREAKING: VP Bowman resigns "to spend time with family and fight these baseless allegations." Barron: "Jay is a great patriot. Total witch hunt"',
-        params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02 },
         magnitude: 'major',
         when: (sim, world) => world.investigations.tanBowmanStory >= 2,
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
-        },
+        params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.03 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -5 }, ],
     },
     {
         id: 'bowman_indicted',
@@ -2068,6 +2036,11 @@ const INVESTIGATION_EVENTS = [
         effects: (world) => {
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
         },
+        portfolioFlavor: (portfolio) => {
+            const optQty = portfolio.positions.filter(p => p.type === 'call' || p.type === 'put').reduce((s, p) => s + Math.abs(p.qty), 0);
+            if (optQty > 5) return 'Your options book is getting whipped by the vol spike on the indictment.';
+            return null;
+        },
     },
 
     // =====================================================================
@@ -2078,16 +2051,11 @@ const INVESTIGATION_EVENTS = [
         category: 'investigation',
         likelihood: 0.8,
         headline: 'House Speaker announces formal impeachment inquiry into President Barron; cites "abuse of power, obstruction, and complicity in corruption"',
-        params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, sigmaR: 0.005 },
         magnitude: 'major',
         when: (sim, world, congress) => !congress.fedControlsHouse && world.investigations.impeachmentStage === 0 && world.investigations.tanBowmanStory >= 2,
-        effects: (world) => {
-            world.investigations.impeachmentStage = 1;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
-        },
-        followups: [
-            { id: 'impeachment_vote', mtth: 40, weight: 0.6 },
-        ],
+        params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.015, sigmaR: 0.004 },
+        effects: [ { path: 'investigations.impeachmentStage', op: 'set', value: 1 }, { path: 'election.barronApproval', op: 'add', value: -3 }, ],
+        followups: [{ id: 'impeachment_vote', mtth: 40, weight: 0.6 }],
     },
     {
         id: 'impeachment_vote',
@@ -2124,12 +2092,10 @@ const COMPOUND_EVENTS = [
         category: 'compound',
         likelihood: 1.0,
         headline: 'Military spending bill fails as Congress balks at deficit during recession; defense stocks crater. Barron blames "weak politicians who don\'t support the troops"',
-        params: { mu: -0.06, theta: 0.03, lambda: 1.5 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.mideastEscalation >= 2 && world.geopolitical.recessionDeclared,
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
-        },
+        params: { mu: -0.04, theta: 0.025, lambda: 1.0 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -5 }, ],
     },
     {
         id: 'compound_pnth_scandal_trade_war',
@@ -2142,6 +2108,11 @@ const COMPOUND_EVENTS = [
         effects: (world) => {
             world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
             world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
+        },
+        portfolioFlavor: (portfolio) => {
+            const longStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty > 0).reduce((s, p) => s + p.qty, 0);
+            if (longStock > 10) return 'Meridian\'s tech-heavy long book is feeling the geopolitical heat.';
+            return null;
         },
     },
     {
@@ -2158,9 +2129,9 @@ const COMPOUND_EVENTS = [
         category: 'compound',
         likelihood: 1.0,
         headline: '"Worst week since 2008": margin calls cascade as institutional investors flee; regulators hold emergency session. Circuit breakers triggered three days running',
-        params: { mu: -0.08, theta: 0.05, lambda: 3.0, muJ: -0.06, xi: 0.15, q: -0.005 },
         magnitude: 'major',
         when: (sim, world) => world.fed.credibilityScore < 3 && world.geopolitical.recessionDeclared && sim.theta > 0.15,
+        params: { mu: -0.06, theta: 0.04, lambda: 2.0, muJ: -0.04, xi: 0.1, q: -0.003 },
     },
     {
         id: 'compound_impeachment_war',
@@ -2292,6 +2263,11 @@ const CONGRESSIONAL_EVENTS = [
             world.congress.senate.farmerLabor += 1;
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
         },
+        portfolioFlavor: (portfolio) => {
+            const longStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty > 0).reduce((s, p) => s + p.qty, 0);
+            if (longStock > 10) return 'Your long equity book dips as the Federalist majority narrows and deregulation odds shrink.';
+            return null;
+        },
     },
     {
         id: 'special_election_senate_fed_gains',
@@ -2365,17 +2341,11 @@ const CONGRESSIONAL_EVENTS = [
         category: 'congressional',
         likelihood: 0.3,
         headline: 'Rep. Calloway switches from Federalist to Farmer-Labor on House floor: "I can no longer support a party that has abandoned its principles"',
-        params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
         magnitude: 'moderate',
         when: (sim, world) => world.congress.house.federalist >= 216 && world.election.barronApproval < 45,
-        effects: (world) => {
-            world.congress.house.federalist -= 1;
-            world.congress.house.farmerLabor += 1;
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
-        },
-        followups: [
-            { id: 'defection_fallout_fed', mtth: 10, weight: 0.6 },
-        ],
+        params: { mu: -0.01, theta: 0.005, lambda: 0.1 },
+        effects: [ { path: 'congress.house.federalist', op: 'add', value: -1 }, { path: 'congress.house.farmerLabor', op: 'add', value: 1 }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
+        followups: [ { id: 'defection_fallout_fed', mtth: 12, weight: 0.4 }, ],
     },
     {
         id: 'defection_fallout_fed',
@@ -2437,13 +2407,10 @@ const CONGRESSIONAL_EVENTS = [
         category: 'congressional',
         likelihood: 0.5,
         headline: 'Hard-right Federalist bloc files motion to vacate the chair; House Speaker faces confidence vote as party fractures over spending bill',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.4 },
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.fedControlsHouse && world.congress.house.federalist <= 225,
-        followups: [
-            { id: 'speaker_survives', mtth: 5, weight: 0.5 },
-            { id: 'speaker_ousted', mtth: 5, weight: 0.5 },
-        ],
+        params: { mu: -0.015, theta: 0.005, lambda: 0.2 },
+        followups: [ { id: 'speaker_survives', mtth: 5, weight: 0.6 }, { id: 'speaker_ousted', mtth: 5, weight: 0.4 }, ],
     },
     {
         id: 'speaker_survives',
@@ -2492,14 +2459,10 @@ const CONGRESSIONAL_EVENTS = [
         category: 'congressional',
         likelihood: 0.5,
         headline: 'Treasury warns of "extraordinary measures" as debt ceiling deadline looms; rating agencies put U.S. on negative watch. T-bill yields spike',
-        params: { mu: -0.03, theta: 0.02, lambda: 0.8, sigmaR: 0.008, b: 0.005 },
         magnitude: 'major',
         when: (sim, world, congress) => !congress.trifecta,
-        followups: [
-            { id: 'debt_ceiling_last_minute_deal', mtth: 15, weight: 0.6 },
-            { id: 'debt_ceiling_technical_default', mtth: 20, weight: 0.2 },
-            { id: 'debt_ceiling_clean_raise', mtth: 10, weight: 0.2 },
-        ],
+        params: { mu: -0.04, theta: 0.025, lambda: 1.2, sigmaR: 0.01, b: 0.008 },
+        followups: [ { id: 'debt_ceiling_last_minute_deal', mtth: 18, weight: 0.5 }, { id: 'debt_ceiling_technical_default', mtth: 15, weight: 0.3 }, { id: 'debt_ceiling_clean_raise', mtth: 12, weight: 0.2 }, ],
     },
     {
         id: 'debt_ceiling_last_minute_deal',
@@ -2522,6 +2485,14 @@ const CONGRESSIONAL_EVENTS = [
         followups: [
             { id: 'debt_ceiling_last_minute_deal', mtth: 5, weight: 0.9 },
         ],
+        portfolioFlavor: (portfolio) => {
+            const bondQty = portfolio.positions.filter(p => p.type === 'bond').reduce((s, p) => s + p.qty, 0);
+            if (bondQty > 5) return 'Your bond portfolio is in freefall as the U.S. loses its AAA rating. This is unprecedented.';
+            if (bondQty < -5) return 'Your short bond position is exploding in value. The unthinkable just happened.';
+            const totalVal = Math.abs(portfolio.cash) + portfolio.positions.reduce((s, p) => s + Math.abs(p.qty) * 100, 0);
+            if (totalVal > 5000) return 'Meridian\'s risk systems are flashing red. Every desk on the Street is getting margin-called.';
+            return null;
+        },
     },
     {
         id: 'debt_ceiling_clean_raise',
@@ -2576,12 +2547,10 @@ const CONGRESSIONAL_EVENTS = [
         category: 'congressional',
         likelihood: 0.3,
         headline: 'Senate Majority Leader invokes nuclear option to eliminate legislative filibuster; major policy shifts now possible with bare 51-vote majority',
-        params: { mu: -0.02, theta: 0.015, lambda: 0.5, sigmaR: 0.004 },
         magnitude: 'major',
         when: (sim, world, congress) => congress.fedControlsSenate && world.congress.senate.federalist >= 52,
-        effects: (world) => {
-            world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
-        },
+        params: { mu: -0.025, theta: 0.02, lambda: 0.6, sigmaR: 0.005 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: 2 }, ],
     },
     {
         id: 'senate_rejects_barron_nominee',
@@ -2643,24 +2612,20 @@ const CONGRESSIONAL_EVENTS = [
         category: 'congressional',
         likelihood: 0.4,
         headline: 'Barron\'s corporate tax reform passes both chambers: rate cut to 15%, repatriation holiday. Analysts project massive surge in shareholder returns',
-        params: { mu: 0.04, theta: -0.01, b: 0.003, q: 0.005 },
         magnitude: 'major',
         when: (sim, world, congress) => congress.trifecta,
-        effects: (world) => {
-            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
-        },
+        params: { mu: 0.03, theta: -0.005, b: 0.002, q: 0.004 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: 3 }, ],
     },
     {
         id: 'capital_gains_tax_scare',
         category: 'congressional',
         likelihood: 0.5,
         headline: 'Senate Finance Committee floats doubling capital gains tax to 40%; wealthy investors front-run by locking in gains. Selling pressure intensifies',
-        params: { mu: -0.03, theta: 0.015, lambda: 0.5, q: -0.002 },
         magnitude: 'moderate',
         when: (sim, world, congress) => !congress.trifecta,
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 1);
-        },
+        params: { mu: -0.02, theta: 0.008, lambda: 0.3, q: -0.001 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -1 }, ],
     },
 ];
 const MIDTERM_EVENTS = [
@@ -2681,22 +2646,18 @@ const MIDTERM_EVENTS = [
         category: 'midterm',
         likelihood: 1.0,
         headline: 'Farmer-Labor elects new House Speaker; pledges immediate investigations into Barron administration. "Accountability starts now"',
-        params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
-        },
+        params: { mu: -0.02, theta: 0.008, lambda: 0.3 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -2 }, ],
     },
     {
         id: 'midterm_lame_duck_barron',
         category: 'midterm',
         likelihood: 1.0,
         headline: 'Barron retreats to Mar-a-Lago after historic losses; agenda effectively dead. Aides describe him as "furious and isolated." Markets rally on gridlock',
-        params: { mu: 0.04, theta: -0.02, lambda: -0.5, sigmaR: -0.003 },
         magnitude: 'major',
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 8);
-        },
+        params: { mu: 0.03, theta: -0.01, lambda: -0.3, sigmaR: -0.002 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -8 }, ],
     },
     {
         id: 'midterm_status_quo',
@@ -2711,11 +2672,9 @@ const MIDTERM_EVENTS = [
         category: 'midterm',
         likelihood: 1.0,
         headline: 'Farmer-Labor takes Senate majority by one seat; committee chairmanships flip. Okafor gains full subpoena power over Intelligence Committee',
-        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
         magnitude: 'moderate',
-        effects: (world) => {
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
-        },
+        params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
+        effects: [ { path: 'election.barronApproval', op: 'add', value: -3 }, ],
     },
 ];
 
@@ -2990,11 +2949,9 @@ const MARKET_EVENTS = [
             return base;
         },
         headline: 'Repo market seizure: overnight rates spike to 8% as dealers hoard reserves; Fed forced into emergency operations',
-        params: { mu: -0.05, theta: 0.035, lambda: 2.0, muJ: -0.04, borrowSpread: 0.8, q: -0.003 },
         magnitude: 'major',
-        followups: [
-            { id: 'fed_emergency_repo', mtth: 3, weight: 0.8 },
-        ],
+        params: { mu: -0.03, theta: 0.04, lambda: 2.5, muJ: -0.04, borrowSpread: 1.0, q: -0.003 },
+        followups: [{ id: 'fed_emergency_repo', mtth: 3, weight: 0.9 }],
     },
     {
         id: 'opex_vol_spike',
@@ -3025,8 +2982,8 @@ const MARKET_EVENTS = [
             return base;
         },
         headline: 'Leveraged vol ETP liquidation cascade: inverse-VIX fund NAV collapses 90%, forced rebalancing hammers futures',
-        params: { mu: -0.06, theta: 0.05, lambda: 3.5, muJ: -0.05, xi: 0.2, rho: -0.1 },
         magnitude: 'major',
+        params: { mu: -0.04, theta: 0.04, lambda: 2.5, muJ: -0.04, xi: 0.15, rho: -0.08 },
     },
     {
         id: 'margin_call_cascade',
@@ -3040,6 +2997,12 @@ const MARKET_EVENTS = [
         headline: 'Prime brokers issue wave of margin calls across hedge fund complex; forced liquidation drives broad-based selling',
         params: { mu: -0.04, theta: 0.03, lambda: 2.5, muJ: -0.04, xi: 0.1, borrowSpread: 0.5, q: -0.002 },
         magnitude: 'major',
+        portfolioFlavor: (portfolio) => {
+            const shortQty = portfolio.positions.filter(p => p.qty < 0).reduce((s, p) => s + Math.abs(p.qty), 0);
+            if (shortQty > 5) return 'Meridian\'s prime broker is reviewing short borrows across the desk.';
+            if (portfolio.cash < 0) return 'The desk is running negative cash — margin calls hit close to home.';
+            return null;
+        },
     },
     {
         id: 'low_vol_grind',
@@ -3133,6 +3096,106 @@ export const OFFLINE_EVENTS = [
     ...INVESTIGATION_EVENTS,
     ...COMPOUND_EVENTS,
     ...MIDTERM_EVENTS,
+
+    // -- Insider tip outcome events (real) --
+    {
+        id: 'tip_dividend_hike',
+        category: 'pnth_earnings',
+        likelihood: 0,
+        headline: 'PNTH announces surprise dividend hike — payout doubles',
+        params: { mu: 0.03, theta: -0.01 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_fed_pause',
+        category: 'fed',
+        likelihood: 0,
+        headline: 'Fed holds steady in surprise decision — doves prevail',
+        params: { mu: 0.02, theta: -0.005, b: -0.005, sigmaR: -0.002 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_contract_win',
+        category: 'sector',
+        likelihood: 0,
+        headline: 'PNTH wins $2.8B defense contract — shares surge',
+        params: { mu: 0.04, theta: -0.015 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_short_squeeze',
+        category: 'market',
+        likelihood: 0,
+        headline: 'Short squeeze erupts — forced covering drives 8% rally in hours',
+        params: { mu: 0.05, theta: 0.02, lambda: 1.5 },
+        magnitude: 'major',
+    },
+    {
+        id: 'tip_earnings_beat',
+        category: 'pnth_earnings',
+        likelihood: 0,
+        headline: 'PNTH crushes earnings — revenue up 25%, guidance raised',
+        params: { mu: 0.04, theta: -0.01, q: 0.002 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_acquisition_bid',
+        category: 'sector',
+        likelihood: 0,
+        headline: 'Foreign consortium launches $55B bid for PNTH — 30% premium',
+        params: { mu: 0.06, theta: -0.02, xi: 0.03 },
+        magnitude: 'major',
+    },
+
+    // -- Insider tip outcome events (fake — "despite rumors") --
+    {
+        id: 'tip_dividend_flat',
+        category: 'pnth_earnings',
+        likelihood: 0,
+        headline: 'PNTH maintains dividend despite rumors of increase — board prioritizes buybacks',
+        params: { mu: -0.01, theta: 0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'tip_fed_hike',
+        category: 'fed',
+        likelihood: 0,
+        headline: 'Despite rumors of a pause, Fed hikes 25bps — Hartley cites persistent inflation',
+        params: { mu: -0.02, theta: 0.01, b: 0.005, sigmaR: 0.003 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_contract_loss',
+        category: 'sector',
+        likelihood: 0,
+        headline: 'PNTH loses defense bid to rival despite rumors of a win — shares slide',
+        params: { mu: -0.03, theta: 0.01 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_squeeze_fizzle',
+        category: 'market',
+        likelihood: 0,
+        headline: 'Rumored short squeeze fizzles — shorts hold firm, longs trapped',
+        params: { mu: -0.02, theta: 0.015 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'tip_earnings_miss',
+        category: 'pnth_earnings',
+        likelihood: 0,
+        headline: 'Despite whisper-number optimism, PNTH misses estimates — guidance lowered',
+        params: { mu: -0.03, theta: 0.015, q: -0.001 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_acquisition_denied',
+        category: 'sector',
+        likelihood: 0,
+        headline: 'PNTH denies acquisition rumors — "not in discussions with any party"',
+        params: { mu: -0.02, theta: 0.01, xi: -0.01 },
+        magnitude: 'minor',
+    },
 ];
 
 // -- Event-by-id lookup ---------------------------------------------------

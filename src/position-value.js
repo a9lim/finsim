@@ -6,8 +6,9 @@
    values. Used by portfolio.js and portfolio-renderer.js.
    ===================================================== */
 
-import { allocTree, prepareTree, priceWithTree, vasicekBondPrice } from './pricing.js';
+import { allocTree, prepareTree, priceWithTree, vasicekBondPrice, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
+import { getStockImpact, getOptionImpact } from './price-impact.js';
 import { market } from './market.js';
 
 let _tree = null;
@@ -30,17 +31,24 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
         ? Math.max((expiryDay - day) / TRADING_DAYS_PER_YEAR, 0)
         : 0;
     switch (type) {
-        case 'stock': return S;
+        case 'stock': return S + getStockImpact(vol);
         case 'bond':
             return market.a >= 1e-8
                 ? vasicekBondPrice(BOND_FACE_VALUE, rate, dte, market.a, market.b, market.sigmaR)
                 : BOND_FACE_VALUE * Math.exp(-rate * dte);
         case 'call':
-        case 'put':
+        case 'put': {
             if (dte <= 0 || vol <= 0) return Math.max(0, type === 'call' ? S - strike : strike - S);
+            const sigmaEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
+            const sigma = computeSkewSigma(sigmaEff, S, strike, dte, market.rho, market.xi, market.kappa);
             if (!_tree) _tree = allocTree();
-            prepareTree(dte, rate, vol, q, day, _tree);
-            return priceWithTree(S, strike, type === 'put', _tree);
+            prepareTree(dte, rate, sigma, q, day, _tree);
+            const treePrice = priceWithTree(S, strike, type === 'put', _tree);
+            const logSK = Math.log(S / strike);
+            const dteDays = Math.max(1, expiryDay - day);
+            const imp = getOptionImpact(type, strike, expiryDay, sigma, logSK, dteDays);
+            return Math.max(0, treePrice + imp);
+        }
         default: return 0;
     }
 }
