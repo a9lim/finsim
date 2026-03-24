@@ -279,7 +279,7 @@ function init() {
         onStep:           () => step(),
         onSpeedUp:        () => cycleSpeed(),
         onSpeedDown:      () => decycleSpeed(),
-        onToggleTheme:    () => toggleTheme(),
+        onToggleTheme:    () => { toggleTheme(); updateUI(); dirty = true; },
         onPresetChange:   (index) => loadPreset(index),
         onReset:          () => resetSim(),
         onSliderChange:   (param, value) => syncSliderToSim(param, value),
