@@ -225,7 +225,7 @@ function _diffOrderRows(container, orders) {
 // updatePortfolioDisplay -- main export
 // ---------------------------------------------------------------------------
 
-export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, day, marginInfo, q) {
+export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, day, marginInfo, q, portfolioHistory) {
     $.cashDisplay.textContent = fmtDollar(portfolio.cash);
     $.cashDisplay.className = 'stat-value ' + (portfolio.cash < 0 ? 'pnl-down' : '');
 
@@ -235,9 +235,22 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     const totalValue = (marginInfo && marginInfo.equity != null) ? marginInfo.equity : portfolio.cash;
     $.portfolioValue.textContent = fmtDollar(totalValue);
 
-    const pnl = totalValue - portfolio.initialCapital;
-    $.totalPnl.textContent = fmtDollar(pnl);
-    $.totalPnl.className   = 'stat-value ' + pnlClass(pnl);
+    // Color portfolio value: green if outpacing buy-and-hold stock, red if underperforming
+    const buyHoldValue = (portfolio.initialCapital / 100) * currentPrice;
+    const vsBenchmark = totalValue - buyHoldValue;
+    const benchCls = vsBenchmark > 0.005 ? 'pnl-up' : vsBenchmark < -0.005 ? 'pnl-down' : '';
+    $.portfolioValue.className = 'stat-value ' + benchCls;
+
+    // Portfolio value sparkline
+    if ($.portfolioSparkCtx && portfolioHistory && portfolioHistory.count >= 2
+        && typeof drawSparkline !== 'undefined') {
+        const c = $.portfolioSparkCanvas;
+        let color;
+        if (benchCls === 'pnl-up') color = typeof _PALETTE !== 'undefined' ? _PALETTE.up : '#22c55e';
+        else if (benchCls === 'pnl-down') color = typeof _PALETTE !== 'undefined' ? _PALETTE.down : '#ef4444';
+        else color = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#000000';
+        drawSparkline($.portfolioSparkCtx, portfolioHistory, c.width, c.height, color, color + '44');
+    }
 
     // Margin display from pre-computed values
     const marginDisplay = marginInfo

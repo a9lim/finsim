@@ -56,6 +56,8 @@ export function cacheDOMElements($) {
     $.pendingOrders     = document.getElementById('pending-orders');
     $.cashDisplay       = document.getElementById('cash-display');
     $.portfolioValue    = document.getElementById('portfolio-value');
+    $.portfolioSparkCanvas = document.getElementById('portfolio-sparkline');
+    $.portfolioSparkCtx    = $.portfolioSparkCanvas ? $.portfolioSparkCanvas.getContext('2d') : null;
     $.totalPnl          = document.getElementById('total-pnl');
     $.marginStatus      = document.getElementById('margin-status');
     $.borrowCostDisplay = document.getElementById('borrow-cost');
@@ -102,6 +104,11 @@ export function cacheDOMElements($) {
     $.introStart  = document.getElementById('intro-start');
     $.strategyLegsList = document.getElementById('strategy-legs-list');
     $.strategySummary  = document.getElementById('strategy-summary');
+    $.stratGreekDelta  = document.getElementById('strat-greek-delta');
+    $.stratGreekGamma  = document.getElementById('strat-greek-gamma');
+    $.stratGreekTheta  = document.getElementById('strat-greek-theta');
+    $.stratGreekVega   = document.getElementById('strat-greek-vega');
+    $.stratGreekRho    = document.getElementById('strat-greek-rho');
     $.saveStrategyBtn  = document.getElementById('save-strategy-btn');
     $.deleteStrategyBtn  = document.getElementById('delete-strategy-btn');
     $.strategyNameInput  = document.getElementById('strategy-name');
@@ -380,10 +387,6 @@ export function updateGreeksDisplay($, greeks) {
     $.greekTheta.textContent = fmtNum(greeks.theta, 4);
     $.greekVega.textContent  = fmtNum(greeks.vega,  4);
     $.greekRho.textContent   = fmtNum(greeks.rho,   4);
-    $.greekDelta.classList.toggle('pnl-up',   greeks.delta > 0);
-    $.greekDelta.classList.toggle('pnl-down', greeks.delta < 0);
-    $.greekTheta.classList.toggle('pnl-down', greeks.theta < 0);
-    $.greekVega.classList.toggle('pnl-up',    greeks.vega  > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -657,9 +660,9 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
                 return (v < 0 ? '-' : '') + Math.abs(v).toFixed(2);
             };
             const items = [
-                { label: summary.netCost < 0 ? 'Net Credit' : 'Net Debit', value: fmtVal(Math.abs(summary.netCost)), cls: summary.netCost < 0 ? 'pnl-up' : 'pnl-down' },
-                { label: 'Max Profit', value: fmtVal(summary.maxProfit), cls: 'pnl-up' },
-                { label: 'Max Loss', value: fmtVal(summary.maxLoss), cls: 'pnl-down' },
+                { label: summary.netCost < 0 ? 'Net Credit' : summary.netCost > 0 ? 'Net Debit' : 'Net Cost', value: fmtVal(Math.abs(summary.netCost)), cls: pnlClass(-summary.netCost) },
+                { label: 'Max Profit', value: fmtVal(summary.maxProfit), cls: summary.maxProfit > 0 ? 'pnl-up' : '' },
+                { label: 'Max Loss', value: fmtVal(summary.maxLoss), cls: summary.maxLoss < 0 ? 'pnl-down' : '' },
             ];
             if (summary.breakevens.length > 0) {
                 items.push({
@@ -682,6 +685,16 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
                 $.strategySummary.appendChild(row);
             }
         }
+    }
+
+    // Strategy Greeks at current price
+    if ($.stratGreekDelta) {
+        const g = (summary && legs && legs.length > 0) ? summary.greeks : null;
+        $.stratGreekDelta.textContent = fmtNum(g ? g.delta : 0, 4);
+        $.stratGreekGamma.textContent = fmtNum(g ? g.gamma : 0, 4);
+        $.stratGreekTheta.textContent = fmtNum(g ? g.theta : 0, 4);
+        $.stratGreekVega.textContent  = fmtNum(g ? g.vega  : 0, 4);
+        $.stratGreekRho.textContent   = fmtNum(g ? g.rho   : 0, 4);
     }
 
     // Disable edit fields for built-in strategies
@@ -723,12 +736,11 @@ export function updateCreditDebit($, netCost) {
         $.strategyNetCost.className = 'stat-value';
         return;
     }
-    const isCredit = netCost < 0;
-    const label = isCredit ? 'Net Credit' : 'Net Debit';
+    const label = netCost < 0 ? 'Net Credit' : netCost > 0 ? 'Net Debit' : 'Net Cost';
     const value = Math.abs(netCost).toFixed(2);
     $.strategyCreditDebit.querySelector('.stat-label').textContent = label;
     $.strategyNetCost.textContent = value;
-    $.strategyNetCost.className = 'stat-value ' + (isCredit ? 'pnl-up' : 'pnl-down');
+    $.strategyNetCost.className = 'stat-value ' + pnlClass(-netCost);
 }
 
 function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {

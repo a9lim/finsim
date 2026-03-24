@@ -18,12 +18,12 @@ body {
 .pnl-up   { color: var(--up); }
 .pnl-down { color: var(--down); }
 
-/* --- Greek Label Colors --- */
-#greek-delta { color: var(--delta); }
-#greek-gamma { color: var(--gamma); }
-#greek-theta { color: var(--theta); }
-#greek-vega  { color: var(--vega); }
-#greek-rho   { color: var(--rho); }
+/* --- Greek Colors --- */
+.greek-label-delta, #greek-delta, #strat-greek-delta { color: var(--delta); }
+.greek-label-gamma, #greek-gamma, #strat-greek-gamma { color: var(--gamma); }
+.greek-label-theta, #greek-theta, #strat-greek-theta { color: var(--theta); }
+.greek-label-vega,  #greek-vega,  #strat-greek-vega  { color: var(--vega); }
+.greek-label-rho,   #greek-rho,   #strat-greek-rho   { color: var(--rho); }
 
 /* --- Panel Hints --- */
 .panel-hint {

@@ -341,13 +341,7 @@
                             </span>
                             <span class="stat-value" id="portfolio-value">$10,000</span>
                         </div>
-                        <div class="stat-row">
-                            <span class="stat-label-wrap">
-                                <span class="stat-label">Total P&L</span>
-                                <button class="info-trigger" type="button" data-info="totalPnl" aria-label="Info: Total P&L">?</button>
-                            </span>
-                            <span class="stat-value" id="total-pnl">$0.00</span>
-                        </div>
+                        <canvas class="rate-sparkline" id="portfolio-sparkline" width="280" height="40"></canvas>
                         <div class="stat-row">
                             <span class="stat-label-wrap" id="margin-label-wrap">
                                 <span class="stat-label">Margin Status</span>
@@ -430,6 +424,14 @@
                             <p class="panel-hint">No legs added. Click buttons above to build a strategy.</p>
                         </div>
                         <div id="strategy-summary" class="strategy-summary"></div>
+                        <div class="group-label">Greeks (at current price)</div>
+                        <div id="strategy-greeks">
+                            <div class="stat-row"><span class="stat-label greek-label-delta">Delta</span><span class="stat-value" id="strat-greek-delta">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label greek-label-gamma">Gamma</span><span class="stat-value" id="strat-greek-gamma">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label greek-label-theta">Theta</span><span class="stat-value" id="strat-greek-theta">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label greek-label-vega">Vega</span><span class="stat-value" id="strat-greek-vega">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label greek-label-rho">Rho</span><span class="stat-value" id="strat-greek-rho">0.00</span></div>
+                        </div>
                         <div class="group-label">Save Strategy</div>
                         <div class="control-group">
                             <label for="strategy-load-select">Strategy</label>
