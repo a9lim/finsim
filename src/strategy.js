@@ -332,6 +332,33 @@ export class StrategyRenderer {
         }, { passive: false });
     }
 
+    bindPan(el) {
+        let panning = false, lastX = 0, startX = 0, dragged = false;
+        el.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            panning = true; dragged = false;
+            lastX = startX = e.clientX;
+            el.style.cursor = 'grabbing';
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!panning) return;
+            const dx = e.clientX - lastX;
+            if (Math.abs(e.clientX - startX) > 3) dragged = true;
+            // Convert pixel delta to world units: pixels / (plotW / (2 * xRange))
+            const plotW = this._cssW - MARGIN.left - MARGIN.right;
+            if (plotW > 0) this._xCenter -= dx * (2 * this._xRange) / plotW;
+            lastX = e.clientX;
+            this._dirty = true;
+        });
+        window.addEventListener('mouseup', (e) => {
+            if (e.button !== 0 || !panning) return;
+            panning = false;
+            el.style.cursor = '';
+        });
+        // Expose drag state for click handler
+        this._wasDrag = () => dragged;
+    }
+
     /**
      * Handle a click on the canvas. Checks legend item bounding boxes
      * and toggles the corresponding Greek in greekToggles if hit.

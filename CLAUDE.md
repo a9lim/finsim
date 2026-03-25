@@ -68,10 +68,11 @@ src/
   chart.js              728 lines  ChartRenderer: log Y-axis OHLC candles (rounded bodies),
                                    live candle cubic interpolation, position markers, strike
                                    lines; shared-camera.js; uses resizeCanvasDPR()
-  strategy.js           960 lines  StrategyRenderer: payoff P&L, Greek overlays, breakevens
+  strategy.js           ~1000 lines StrategyRenderer: payoff P&L, Greek overlays, breakevens
                                    (analytical at expiry), input-keyed caching, unitPrice-based
                                    entry values, tree-based hypothetical S sweep,
-                                   computeSummary returns .greeks (aggregate at spot); uses
+                                   computeSummary returns .greeks (aggregate at spot),
+                                   bindPan() for left-click drag panning; uses
                                    resizeCanvasDPR()
   ui.js                1054 lines  DOM binding, display updaters, overlay management;
                                    delegates to chain-renderer.js and portfolio-renderer.js.
@@ -301,7 +302,7 @@ ATM = `round(S/5)*5`, 10 strikes each side (21 total). `ExpiryManager` maintains
 
 ## UI Architecture
 
-Floating glass panels over full-viewport canvas. Fixed topbar, right slide-in sidebar (4 tabs: Trade/Portfolio/Strategy/Settings), bottom pill bar. Portfolio tab shows portfolio value (colored green/red/neutral vs buy-and-hold benchmark) with a sparkline below it. No separate Total P&L line.
+Floating glass panels over full-viewport canvas. Fixed topbar, right slide-in sidebar (4 tabs: Trade/Portfolio/Strategy/Settings), bottom pill bar. Portfolio tab shows portfolio value (colored green/red/neutral vs buy-and-hold benchmark) with a sparkline below it. No separate Total P&L line. Both canvases support left-click drag to pan (chart via `camera.bindMousePan`, strategy via `strategy.bindPan`). Zoom controls hidden in strategy mode.
 
 **Overlays**: chain (pauses sim), trade dialog (confirm button cloned each open), popup decision (pauses sim, glass panel, category-themed, used for narrative events + margin calls + game over), reference (KaTeX, 29 entries), epilogue (4-page narrative). Old standalone margin-call and fraud overlays removed — all decision points flow through the popup system.
 
