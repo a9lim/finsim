@@ -204,6 +204,7 @@ function init() {
         // 3. Bind camera to chart canvas
         camera.bindWheel($.chartCanvas);
         camera.bindMousePan($.chartCanvas, { button: 0 });
+        camera.bindTouch($.chartCanvas);
         camera.bindZoomButtons({
             zoomIn:  $.zoomInBtn,
             zoomOut: $.zoomOutBtn,
@@ -263,7 +264,7 @@ function init() {
         { key: '0', label: 'Reset zoom',           group: 'View',       action: () => { if (camera) { camera.zoom = CHART_SLOT_PX; _repositionCamera(); } } },
         { key: 'b', label: 'Buy / sell stock',     group: 'Trade',      action: () => handleBuyStock() },
         { key: 'n', label: 'Buy / sell bond',      group: 'Trade',      action: () => handleBuyBond() },
-        { key: 'x', label: 'Toggle buy / sell',    group: 'Trade',      action: () => {} },
+        { key: 'x', label: 'Toggle buy / sell',    group: 'Trade',      action: () => document.getElementById('mode-btn').click() },
         { key: 'o', label: 'Open options chain',   group: 'Trade',      action: () => openFullChain() },
         { key: 'Enter', label: 'Execute strategy', group: 'Trade',      action: () => handleTradeExecStrategy() },
         { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
