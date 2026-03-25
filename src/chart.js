@@ -387,8 +387,12 @@ export class ChartRenderer {
             }
             ctx.stroke();
             ctx.fillStyle = color;
+            const r = Math.min(candleWidthRaw * 0.25, 3);
             for (let j = 0; j < bodies.length; j += 4) {
-                ctx.fillRect(bodies[j], bodies[j + 1], bodies[j + 2], bodies[j + 3]);
+                const bx = bodies[j], by = bodies[j + 1], bw = bodies[j + 2], bh = bodies[j + 3];
+                ctx.beginPath();
+                ctx.roundRect(bx, by, bw, bh, bh > r * 2 ? r : bh / 2);
+                ctx.fill();
             }
         }
 

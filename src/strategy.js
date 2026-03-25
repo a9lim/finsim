@@ -595,10 +595,10 @@ export class StrategyRenderer {
         const pnls = samplePts.map(S => _pnlAt(S));
         const breakevens = _zeroCrossings(xs, pnls);
 
-        // Aggregate Greeks at current spot
-        const infos = _precomputeLegs(legs, spot, vol, rate, evalDay, entryDay, fallbackDte, q);
+        // Aggregate Greeks at current spot/time (always use entry day, not slider)
+        const greekInfos = _precomputeLegs(legs, spot, vol, rate, entryDay, entryDay, fallbackDte, q);
         const greeks = { delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 };
-        for (const info of infos) {
+        for (const info of greekInfos) {
             const g = _legGreeksFast(info, spot);
             greeks.delta += g.delta;
             greeks.gamma += g.gamma;

@@ -398,8 +398,8 @@ export function updateRateDisplay($, rate, rateHistory) {
     if ($.rateSparkCtx && rateHistory && rateHistory.count >= 2
         && typeof drawSparkline !== 'undefined') {
         const c = $.rateSparkCanvas;
-        const accent = typeof _PALETTE !== 'undefined' ? _PALETTE.accent : '#E11107';
-        drawSparkline($.rateSparkCtx, rateHistory, c.width, c.height, accent, accent + '44');
+        const color = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#000000';
+        drawSparkline($.rateSparkCtx, rateHistory, c.width, c.height, color, color + '44');
     }
 }
 
@@ -633,6 +633,11 @@ export function updateStrategyChainDisplay($, pricedExpiry, onAddLeg, posMap) {
 }
 
 
+const _STRATEGY_INFO = {
+    netCost:    { title: 'Net Debit / Credit', body: 'Cost to enter the strategy at current prices. Debit = you pay; credit = you receive premium.' },
+    breakevens: { title: 'Breakevens', body: 'Stock prices where strategy P&L crosses zero at expiry. Multi-leg strategies can have multiple breakevens.' },
+};
+
 export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, onLegChange, currentStrategyHash, isBuiltin) {
     if (!$.strategyLegsList) return;
 
@@ -660,7 +665,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
                 return (v < 0 ? '-' : '') + Math.abs(v).toFixed(2);
             };
             const items = [
-                { label: summary.netCost < 0 ? 'Net Credit' : summary.netCost > 0 ? 'Net Debit' : 'Net Cost', value: fmtVal(Math.abs(summary.netCost)), cls: pnlClass(-summary.netCost) },
+                { label: summary.netCost < 0 ? 'Net Credit' : summary.netCost > 0 ? 'Net Debit' : 'Net Cost', value: fmtVal(Math.abs(summary.netCost)), cls: pnlClass(-summary.netCost), info: 'netCost' },
                 { label: 'Max Profit', value: fmtVal(summary.maxProfit), cls: summary.maxProfit > 0 ? 'pnl-up' : '' },
                 { label: 'Max Loss', value: fmtVal(summary.maxLoss), cls: summary.maxLoss < 0 ? 'pnl-down' : '' },
             ];
@@ -669,6 +674,7 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
                     label: 'Breakeven' + (summary.breakevens.length > 1 ? 's' : ''),
                     value: summary.breakevens.map(b => b.toFixed(2)).join(', '),
                     cls: '',
+                    info: 'breakevens',
                 });
             }
             for (const item of items) {
@@ -677,6 +683,17 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
                 const lbl = document.createElement('span');
                 lbl.className = 'stat-label';
                 lbl.textContent = item.label;
+                if (item.info && typeof createInfoTip !== 'undefined') {
+                    const btn = document.createElement('button');
+                    btn.className = 'info-trigger';
+                    btn.type = 'button';
+                    btn.dataset.info = item.info;
+                    btn.setAttribute('aria-label', 'Info: ' + item.label);
+                    btn.textContent = '?';
+                    lbl.appendChild(document.createTextNode(' '));
+                    lbl.appendChild(btn);
+                    createInfoTip(btn, _STRATEGY_INFO[item.info]);
+                }
                 const val = document.createElement('span');
                 val.className = 'stat-value ' + item.cls;
                 val.textContent = item.value;
@@ -841,7 +858,7 @@ export function wireInfoTips() {
         bidask:       { title: 'Bid-Ask Spread', body: 'You buy at the ask and sell at the bid. Spreads widen with higher volatility and deeper OTM strikes. Hover any cell to see bid/ask.' },
         // --- Strategy ---
         strategies:   { title: 'Strategy Builder', body: 'Build multi-leg strategies: left-click for long, right-click for short. Execute fills all legs atomically with rollback on failure.' },
-        payoff:       { title: 'Payoff Diagram', body: 'P&L profile across stock prices. Green = profit, rose = loss. Use the time slider and Greek overlays to explore risk.' },
+        sharedExpiry: { title: 'Shared Expiry', body: 'On: all legs share the expiry dropdown selection. Off: each leg keeps its own DTE offset (for calendar spreads).' },
         // --- Settings ---
         regime:       { title: 'Market Regime', body: '5 static presets (Calm Bull to Rate Hike) plus 2 dynamic modes with narrative events. Changing preset resets the simulation.' },
         riskFreeRate: { title: 'Risk-Free Rate', body: 'Current Vasicek rate $r$. Drives option pricing, bond values, and borrow costs. Sparkline shows recent history.' },

@@ -65,9 +65,9 @@ src/
                                    (includes strategyName), cash/margin, borrow interest,
                                    dividends, option expiry, bid/ask spreads, slippage
                                    integration, computeNetDelta(), computeGrossNotional()
-  chart.js              728 lines  ChartRenderer: log Y-axis OHLC candles, live candle cubic
-                                   interpolation, position markers, strike lines; shared-camera.js;
-                                   uses resizeCanvasDPR() from shared-utils.js
+  chart.js              728 lines  ChartRenderer: log Y-axis OHLC candles (rounded bodies),
+                                   live candle cubic interpolation, position markers, strike
+                                   lines; shared-camera.js; uses resizeCanvasDPR()
   strategy.js           960 lines  StrategyRenderer: payoff P&L, Greek overlays, breakevens
                                    (analytical at expiry), input-keyed caching, unitPrice-based
                                    entry values, tree-based hypothetical S sweep,
@@ -267,7 +267,7 @@ Almgren-Chriss framework with a single sqrt impact model and decaying cumulative
 
 ## Value Coloring
 
-3-way pattern throughout: negative/debit → `pnl-down` (red), neutral/zero → no class (text color), positive/credit → `pnl-up` (green). Portfolio value is colored vs buy-and-hold benchmark (green if outpacing, red if underperforming, text if neutral). Portfolio sparkline matches: `_PALETTE.up`/`_PALETTE.down`/`--text` CSS var. Greeks (both portfolio and strategy tabs) use per-Greek CSS colors (`--delta`, `--gamma`, `--theta`, `--vega`, `--rho`) on both labels (`.greek-label-*` classes) and values (by ID), NOT `pnl-up`/`pnl-down`.
+3-way pattern throughout: negative/debit → `pnl-down` (red), neutral/zero → no class (text color), positive/credit → `pnl-up` (green). Portfolio value is colored vs buy-and-hold benchmark (green if outpacing, red if underperforming, text if neutral). Both sparklines (portfolio value, risk-free rate) always use `--text` CSS var color. Greeks (both portfolio and strategy tabs) use per-Greek CSS colors (`--delta`, `--gamma`, `--theta`, `--vega`, `--rho`) on both labels (`.greek-label-*` classes) and values (by ID), NOT `pnl-up`/`pnl-down`.
 
 ## Display Scaling
 
@@ -309,7 +309,7 @@ Floating glass panels over full-viewport canvas. Fixed topbar, right slide-in si
 
 **Custom events**: `shoals:closePosition`, `shoals:exerciseOption`, `shoals:cancelOrder`, `shoals:unwindStrategy` -- ui.js/portfolio-renderer.js -> main.js.
 
-**Strategy tab**: sets `strategyMode = true`, pauses sim, shows strategy canvas + time-to-expiry slider (percentage maps to `evalDay`, clamped to min DTE). "Greeks (at current price)" section below legs shows aggregate delta/gamma/theta/vega/rho colored with per-Greek CSS vars (`--delta` through `--rho`). Strategy dropdown auto-loads on select ("New strategy" clears builder). Built-in strategies disable name/toggle/save/delete via `ctrl-disabled`. Selectable expiry toggle controls whether legs use the selected expiry or per-leg DTE offsets. On tab switch, `strategy._cache` and `_summaryCache` are invalidated and `updateStrategyBuilder()` is called so chart/summary/chain reflect current price impact state from trades on other tabs.
+**Strategy tab**: sets `strategyMode = true`, pauses sim, shows strategy canvas + time-to-expiry slider (percentage maps to `evalDay`, clamped to min DTE). "Greeks (at current price/time)" section below legs shows aggregate delta/gamma/theta/vega/rho computed at entry day (not slider), colored with per-Greek CSS vars (`--delta` through `--rho`). Strategy summary shows Net Debit/Credit and Breakevens with info tip buttons. Strategy dropdown auto-loads on select ("New strategy" clears builder). Built-in strategies disable name/toggle/save/delete via `ctrl-disabled`. "Shared Expiry" toggle (internal: `selectableExpiry`) controls whether legs use the selected expiry or per-leg DTE offsets. On tab switch, `strategy._cache` and `_summaryCache` are invalidated and `updateStrategyBuilder()` is called so chart/summary/chain reflect current price impact state from trades on other tabs.
 
 ## Dynamic Regime
 
@@ -388,7 +388,7 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **`priceAmerican` removed** -- all pricing uses `prepareTree` + `priceWithTree`. Each module owns its own reusable tree(s). Do NOT re-add `priceAmerican` or its transparent cache.
 - **`portfolio.strategies` removed** -- strategies live in localStorage via `strategy-store.js`. Do NOT add strategy storage back to portfolio.
 - **Strategy legs are relative** -- stored as `strikeOffset`/`dteOffset` (or `null` for selectable expiry). Use `legsToRelative()` to convert from absolute, `resolveLegs()` to convert back. In-memory `strategyLegs` in main.js use absolute values with `_refS`/`_refDay` for display.
-- **Selectable expiry** -- when `selectableExpiry: true`, option legs store `dteOffset: null` and use the expiry dropdown's selection at execution/load time. Most built-in strategies use selectable expiry; calendar spreads use fixed `dteOffset` (63/126 days) since they need different expiries per leg.
+- **Shared expiry** (internal: `selectableExpiry`) -- UI label "Shared Expiry". When `selectableExpiry: true`, option legs store `dteOffset: null` and use the expiry dropdown's selection at execution/load time. Most built-in strategies use shared expiry; calendar spreads use fixed `dteOffset` (63/126 days) since they need different expiries per leg.
 - **Position netting includes `strategyName`** -- two strategies with the same type/strike/expiry but different names create separate positions.
 - **`syncMarket` after `prepopulate`** -- must call `syncMarket(sim)` after `sim.prepopulate()` in both `init()` and `_resetCore()` or market params (v, kappa, theta, xi, rho) will be zero.
 - **`strategyBaseQty` on positions** -- set at first strategy execution, preserved through netting. Used by portfolio-renderer to compute execution multiplier vs per-unit leg quantities.
@@ -408,8 +408,9 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **`computeEffectiveSigma` signature** -- `(v, T, kappa, theta, xi)` — takes variance `v`, NOT vol. Do NOT pass extra args (S, K, rho) — those go to `computeSkewSigma`.
 - **No nested `.glass`** -- elements inside a `.glass` panel should NOT also have `.glass` class. Nested backdrop-filter stacks, making inner elements more opaque. Use `bg-hover` or `bg-elevated` for differentiation within glass panels.
 - **`fmtDollar` appends "k"** -- portfolio-scale dollar values only. Per-unit prices (fills, strategy net debit, breakevens, trigger prices) use raw `$X.XX`. Do NOT use `fmtDollar` for per-unit values.
-- **Portfolio value vs benchmark** -- colored by `totalValue - buyHoldValue` (buy-and-hold = `initialCapital / 100 * currentPrice`). Sparkline uses `--text` CSS var for neutral, not a hardcoded color. Theme toggle calls `updateUI()` to redraw the sparkline with the correct `--text` value.
+- **Portfolio value vs benchmark** -- colored by `totalValue - buyHoldValue` (buy-and-hold = `initialCapital / 100 * currentPrice`). Both sparklines (portfolio value, rate) always use `--text` CSS var, not accent or pnl colors. Theme toggle calls `updateUI()` to redraw with the correct `--text` value.
 - **`portfolioHistory` ring buffer** -- lives in main.js, pushed once per day in `_onDayComplete()`. Passed to `updatePortfolioDisplay()` as 9th arg. Prepopulated with buy-and-hold performance (`initialCapital / 100 * bar.close`) from history bars, so sparkline shows stock tracking instead of a flat line.
 - **Greek coloring is per-Greek, not pnl-based** -- DO NOT toggle `pnl-up`/`pnl-down` on Greek values. They are colored by CSS via `--delta`/`--gamma`/`--theta`/`--vega`/`--rho` vars. Both portfolio and strategy tabs use the same pattern.
+- **Strategy tab Greeks use entry day, not slider** -- `computeSummary` passes `entryDay` (not `evalDay`) to `_precomputeLegs` for the Greek computation, so Greeks always reflect current time regardless of slider position. The P&L curve and chart overlays still follow the slider.
 - **Strategy pending orders** -- `placePendingOrder` accepts `legs` array and `execMult` for multi-leg orders. These have `type: null, side: null, qty: null` with `order.legs` containing the resolved/scaled leg array. `checkPendingOrders` detects `order.legs` and runs rollback execution. Strategy limit orders trigger when `currentPrice <= triggerPrice`; strategy stop orders trigger when `currentPrice >= triggerPrice`.
 - **No Total P&L row** -- removed from HTML. Do NOT re-add `$.totalPnl` references.
