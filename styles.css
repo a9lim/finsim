@@ -109,7 +109,7 @@ main {
 
 /* Speed button and play/pause states now in shared-base.css */
 
-/* --- Stat group spacing (matches physsim) --- */
+/* --- Stat group spacing (matches geon) --- */
 .stat-group {
     display: flex;
     flex-direction: column;
