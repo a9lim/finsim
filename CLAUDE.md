@@ -118,13 +118,17 @@ src/
   history-buffer.js     103 lines  Ring buffer (capacity 252) for OHLC bars
   format-helpers.js      63 lines  fmtDollar() (appends "k"), fmtQty(), fmtNum(), pnlClass(),
                                    fmtDte(), fmtRelDay()
-  strategy-store.js    ~400 lines Built-in strategy defs (26 presets: verticals, butterflies,
-                                   condors, straddles, strangles, conversions, reversals,
-                                   box spreads, ladders, ratio spreads, calendars, collars,
-                                   jade lizard, guts, risk reversal), localStorage CRUD
-                                   (hash IDs, name collision enforcement), resolveLegs
-                                   (with override expiry), formatLeg, computeNetCost
-                                   (uses unitPrice), legsToRelative, nextAutoName
+  strategy-store.js    ~370 lines Built-in strategy defs (22 presets, no unlimited-
+                                   downside strategies). Groups: vertical spreads (bull/
+                                   bear call/put), volatility (straddle/strangle/guts),
+                                   butterflies & condors, stock+options (covered call/
+                                   protective put/collar), asymmetric (risk reversal/
+                                   jade lizard/put ratio/put ladder), arbitrage
+                                   (conversion/reversal/box), calendars. localStorage
+                                   CRUD (hash IDs, name collision enforcement),
+                                   resolveLegs (with override expiry), formatLeg,
+                                   computeNetCost (uses unitPrice), legsToRelative,
+                                   nextAutoName
   position-value.js      88 lines  unitPrice() (uses vol surface + per-strike impact
                                    for options), computePositionValue(), computePositionPnl()
   chain-renderer.js     314 lines  Chain table DOM with event delegation: renderChainInto(),
@@ -293,7 +297,7 @@ ATM = `round(S/5)*5`, 10 strikes each side (21 total). `ExpiryManager` maintains
 
 **Quarterly reviews**: every `QUARTERLY_CYCLE` days during live trading. Compares P&L vs buy-and-hold benchmark. Flavor text varies by performance rating (strong/solid/underperform/poor). Pure atmosphere, no mechanical effect.
 
-**Strategy**: legs in `main.js` (`strategyLegs[]`). Execution via `executeWithRollback()` rolls back all legs on partial failure. Strategies persisted in localStorage via `strategy-store.js` with hash-based IDs, 26 built-in presets, selectable expiry toggle, and relative strike/DTE offsets. Trade tab has saved strategy dropdown with live credit/debit and qty multiplier. Execute strategy respects order type selector — limit/stop places a pending strategy order instead of immediate execution.
+**Strategy**: legs in `main.js` (`strategyLegs[]`). Execution via `executeWithRollback()` rolls back all legs on partial failure. Strategies persisted in localStorage via `strategy-store.js` with hash-based IDs, 22 built-in presets (no unlimited-downside strategies), selectable expiry toggle, and relative strike/DTE offsets. Trade tab has saved strategy dropdown with live credit/debit and qty multiplier. Execute strategy respects order type selector — limit/stop places a pending strategy order instead of immediate execution.
 
 ## UI Architecture
 
