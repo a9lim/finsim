@@ -109,9 +109,12 @@ function _initRateHistory() {
 
 function _initPortfolioHistory() {
     portfolioHistory = createSparkHistory(HISTORY_CAPACITY);
-    // Start with initial capital for the prepopulated history period
-    for (let d = 0; d < HISTORY_CAPACITY; d++) {
-        pushSparkSample(portfolioHistory, portfolio.initialCapital);
+    // Prepopulate with buy-and-hold performance tracking the stock price
+    const h = sim.history;
+    const cap = portfolio.initialCapital;
+    for (let d = h.minDay; d <= h.maxDay; d++) {
+        const bar = h.get(d);
+        if (bar) pushSparkSample(portfolioHistory, cap / 100 * bar.close);
     }
 }
 
@@ -1747,7 +1750,19 @@ function handleTradeExecStrategy() {
     const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
     const mult = parseInt($.tradeQty?.value, 10) || 1;
     const scaled = resolved.map(l => ({ ...l, _baseQty: Math.abs(l.qty), qty: l.qty * mult }));
-    executeWithRollback(scaled, strat.name, mult);
+
+    const orderType = _getOrderType();
+    if (orderType === 'market') {
+        executeWithRollback(scaled, strat.name, mult);
+    } else {
+        const triggerPrice = _getTriggerPrice();
+        placePendingOrder(null, null, null, orderType, triggerPrice, null, null, strat.name, scaled, mult);
+        if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' for ' + mult + 'k ' + strat.name + 's @ $' + triggerPrice.toFixed(0));
+        if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
+        chainDirty = true;
+        updateUI();
+        dirty = true;
+    }
 }
 
 function _updateTradeCreditDebit() {
