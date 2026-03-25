@@ -203,7 +203,7 @@ function init() {
 
         // 3. Bind camera to chart canvas
         camera.bindWheel($.chartCanvas);
-        camera.bindMousePan($.chartCanvas);
+        camera.bindMousePan($.chartCanvas, { button: 0 });
         camera.bindZoomButtons({
             zoomIn:  $.zoomInBtn,
             zoomOut: $.zoomOutBtn,
@@ -220,11 +220,13 @@ function init() {
         chart.setCamera(camera);
     }
 
-    // 5. Bind strategy canvas wheel zoom
+    // 5. Bind strategy canvas wheel zoom and drag pan
     strategy.bindWheel($.strategyCanvas);
+    strategy.bindPan($.strategyCanvas);
 
-    // 6. Bind click on strategy canvas for legend toggling
+    // 6. Bind click on strategy canvas for legend toggling (skip if drag)
     $.strategyCanvas.addEventListener('click', (e) => {
+        if (strategy._wasDrag && strategy._wasDrag()) return;
         const rect = $.strategyCanvas.getBoundingClientRect();
         const cssX = e.clientX - rect.left;
         const cssY = e.clientY - rect.top;

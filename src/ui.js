@@ -80,6 +80,7 @@ export function cacheDOMElements($) {
         $.sliders[p]         = document.getElementById('slider-' + p);
         $.sliders[p + 'Val'] = document.getElementById('slider-' + p + '-val');
     }
+    $.zoomControls = document.getElementById('zoom-controls');
     $.zoomInBtn    = document.getElementById('zoom-in-btn');
     $.zoomOutBtn   = document.getElementById('zoom-out-btn');
     $.zoomResetBtn = document.getElementById('zoom-reset-btn');
@@ -565,10 +566,12 @@ export function toggleStrategyView($, active) {
     if (active) {
         $.chartCanvas.classList.add('hidden');
         $.strategyCanvas.classList.remove('hidden');
+        if ($.zoomControls) $.zoomControls.classList.add('hidden');
     } else {
         $.chartCanvas.classList.remove('hidden');
         $.strategyCanvas.classList.add('hidden');
         $.timeSliderBar.classList.add('hidden');
+        if ($.zoomControls) $.zoomControls.classList.remove('hidden');
     }
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
