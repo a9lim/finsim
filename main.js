@@ -267,11 +267,14 @@ function init() {
 
     if (typeof initAboutPanel === 'function') {
         initAboutPanel({
-            title: 'Options Trading',
-            description: 'Options trading simulator with GBM, Merton jump-diffusion, and Heston stochastic volatility stock models. Build strategies with CRR binomial tree pricing and navigate narrative-driven market events.',
+            title: 'Shoals',
+            description: 'Trade stocks, bonds, and American options in a realistic market simulator. Build multi-leg strategies with live payoff diagrams, manage a margin portfolio, and navigate narrative-driven market events during a volatile political term.',
             controls: [
-                { label: 'Buy stock', value: 'Click Buy button' },
-                { label: 'Place option', value: 'Configure in Strategy tab' },
+                { label: 'Buy / sell stock', value: 'Click Buy button or press B' },
+                { label: 'Trade options', value: 'Open chain from Trade tab' },
+                { label: 'Build strategy', value: 'Add legs in Strategy tab' },
+                { label: 'Pan chart', value: 'Click + drag on chart' },
+                { label: 'Load preset', value: 'Settings tab or keys 1\u20137' },
             ],
             shortcuts: _shortcuts,
             repo: 'https://github.com/a9lim/finsim',

@@ -46,6 +46,22 @@ The event engine fires two types of events: scheduled FOMC meetings every 32 tra
 
 **LLM mode:** Browser-direct Anthropic API generates batches of 3-5 events via structured tool use, with full universe context and simulation state. Falls back to offline pool on failure.
 
+### Compliance & Reputation
+
+- **Compliance system** -- regulatory pressure escalates based on player defiance. Heat vs credibility balance determines tone (warm → professional → pointed → final warning → terminated). Profitable track records reduce heat and raise credibility.
+- **26 portfolio-triggered popup events** -- compliance directives with declarative trade execution, insider tip offers (70% real / 30% fake), and atmospheric narrative moments.
+- **Reputation synthesis** -- Insider, Principled, Speculator, Survivor, Kingmaker, or Ghost, determined by player choices across the full term.
+
+### Price Impact
+
+- **Almgren-Chriss model** -- sqrt impact with decaying cumulative volume (half-life 5 days). Impact is an overlay on the simulation price, never mutating it.
+- **Dynamic MM rehedging** -- market makers hedge aggregate player delta each substep, creating realistic gamma squeeze and pin-to-strike dynamics.
+- **Layer 3 param shifts** -- large gross notional exposure shifts volatility and drift parameters with logarithmic scaling.
+
+### Epilogue
+
+4-page narrative ending generated from world state, portfolio history, event log, and player choices. Congressional diagrams, financial scorecards, career arc from quarterly reviews, and a signature moment from impact history. Triggered at the end of the presidential term (day 1008).
+
 ## Controls
 
 | Key | Action |
@@ -79,34 +95,58 @@ Vanilla HTML/CSS/JS with ES6 modules. No build step, no bundler, no npm. Canvas 
 ## Architecture
 
 ```
-main.js                810 lines  Entry point: rAF loop, sub-step streaming, live candle animation,
-                                   camera, shortcuts, strategy builder with rollback, ExpiryManager
-index.html             500 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs), chain overlay,
-                                   trade dialog, margin call overlay, intro screen
-styles.css             800 lines  Chain table, position rows, strategy builder, trade dialog,
-                                   margin alert, P&L coloring, Greek colors, responsive breakpoints
+main.js               1810 lines  Orchestrator: rAF loop, sub-step streaming, live candle animation,
+                                   camera, shortcuts, strategy builder with rollback, ExpiryManager,
+                                   popup queue, compliance integration, epilogue trigger
+index.html             691 lines  Toolbar, chart/strategy canvases, sidebar (4 tabs), chain/trade/
+                                   popup/reference/epilogue overlays, intro screen
+styles.css            1065 lines  Chain table, positions, strategy builder, trade dialog, popup
+                                   events, P&L/Greek colors, responsive breakpoints
 colors.js               59 lines  Financial color aliases (up/down/call/put/stock/bond + Greeks)
 src/
-  config.js             26 lines  Named constants and PRESETS array (5 static + 2 dynamic)
-  simulation.js        245 lines  GBM + Merton + Heston + Vasicek; beginDay/substep/finalizeDay
-                                   pipeline; prepopulate() with synthetic backfill
-  pricing.js           120 lines  CRR binomial tree (128 steps) + discrete dividends + finite-diff Greeks
-  chain.js             170 lines  ExpiryManager (8 rolling expiries), strike generation, lazy pricing
-  portfolio.js         770 lines  Signed-qty positions, order execution, netting, margin, borrow
-                                   interest, expiry processing, strategy execution with rollback
-  chart.js             650 lines  Log Y-axis OHLC candles, auto-scale, position markers, strike lines,
-                                   live candle cubic interpolation, shared-camera.js integration
-  strategy.js          830 lines  Payoff diagram, Greek overlays, breakeven analysis, time slider,
-                                   input-keyed caching, precomputed per-leg entry values
-  events.js            500 lines  EventEngine: Poisson scheduler, MTTH chains, 88 curated events
-  llm.js               170 lines  LLMEventSource: Anthropic API via structured tool use
-  ui.js                670 lines  DOM cache, event binding, chain/portfolio display, overlays
-  format-helpers.js     48 lines  Shared formatting: fmtDollar, fmtNum, pnlClass, fmtDte
-  position-value.js     40 lines  Unified position valuation and P&L computation
-  chain-renderer.js    220 lines  Chain table DOM with event delegation and position indicators
-  portfolio-renderer.js 190 lines Portfolio display with DOM diffing
+  config.js            103 lines  All constants (timing, instruments, margin, spreads, events,
+                                   rendering, price impact), PRESETS (5 static + 2 dynamic)
+  simulation.js        251 lines  GBM + Merton + Heston + Vasicek; beginDay/substep/finalizeDay
+                                   pipeline; prepopulate() with reverse-backfill
+  pricing.js           834 lines  CRR binomial tree (128 steps) with BSS smoothing, term-structure
+                                   vol, moneyness skew, Vasicek per-step discounting, discrete
+                                   dividends, dual call+put induction, finite-diff Greeks (14 trees)
+  chain.js             230 lines  ExpiryManager (8 rolling expiries), strike generation, lazy pricing
+                                   with reusable tree pool, per-strike impact overlay
+  portfolio.js        1070 lines  Signed-qty positions, market/limit/stop orders, netting, margin,
+                                   borrow interest, expiry, strategy execution with rollback
+  chart.js             728 lines  Log Y-axis OHLC candles, live cubic interpolation, position markers,
+                                   strike lines, crosshair, shared-camera.js integration
+  strategy.js         1000 lines  Payoff diagram, Greek overlays, breakeven analysis, time slider,
+                                   input-keyed caching, tree-based hypothetical S sweep
+  ui.js               1054 lines  DOM binding, display updaters, overlay management, chain/portfolio
+                                   renderers, strategy dropdowns, popup event display
+  events.js            529 lines  EventEngine: Poisson scheduler, MTTH chains, Fed schedule,
+                                   boredom boost, midterms, era gating
+  event-pool.js       3210 lines  ~277 curated events across 12 categories (Fed, macro, sector,
+                                   political, market, compound, etc.), insider tip outcomes
+  popup-events.js     1248 lines  26 portfolio-triggered popup events: 10 compliance directives,
+                                   3 insider tips, 12 atmosphere, 1 unlimited risk
+  world-state.js       170 lines  Mutable narrative state: Congress, PNTH board, geopolitics,
+                                   Fed credibility, election cycle
+  price-impact.js      260 lines  Almgren-Chriss sqrt impact model with decaying cumulative volume,
+                                   dynamic MM rehedging, Layer 3 param overlays
+  compliance.js         91 lines  Regulatory heat/credibility state, escalating tone, game over
+  epilogue.js          567 lines  4-page narrative ending from world state + portfolio + event log,
+                                   reputation synthesis, congressional diagrams
+  llm.js               271 lines  LLMEventSource: Anthropic API via structured tool use,
+                                   full lore in system prompt, offline fallback
+  strategy-store.js    370 lines  22 built-in strategy presets, localStorage CRUD, relative
+                                   strike/DTE offsets, resolveLegs(), shared expiry toggle
+  reference.js        1617 lines  29 reference entries with KaTeX math
+  chain-renderer.js    314 lines  Chain table DOM with event delegation, modeled OI display
+  portfolio-renderer.js 420 lines Portfolio display with DOM diffing, strategy group boxes,
+                                   portfolio value sparkline vs buy-and-hold benchmark
+  position-value.js     88 lines  unitPrice() (vol surface + impact), position value and P&L
+  format-helpers.js     63 lines  fmtDollar (appends "k"), fmtQty, fmtNum, pnlClass, fmtDte
+  market.js             27 lines  Shared mutable market state + syncMarket()
   history-buffer.js    103 lines  Fixed-capacity (252) ring buffer for OHLC bars
-  theme.js              20 lines  Light/dark theme toggle
+  theme.js               9 lines  Light/dark theme toggle (delegates to _toolbar)
 ```
 
 ## Sibling Projects
