@@ -239,19 +239,33 @@ function init() {
     _toolbar.initSidebar($.panelToggle, $.sidebar, $.closePanel);
 
     // 8. Init keyboard shortcuts
+    function cycleTab(dir) {
+        var btns = document.querySelectorAll('.tab-btn');
+        var idx = 0;
+        btns.forEach(function(b, i) { if (b.classList.contains('active')) idx = i; });
+        var next = (idx + dir + btns.length) % btns.length;
+        btns[next].click();
+    }
+
     var _shortcuts = [
-        { key: ' ',  label: 'Play / Pause', group: 'Simulation', action: () => togglePlay() },
-        { key: '.', label: 'Step forward',  group: 'Simulation', action: () => step() },
-        { key: 's', label: 'Strategy view',  group: 'View',       action: () => {
-            if (!$.sidebar.classList.contains('open')) {
-                _toolbar.toggleSidebar($.panelToggle, $.sidebar);
-            }
-            const tab = document.querySelector('[data-tab="strategy"]');
-            if (tab) tab.click();
-        } },
-        { key: 'b', label: 'Buy stock',      group: 'Trade',      action: () => handleBuyStock() },
-        { key: 't', label: 'Toggle sidebar',  group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); } },
-        { key: 'r', label: 'Reset',           group: 'Simulation', action: () => resetSim() },
+        { key: ' ',  label: 'Play / Pause',      group: 'Simulation', action: () => togglePlay() },
+        { key: '.', label: 'Speed up',            group: 'Simulation', action: () => cycleSpeed() },
+        { key: ',', label: 'Slow down',            group: 'Simulation', action: () => decycleSpeed() },
+        { key: '/', label: 'Step forward one day', group: 'Simulation', action: () => step() },
+        { key: 'r', label: 'Reset simulation',    group: 'Simulation', action: () => resetSim() },
+        { key: 's', label: 'Toggle sidebar',       group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); } },
+        { key: 't', label: 'Toggle sidebar',       group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); } },
+        { key: '[', label: 'Previous tab',         group: 'View',       action: () => cycleTab(-1) },
+        { key: ']', label: 'Next tab',             group: 'View',       action: () => cycleTab(1) },
+        { key: 'Escape', label: 'Close sidebar',   group: 'View',       action: () => { if ($.sidebar.classList.contains('open')) _toolbar.toggleSidebar($.panelToggle, $.sidebar); } },
+        { key: '=', label: 'Zoom in',              group: 'View',       action: () => { if (camera) camera.zoomBy(1.2); } },
+        { key: '-', label: 'Zoom out',             group: 'View',       action: () => { if (camera) camera.zoomBy(1 / 1.2); } },
+        { key: '0', label: 'Reset zoom',           group: 'View',       action: () => { if (camera) { camera.zoom = CHART_SLOT_PX; _repositionCamera(); } } },
+        { key: 'b', label: 'Buy / sell stock',     group: 'Trade',      action: () => handleBuyStock() },
+        { key: 'n', label: 'Buy / sell bond',      group: 'Trade',      action: () => handleBuyBond() },
+        { key: 'x', label: 'Toggle buy / sell',    group: 'Trade',      action: () => {} },
+        { key: 'o', label: 'Open options chain',   group: 'Trade',      action: () => openFullChain() },
+        { key: 'Enter', label: 'Execute strategy', group: 'Trade',      action: () => handleTradeExecStrategy() },
         { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
         { key: '2', label: PRESETS[1].name,   group: 'Presets',    action: () => loadPreset(1) },
         { key: '3', label: PRESETS[2].name,   group: 'Presets',    action: () => loadPreset(2) },
@@ -271,9 +285,13 @@ function init() {
             description: 'Trade stocks, bonds, and American options in a realistic market simulator. Build multi-leg strategies with live payoff diagrams, manage a margin portfolio, and navigate narrative-driven market events during a volatile political term.',
             controls: [
                 { label: 'Buy / sell stock', value: 'Click Buy button or press B' },
-                { label: 'Trade options', value: 'Open chain from Trade tab' },
+                { label: 'Buy / sell bond', value: 'Click Bond button or press N' },
+                { label: 'Trade options', value: 'Open chain (O) from Trade tab' },
+                { label: 'Execute strategy', value: 'Enter key or Execute button' },
                 { label: 'Build strategy', value: 'Add legs in Strategy tab' },
-                { label: 'Pan chart', value: 'Click + drag on chart' },
+                { label: 'Pan / zoom chart', value: 'Drag to pan, = / - / 0 to zoom' },
+                { label: 'Cycle tabs', value: '[ previous, ] next' },
+                { label: 'Speed', value: '. faster, , slower, / step' },
                 { label: 'Load preset', value: 'Settings tab or keys 1\u20137' },
             ],
             shortcuts: _shortcuts,
