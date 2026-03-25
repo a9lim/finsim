@@ -22,6 +22,16 @@ let sellMode = false;
 window._shoalsSellMode = () => sellMode;
 
 // ---------------------------------------------------------------------------
+// Focus trap state (module-scoped for overlay open/close)
+// ---------------------------------------------------------------------------
+let _chainTrapCleanup = null;
+let _chainPrevFocus = null;
+let _tradeTrapCleanup = null;
+let _tradePrevFocus = null;
+let _popupTrapCleanup = null;
+let _popupPrevFocus = null;
+
+// ---------------------------------------------------------------------------
 // Tooltip state (module-scoped so refreshTooltip can update visible tip)
 // ---------------------------------------------------------------------------
 let _tip = null;
@@ -256,9 +266,21 @@ export function bindEvents($, handlers) {
     $.fullChainLink.addEventListener('click', onFullChainOpen);
 
     const _hideClass = (el, afterHide) => () => { el.classList.add('hidden'); if (typeof afterHide === 'function') afterHide(); };
-    initOverlayDismiss($.chainOverlay, $.chainOverlayClose, _hideClass($.chainOverlay, onChainClose));
 
-    const closeTrade = _hideClass($.tradeDialog, onTradeClose);
+    const closeChain = () => {
+        $.chainOverlay.classList.add('hidden');
+        if (_chainTrapCleanup) { _chainTrapCleanup(); _chainTrapCleanup = null; }
+        if (_chainPrevFocus && _chainPrevFocus.focus) { _chainPrevFocus.focus(); _chainPrevFocus = null; }
+        if (typeof onChainClose === 'function') onChainClose();
+    };
+    initOverlayDismiss($.chainOverlay, $.chainOverlayClose, closeChain);
+
+    const closeTrade = () => {
+        $.tradeDialog.classList.add('hidden');
+        if (_tradeTrapCleanup) { _tradeTrapCleanup(); _tradeTrapCleanup = null; }
+        if (_tradePrevFocus && _tradePrevFocus.focus) { _tradePrevFocus.focus(); _tradePrevFocus = null; }
+        if (typeof onTradeClose === 'function') onTradeClose();
+    };
     initOverlayDismiss($.tradeDialog, $.tradeDialogClose, closeTrade);
     $.tradeCancelBtn.addEventListener('click', closeTrade);
 
@@ -582,7 +604,11 @@ export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posM
     };
 
     renderOverlay();
+    _chainPrevFocus = document.activeElement;
     $.chainOverlay.classList.remove('hidden');
+    if (typeof trapFocus === 'function') _chainTrapCleanup = trapFocus($.chainOverlay);
+    var firstFocusable = $.chainOverlay.querySelector('button, [tabindex="0"]');
+    if (firstFocusable) firstFocusable.focus();
     if (typeof _haptics !== 'undefined') _haptics.trigger('light');
 }
 
@@ -1108,16 +1134,24 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
             panel.style.borderTopColor = '';
             $.popupOverlay.style.background = '';
             $.popupOverlay.style.backdropFilter = '';
+            if (_popupTrapCleanup) { _popupTrapCleanup(); _popupTrapCleanup = null; }
+            if (_popupPrevFocus && _popupPrevFocus.focus) { _popupPrevFocus.focus(); _popupPrevFocus = null; }
             onChoice(i);
         });
         $.popupChoices.appendChild(btn);
     });
+    _popupPrevFocus = document.activeElement;
     $.popupOverlay.classList.remove('hidden');
+    if (typeof trapFocus === 'function') _popupTrapCleanup = trapFocus($.popupOverlay);
+    var firstChoice = $.popupChoices.querySelector('button');
+    if (firstChoice) firstChoice.focus();
     if (typeof _haptics !== 'undefined') _haptics.trigger(magnitude === 'major' ? 'medium' : 'light');
 }
 
 export function hidePopupEvent($) {
     $.popupOverlay.classList.add('hidden');
+    if (_popupTrapCleanup) { _popupTrapCleanup(); _popupTrapCleanup = null; }
+    if (_popupPrevFocus && _popupPrevFocus.focus) { _popupPrevFocus.focus(); _popupPrevFocus = null; }
 }
 
 export function isPopupVisible($) {

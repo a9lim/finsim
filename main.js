@@ -1874,21 +1874,34 @@ function _showEpilogue(terminationReason = null) {
         }, 200);
     }
 
+    var _epiloguePrevFocus = document.activeElement;
+    var _epilogueTrapCleanup = null;
+
+    function _cleanupEpilogue() {
+        if (_epilogueTrapCleanup) { _epilogueTrapCleanup(); _epilogueTrapCleanup = null; }
+        if (_epiloguePrevFocus && _epiloguePrevFocus.focus) { _epiloguePrevFocus.focus(); _epiloguePrevFocus = null; }
+    }
+
     backBtn.onclick = () => { if (currentPage > 0) { currentPage--; render(); } };
     nextBtn.onclick = () => { if (currentPage < pages.length - 1) { currentPage++; render(); } };
     restartBtn.onclick = () => {
         overlay.classList.add('hidden');
+        _cleanupEpilogue();
         // Find the Dynamic (Offline) preset index
         const offlineIdx = PRESETS.findIndex(p => p.name.includes('Offline'));
         if (offlineIdx >= 0) _resetCore(offlineIdx);
     };
     keepBtn.onclick = () => {
         overlay.classList.add('hidden');
+        _cleanupEpilogue();
         if (typeof showToast !== 'undefined') showToast('Event storyline complete. Market simulation continues.');
     };
 
     overlay.classList.remove('hidden');
+    if (typeof trapFocus === 'function') _epilogueTrapCleanup = trapFocus(overlay);
     render();
+    var firstBtn = overlay.querySelector('button:not(.hidden)');
+    if (firstBtn) firstBtn.focus();
 }
 
 // ---------------------------------------------------------------------------

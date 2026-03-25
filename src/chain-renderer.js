@@ -163,6 +163,21 @@ export function bindChainTableClicks(container, onChainCellClick) {
         if (e.key === 'Enter' || e.key === ' ') {
             const cell = e.target.closest('[data-type]');
             if (cell && container.contains(cell)) { e.preventDefault(); handleAction(cell, 'long'); }
+            return;
+        }
+        // Arrow key navigation between focusable chain cells
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            var cells = Array.from(container.querySelectorAll('[tabindex="0"]'));
+            var idx = cells.indexOf(document.activeElement);
+            if (idx === -1) return;
+            // 2 focusable cells per row (call + put); stock/bond row also has 2
+            var cols = 2;
+            var target = null;
+            if (e.key === 'ArrowRight') target = cells[idx + 1];
+            else if (e.key === 'ArrowLeft') target = cells[idx - 1];
+            else if (e.key === 'ArrowDown') target = cells[idx + cols];
+            else if (e.key === 'ArrowUp') target = cells[idx - cols];
+            if (target) { e.preventDefault(); target.focus(); }
         }
     });
 }
