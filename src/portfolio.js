@@ -17,7 +17,7 @@ import {
     MONEYNESS_SPREAD_WEIGHT,
 } from './config.js';
 
-import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
+import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
 import { recordStockTrade, recordOptionTrade } from './price-impact.js';
 
 let _greekTrees = null;
@@ -498,7 +498,7 @@ export function executeMarketOrder(
  */
 export function placePendingOrder(
     type, side, qty, orderType, triggerPrice,
-    strike, expiryDay, strategyName
+    strike, expiryDay, strategyName, legs, execMult
 ) {
     const order = {
         id:           _nextOrderId++,
@@ -512,6 +512,7 @@ export function placePendingOrder(
 
     if (strike    != null) order.strike    = strike;
     if (expiryDay != null) order.expiryDay = expiryDay;
+    if (legs) { order.legs = legs; order.execMult = execMult || 1; }
 
     portfolio.orders.push(order);
     return order;
@@ -546,7 +547,14 @@ export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, c
         const { orderType, side, triggerPrice } = order;
         let triggered = false;
 
-        if (orderType === 'limit') {
+        if (order.legs) {
+            // Strategy order: trigger when price reaches the trigger level
+            if (orderType === 'limit') {
+                triggered = currentPrice <= triggerPrice;
+            } else if (orderType === 'stop') {
+                triggered = currentPrice >= triggerPrice;
+            }
+        } else if (orderType === 'limit') {
             triggered = side === 'long'
                 ? currentPrice <= triggerPrice
                 : currentPrice >= triggerPrice;
@@ -557,13 +565,50 @@ export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, c
         }
 
         if (triggered) {
-            const pos = executeMarketOrder(
-                sim, order.type, order.side, order.qty,
-                currentPrice, currentVol, currentRate, currentDay,
-                order.strike, order.expiryDay, order.strategyName, q
-            );
-            if (pos) filled.push(pos);
-            // If order could not be filled (null), silently drop it.
+            if (order.legs) {
+                // Strategy order -- execute all legs with rollback
+                const savedCash = portfolio.cash;
+                const savedPositions = portfolio.positions.map(p => ({ ...p }));
+                const savedClosedBorrowCost = portfolio.closedBorrowCost;
+                const savedMarginDebitCost = portfolio.marginDebitCost;
+                const savedTotalDividends = portfolio.totalDividends;
+                const savedTotalTrades = portfolio.totalTrades;
+                let legFailed = false;
+                const legResults = [];
+                for (const leg of order.legs) {
+                    const legSide = leg.qty < 0 ? 'short' : 'long';
+                    const absQty = Math.abs(leg.qty);
+                    const pos = executeMarketOrder(
+                        sim, leg.type, legSide, absQty,
+                        currentPrice, currentVol, currentRate, currentDay,
+                        leg.strike, leg.expiryDay, order.strategyName, q
+                    );
+                    if (pos) {
+                        if (!pos.strategyBaseQty) pos.strategyBaseQty = leg._baseQty || absQty;
+                        legResults.push(pos);
+                    } else { legFailed = true; break; }
+                }
+                if (legFailed) {
+                    portfolio.cash = savedCash;
+                    portfolio.closedBorrowCost = savedClosedBorrowCost;
+                    portfolio.marginDebitCost = savedMarginDebitCost;
+                    portfolio.totalDividends = savedTotalDividends;
+                    portfolio.totalTrades = savedTotalTrades;
+                    portfolio.positions.length = 0;
+                    for (const p of savedPositions) portfolio.positions.push(p);
+                    if (typeof showToast !== 'undefined') showToast((order.strategyName || 'Strategy') + ' ' + order.orderType + ' order failed \u2014 insufficient margin.');
+                } else {
+                    for (const r of legResults) filled.push(r);
+                    if (typeof showToast !== 'undefined') showToast((order.strategyName || 'Strategy') + ' ' + order.orderType + ' filled at $' + currentPrice.toFixed(2));
+                }
+            } else {
+                const pos = executeMarketOrder(
+                    sim, order.type, order.side, order.qty,
+                    currentPrice, currentVol, currentRate, currentDay,
+                    order.strike, order.expiryDay, order.strategyName, q
+                );
+                if (pos) filled.push(pos);
+            }
         } else {
             remaining.push(order);
         }

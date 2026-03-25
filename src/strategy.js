@@ -332,6 +332,33 @@ export class StrategyRenderer {
         }, { passive: false });
     }
 
+    bindPan(el) {
+        let panning = false, lastX = 0, startX = 0, dragged = false;
+        el.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            panning = true; dragged = false;
+            lastX = startX = e.clientX;
+            el.style.cursor = 'grabbing';
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!panning) return;
+            const dx = e.clientX - lastX;
+            if (Math.abs(e.clientX - startX) > 3) dragged = true;
+            // Convert pixel delta to world units: pixels / (plotW / (2 * xRange))
+            const plotW = this._cssW - MARGIN.left - MARGIN.right;
+            if (plotW > 0) this._xCenter -= dx * (2 * this._xRange) / plotW;
+            lastX = e.clientX;
+            this._dirty = true;
+        });
+        window.addEventListener('mouseup', (e) => {
+            if (e.button !== 0 || !panning) return;
+            panning = false;
+            el.style.cursor = '';
+        });
+        // Expose drag state for click handler
+        this._wasDrag = () => dragged;
+    }
+
     /**
      * Handle a click on the canvas. Checks legend item bounding boxes
      * and toggles the corresponding Greek in greekToggles if hit.
@@ -527,7 +554,7 @@ export class StrategyRenderer {
      */
     computeSummary(legs, spot, vol, rate, dte, evalDay, entryDay, q) {
         if (!legs || legs.length === 0) {
-            return { maxProfit: 0, maxLoss: 0, breakevens: [], netCost: 0 };
+            return { maxProfit: 0, maxLoss: 0, breakevens: [], netCost: 0, greeks: { delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 } };
         }
 
         const sumKey = _cacheKey(legs, vol, rate, evalDay, entryDay, dte, (spot * 100 | 0) + ',' + (q * 1e6 | 0) + ',' + _modelKey());
@@ -595,7 +622,19 @@ export class StrategyRenderer {
         const pnls = samplePts.map(S => _pnlAt(S));
         const breakevens = _zeroCrossings(xs, pnls);
 
-        const result = { maxProfit, maxLoss, breakevens, netCost };
+        // Aggregate Greeks at current spot/time (always use entry day, not slider)
+        const greekInfos = _precomputeLegs(legs, spot, vol, rate, entryDay, entryDay, fallbackDte, q);
+        const greeks = { delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 };
+        for (const info of greekInfos) {
+            const g = _legGreeksFast(info, spot);
+            greeks.delta += g.delta;
+            greeks.gamma += g.gamma;
+            greeks.theta += g.theta;
+            greeks.vega  += g.vega;
+            greeks.rho   += g.rho;
+        }
+
+        const result = { maxProfit, maxLoss, breakevens, netCost, greeks };
         this._summaryCache = { key: sumKey, result };
         return result;
     }

@@ -341,13 +341,7 @@
                             </span>
                             <span class="stat-value" id="portfolio-value">$10,000</span>
                         </div>
-                        <div class="stat-row">
-                            <span class="stat-label-wrap">
-                                <span class="stat-label">Total P&L</span>
-                                <button class="info-trigger" type="button" data-info="totalPnl" aria-label="Info: Total P&L">?</button>
-                            </span>
-                            <span class="stat-value" id="total-pnl">$0.00</span>
-                        </div>
+                        <canvas class="rate-sparkline" id="portfolio-sparkline" width="280" height="40"></canvas>
                         <div class="stat-row">
                             <span class="stat-label-wrap" id="margin-label-wrap">
                                 <span class="stat-label">Margin Status</span>
@@ -424,12 +418,20 @@
                         <div id="strategy-chain-table" class="chain-table">
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
-                        <p class="panel-hint trade-hint">Strategies save relative strikes &amp; expiries. If selectable expiry is on, the strategy&rsquo;s expiry depends on the dropdown. Payoff <button class="info-trigger" type="button" data-info="payoff" aria-label="Info: Payoff Diagrams">?</button></p>
+                        <p class="panel-hint trade-hint">Strategies save relative strikes &amp; expiries.</p>
                         <div class="group-label">Legs</div>
                         <div id="strategy-legs-list" class="strategy-legs-list">
                             <p class="panel-hint">No legs added. Click buttons above to build a strategy.</p>
                         </div>
                         <div id="strategy-summary" class="strategy-summary"></div>
+                        <div class="group-label">Greeks (at current price/time)</div>
+                        <div id="strategy-greeks">
+                            <div class="stat-row"><span class="stat-label greek-label-delta">Delta</span><span class="stat-value" id="strat-greek-delta">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label greek-label-gamma">Gamma</span><span class="stat-value" id="strat-greek-gamma">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label greek-label-theta">Theta</span><span class="stat-value" id="strat-greek-theta">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label greek-label-vega">Vega</span><span class="stat-value" id="strat-greek-vega">0.00</span></div>
+                            <div class="stat-row"><span class="stat-label greek-label-rho">Rho</span><span class="stat-value" id="strat-greek-rho">0.00</span></div>
+                        </div>
                         <div class="group-label">Save Strategy</div>
                         <div class="control-group">
                             <label for="strategy-load-select">Strategy</label>
@@ -442,7 +444,7 @@
                                 <label for="strategy-name">Name</label>
                                 <input type="text" id="strategy-name" class="sim-input" placeholder="Strategy 1" maxlength="40">
                             </div>
-                            <div class="ctrl-row"><label for="selectable-expiry-toggle">Selectable Expiry</label>
+                            <div class="ctrl-row"><label for="selectable-expiry-toggle">Shared Expiry <button class="info-trigger" type="button" data-info="sharedExpiry" aria-label="Info: Shared Expiry">?</button></label>
                                 <div class="tog-wrap"><input type="checkbox" id="selectable-expiry-toggle" checked role="switch" aria-checked="true">
                                 <label for="selectable-expiry-toggle" class="tog"><span class="tog-thumb"></span></label></div></div>
                         </div>

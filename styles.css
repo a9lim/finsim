@@ -18,12 +18,12 @@ body {
 .pnl-up   { color: var(--up); }
 .pnl-down { color: var(--down); }
 
-/* --- Greek Label Colors --- */
-#greek-delta { color: var(--delta); }
-#greek-gamma { color: var(--gamma); }
-#greek-theta { color: var(--theta); }
-#greek-vega  { color: var(--vega); }
-#greek-rho   { color: var(--rho); }
+/* --- Greek Colors --- */
+.greek-label-delta, #greek-delta, #strat-greek-delta { color: var(--delta); }
+.greek-label-gamma, #greek-gamma, #strat-greek-gamma { color: var(--gamma); }
+.greek-label-theta, #greek-theta, #strat-greek-theta { color: var(--theta); }
+.greek-label-vega,  #greek-vega,  #strat-greek-vega  { color: var(--vega); }
+.greek-label-rho,   #greek-rho,   #strat-greek-rho   { color: var(--rho); }
 
 /* --- Panel Hints --- */
 .panel-hint {
@@ -67,6 +67,7 @@ main {
     width: 100%;
     height: 100%;
     display: block;
+    cursor: grab;
 }
 
 /* --- Time Slider (below chart in strategy mode) --- */
@@ -425,6 +426,14 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-family: var(--font-mono);
+}
+.order-detail {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: 1.3;
 }
 
 /* --- Margin Status --- */

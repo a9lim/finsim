@@ -8,26 +8,21 @@ const MAX_STRATEGIES = 50;
 const MAX_NAME_LEN = 40;
 
 // --- Built-in strategies (never in localStorage) ---
+// No strategies with unlimited downside (net short uncovered calls).
 const BUILTINS = [
-    {
-        id: 'builtin_covered_call', name: 'Covered Call', builtin: true, selectableExpiry: true,
-        legs: [
-            { type: 'stock', qty: 1, strikeOffset: null, dteOffset: null },
-            { type: 'call', qty: -1, strikeOffset: 0, dteOffset: null },
-        ],
-    },
-    {
-        id: 'builtin_protective_put', name: 'Protective Put', builtin: true, selectableExpiry: true,
-        legs: [
-            { type: 'stock', qty: 1, strikeOffset: null, dteOffset: null },
-            { type: 'put', qty: 1, strikeOffset: 0, dteOffset: null },
-        ],
-    },
+    // -- Vertical spreads (directional, defined risk) --
     {
         id: 'builtin_bull_call_spread', name: 'Bull Call Spread', builtin: true, selectableExpiry: true,
         legs: [
             { type: 'call', qty: 1, strikeOffset: 0, dteOffset: null },
             { type: 'call', qty: -1, strikeOffset: 10, dteOffset: null },
+        ],
+    },
+    {
+        id: 'builtin_bull_put_spread', name: 'Bull Put Spread', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'put', qty: -1, strikeOffset: 0, dteOffset: null },
+            { type: 'put', qty: 1, strikeOffset: -10, dteOffset: null },
         ],
     },
     {
@@ -37,6 +32,14 @@ const BUILTINS = [
             { type: 'put', qty: -1, strikeOffset: -10, dteOffset: null },
         ],
     },
+    {
+        id: 'builtin_bear_call_spread', name: 'Bear Call Spread', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'call', qty: -1, strikeOffset: 0, dteOffset: null },
+            { type: 'call', qty: 1, strikeOffset: 10, dteOffset: null },
+        ],
+    },
+    // -- Volatility (straddle, strangle, guts) --
     {
         id: 'builtin_long_straddle', name: 'Long Straddle', builtin: true, selectableExpiry: true,
         legs: [
@@ -52,12 +55,27 @@ const BUILTINS = [
         ],
     },
     {
-        id: 'builtin_iron_condor', name: 'Iron Condor', builtin: true, selectableExpiry: true,
+        id: 'builtin_long_guts', name: 'Long Guts', builtin: true, selectableExpiry: true,
         legs: [
-            { type: 'put', qty: 1, strikeOffset: -15, dteOffset: null },
-            { type: 'put', qty: -1, strikeOffset: -10, dteOffset: null },
-            { type: 'call', qty: -1, strikeOffset: 10, dteOffset: null },
-            { type: 'call', qty: 1, strikeOffset: 15, dteOffset: null },
+            { type: 'call', qty: 1, strikeOffset: -5, dteOffset: null },
+            { type: 'put', qty: 1, strikeOffset: 5, dteOffset: null },
+        ],
+    },
+    // -- Butterflies & condors (defined risk, neutral) --
+    {
+        id: 'builtin_call_butterfly', name: 'Call Butterfly', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'call', qty: 1, strikeOffset: -5, dteOffset: null },
+            { type: 'call', qty: -2, strikeOffset: 0, dteOffset: null },
+            { type: 'call', qty: 1, strikeOffset: 5, dteOffset: null },
+        ],
+    },
+    {
+        id: 'builtin_put_butterfly', name: 'Put Butterfly', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'put', qty: 1, strikeOffset: -5, dteOffset: null },
+            { type: 'put', qty: -2, strikeOffset: 0, dteOffset: null },
+            { type: 'put', qty: 1, strikeOffset: 5, dteOffset: null },
         ],
     },
     {
@@ -67,6 +85,110 @@ const BUILTINS = [
             { type: 'put', qty: -1, strikeOffset: 0, dteOffset: null },
             { type: 'call', qty: -1, strikeOffset: 0, dteOffset: null },
             { type: 'call', qty: 1, strikeOffset: 10, dteOffset: null },
+        ],
+    },
+    {
+        id: 'builtin_iron_condor', name: 'Iron Condor', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'put', qty: 1, strikeOffset: -15, dteOffset: null },
+            { type: 'put', qty: -1, strikeOffset: -10, dteOffset: null },
+            { type: 'call', qty: -1, strikeOffset: 10, dteOffset: null },
+            { type: 'call', qty: 1, strikeOffset: 15, dteOffset: null },
+        ],
+    },
+    // -- Stock + options (hedged) --
+    {
+        id: 'builtin_covered_call', name: 'Covered Call', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'stock', qty: 1, strikeOffset: null, dteOffset: null },
+            { type: 'call', qty: -1, strikeOffset: 0, dteOffset: null },
+        ],
+    },
+    {
+        id: 'builtin_protective_put', name: 'Protective Put', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'stock', qty: 1, strikeOffset: null, dteOffset: null },
+            { type: 'put', qty: 1, strikeOffset: 0, dteOffset: null },
+        ],
+    },
+    {
+        id: 'builtin_collar', name: 'Collar', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'stock', qty: 1, strikeOffset: null, dteOffset: null },
+            { type: 'put', qty: 1, strikeOffset: -5, dteOffset: null },
+            { type: 'call', qty: -1, strikeOffset: 5, dteOffset: null },
+        ],
+    },
+    // -- Asymmetric / leveraged (finite downside) --
+    {
+        id: 'builtin_risk_reversal', name: 'Risk Reversal', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'put', qty: -1, strikeOffset: -5, dteOffset: null },
+            { type: 'call', qty: 1, strikeOffset: 5, dteOffset: null },
+        ],
+    },
+    {
+        id: 'builtin_jade_lizard', name: 'Jade Lizard', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'put', qty: -1, strikeOffset: -5, dteOffset: null },
+            { type: 'call', qty: -1, strikeOffset: 5, dteOffset: null },
+            { type: 'call', qty: 1, strikeOffset: 10, dteOffset: null },
+        ],
+    },
+    {
+        id: 'builtin_put_ratio_spread', name: 'Put Ratio Spread', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'put', qty: 1, strikeOffset: 0, dteOffset: null },
+            { type: 'put', qty: -2, strikeOffset: -10, dteOffset: null },
+        ],
+    },
+    {
+        id: 'builtin_put_ladder', name: 'Put Ladder', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'put', qty: 1, strikeOffset: 0, dteOffset: null },
+            { type: 'put', qty: -1, strikeOffset: -5, dteOffset: null },
+            { type: 'put', qty: -1, strikeOffset: -10, dteOffset: null },
+        ],
+    },
+    // -- Arbitrage & synthetic --
+    {
+        id: 'builtin_conversion', name: 'Conversion', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'stock', qty: 1, strikeOffset: null, dteOffset: null },
+            { type: 'put', qty: 1, strikeOffset: 0, dteOffset: null },
+            { type: 'call', qty: -1, strikeOffset: 0, dteOffset: null },
+        ],
+    },
+    {
+        id: 'builtin_reversal', name: 'Reversal', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'stock', qty: -1, strikeOffset: null, dteOffset: null },
+            { type: 'call', qty: 1, strikeOffset: 0, dteOffset: null },
+            { type: 'put', qty: -1, strikeOffset: 0, dteOffset: null },
+        ],
+    },
+    {
+        id: 'builtin_box_spread', name: 'Box Spread', builtin: true, selectableExpiry: true,
+        legs: [
+            { type: 'call', qty: 1, strikeOffset: -5, dteOffset: null },
+            { type: 'call', qty: -1, strikeOffset: 5, dteOffset: null },
+            { type: 'put', qty: -1, strikeOffset: -5, dteOffset: null },
+            { type: 'put', qty: 1, strikeOffset: 5, dteOffset: null },
+        ],
+    },
+    // -- Calendar spreads (multi-expiry, fixed DTE) --
+    {
+        id: 'builtin_call_calendar', name: 'Call Calendar', builtin: true, selectableExpiry: false,
+        legs: [
+            { type: 'call', qty: -1, strikeOffset: 0, dteOffset: 63 },
+            { type: 'call', qty: 1, strikeOffset: 0, dteOffset: 126 },
+        ],
+    },
+    {
+        id: 'builtin_put_calendar', name: 'Put Calendar', builtin: true, selectableExpiry: false,
+        legs: [
+            { type: 'put', qty: -1, strikeOffset: 0, dteOffset: 63 },
+            { type: 'put', qty: 1, strikeOffset: 0, dteOffset: 126 },
         ],
     },
 ];

@@ -94,9 +94,54 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
 // ---------------------------------------------------------------------------
 
 function _buildOrderRow(order) {
-    const typeLabel = posTypeLabel(order.type, order.side);
-    const strikeStr = order.strike != null ? ' K' + order.strike : '';
-    const labelStr  = typeLabel + strikeStr + ' x' + fmtQty(order.qty) + ' ' + order.orderType + ' @ $' + order.triggerPrice.toFixed(2);
+    let labelStr;
+    if (order.legs) {
+        labelStr = (order.strategyName || 'Strategy') + ' x' + fmtQty(order.execMult) + ' ' + order.orderType + ' @ $' + order.triggerPrice.toFixed(2);
+    } else {
+        const typeLabel = posTypeLabel(order.type, order.side);
+        const strikeStr = order.strike != null ? ' K' + order.strike : '';
+        labelStr = typeLabel + strikeStr + ' x' + fmtQty(order.qty) + ' ' + order.orderType + ' @ $' + order.triggerPrice.toFixed(2);
+    }
+
+    // Strategy orders use a strategy-group-style box; single-leg orders use a flat row
+    if (order.legs) {
+        const group = document.createElement('div');
+        group.className = 'strategy-group';
+        group.dataset.orderId = order.id;
+
+        const header = document.createElement('div');
+        header.className = 'strategy-group-header';
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'stat-label strategy-group-name';
+        nameEl.textContent = labelStr;
+        header.appendChild(nameEl);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'ghost-btn pos-close-btn';
+        cancelBtn.textContent = 'X';
+        cancelBtn.title = 'Cancel order';
+        cancelBtn.addEventListener('click', () => {
+            cancelBtn.dispatchEvent(new CustomEvent('shoals:cancelOrder', { detail: { id: order.id }, bubbles: true }));
+            if (typeof _haptics !== 'undefined') _haptics.trigger('light');
+        });
+        header.appendChild(cancelBtn);
+
+        const detail = document.createElement('div');
+        detail.className = 'order-detail';
+        const parts = order.legs.map(leg => {
+            const baseQty = leg._baseQty || Math.abs(leg.qty);
+            const label = posTypeLabel(leg.type, leg.qty);
+            const isOption = leg.type === 'call' || leg.type === 'put';
+            const strikeStr = isOption && leg.strike != null ? ' K' + leg.strike : '';
+            return label + strikeStr + ' x' + baseQty;
+        });
+        detail.textContent = parts.join(', ');
+
+        group.appendChild(header);
+        group.appendChild(detail);
+        return group;
+    }
 
     const row = document.createElement('div');
     row.className = 'data-row order-row stat-row';
@@ -225,7 +270,7 @@ function _diffOrderRows(container, orders) {
 // updatePortfolioDisplay -- main export
 // ---------------------------------------------------------------------------
 
-export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, day, marginInfo, q) {
+export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, day, marginInfo, q, portfolioHistory) {
     $.cashDisplay.textContent = fmtDollar(portfolio.cash);
     $.cashDisplay.className = 'stat-value ' + (portfolio.cash < 0 ? 'pnl-down' : '');
 
@@ -235,9 +280,19 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     const totalValue = (marginInfo && marginInfo.equity != null) ? marginInfo.equity : portfolio.cash;
     $.portfolioValue.textContent = fmtDollar(totalValue);
 
-    const pnl = totalValue - portfolio.initialCapital;
-    $.totalPnl.textContent = fmtDollar(pnl);
-    $.totalPnl.className   = 'stat-value ' + pnlClass(pnl);
+    // Color portfolio value: green if outpacing buy-and-hold stock, red if underperforming
+    const buyHoldValue = (portfolio.initialCapital / 100) * currentPrice;
+    const vsBenchmark = totalValue - buyHoldValue;
+    const benchCls = vsBenchmark > 0.005 ? 'pnl-up' : vsBenchmark < -0.005 ? 'pnl-down' : '';
+    $.portfolioValue.className = 'stat-value ' + benchCls;
+
+    // Portfolio value sparkline
+    if ($.portfolioSparkCtx && portfolioHistory && portfolioHistory.count >= 2
+        && typeof drawSparkline !== 'undefined') {
+        const c = $.portfolioSparkCanvas;
+        const color = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#000000';
+        drawSparkline($.portfolioSparkCtx, portfolioHistory, c.width, c.height, color, color + '44');
+    }
 
     // Margin display from pre-computed values
     const marginDisplay = marginInfo
