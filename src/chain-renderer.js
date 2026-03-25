@@ -124,7 +124,8 @@ function bindCellTrade(cell, type, onChainCellClick) {
     cell.addEventListener('click', () => {
         if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
         if (typeof onChainCellClick === 'function') {
-            onChainCellClick({ type, side: 'long', strike: null, expiryDay: null });
+            const side = (typeof _shoalsSellMode === 'function' && _shoalsSellMode()) ? 'short' : 'long';
+            onChainCellClick({ type, side, strike: null, expiryDay: null });
         }
     });
     cell.addEventListener('contextmenu', (e) => {
@@ -149,7 +150,10 @@ export function bindChainTableClicks(container, onChainCellClick) {
     }
     container.addEventListener('click', (e) => {
         const cell = e.target.closest('[data-type]');
-        if (cell && container.contains(cell)) handleAction(cell, 'long');
+        if (cell && container.contains(cell)) {
+            const side = (typeof _shoalsSellMode === 'function' && _shoalsSellMode()) ? 'short' : 'long';
+            handleAction(cell, side);
+        }
     });
     container.addEventListener('contextmenu', (e) => {
         const cell = e.target.closest('[data-type]');

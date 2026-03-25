@@ -16,6 +16,12 @@ import { getStockImpact } from './price-impact.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
 // ---------------------------------------------------------------------------
+// Buy/Sell mode toggle (module-scoped)
+// ---------------------------------------------------------------------------
+let sellMode = false;
+window._shoalsSellMode = () => sellMode;
+
+// ---------------------------------------------------------------------------
 // Tooltip state (module-scoped so refreshTooltip can update visible tip)
 // ---------------------------------------------------------------------------
 let _tip = null;
@@ -213,18 +219,40 @@ export function bindEvents($, handlers) {
         onTimeSlider(pct);
     });
 
-    // Stock price cell: left-click = buy, right-click = short
-    $.stockPriceCell.addEventListener('click', onBuyStock);
+    // Buy/sell mode toggle button
+    const modeBtn = document.getElementById('mode-btn');
+    if (modeBtn) {
+        modeBtn.addEventListener('click', () => {
+            sellMode = !sellMode;
+            modeBtn.setAttribute('aria-pressed', String(sellMode));
+            modeBtn.setAttribute('aria-label', sellMode ? 'Sell mode' : 'Buy mode');
+            modeBtn.title = sellMode ? 'Sell mode (X)' : 'Buy mode (X)';
+            modeBtn.style.color = sellMode ? 'var(--accent)' : '';
+        });
+    }
+
+    // Stock price cell: left-click = buy (or sell in sell mode), right-click = short
+    $.stockPriceCell.addEventListener('click', () => {
+        if (sellMode) onShortStock(); else onBuyStock();
+    });
     $.stockPriceCell.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         onShortStock();
     });
-    // Bond price cell: left-click = buy, right-click = sell/short
-    $.bondPriceCell.addEventListener('click', onBuyBond);
+    // Bond price cell: left-click = buy (or sell in sell mode), right-click = sell/short
+    $.bondPriceCell.addEventListener('click', () => {
+        if (sellMode) { if (typeof onShortBond === 'function') onShortBond(); } else onBuyBond();
+    });
     $.bondPriceCell.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (typeof onShortBond === 'function') onShortBond();
     });
+
+    // Mobile hint text
+    if (window.matchMedia('(pointer: coarse)').matches) {
+        const hint = document.getElementById('trade-hint');
+        if (hint) hint.textContent = 'Tap to Trade \u00b7 Long-press for Bid/Ask \u00b7 Pinch to Zoom Chart';
+    }
     $.fullChainLink.addEventListener('click', onFullChainOpen);
 
     const _hideClass = (el, afterHide) => () => { el.classList.add('hidden'); if (typeof afterHide === 'function') afterHide(); };

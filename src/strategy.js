@@ -357,6 +357,25 @@ export class StrategyRenderer {
         });
         // Expose drag state for click handler
         this._wasDrag = () => dragged;
+
+        // Touch pan (single finger)
+        let touchPanning = false, touchLastX = 0;
+        el.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return;
+            touchPanning = true;
+            touchLastX = e.touches[0].clientX;
+        }, { passive: true });
+        el.addEventListener('touchmove', (e) => {
+            if (!touchPanning || e.touches.length !== 1) return;
+            const dx = e.touches[0].clientX - touchLastX;
+            const plotW = this._cssW - MARGIN.left - MARGIN.right;
+            if (plotW > 0) this._xCenter -= dx * (2 * this._xRange) / plotW;
+            touchLastX = e.touches[0].clientX;
+            this._dirty = true;
+            e.preventDefault();
+        }, { passive: false });
+        el.addEventListener('touchend', () => { touchPanning = false; }, { passive: true });
+        el.addEventListener('touchcancel', () => { touchPanning = false; }, { passive: true });
     }
 
     /**
