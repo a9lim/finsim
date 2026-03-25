@@ -366,6 +366,60 @@ Browser-direct Anthropic API (`anthropic-dangerous-direct-browser-access` header
 - **Cumulative volume**: `price-impact.js` tracks buy/sell volume (stock + per-strike options). Decays every substep via `decayImpactVolumes()` with `VOLUME_HALF_LIFE` (1 day). `rehedgeMM(positions)` called each substep adds incremental MM hedge volume. Impact = `coeff * sigma * sqrt(cumVol / ref)`. Fill cost is the marginal sqrt increment. Volume persists and decays gradually.
 - **Dynamic MM rehedging**: `rehedgeMM` computes `sum(delta * qty)` for all player option positions each substep. Diff from `_mmCurrentHedge` is recorded as stock cumulative volume. Position closes are handled naturally — removed positions reduce required hedge on next rehedge call.
 
+## Keyboard Shortcuts
+
+Registered via `initShortcuts(_shortcuts, ...)` in main.js. Universal keys from `shared-shortcuts.js` plus project-specific bindings. `?` opens the shortcut help overlay (via `shared-about.js`).
+
+| Key | Label | Group |
+|-----|-------|-------|
+| `Space` | Play / Pause | Simulation |
+| `.` | Speed up | Simulation |
+| `,` | Slow down | Simulation |
+| `/` | Step forward one day | Simulation |
+| `R` | Reset simulation | Simulation |
+| `S` / `T` | Toggle sidebar | View |
+| `[` | Previous tab | View |
+| `]` | Next tab | View |
+| `Escape` | Close sidebar | View |
+| `=` | Zoom in | View |
+| `-` | Zoom out | View |
+| `0` | Reset zoom | View |
+| `B` | Buy / sell stock | Trade |
+| `N` | Buy / sell bond | Trade |
+| `X` | Toggle buy / sell mode | Trade |
+| `O` | Open options chain | Trade |
+| `Enter` | Execute strategy | Trade |
+| `1`–`7` | Load preset (by index) | Presets |
+
+Chain overlay also supports `ArrowUp`/`ArrowDown`/`ArrowLeft`/`ArrowRight` for cell navigation (see Accessibility).
+
+## Buy/Sell Toggle
+
+`#mode-btn` toolbar button toggles buy/sell mode. Also toggled by the `X` key.
+
+- **Buy mode** (default): left-click/tap on chain, stock, or bond cells buys long.
+- **Sell mode**: left-click/tap sells/shorts instead.
+- State managed in `src/ui.js` as module-scoped `sellMode` boolean, exported globally via `window._shoalsSellMode()`.
+- Consumed by `chain-renderer.js` (chain cell click delegation) and `ui.js` (stock/bond price cell click handlers) to determine `side` ('long' vs 'short').
+- Desktop right-click always sells regardless of mode (contextmenu handlers bypass the toggle).
+- Visual feedback: button `aria-pressed` toggles, `aria-label` updates, icon color switches to `var(--accent)` in sell mode.
+
+## Touch Interactions
+
+- **Chart canvas**: pinch-zoom and two-finger pan via `camera.bindTouch($.chartCanvas)` (from `shared-camera.js`).
+- **Strategy canvas**: single-finger touch pan via `strategy.bindPan()` — tracks `touchstart`/`touchmove`/`touchend` on the strategy canvas with `translateX` panning.
+- **Chain/stock/bond cells**: `data-tooltip` attributes store bid/ask text. On desktop, `mouseover` delegation via `createSimTooltip()` shows tooltip. On touch devices, the hint bar reads "Tap to Trade · Long-press for Bid/Ask · Pinch to Zoom Chart" (set when `(pointer: coarse)` matches).
+- **Hint bar**: `#trade-hint` element — on `(pointer: coarse)` devices, `ui.js` replaces the default text with touch-appropriate instructions.
+
+## Accessibility
+
+- **Dialog overlays**: chain overlay (`#chain-overlay`), trade dialog (`#trade-dialog`), popup event overlay (`#popup-event-overlay`), and epilogue overlay (`#epilogue-overlay`) all have `role="dialog"` and `aria-modal="true"` in `index.html`. Each uses `trapFocus()` (from `shared-shortcuts.js`) when opened: chain and popup traps in `ui.js`, epilogue trap in `main.js`.
+- **Reference overlay**: `initReferenceOverlay()` (from `shared-info.js`) sets `aria-modal="true"` dynamically and calls `trapFocus()` on open.
+- **About panel**: `initAboutPanel()` (from `shared-about.js`) uses `trapFocus()` when opened.
+- **Chain overlay arrow key navigation**: `keydown` listener in `chain-renderer.js` handles `ArrowUp`/`ArrowDown`/`ArrowLeft`/`ArrowRight` to move focus between `[tabindex="0"]` chain cells in a 2-column grid layout.
+- **Touch targets**: `shared-base.css` `@media (pointer: coarse)` expands `.tool-btn` to 44×44px, `.tab-btn` and `.mode-btn` to `min-height: 44px`.
+- **Buy/sell toggle**: `#mode-btn` uses `aria-pressed` and `aria-label` attributes that update dynamically with mode state.
+
 ## Gotchas
 
 - **Signed qty, no side field** -- `qty > 0` = long, `qty < 0` = short. No `side` property.
