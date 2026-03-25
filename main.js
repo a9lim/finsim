@@ -277,7 +277,7 @@ function init() {
                 { label: 'Load preset', value: 'Settings tab or keys 1\u20137' },
             ],
             shortcuts: _shortcuts,
-            repo: 'https://github.com/a9lim/finsim',
+            repo: 'https://github.com/a9lim/shoals',
         });
     }
 

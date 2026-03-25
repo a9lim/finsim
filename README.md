@@ -1,10 +1,10 @@
 # Shoals
 
-A full-featured options trading simulator at [a9l.im/finsim](https://a9l.im/finsim).
+A full-featured options trading simulator at [a9l.im/shoals](https://a9l.im/shoals).
 
 Trade stocks, zero-coupon bonds, and American options in a market driven by stochastic volatility, jump diffusion, and mean-reverting interest rates. Build multi-leg strategies, analyze Greeks, manage a margin portfolio, and watch narrative-driven market events unfold -- all in the browser with zero dependencies.
 
-**[Live Demo](https://a9l.im/finsim)** | Part of the [a9l.im](https://a9l.im) portfolio
+**[Live Demo](https://a9l.im/shoals)** | Part of the [a9l.im](https://a9l.im) portfolio
 
 ## Highlights
 
@@ -86,7 +86,7 @@ cd path/to/a9lim.github.io
 python -m http.server
 ```
 
-Then open `http://localhost:8000/finsim/`.
+Then open `http://localhost:8000/shoals/`.
 
 ## Tech
 
@@ -151,8 +151,8 @@ src/
 
 ## Sibling Projects
 
-- [Geon](https://github.com/a9lim/physsim) -- [a9l.im/physsim](https://a9l.im/physsim)
-- [Cyano](https://github.com/a9lim/biosim) -- [a9l.im/biosim](https://a9l.im/biosim)
+- [Geon](https://github.com/a9lim/geon) -- [a9l.im/geon](https://a9l.im/geon)
+- [Cyano](https://github.com/a9lim/cyano) -- [a9l.im/cyano](https://a9l.im/cyano)
 - [Gerry](https://github.com/a9lim/gerry) -- [a9l.im/gerry](https://a9l.im/gerry)
 
 ## License
