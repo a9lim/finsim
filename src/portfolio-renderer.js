@@ -290,10 +290,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     if ($.portfolioSparkCtx && portfolioHistory && portfolioHistory.count >= 2
         && typeof drawSparkline !== 'undefined') {
         const c = $.portfolioSparkCanvas;
-        let color;
-        if (benchCls === 'pnl-up') color = typeof _PALETTE !== 'undefined' ? _PALETTE.up : '#22c55e';
-        else if (benchCls === 'pnl-down') color = typeof _PALETTE !== 'undefined' ? _PALETTE.down : '#ef4444';
-        else color = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#000000';
+        const color = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#000000';
         drawSparkline($.portfolioSparkCtx, portfolioHistory, c.width, c.height, color, color + '44');
     }
 
