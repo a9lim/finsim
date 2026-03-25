@@ -56,6 +56,8 @@ export function cacheDOMElements($) {
     $.pendingOrders     = document.getElementById('pending-orders');
     $.cashDisplay       = document.getElementById('cash-display');
     $.portfolioValue    = document.getElementById('portfolio-value');
+    $.portfolioSparkCanvas = document.getElementById('portfolio-sparkline');
+    $.portfolioSparkCtx    = $.portfolioSparkCanvas ? $.portfolioSparkCanvas.getContext('2d') : null;
     $.totalPnl          = document.getElementById('total-pnl');
     $.marginStatus      = document.getElementById('margin-status');
     $.borrowCostDisplay = document.getElementById('borrow-cost');
@@ -78,6 +80,7 @@ export function cacheDOMElements($) {
         $.sliders[p]         = document.getElementById('slider-' + p);
         $.sliders[p + 'Val'] = document.getElementById('slider-' + p + '-val');
     }
+    $.zoomControls = document.getElementById('zoom-controls');
     $.zoomInBtn    = document.getElementById('zoom-in-btn');
     $.zoomOutBtn   = document.getElementById('zoom-out-btn');
     $.zoomResetBtn = document.getElementById('zoom-reset-btn');
@@ -102,6 +105,11 @@ export function cacheDOMElements($) {
     $.introStart  = document.getElementById('intro-start');
     $.strategyLegsList = document.getElementById('strategy-legs-list');
     $.strategySummary  = document.getElementById('strategy-summary');
+    $.stratGreekDelta  = document.getElementById('strat-greek-delta');
+    $.stratGreekGamma  = document.getElementById('strat-greek-gamma');
+    $.stratGreekTheta  = document.getElementById('strat-greek-theta');
+    $.stratGreekVega   = document.getElementById('strat-greek-vega');
+    $.stratGreekRho    = document.getElementById('strat-greek-rho');
     $.saveStrategyBtn  = document.getElementById('save-strategy-btn');
     $.deleteStrategyBtn  = document.getElementById('delete-strategy-btn');
     $.strategyNameInput  = document.getElementById('strategy-name');
@@ -380,10 +388,6 @@ export function updateGreeksDisplay($, greeks) {
     $.greekTheta.textContent = fmtNum(greeks.theta, 4);
     $.greekVega.textContent  = fmtNum(greeks.vega,  4);
     $.greekRho.textContent   = fmtNum(greeks.rho,   4);
-    $.greekDelta.classList.toggle('pnl-up',   greeks.delta > 0);
-    $.greekDelta.classList.toggle('pnl-down', greeks.delta < 0);
-    $.greekTheta.classList.toggle('pnl-down', greeks.theta < 0);
-    $.greekVega.classList.toggle('pnl-up',    greeks.vega  > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,8 +399,8 @@ export function updateRateDisplay($, rate, rateHistory) {
     if ($.rateSparkCtx && rateHistory && rateHistory.count >= 2
         && typeof drawSparkline !== 'undefined') {
         const c = $.rateSparkCanvas;
-        const accent = typeof _PALETTE !== 'undefined' ? _PALETTE.accent : '#E11107';
-        drawSparkline($.rateSparkCtx, rateHistory, c.width, c.height, accent, accent + '44');
+        const color = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#000000';
+        drawSparkline($.rateSparkCtx, rateHistory, c.width, c.height, color, color + '44');
     }
 }
 
@@ -562,10 +566,12 @@ export function toggleStrategyView($, active) {
     if (active) {
         $.chartCanvas.classList.add('hidden');
         $.strategyCanvas.classList.remove('hidden');
+        if ($.zoomControls) $.zoomControls.classList.add('hidden');
     } else {
         $.chartCanvas.classList.remove('hidden');
         $.strategyCanvas.classList.add('hidden');
         $.timeSliderBar.classList.add('hidden');
+        if ($.zoomControls) $.zoomControls.classList.remove('hidden');
     }
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
@@ -630,6 +636,11 @@ export function updateStrategyChainDisplay($, pricedExpiry, onAddLeg, posMap) {
 }
 
 
+const _STRATEGY_INFO = {
+    netCost:    { title: 'Net Debit / Credit', body: 'Cost to enter the strategy at current prices. Debit = you pay; credit = you receive premium.' },
+    breakevens: { title: 'Breakevens', body: 'Stock prices where strategy P&L crosses zero at expiry. Multi-leg strategies can have multiple breakevens.' },
+};
+
 export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, onLegChange, currentStrategyHash, isBuiltin) {
     if (!$.strategyLegsList) return;
 
@@ -657,15 +668,16 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
                 return (v < 0 ? '-' : '') + Math.abs(v).toFixed(2);
             };
             const items = [
-                { label: summary.netCost < 0 ? 'Net Credit' : 'Net Debit', value: fmtVal(Math.abs(summary.netCost)), cls: summary.netCost < 0 ? 'pnl-up' : 'pnl-down' },
-                { label: 'Max Profit', value: fmtVal(summary.maxProfit), cls: 'pnl-up' },
-                { label: 'Max Loss', value: fmtVal(summary.maxLoss), cls: 'pnl-down' },
+                { label: summary.netCost < 0 ? 'Net Credit' : summary.netCost > 0 ? 'Net Debit' : 'Net Cost', value: fmtVal(Math.abs(summary.netCost)), cls: pnlClass(-summary.netCost), info: 'netCost' },
+                { label: 'Max Profit', value: fmtVal(summary.maxProfit), cls: summary.maxProfit > 0 ? 'pnl-up' : '' },
+                { label: 'Max Loss', value: fmtVal(summary.maxLoss), cls: summary.maxLoss < 0 ? 'pnl-down' : '' },
             ];
             if (summary.breakevens.length > 0) {
                 items.push({
                     label: 'Breakeven' + (summary.breakevens.length > 1 ? 's' : ''),
                     value: summary.breakevens.map(b => b.toFixed(2)).join(', '),
                     cls: '',
+                    info: 'breakevens',
                 });
             }
             for (const item of items) {
@@ -674,6 +686,17 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
                 const lbl = document.createElement('span');
                 lbl.className = 'stat-label';
                 lbl.textContent = item.label;
+                if (item.info && typeof createInfoTip !== 'undefined') {
+                    const btn = document.createElement('button');
+                    btn.className = 'info-trigger';
+                    btn.type = 'button';
+                    btn.dataset.info = item.info;
+                    btn.setAttribute('aria-label', 'Info: ' + item.label);
+                    btn.textContent = '?';
+                    lbl.appendChild(document.createTextNode(' '));
+                    lbl.appendChild(btn);
+                    createInfoTip(btn, _STRATEGY_INFO[item.info]);
+                }
                 const val = document.createElement('span');
                 val.className = 'stat-value ' + item.cls;
                 val.textContent = item.value;
@@ -682,6 +705,16 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
                 $.strategySummary.appendChild(row);
             }
         }
+    }
+
+    // Strategy Greeks at current price
+    if ($.stratGreekDelta) {
+        const g = (summary && legs && legs.length > 0) ? summary.greeks : null;
+        $.stratGreekDelta.textContent = fmtNum(g ? g.delta : 0, 4);
+        $.stratGreekGamma.textContent = fmtNum(g ? g.gamma : 0, 4);
+        $.stratGreekTheta.textContent = fmtNum(g ? g.theta : 0, 4);
+        $.stratGreekVega.textContent  = fmtNum(g ? g.vega  : 0, 4);
+        $.stratGreekRho.textContent   = fmtNum(g ? g.rho   : 0, 4);
     }
 
     // Disable edit fields for built-in strategies
@@ -723,12 +756,11 @@ export function updateCreditDebit($, netCost) {
         $.strategyNetCost.className = 'stat-value';
         return;
     }
-    const isCredit = netCost < 0;
-    const label = isCredit ? 'Net Credit' : 'Net Debit';
+    const label = netCost < 0 ? 'Net Credit' : netCost > 0 ? 'Net Debit' : 'Net Cost';
     const value = Math.abs(netCost).toFixed(2);
     $.strategyCreditDebit.querySelector('.stat-label').textContent = label;
     $.strategyNetCost.textContent = value;
-    $.strategyNetCost.className = 'stat-value ' + (isCredit ? 'pnl-up' : 'pnl-down');
+    $.strategyNetCost.className = 'stat-value ' + pnlClass(-netCost);
 }
 
 function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
@@ -829,7 +861,7 @@ export function wireInfoTips() {
         bidask:       { title: 'Bid-Ask Spread', body: 'You buy at the ask and sell at the bid. Spreads widen with higher volatility and deeper OTM strikes. Hover any cell to see bid/ask.' },
         // --- Strategy ---
         strategies:   { title: 'Strategy Builder', body: 'Build multi-leg strategies: left-click for long, right-click for short. Execute fills all legs atomically with rollback on failure.' },
-        payoff:       { title: 'Payoff Diagram', body: 'P&L profile across stock prices. Green = profit, rose = loss. Use the time slider and Greek overlays to explore risk.' },
+        sharedExpiry: { title: 'Shared Expiry', body: 'On: all legs share the expiry dropdown selection. Off: each leg keeps its own DTE offset (for calendar spreads).' },
         // --- Settings ---
         regime:       { title: 'Market Regime', body: '5 static presets (Calm Bull to Rate Hike) plus 2 dynamic modes with narrative events. Changing preset resets the simulation.' },
         riskFreeRate: { title: 'Risk-Free Rate', body: 'Current Vasicek rate $r$. Drives option pricing, bond values, and borrow costs. Sparkline shows recent history.' },
