@@ -177,6 +177,15 @@ export class EventEngine {
         if (w.geopolitical.tradeWarStage === 4)    score += 6;
         if (w.geopolitical.oilCrisis)              score -= 5;
 
+        // New geopolitical/media scoring factors
+        if (w.geopolitical.khasurianCrisis >= 3) score -= 6;
+        if (w.geopolitical.straitClosed) score -= 8;
+        if (w.congress.bigBillStatus === 3) score += 5;
+        if (w.congress.bigBillStatus === 4) score -= 4;
+        if (w.media.pressFreedomIndex <= 3) score -= 3;
+        if (w.media.sentinelRating >= 8) score += 2;
+        if (w.media.tanCredibility >= 8) score -= 3;
+
         // Noise: +-5
         score += (Math.random() - 0.5) * 10;
 
