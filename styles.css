@@ -1199,5 +1199,7 @@ main {
 .toast.interjection-toast {
     font-style: italic; color: var(--text-muted);
     border-color: transparent; background: var(--bg-panel);
-    font-size: 0.8rem; max-width: 360px; text-align: center;
+    font-size: 0.8rem; max-width: 360px;
+    border-radius: var(--radius-lg, 12px);
+    padding: 12px 20px; line-height: 1.45;
 }
