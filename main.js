@@ -64,6 +64,10 @@ import {
     evaluateRegulations, getActiveRegulations, getRegulation,
     getRegulationEffect, resetRegulations,
 } from './src/regulations.js';
+import {
+    addScrutiny, getScrutinyLevel, getScrutinyState,
+    settleScrutiny, cooperateScrutiny, resetScrutiny,
+} from './src/scrutiny.js';
 import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 
@@ -776,6 +780,21 @@ function _processPopupQueue() {
         if (choice.playerFlag) {
             playerChoices[choice.playerFlag] = sim.day;
         }
+        if (choice.playerFlag === 'pursued_insider_tip' || choice.playerFlag === 'pursued_pnth_tip') {
+            addScrutiny(2, 'Insider tip accepted', sim.day);
+        } else if (choice.playerFlag === 'pursued_analyst_tip') {
+            addScrutiny(1.5, 'Analyst information edge used', sim.day);
+        }
+        if (choice.playerFlag === 'settled_sec') {
+            portfolio.cash -= 2000;
+            settleScrutiny();
+        }
+        if (choice.playerFlag === 'informed_sec') {
+            cooperateScrutiny();
+        }
+        if (choice.playerFlag === 'fought_sec') {
+            addScrutiny(2, 'Fighting SEC enforcement', sim.day);
+        }
         if (choice.followups && eventEngine) {
             for (const fu of choice.followups) {
                 eventEngine.scheduleFollowup(fu, sim.day);
@@ -850,6 +869,9 @@ function _processPopupQueue() {
         // -- Compliance tier processing --
         if (choice.complianceTier) {
             onComplianceChoice(choice.complianceTier);
+            if (choice.complianceTier === 'defiant') {
+                addScrutiny(0.5, 'Compliance defiance', sim.day);
+            }
             if (effectiveHeat() >= COMPLIANCE_GAME_OVER_HEAT) {
                 _showComplianceTermination();
             }
@@ -1146,6 +1168,8 @@ function _onDayComplete() {
     const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
     const toast = selectImpactToast(grossRatio, hasOptions ? 'option' : 'stock', sim.day);
     if (toast) showToast(toast, 3000);
+
+    if (grossRatio > 0.75) addScrutiny(0.1, 'Sustained high-volume activity', sim.history.maxDay);
 
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     chainDirty = true;
@@ -1483,6 +1507,7 @@ function _resetCore(index) {
     resetCompliance();
     resetConvictions();
     resetRegulations();
+    resetScrutiny();
     resetAudio();
     sim.reset(index);
     resetPortfolio();
@@ -1975,7 +2000,7 @@ function updateStrategyBuilder() {
 // ---------------------------------------------------------------------------
 
 function _showEpilogue(terminationReason = null) {
-    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason, getConvictionIds());
+    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason, getConvictionIds(), getScrutinyState());
     let currentPage = 0;
 
     const overlay = document.getElementById('epilogue-overlay');

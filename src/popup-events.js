@@ -17,6 +17,7 @@ import {
     cooldownMultiplier, thresholdMultiplier, complianceTone,
 } from './compliance.js';
 import { getConvictionEffect } from './convictions.js';
+import { getScrutinyLevel } from './scrutiny.js';
 
 const _cooldowns = {}; // id → last fired day
 
@@ -1222,6 +1223,124 @@ export const PORTFOLIO_POPUPS = [
                 desc: 'Information is the currency of this business. Hear what he has.',
                 playerFlag: 'pursued_analyst_tip',
                 _tipAction: true,
+            },
+        ],
+    },
+
+    // ===================================================================
+    //  SCRUTINY (~4)
+    // ===================================================================
+
+    {
+        id: 'scrutiny_press_inquiry',
+        trigger: (sim, world, portfolio) => getScrutinyLevel() >= 1,
+        cooldown: 200,
+        era: 'mid',
+        popup: true,
+        headline: 'Financial Times Inquiry',
+        context: 'A reporter from the Financial Times has been asking questions about unusual trading patterns from the Meridian derivatives desk. Your name came up. The compliance department wants to know how you\u2019d like to handle it.',
+        choices: [
+            {
+                label: 'No comment',
+                desc: 'Decline the interview. The story might run anyway.',
+                playerFlag: 'declined_ft_scrutiny',
+                resultToast: 'No comment issued. The story runs with "Meridian declined to comment."',
+            },
+            {
+                label: 'Cooperate with compliance review',
+                desc: 'Open your books to the internal review team. Proactive transparency.',
+                playerFlag: 'cooperated_scrutiny_review',
+                complianceTier: 'full',
+                resultToast: 'Internal review finds nothing actionable. For now.',
+            },
+        ],
+    },
+    {
+        id: 'scrutiny_regulatory_letter',
+        trigger: (sim, world, portfolio) => getScrutinyLevel() >= 2,
+        cooldown: 300,
+        era: 'mid',
+        popup: true,
+        headline: 'SEC Information Request',
+        context: 'A formal letter from the SEC\u2019s Division of Enforcement has arrived at Meridian\u2019s legal department. They\u2019re requesting trading records, communications, and position histories for your desk. This is not a routine examination.',
+        choices: [
+            {
+                label: 'Full cooperation',
+                desc: 'Provide everything requested and offer to meet voluntarily.',
+                playerFlag: 'cooperated_sec_letter',
+                complianceTier: 'full',
+                resultToast: 'Meridian\u2019s legal team begins assembling the response package.',
+            },
+            {
+                label: 'Lawyer up',
+                desc: 'Retain outside counsel. Respond only to what\u2019s legally required.',
+                playerFlag: 'lawyered_up',
+                resultToast: 'Outside counsel engaged. The meter is running.',
+            },
+            {
+                label: 'Stonewall',
+                desc: 'Delay, obfuscate, and challenge the scope of the request.',
+                playerFlag: 'stonewalled_sec',
+                complianceTier: 'defiant',
+                resultToast: 'The SEC notes Meridian\u2019s "lack of cooperation" in their file.',
+            },
+        ],
+    },
+    {
+        id: 'scrutiny_subpoena',
+        trigger: (sim, world, portfolio) => getScrutinyLevel() >= 3,
+        cooldown: 400,
+        era: 'late',
+        popup: true,
+        headline: 'Federal Subpoena',
+        context: 'A process server has delivered a federal subpoena to Meridian Capital\u2019s general counsel. The SEC has escalated to a formal investigation. You have been named as a person of interest. Congressional staffers are making calls.',
+        choices: [
+            {
+                label: 'Testify fully',
+                desc: 'Appear before the committee and answer every question.',
+                playerFlag: 'testified_fully',
+                complianceTier: 'full',
+                resultToast: 'Your testimony is entered into the congressional record.',
+            },
+            {
+                label: 'Invoke the Fifth',
+                desc: 'Exercise your constitutional right against self-incrimination.',
+                playerFlag: 'invoked_fifth',
+                resultToast: 'You decline to answer on Fifth Amendment grounds. The cameras flash.',
+            },
+        ],
+    },
+    {
+        id: 'scrutiny_enforcement',
+        trigger: (sim, world, portfolio) => getScrutinyLevel() >= 4,
+        cooldown: 9999,
+        popup: true,
+        headline: 'SEC Enforcement Action',
+        context: () => {
+            const level = getScrutinyLevel();
+            if (level >= 4) return 'The SEC has filed a formal enforcement action against you personally. The complaint alleges insider trading, market manipulation, and failure to supervise. Meridian\u2019s board has called an emergency session. Your options are narrowing.';
+            return 'The SEC is pursuing enforcement proceedings related to your trading activity. Meridian\u2019s legal team advises immediate action.';
+        },
+        choices: [
+            {
+                label: 'Settle',
+                desc: 'Pay the fine, accept the censure, and move on. It will cost $2,000k.',
+                playerFlag: 'settled_sec',
+                resultToast: 'Settlement reached. $2,000k penalty paid. The investigation is closed.',
+            },
+            {
+                label: 'Fight it',
+                desc: 'Contest the charges in court. This will get worse before it gets better.',
+                playerFlag: 'fought_sec',
+                complianceTier: 'defiant',
+                resultToast: 'Your legal team files a motion to dismiss. The SEC doubles down.',
+            },
+            {
+                label: 'Cooperate and inform',
+                desc: 'Offer full cooperation and information on broader market patterns.',
+                playerFlag: 'informed_sec',
+                complianceTier: 'full',
+                resultToast: 'The SEC notes your cooperation. Scrutiny eases \u2014 for now.',
             },
         ],
     },
