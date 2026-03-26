@@ -1067,8 +1067,9 @@ function _updateRegulationDisplay() {
     for (const r of regs) {
         const badge = document.createElement('div');
         badge.className = 'regulation-badge';
-        badge.title = r.description;
+        badge.dataset.tooltip = r.description;
         badge.textContent = r.name;
+        if (r.color) badge.style.color = r.color;
         list.appendChild(badge);
     }
 }
