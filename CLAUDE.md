@@ -18,7 +18,7 @@ Serve from the root — shared files load via absolute paths (`/shared-*.js`, `/
 
 ## Overview
 
-Interactive options trading simulator at **Meridian Capital**. Player is a senior derivatives trader during the Barron administration. GBM+Merton+Heston stock, Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), strategy builder, portfolio/margin system, Almgren-Chriss price impact, narrative event engine with popup decisions, political lore, and 4-page epilogue. Zero dependencies, vanilla ES6 modules, no build step.
+Interactive options trading simulator at **Meridian Capital**. Player is a senior derivatives trader during the Barron administration. GBM+Merton+Heston stock, Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), strategy builder, portfolio/margin system, Almgren-Chriss price impact, narrative event engine with popup decisions, political lore, chiptune jazz soundtrack, and 4-page epilogue. Zero dependencies, vanilla ES6 modules, no build step.
 
 ## Architecture
 
@@ -27,6 +27,8 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 **Module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator. `market.js` is shared mutable state (single-writer main.js via `syncMarket`, multiple readers).
 
 **Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains + filibuster/media recurring pulses + conviction-aware likelihood weighting), event-pool.js (~320 toast events with lore-specific headlines), popup-events.js (~30 interactive popup decisions with conviction-aware context variants), world-state.js (congress/PNTH/geopolitical/Fed/media), compliance.js, convictions.js (12 permanent modifiers), regulations.js (11 dynamic trading rules including filibuster uncertainty), scrutiny.js (hidden SEC investigation arc), compound-triggers.js (18 cross-domain one-shot triggers), lobbying.js (2 PAC-funding pills with bill-specific descriptions), interjections.js (lore-aware atmospheric text), epilogue.js (4-page ending with product/geopolitical/conviction-specific narratives).
+
+**Audio**: `audio.js` — all Web Audio API synthesis, no external audio files. Three layers: (1) chiptune jazz loop (128 BPM, 16-bar Am diatonic circle: walking bass, shell-voicing comps, swung hi-hat, nocturne-influenced melody head), (2) continuous Am drone pad (sine/triangle/sawtooth oscillators), (3) event stingers + superevent chord stabs. `setAmbientMood(mood)` crossfades between jazz and drone: calm = full jazz, tense = jazz 55% / drone 45%, crisis = jazz 15% / drone 85%. Jazz loop uses a look-ahead scheduler (`_jazzSchedule`) that keeps 4s of audio queued. `playMusic(track)` ducks both jazz and drone to silence for superevent chord stabs, `stopMusic` restores them to the current mood mix. Volume slider is in the Settings group of the Info tab.
 
 **Lore bible**: `lore.md` at project root — canonical creative reference for all named characters, nations, products, legislation, publications, and journalists. Not consumed by runtime code. Consult when writing new events or modifying narrative text.
 
@@ -123,6 +125,8 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - Lobby actions that directly set congress seats — use `barronApproval` ±2 and `lobbyMomentum` ±1 instead
 - `chinaRelations` — renamed to `sericaRelations` everywhere
 - Dark overlay backgrounds on popups — use blur-only (`background: none`), never `rgba(0,0,0,...)`
+- `AMBIENT_MOODS` / `_stopAmbient` / `_ambientNodes` / `_ambientGain` — old drone-only ambient system replaced by jazz loop + drone crossfade via `MOOD_MIX`
+- `_jazzFilter` for mood — mood is now a jazz↔drone crossfade, not a lowpass filter
 
 ### Lore Reference
 
