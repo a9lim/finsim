@@ -57,6 +57,7 @@ import {
     onComplianceTriggered, onComplianceChoice,
 } from './src/compliance.js';
 import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
+import { initAudio, setAmbientMood, playStinger, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -173,6 +174,7 @@ function _priceExpiryGreeks(idx) {
 // ---------------------------------------------------------------------------
 
 cacheDOMElements($);
+$.volumeSlider = document.getElementById('volume-slider');
 initTheme();
 init();
 
@@ -463,6 +465,8 @@ function init() {
 
     // 11. Wire intro screen
     _intro.init($.introScreen, $.introStart);
+    initAudio();
+    setAmbientMood('calm');
 
     // 12. Wire info tips for slider labels
     wireInfoTips();
@@ -590,6 +594,12 @@ function init() {
             }
         });
     });
+
+    // Audio volume control
+    if ($.volumeSlider) {
+        $.volumeSlider.value = Math.round(getVolume() * 100);
+        $.volumeSlider.addEventListener('input', () => setVolume($.volumeSlider.value / 100));
+    }
 
     // 19. Start animation loop
     requestAnimationFrame(frame);
@@ -735,6 +745,7 @@ function _processPopupQueue() {
         : event.context || '';
 
     const popupCat = event.category || (event.id && event.id.startsWith('desk_') ? 'desk' : '');
+    playStinger('alert');
     // Compliance pre-processing: check profitability since last review
     if (event.choices && event.choices.some(c => c.complianceTier)) {
         onComplianceTriggered(_portfolioEquity(), sim.day);
@@ -1011,6 +1022,12 @@ function _onDayComplete() {
                     const duration = ev.magnitude === 'major' ? 8000
                         : ev.magnitude === 'moderate' ? 5000 : 3000;
                     setTimeout(function() { showToast(headline, duration); }, i * 1500);
+                    setTimeout(function() {
+                        const _mu = ev.params?.mu || 0;
+                        if (_mu > 0.02) playStinger('positive');
+                        else if (_mu < -0.02) playStinger('negative');
+                        else playStinger('alert');
+                    }, i * 1500 + 200);
                 }
             }
         }
@@ -1021,6 +1038,12 @@ function _onDayComplete() {
         const portfolioPopups = evaluatePortfolioPopups(sim, eventEngine.world, portfolio, sim.day);
         for (const pp of portfolioPopups) _popupQueue.push(pp);
     }
+
+    // Update ambient mood based on market regime
+    const _ambientVol = Math.sqrt(sim.v);
+    if (_ambientVol > 0.35 || sim.lambda > 5) setAmbientMood('crisis');
+    else if (_ambientVol > 0.20 || sim.lambda > 2) setAmbientMood('tense');
+    else setAmbientMood('calm');
 
     // Layer 3: update param shifts based on gross exposure
     const grossNotional = computeGrossNotional();
@@ -1353,6 +1376,7 @@ function _resetCore(index) {
     quarterlyReviews.length = 0;
     resetPopupCooldowns();
     resetCompliance();
+    resetAudio();
     sim.reset(index);
     resetPortfolio();
     resetImpactState();
