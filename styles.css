@@ -63,9 +63,8 @@ main {
 #chart-canvas,
 #strategy-canvas {
     position: absolute;
-    inset: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     width: 100%;
-    height: 100%;
     display: block;
     cursor: grab;
 }
@@ -81,6 +80,10 @@ main {
     padding: 4px 8px;
     border-radius: var(--radius-pill);
     z-index: 20;
+}
+/* Reserve space at bottom of chart so candles don't clip under lobby bar */
+#chart-container:has(.lobby-bar:not([style*="display: none"])) #chart-canvas {
+    bottom: 44px;
 }
 .lobby-bar .substrate-pill {
     display: flex;
