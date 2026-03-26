@@ -54,9 +54,12 @@ import { checkCompoundTriggers, resetCompoundTriggers } from './src/compound-tri
 import { evaluatePortfolioPopups, resetPopupCooldowns, pickTip } from './src/popup-events.js';
 import { getEventById } from './src/event-pool.js';
 import {
-    compliance, resetCompliance, effectiveHeat,
-    onComplianceTriggered, onComplianceChoice,
-} from './src/compliance.js';
+    factions, resetFactions, getFaction,
+    onQuarterlyReview, applyComplianceChoice,
+    shiftFaction, firmTone,
+    getRegLevel, getFactionState,
+    settleRegulatory, cooperateRegulatory,
+} from './src/faction-standing.js';
 import {
     evaluateConvictions, getActiveConvictions, getConviction,
     getConvictionEffect, resetConvictions, getConvictionIds,
@@ -65,10 +68,6 @@ import {
     evaluateRegulations, getActiveRegulations, getRegulation,
     getRegulationEffect, resetRegulations,
 } from './src/regulations.js';
-import {
-    addScrutiny, getScrutinyLevel, getScrutinyState,
-    settleScrutiny, cooperateScrutiny, resetScrutiny,
-} from './src/scrutiny.js';
 import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 import { getAvailableActions, executeLobbyAction, resetLobbying } from './src/lobbying.js';
@@ -1657,10 +1656,9 @@ function _resetCore(index) {
     impactHistory.length = 0;
     quarterlyReviews.length = 0;
     resetPopupCooldowns();
-    resetCompliance();
+    resetFactions();
     resetConvictions();
     resetRegulations();
-    resetScrutiny();
     resetCompoundTriggers();
     resetLobbying();
     resetInterjections();
