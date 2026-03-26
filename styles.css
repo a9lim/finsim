@@ -1090,7 +1090,7 @@ main {
 }
 .popup-choice-desc {
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     line-height: 1.4;
 }
 
