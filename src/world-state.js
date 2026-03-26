@@ -79,6 +79,14 @@ export function createWorldState() {
             pressFreedomIndex: 7,
             leakCount:         0,
         },
+        factions: {
+            firmStanding:        65,
+            regulatoryExposure:  10,
+            federalistSupport:   30,
+            farmerLaborSupport:  30,
+            mediaTrust:          40,
+            fedRelations:        40,
+        },
     };
 }
 
@@ -166,6 +174,13 @@ export const WORLD_STATE_RANGES = {
     'media.sentinelRating':             { min: 0,   max: 10,  type: 'number' },
     'media.pressFreedomIndex':          { min: 0,   max: 10,  type: 'number' },
     'media.leakCount':                  { min: 0,   max: 5,   type: 'number' },
+    // factions
+    'factions.firmStanding':            { min: 0,   max: 100, type: 'number' },
+    'factions.regulatoryExposure':      { min: 0,   max: 100, type: 'number' },
+    'factions.federalistSupport':       { min: 0,   max: 100, type: 'number' },
+    'factions.farmerLaborSupport':      { min: 0,   max: 100, type: 'number' },
+    'factions.mediaTrust':              { min: 0,   max: 100, type: 'number' },
+    'factions.fedRelations':            { min: 0,   max: 100, type: 'number' },
 };
 
 // -- Apply structured effects from LLM -----------------------------------
