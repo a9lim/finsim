@@ -17,7 +17,7 @@ import {
 
 import { createWorldState, congressHelpers, applyStructuredEffects } from './world-state.js';
 import { OFFLINE_EVENTS, PARAM_RANGES, getEventById } from './event-pool.js';
-import { getConvictionEffect } from './convictions.js';
+import { getConvictionEffect, getConvictionIds } from './convictions.js';
 
 // -- Re-export for backwards compat -------------------------------------
 export { PARAM_RANGES } from './event-pool.js';
@@ -55,12 +55,16 @@ export class EventEngine {
             fed:            OFFLINE_EVENTS.filter(e => e.category === 'fed'),
             pnth_earnings:  OFFLINE_EVENTS.filter(e => e.category === 'pnth_earnings'),
             random:         OFFLINE_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category)),
+            filibuster:     OFFLINE_EVENTS.filter(e => e.category === 'filibuster'),
+            media:          OFFLINE_EVENTS.filter(e => e.category === 'media'),
         };
 
         // Pulse schedule
         this._pulses = [
             { type: 'recurring', id: 'fomc',           interval: FED_MEETING_INTERVAL,    jitter: FED_MEETING_JITTER,    nextDay: -1, poolKey: 'fed' },
             { type: 'recurring', id: 'pnth_earnings',  interval: PNTH_EARNINGS_INTERVAL,  jitter: PNTH_EARNINGS_JITTER,  nextDay: -1, poolKey: 'pnth_earnings' },
+            { type: 'recurring', id: 'filibuster_check', interval: 7,  jitter: 2, nextDay: -1, poolKey: 'filibuster' },
+            { type: 'recurring', id: 'media_cycle',      interval: 21, jitter: 5, nextDay: -1, poolKey: 'media' },
             { type: 'fixed',     id: 'campaign_season', day: CAMPAIGN_START_DAY, fired: false, handler: '_onCampaignSeason' },
             { type: 'fixed',     id: 'midterm',         day: MIDTERM_DAY,        fired: false, handler: '_onMidterm' },
         ];
@@ -366,11 +370,27 @@ export class EventEngine {
         const congress = congressHelpers(this.world);
         const boredomImmune = getConvictionEffect('boredomImmune', false);
         const boostNonMinor = !boredomImmune && this._consecutiveMinor >= BOREDOM_THRESHOLD;
+        const _convIds = getConvictionIds();
         let totalWeight = 0;
         for (const ev of events) {
             let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
             if (boostNonMinor && ev.magnitude !== 'minor' && ev.category !== 'neutral') {
                 w *= 2;
+            }
+            // Conviction-aware likelihood adjustments
+            if (_convIds.length > 0) {
+                if (_convIds.includes('political_operator') && (ev.category === 'congressional' || ev.category === 'filibuster' || ev.category === 'political')) {
+                    w *= 1.5;
+                }
+                if (_convIds.includes('volatility_addict') && (ev.category === 'pnth' || ev.category === 'pnth_earnings')) {
+                    w *= 1.3;
+                }
+                if (_convIds.includes('information_edge') && (ev.category === 'investigation' || ev.category === 'media')) {
+                    w *= 1.4;
+                }
+                if (_convIds.includes('ghost_protocol')) {
+                    w *= 0.7;
+                }
             }
             totalWeight += w;
         }
@@ -379,6 +399,21 @@ export class EventEngine {
             let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
             if (boostNonMinor && ev.magnitude !== 'minor' && ev.category !== 'neutral') {
                 w *= 2;
+            }
+            // Conviction-aware likelihood adjustments
+            if (_convIds.length > 0) {
+                if (_convIds.includes('political_operator') && (ev.category === 'congressional' || ev.category === 'filibuster' || ev.category === 'political')) {
+                    w *= 1.5;
+                }
+                if (_convIds.includes('volatility_addict') && (ev.category === 'pnth' || ev.category === 'pnth_earnings')) {
+                    w *= 1.3;
+                }
+                if (_convIds.includes('information_edge') && (ev.category === 'investigation' || ev.category === 'media')) {
+                    w *= 1.4;
+                }
+                if (_convIds.includes('ghost_protocol')) {
+                    w *= 0.7;
+                }
             }
             roll -= w;
             if (roll <= 0) return ev;

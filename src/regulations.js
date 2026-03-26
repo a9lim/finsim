@@ -91,6 +91,14 @@ const REGULATIONS = [
         condition: (world) => world.election.primarySeason,
         effects: {},
     },
+    {
+        id: 'filibuster_uncertainty',
+        name: 'Senate Filibuster Uncertainty',
+        description: 'Whitfield holds the Senate floor. Markets hate uncertainty — spreads widen and vol ticks up while the filibuster continues.',
+        color: 'var(--ext-indigo)',
+        condition: (world) => world.congress.filibusterActive,
+        effects: { spreadMult: 1.25 },
+    },
 ];
 
 /**
