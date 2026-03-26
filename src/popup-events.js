@@ -13,11 +13,8 @@ import {
 import { computeNetDelta, computeGrossNotional, portfolio, portfolioValue } from './portfolio.js';
 import { market } from './market.js';
 import { unitPrice } from './position-value.js';
-import {
-    cooldownMultiplier, thresholdMultiplier, complianceTone,
-} from './compliance.js';
-import { getConvictionEffect, getConvictionIds } from './convictions.js';
-import { getScrutinyLevel } from './scrutiny.js';
+import { getConvictionIds } from './convictions.js';
+import { firmThresholdMult, firmCooldownMult, firmTone, getRegLevel } from './faction-standing.js';
 
 const _cooldowns = {}; // id → last fired day
 
@@ -185,14 +182,14 @@ export const PORTFOLIO_POPUPS = [
         trigger: (sim, world) => {
             const eq = _equity();
             if (eq <= 0) return false;
-            return _shortDirectionalNotional() / eq > 0.30 * thresholdMultiplier() && _anyInvestigationActive(world);
+            return _shortDirectionalNotional() / eq > 0.30 * firmThresholdMult() && _anyInvestigationActive(world);
         },
         cooldown: 200,
         popup: true,
         headline: 'Meridian compliance flags short book — Okafor\'s committee is watching',
         context: (sim, world) => {
             const netDelta = computeNetDelta();
-            const tone = complianceTone();
+            const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
@@ -236,7 +233,7 @@ export const PORTFOLIO_POPUPS = [
         trigger: (sim, world) => {
             const eq = _equity();
             if (eq <= 0) return false;
-            return _longDirectionalNotional() / eq > 1.5 * thresholdMultiplier() &&
+            return _longDirectionalNotional() / eq > 1.5 * firmThresholdMult() &&
                 (world.geopolitical.tradeWarStage >= 2 || world.geopolitical.recessionDeclared);
         },
         cooldown: 250,
@@ -244,7 +241,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Meridian CRO: "Do you know something we don\'t?"',
         context: (sim, world) => {
             const netDelta = computeNetDelta();
-            const tone = complianceTone();
+            const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
@@ -289,14 +286,14 @@ export const PORTFOLIO_POPUPS = [
             const eq = _equity();
             if (eq <= 0) return false;
             const { notional } = _maxStrikeConcentration();
-            return notional / totalOpt > 0.50 && notional / eq > 0.10 * thresholdMultiplier();
+            return notional / totalOpt > 0.50 && notional / eq > 0.10 * firmThresholdMult();
         },
         cooldown: 180,
         popup: true,
         headline: 'Market maker complains about single-strike concentration',
         context: () => {
             const { strike, notional } = _maxStrikeConcentration();
-            const tone = complianceTone();
+            const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
@@ -338,7 +335,7 @@ export const PORTFOLIO_POPUPS = [
             const eq = _equity();
             const gross = computeGrossNotional();
             const ratio = (gross / eq).toFixed(1);
-            const tone = complianceTone();
+            const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
@@ -384,7 +381,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Your name is on the tape',
         context: () => {
             const absStock = _absStockQty();
-            const tone = complianceTone();
+            const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
@@ -425,14 +422,14 @@ export const PORTFOLIO_POPUPS = [
             if (nuu >= 0) return false;
             const eq = _equity();
             if (eq <= 0) return false;
-            return Math.abs(nuu) * market.S / eq > 0.10 * thresholdMultiplier();
+            return Math.abs(nuu) * market.S / eq > 0.10 * firmThresholdMult();
         },
         cooldown: 120,
         popup: true,
         headline: 'Risk desk flags unlimited upside exposure',
         context: (sim) => {
             const nuu = _netUncoveredUpside();
-            const tone = complianceTone();
+            const tone = firmTone();
             const tonePrefix = tone === 'warm'
                 ? 'Routine check —'
                 : tone === 'pointed'
@@ -474,7 +471,7 @@ export const PORTFOLIO_POPUPS = [
         trigger: (sim, world) => {
             const eq = _equity();
             if (eq <= 0) return false;
-            return _bondNotional() / eq > 0.20 * thresholdMultiplier() && !world.fed.hartleyFired;
+            return _bondNotional() / eq > 0.20 * firmThresholdMult() && !world.fed.hartleyFired;
         },
         cooldown: 180,
         era: 'early',
@@ -482,7 +479,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Compliance flags bond position ahead of Hartley\'s FOMC meeting',
         context: (sim, world) => {
             const bondNot = _bondNotional();
-            const tone = complianceTone();
+            const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
@@ -516,7 +513,7 @@ export const PORTFOLIO_POPUPS = [
             const pnthNotional = portfolio.positions.filter(p => p.type === 'stock')
                 .reduce((s, p) => s + Math.abs(p.qty) * _posPrice(p), 0);
             const daysToEarnings = QUARTERLY_CYCLE - (sim.day % QUARTERLY_CYCLE);
-            return pnthNotional / eq > 0.15 * thresholdMultiplier() && daysToEarnings <= 10;
+            return pnthNotional / eq > 0.15 * firmThresholdMult() && daysToEarnings <= 10;
         },
         cooldown: 150,
         popup: true,
@@ -631,7 +628,7 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const loss = ((1 - eq / INITIAL_CAPITAL) * 100).toFixed(0);
-            const tone = complianceTone();
+            const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
@@ -720,7 +717,7 @@ export const PORTFOLIO_POPUPS = [
         context: () => {
             const eq = _equity();
             const loss = ((1 - eq / INITIAL_CAPITAL) * 100).toFixed(0);
-            const tone = complianceTone();
+            const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
@@ -1112,14 +1109,14 @@ export const PORTFOLIO_POPUPS = [
             if (eq <= 0) return false;
             return (world.geopolitical.mideastEscalation >= 2 || world.geopolitical.oilCrisis) &&
                 eq > INITIAL_CAPITAL * 1.1 &&
-                _shortDirectionalNotional() / eq > 0.15 * thresholdMultiplier();
+                _shortDirectionalNotional() / eq > 0.15 * firmThresholdMult();
         },
         cooldown: 300,
         popup: true,
         headline: 'The Continental investigates "Meridian\'s crisis profits"',
         context: (sim, world) => {
             const crisis = world.geopolitical.oilCrisis ? 'Farsistan oil crisis' : 'Farsistan escalation';
-            const tone = complianceTone();
+            const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
@@ -1151,7 +1148,7 @@ export const PORTFOLIO_POPUPS = [
         trigger: (sim, world) => {
             const eq = _equity();
             if (eq <= 0) return false;
-            return _bondNotional() / eq > 0.10 * thresholdMultiplier() && world.fed.hikeCycle;
+            return _bondNotional() / eq > 0.10 * firmThresholdMult() && world.fed.hikeCycle;
         },
         cooldown: 200,
         era: 'mid',
@@ -1159,7 +1156,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'Compliance requires documentation during Hartley\'s hiking cycle',
         context: (sim, world) => {
             const bondNot = _bondNotional();
-            const tone = complianceTone();
+            const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
@@ -1271,7 +1268,7 @@ export const PORTFOLIO_POPUPS = [
 
     {
         id: 'scrutiny_press_inquiry',
-        trigger: (sim, world, portfolio) => getScrutinyLevel() >= 1,
+        trigger: (sim, world, portfolio) => getRegLevel() >= 1,
         cooldown: 200,
         era: 'mid',
         popup: true,
@@ -1295,7 +1292,7 @@ export const PORTFOLIO_POPUPS = [
     },
     {
         id: 'scrutiny_regulatory_letter',
-        trigger: (sim, world, portfolio) => getScrutinyLevel() >= 2,
+        trigger: (sim, world, portfolio) => getRegLevel() >= 2,
         cooldown: 300,
         era: 'mid',
         popup: true,
@@ -1326,7 +1323,7 @@ export const PORTFOLIO_POPUPS = [
     },
     {
         id: 'scrutiny_subpoena',
-        trigger: (sim, world, portfolio) => getScrutinyLevel() >= 3,
+        trigger: (sim, world, portfolio) => getRegLevel() >= 3,
         cooldown: 400,
         era: 'late',
         popup: true,
@@ -1350,12 +1347,12 @@ export const PORTFOLIO_POPUPS = [
     },
     {
         id: 'scrutiny_enforcement',
-        trigger: (sim, world, portfolio) => getScrutinyLevel() >= 4,
+        trigger: (sim, world, portfolio) => getRegLevel() >= 4,
         cooldown: 9999,
         popup: true,
         headline: 'SEC Enforcement Action',
         context: () => {
-            const level = getScrutinyLevel();
+            const level = getRegLevel();
             if (level >= 4) return 'The SEC has filed a formal enforcement action against you personally. The complaint alleges insider trading, market manipulation, and failure to supervise. Marcus Cole is running the story on The Sentinel\u2019s prime-time show. Meridian\u2019s board has called an emergency session. Your options are narrowing.';
             return 'The SEC is pursuing enforcement proceedings related to your trading activity. Meridian\u2019s legal team advises immediate action.';
         },
@@ -1391,7 +1388,7 @@ export const PORTFOLIO_POPUPS = [
 export function evaluatePortfolioPopups(sim, world, portfolio, day) {
     const triggered = [];
     for (const pp of PORTFOLIO_POPUPS) {
-        if (_cooldowns[pp.id] && day - _cooldowns[pp.id] < pp.cooldown * cooldownMultiplier() * getConvictionEffect('popupFrequencyMult', 1)) continue;
+        if (_cooldowns[pp.id] && day - _cooldowns[pp.id] < pp.cooldown * firmCooldownMult()) continue;
         if (pp.era === 'early' && _liveDay(day) > 500) continue;
         if (pp.era === 'mid'   && (_liveDay(day) < 500 || _liveDay(day) > 800)) continue;
         if (pp.era === 'late'  && _liveDay(day) < 800) continue;
