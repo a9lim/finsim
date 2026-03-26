@@ -95,6 +95,18 @@ export class EventEngine {
             return { fired, popups };
         };
 
+        // Deterministic pre-pass: fire eligible one-shot events
+        const oneShotCandidates = this._pools.random.filter(ev =>
+            ev.oneShot && !this._firedOneShot.has(ev.id)
+        );
+        if (oneShotCandidates.length > 0) {
+            const eligible = this._filterEligible(oneShotCandidates, sim);
+            if (eligible.length > 0) {
+                this._firedOneShot.add(eligible[0].id);
+                return _partition([this._fireEvent(eligible[0], sim, day, 0, netDelta)]);
+            }
+        }
+
         // 1. Check pulses in array order
         for (const pulse of this._pulses) {
             if (pulse.type === 'recurring') {
@@ -384,7 +396,7 @@ export class EventEngine {
 
             const event = picked.event ?? getEventById(picked.id);
             if (!event) continue;
-            if (event.when && !event.when(sim, this.world, congress)) continue;
+            if (event.when && !event.when(sim, this.world, congress, this._playerCtx)) continue;
 
             fired.push(this._fireEvent(event, sim, day, picked.depth, netDelta));
         }
@@ -458,12 +470,15 @@ export class EventEngine {
             const liveDay = day - HISTORY_CAPACITY;
             if (ev.minDay != null && liveDay < ev.minDay) return false;
             if (ev.maxDay != null && liveDay > ev.maxDay) return false;
-            return !ev.when || ev.when(sim, this.world, congress);
+            return !ev.when || ev.when(sim, this.world, congress, this._playerCtx);
         });
     }
 
     _drawRandom(sim) {
-        const eligible = this._filterEligible(this._pools.random, sim);
+        const pool = this._pools.random.filter(ev =>
+            !(ev.oneShot && this._firedOneShot.has(ev.id))
+        );
+        const eligible = this._filterEligible(pool, sim);
         if (eligible.length === 0) return null;
         return this._weightedPick(eligible, sim);
     }
