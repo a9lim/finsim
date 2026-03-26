@@ -454,7 +454,14 @@ function init() {
     document.addEventListener('shoals:exerciseOption', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
+            // Capture qty before exercise removes the position
+            const pos = portfolio.positions.find(p => p.id === id);
+            const qty = pos ? pos.qty : 0;
+            const isCall = pos && pos.type === 'call';
             const result = exerciseOption(id, sim.S, sim.day, market.sigma, sim.r, sim.q);
+            if (result && qty > 0) {
+                _recordImpact(sim.day, isCall ? 1 : -1, qty, 'Option exercise');
+            }
             if (typeof showToast !== 'undefined') {
                 showToast(result ? 'Option exercised.' : 'Cannot exercise.');
             }
