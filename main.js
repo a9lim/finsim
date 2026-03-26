@@ -539,6 +539,7 @@ function init() {
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
     if ($.lobbyBtn) $.lobbyBtn.style.display = eventEngine ? '' : 'none';
 
+    let _lobbyTrapCleanup = null;
     $.lobbyBtn.addEventListener('click', () => {
         if (!eventEngine) {
             showToast('Lobbying requires Dynamic mode.', 3000);
@@ -546,9 +547,12 @@ function init() {
         }
         _renderLobbyActions();
         $.lobbyOverlay.classList.remove('hidden');
-        if (typeof trapFocus === 'function') trapFocus($.lobbyOverlay);
+        if (typeof trapFocus === 'function') _lobbyTrapCleanup = trapFocus($.lobbyOverlay);
     });
-    $.lobbyClose.addEventListener('click', () => $.lobbyOverlay.classList.add('hidden'));
+    $.lobbyClose.addEventListener('click', () => {
+        $.lobbyOverlay.classList.add('hidden');
+        if (_lobbyTrapCleanup) { _lobbyTrapCleanup(); _lobbyTrapCleanup = null; }
+    });
 
     updateUI();
 

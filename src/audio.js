@@ -76,6 +76,7 @@ export function initAudio() {
 }
 
 function _stopAmbient(fadeMs = 1000) {
+    if (!_ctx) return;
     const now = _ctx.currentTime;
     for (const node of _ambientNodes) {
         if (node.gain) {

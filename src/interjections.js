@@ -15,7 +15,7 @@ const INTERJECTIONS = [
     {
         id: 'vol_spike',
         text: 'Your hands remember 2008. The vol surface is screaming.',
-        condition: (ctx) => Math.sqrt(ctx.sim.v) > ctx.sim.theta * 2.5,
+        condition: (ctx) => Math.sqrt(ctx.sim.v) > Math.sqrt(ctx.sim.theta) * 2.5,
     },
     {
         id: 'sidelines',
