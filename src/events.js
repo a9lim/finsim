@@ -50,6 +50,10 @@ export class EventEngine {
         // Epilogue
         this._epilogueFired = false;
 
+        // Player context for enriched guard signatures
+        this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [] };
+        this._firedOneShot = new Set();
+
         // Pre-filter pools from OFFLINE_EVENTS
         this._pools = {
             fed:            OFFLINE_EVENTS.filter(e => e.category === 'fed'),
@@ -222,6 +226,8 @@ export class EventEngine {
         this._randomCooldown = 0;
         this._consecutiveMinor = 0;
         this._epilogueFired = false;
+        this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [] };
+        this._firedOneShot.clear();
 
         // Reset all pulse states
         for (const pulse of this._pulses) {
@@ -231,6 +237,16 @@ export class EventEngine {
                 pulse.fired = false;
             }
         }
+    }
+
+    /** Update player context passed to event guards. */
+    setPlayerContext(playerChoices, factions, activeRegIds) {
+        this._playerCtx = { playerChoices, factions, activeRegIds };
+    }
+
+    /** Clear fired one-shot tracking (call on reset). */
+    resetOneShot() {
+        this._firedOneShot.clear();
     }
 
     // -- Internal ---------------------------------------------------------
