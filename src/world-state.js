@@ -14,6 +14,8 @@ export function createWorldState() {
         congress: {
             senate: { federalist: 52, farmerLabor: 48 },
             house:  { federalist: 221, farmerLabor: 214 },
+            filibusterActive: false,
+            bigBillStatus:    0,
         },
         pnth: {
             boardDirks:              7,
@@ -29,15 +31,24 @@ export function createWorldState() {
             whistleblowerFiled:      false,
             acquired:                false,
             gottliebStartedRival:    false,
+            sentinelLaunched:        true,
+            aegisDeployed:           false,
+            companionLaunched:       false,
+            foundryLaunched:         false,
+            companionScandal:        0,
+            aegisControversy:        0,
         },
         geopolitical: {
-            tradeWarStage:    0,
-            mideastEscalation:0,
-            southAmericaOps:  0,
-            sanctionsActive:  false,
-            oilCrisis:        false,
-            recessionDeclared:false,
-            chinaRelations:   0,
+            tradeWarStage:       0,
+            mideastEscalation:   0,
+            southAmericaOps:     0,
+            sanctionsActive:     false,
+            oilCrisis:           false,
+            recessionDeclared:   false,
+            sericaRelations:     0,
+            farsistanEscalation: 0,
+            khasurianCrisis:     0,
+            straitClosed:        false,
         },
         fed: {
             hikeCycle:        false,
@@ -61,6 +72,12 @@ export function createWorldState() {
             primarySeason:    false,
             okaforRunning:    false,
             presidentialResult: null,
+        },
+        media: {
+            tanCredibility:    5,
+            sentinelRating:    5,
+            pressFreedomIndex: 7,
+            leakCount:         0,
         },
     };
 }
@@ -92,6 +109,9 @@ export const WORLD_STATE_RANGES = {
     // congress.house
     'congress.house.federalist':        { min: 0,   max: 435, type: 'number' },
     'congress.house.farmerLabor':       { min: 0,   max: 435, type: 'number' },
+    // congress
+    'congress.filibusterActive':        { type: 'boolean' },
+    'congress.bigBillStatus':           { min: 0,   max: 4,   type: 'number' },
     // pnth
     'pnth.boardDirks':                  { min: 0,   max: 12,  type: 'number' },
     'pnth.boardGottlieb':               { min: 0,   max: 12,  type: 'number' },
@@ -106,6 +126,12 @@ export const WORLD_STATE_RANGES = {
     'pnth.whistleblowerFiled':          { type: 'boolean' },
     'pnth.acquired':                    { type: 'boolean' },
     'pnth.gottliebStartedRival':        { type: 'boolean' },
+    'pnth.sentinelLaunched':            { type: 'boolean' },
+    'pnth.aegisDeployed':               { type: 'boolean' },
+    'pnth.companionLaunched':           { type: 'boolean' },
+    'pnth.foundryLaunched':             { type: 'boolean' },
+    'pnth.companionScandal':            { min: 0,   max: 3,   type: 'number' },
+    'pnth.aegisControversy':            { min: 0,   max: 3,   type: 'number' },
     // geopolitical
     'geopolitical.tradeWarStage':       { min: 0,   max: 4,   type: 'number' },
     'geopolitical.mideastEscalation':   { min: 0,   max: 3,   type: 'number' },
@@ -113,7 +139,10 @@ export const WORLD_STATE_RANGES = {
     'geopolitical.sanctionsActive':     { type: 'boolean' },
     'geopolitical.oilCrisis':           { type: 'boolean' },
     'geopolitical.recessionDeclared':   { type: 'boolean' },
-    'geopolitical.chinaRelations':      { min: -3,  max: 3,   type: 'number' },
+    'geopolitical.sericaRelations':      { min: -3,  max: 3,   type: 'number' },
+    'geopolitical.farsistanEscalation': { min: 0,   max: 3,   type: 'number' },
+    'geopolitical.khasurianCrisis':     { min: 0,   max: 3,   type: 'number' },
+    'geopolitical.straitClosed':        { type: 'boolean' },
     // fed
     'fed.hikeCycle':                    { type: 'boolean' },
     'fed.cutCycle':                     { type: 'boolean' },
@@ -132,6 +161,11 @@ export const WORLD_STATE_RANGES = {
     'election.lobbyMomentum':           { min: -3,  max: 3,   type: 'number' },
     'election.primarySeason':           { type: 'boolean' },
     'election.okaforRunning':           { type: 'boolean' },
+    // media
+    'media.tanCredibility':             { min: 0,   max: 10,  type: 'number' },
+    'media.sentinelRating':             { min: 0,   max: 10,  type: 'number' },
+    'media.pressFreedomIndex':          { min: 0,   max: 10,  type: 'number' },
+    'media.leakCount':                  { min: 0,   max: 5,   type: 'number' },
 };
 
 // -- Apply structured effects from LLM -----------------------------------

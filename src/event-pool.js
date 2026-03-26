@@ -307,7 +307,7 @@ const MACRO_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 0,
         params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
-        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 }, { path: 'geopolitical.chinaRelations', op: 'add', value: -1 }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
+        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 }, { path: 'geopolitical.sericaRelations', op: 'add', value: -1 }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
         followups: [ { id: 'trade_retaliation', mtth: 18, weight: 0.7 }, { id: 'tariff_selloff', mtth: 3, weight: 0.5 }, ],
     },
     {
@@ -326,7 +326,7 @@ const MACRO_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 1,
         params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.01 },
-        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 }, { path: 'geopolitical.chinaRelations', op: 'add', value: -1 }, ],
+        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 }, { path: 'geopolitical.sericaRelations', op: 'add', value: -1 }, ],
         followups: [ { id: 'tariff_exemptions', mtth: 18, weight: 0.6 }, ],
     },
     {
@@ -340,7 +340,7 @@ const MACRO_EVENTS = [
         when: (sim, world) => world.geopolitical.tradeWarStage === 2,
         effects: (world) => {
             world.geopolitical.tradeWarStage = 3;
-            world.geopolitical.chinaRelations = -3;
+            world.geopolitical.sericaRelations = -3;
         },
         followups: [
             { id: 'rare_earth_crisis', mtth: 25, weight: 0.7 },
@@ -353,7 +353,7 @@ const MACRO_EVENTS = [
         headline: 'Beijing restricts rare earth exports to U.S. in retaliation; chip manufacturers warn of 6-month supply shortage. Defense stocks crater',
         params: { mu: -0.08, theta: 0.04, lambda: 2.0, muJ: -0.05, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
-        when: (sim, world) => world.geopolitical.tradeWarStage >= 3 && world.geopolitical.chinaRelations <= -2,
+        when: (sim, world) => world.geopolitical.tradeWarStage >= 3 && world.geopolitical.sericaRelations <= -2,
         portfolioFlavor: (portfolio) => {
             const putQty = portfolio.positions.filter(p => p.type === 'put').reduce((s, p) => s + p.qty, 0);
             const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
@@ -371,7 +371,7 @@ const MACRO_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 1 && world.geopolitical.tradeWarStage <= 3,
         effects: (world) => {
-            world.geopolitical.chinaRelations = Math.min(3, world.geopolitical.chinaRelations + 1);
+            world.geopolitical.sericaRelations = Math.min(3, world.geopolitical.sericaRelations + 1);
         },
     },
     {
@@ -388,7 +388,7 @@ const MACRO_EVENTS = [
         minDay: 400,
         when: (sim, world) => world.geopolitical.tradeWarStage >= 2 && world.geopolitical.tradeWarStage < 4,
         params: { mu: 0.04, theta: -0.015, lambda: -0.6, muJ: 0.008, q: 0.002 },
-        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 }, { path: 'geopolitical.chinaRelations', op: 'add', value: 2 }, { path: 'election.barronApproval', op: 'add', value: 3 }, ],
+        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 }, { path: 'geopolitical.sericaRelations', op: 'add', value: 2 }, { path: 'election.barronApproval', op: 'add', value: 3 }, ],
     },
 
     // =====================================================================
@@ -1611,7 +1611,7 @@ const SECTOR_EVENTS = [
         headline: 'Zhaowei CEO Liang Wei keynotes Beijing AI Summit; announces state-backed $50B compute buildout. PNTH investors weigh competitive threat',
         params: { mu: -0.005, theta: 0.003 },
         magnitude: 'minor',
-        when: (sim, world) => world.geopolitical.chinaRelations <= 0,
+        when: (sim, world) => world.geopolitical.sericaRelations <= 0,
     },
     {
         id: 'ai_safety_framework',
@@ -2143,7 +2143,7 @@ const COMPOUND_EVENTS = [
         when: (sim, world) => world.investigations.tanBowmanStory >= 2 && world.geopolitical.tradeWarStage >= 3,
         effects: (world) => {
             world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
-            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
+            world.geopolitical.sericaRelations = Math.max(-3, world.geopolitical.sericaRelations - 1);
         },
         portfolioFlavor: (portfolio) => {
             const longStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty > 0).reduce((s, p) => s + p.qty, 0);

@@ -327,7 +327,7 @@ function _pageWorld(world, sim, impactHistory) {
         body += _h3('Trade &amp; China');
         if (geo.tradeWarStage >= 4) {
             body += _p('The framework deal was, depending on who you asked, either Barron\'s crowning achievement or the most expensive photo opportunity in American economic history. The tariffs came down. The retaliatory measures were unwound. Zhaowei Technologies regained access to American semiconductor supply chains, and American agriculture regained access to Chinese markets. The cost of the detour\u2014measured in shuttered factories, disrupted supply chains, and consumer prices that never fully retreated\u2014was a number that both sides preferred not to calculate.');
-            if (geo.chinaRelations > 0) {
+            if (geo.sericaRelations > 0) {
                 body += _p('Relations between Washington and Beijing settled into something approaching warmth, or at least the absence of active hostility. Diplomatic channels, severed during the worst of the tariff war, were quietly reopened. Liang Wei and Andrea Dirks were photographed shaking hands at Davos, an image that would have been unthinkable eighteen months earlier.');
             }
         } else if (geo.tradeWarStage >= 3) {
