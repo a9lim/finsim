@@ -16,7 +16,7 @@ import { unitPrice } from './position-value.js';
 import {
     cooldownMultiplier, thresholdMultiplier, complianceTone,
 } from './compliance.js';
-import { getConvictionEffect } from './convictions.js';
+import { getConvictionEffect, getConvictionIds } from './convictions.js';
 import { getScrutinyLevel } from './scrutiny.js';
 
 const _cooldowns = {}; // id → last fired day
@@ -130,32 +130,32 @@ function _liveDay(day) {
 
 const INSIDER_TIPS = [
     {
-        hint: 'PNTH is going to raise the dividend at the next earnings call',
+        hint: 'Malhotra is going to raise the PNTH dividend at the next earnings call',
         realEvent: 'tip_dividend_hike',
         fakeEvent: 'tip_dividend_flat',
     },
     {
-        hint: 'the Fed is going to pause despite the hawkish rhetoric',
+        hint: 'Hartley is going to pause despite the hawkish rhetoric — someone on the FOMC leaked it',
         realEvent: 'tip_fed_pause',
         fakeEvent: 'tip_fed_hike',
     },
     {
-        hint: 'a major defense contract announcement is coming within two weeks',
+        hint: 'Dirks is about to announce a major Atlas Aegis defense contract within two weeks',
         realEvent: 'tip_contract_win',
         fakeEvent: 'tip_contract_loss',
     },
     {
-        hint: 'a big short position is about to unwind — something about a margin call',
+        hint: 'a big short position is about to unwind — something about a margin call at a rival fund',
         realEvent: 'tip_short_squeeze',
         fakeEvent: 'tip_squeeze_fizzle',
     },
     {
-        hint: 'earnings are going to blow out expectations by double digits',
+        hint: 'Malhotra\'s earnings are going to blow out expectations by double digits',
         realEvent: 'tip_earnings_beat',
         fakeEvent: 'tip_earnings_miss',
     },
     {
-        hint: 'there\'s an acquisition offer coming — a foreign buyer',
+        hint: 'there\'s an acquisition offer coming — al-Farhan\'s sovereign wealth fund',
         realEvent: 'tip_acquisition_bid',
         fakeEvent: 'tip_acquisition_denied',
     },
@@ -189,7 +189,7 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 200,
         popup: true,
-        headline: 'Compliance flags your short book during active investigation',
+        headline: 'Meridian compliance flags short book — Okafor\'s committee is watching',
         context: (sim, world) => {
             const netDelta = computeNetDelta();
             const tone = complianceTone();
@@ -197,7 +197,11 @@ export const PORTFOLIO_POPUPS = [
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
                 : '';
-            return prefix + `Your net delta is ${netDelta.toFixed(0)} — deeply short — while federal investigators are circling. Compliance has pulled your trading records and wants a meeting. The optics of a large directional bet during an investigation are terrible. The general counsel is asking pointed questions about your information sources.`;
+            const okaforActive = world.investigations.okaforProbeStage > 0;
+            const subpoenaLine = okaforActive
+                ? ' Okafor\'s Special Investigations Committee has subpoena authority over trading records — Meridian\'s general counsel is already briefing outside attorneys.'
+                : ' Congressional staffers have been making informal calls to prime brokers. Meridian\'s general counsel is asking pointed questions about your information sources.';
+            return prefix + `Your net delta is ${netDelta.toFixed(0)} — deeply short — while federal investigators are circling. Compliance has pulled your trading records and wants a meeting. The optics of a large directional bet during an investigation are terrible.` + subpoenaLine;
         },
         choices: [
             {
@@ -237,7 +241,7 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 250,
         popup: true,
-        headline: '"Do you know something we don\'t?"',
+        headline: 'Meridian CRO: "Do you know something we don\'t?"',
         context: (sim, world) => {
             const netDelta = computeNetDelta();
             const tone = complianceTone();
@@ -245,7 +249,10 @@ export const PORTFOLIO_POPUPS = [
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
                 : '';
-            return prefix + `You're carrying ${netDelta.toFixed(0)} delta — massively long — into what everyone else sees as a worsening macro picture. Two PMs on the floor pulled you aside at lunch. The CRO wants to know your thesis. Either you're brilliant or reckless, and right now nobody can tell which.`;
+            const macro = world.geopolitical.recessionDeclared
+                ? 'Priya Sharma\'s MarketWire column called it "the worst macro backdrop in a decade."'
+                : 'The trade war with Serica is deepening and Priya Sharma\'s MarketWire coverage is unrelentingly bearish.';
+            return prefix + `You're carrying ${netDelta.toFixed(0)} delta — massively long — into what everyone else sees as a worsening macro picture. ${macro} Two PMs on the Meridian floor pulled you aside at lunch. The CRO wants to know your thesis. Either you're brilliant or reckless, and right now nobody can tell which.`;
         },
         choices: [
             {
@@ -472,7 +479,7 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 180,
         era: 'early',
         popup: true,
-        headline: 'Compliance flags large bond position ahead of FOMC',
+        headline: 'Compliance flags bond position ahead of Hartley\'s FOMC meeting',
         context: (sim, world) => {
             const bondNot = _bondNotional();
             const tone = complianceTone();
@@ -480,7 +487,7 @@ export const PORTFOLIO_POPUPS = [
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
                 : '';
-            return prefix + `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure with an FOMC meeting imminent. The surveillance team has flagged the timing. They want documentation of your decision-making process — when you initiated the position, what public information you used, and whether you've had any contact with Fed officials or their staff. Standard protocol, but the paperwork is a headache.`;
+            return prefix + `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure with Chair Hartley's FOMC meeting imminent. Priya Sharma's MarketWire preview is already moving bonds. The surveillance team has flagged the timing — they want documentation of your decision-making process, what public information you used, and whether you've had any contact with Fed officials or their staff. Standard protocol, but the paperwork is a headache.`;
         },
         choices: [
             {
@@ -513,9 +520,9 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 150,
         popup: true,
-        headline: 'Sellside salesman mentions "interesting flow" in PNTH options',
+        headline: 'Sellside salesman mentions "interesting flow" ahead of Malhotra\'s earnings call',
         context: () => {
-            return 'A salesman from a bulge bracket calls your line. "Listen, I can\'t say much, but there\'s been some unusual activity in the PNTH options chain. Smart money is positioning ahead of the print. I think you\'d want to know." He trails off, waiting for you to bite.';
+            return 'A salesman from a bulge bracket calls your line. "Listen, I can\'t say much, but there\'s been unusual activity in the PNTH options chain ahead of Malhotra\'s earnings call. Smart money is positioning before the print — someone on the sellside thinks Raj is going to guide higher. I think you\'d want to know." He trails off, waiting for you to bite.';
         },
         choices: [
             {
@@ -542,10 +549,10 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 200,
         popup: true,
-        headline: 'The market is against you',
+        headline: 'The Meridian Brief: "One trader swimming against the tide"',
         context: (sim) => {
             const netDelta = computeNetDelta();
-            return `The index is at $${sim.S.toFixed(0)} — well above where you started shorting — and your delta is ${netDelta.toFixed(0)}. Every tick higher costs you. The PM next to you just booked his best quarter ever going long. Your Bloomberg chat is full of unsolicited advice. The desk head walks past without making eye contact. You're either early or wrong, and right now the P&L doesn't distinguish between the two.`;
+            return `PNTH is at $${sim.S.toFixed(0)} — well above where you started shorting — and your delta is ${netDelta.toFixed(0)}. Every tick higher costs you. The PM next to you on the Meridian floor just booked his best quarter ever going long. Your MarketWire chat is full of unsolicited advice. The desk head walks past without making eye contact. You're either early or wrong, and right now the P&L doesn't distinguish between the two.`;
         },
         choices: [
             {
@@ -581,11 +588,18 @@ export const PORTFOLIO_POPUPS = [
         trigger: () => _equity() > INITIAL_CAPITAL * 1.5,
         cooldown: 300,
         popup: true,
-        headline: 'Financial Times wants a profile',
-        context: () => {
+        headline: 'The Continental wants a profile',
+        context: (sim, world) => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `Your returns are up ${pct}% and the FT's markets desk wants an interview. "The Meridian Trader Who Bet Against the Crowd" — that's their working headline. The PR team is excited. Your MD is cautiously supportive. But every trader who's ever been profiled knows: the cover jinx is real. The moment the ink dries, the market gods come for you.`;
+            const convIds = getConvictionIds();
+            if (convIds.includes('media_darling')) {
+                return `Your returns are up ${pct}% and Rachel Tan's editor at The Continental wants to run a feature. "The Meridian Trader Who Bet Against the Crowd." You already have a reputation — MarketWire, The Sentinel, and now The Continental. Tan's profiles are the gold standard. The PR team is thrilled. But the cover jinx is real.`;
+            }
+            if (convIds.includes('ghost_protocol')) {
+                return `Your returns are up ${pct}% and somehow The Continental's markets desk has noticed. An editor reached out to Meridian's PR team — "The Trader Nobody Knows" is their working headline. You've stayed invisible this long. A profile in The Continental would change that permanently.`;
+            }
+            return `Your returns are up ${pct}% and The Continental's markets desk wants an interview. "The Meridian Trader Who Bet Against the Crowd" — that's their working headline. The PR team is excited. Your MD is cautiously supportive. But every trader who's ever been profiled knows: the cover jinx is real. The moment the ink dries, the market gods come for you.`;
         },
         choices: [
             {
@@ -593,14 +607,14 @@ export const PORTFOLIO_POPUPS = [
                 desc: 'Enjoy the spotlight. You earned it.',
                 deltas: { xi: 0.01 },
                 playerFlag: 'did_ft_interview',
-                resultToast: 'The profile runs. Your LinkedIn explodes. The floor treats you differently now.',
+                resultToast: 'The profile runs in The Continental. Your LinkedIn explodes. The floor treats you differently now.',
             },
             {
                 label: 'Decline politely',
                 desc: 'Stay anonymous. The best traders are the ones nobody\'s heard of.',
                 deltas: {},
                 playerFlag: 'declined_ft_interview',
-                resultToast: 'The FT runs a piece about Meridian anyway, but without your name. Smart.',
+                resultToast: 'The Continental runs a piece about Meridian anyway, but without your name. Smart.',
             },
         ],
     },
@@ -659,11 +673,11 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 300,
         popup: true,
-        headline: '"Profiting from misery" — social media backlash',
+        headline: 'MarketWire: "Meridian Capital profits surge amid recession"',
         context: (sim, world) => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `A recession has been declared and you're up ${pct}%. Someone on Twitter found Meridian's 13F filing and connected the dots. "Wall Street traders making millions while Main Street suffers" is trending. Your name isn't public — yet — but the firm is fielding press calls. The PR team wants to know if you'll issue a statement. The desk is nervous.`;
+            return `A recession has been declared and you're up ${pct}%. Someone found Meridian Capital's 13F filing and connected the dots. Priya Sharma's MarketWire column picked it up: "Meridian's derivatives desk posts record returns while Main Street bleeds." Rep. Oduya quoted the piece on the House floor. Your name isn't public — yet — but the firm is fielding press calls from The Continental and The Sentinel. The PR team wants to know if you'll issue a statement.`;
         },
         choices: [
             {
@@ -684,11 +698,11 @@ export const PORTFOLIO_POPUPS = [
                 resultToast: 'The story dies in 48 hours. But screenshots last forever.',
             },
             {
-                label: 'Go on CNBC to defend capitalism',
-                desc: 'Markets allocate risk. Your profits are price discovery. Someone has to say it.',
+                label: 'Go on The Sentinel to defend capitalism',
+                desc: 'Marcus Cole\'s show. Markets allocate risk. Your profits are price discovery. Someone has to say it.',
                 deltas: { xi: 0.015 },
                 playerFlag: 'defended_capitalism_tv',
-                resultToast: 'The clip goes viral. Half the finance world loves you. The other half doesn\'t.',
+                resultToast: 'The clip from Cole\'s show goes viral. Half the finance world loves you. The other half doesn\'t.',
             },
         ],
     },
@@ -751,11 +765,11 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 120,
         popup: true,
-        headline: 'Compliance flags unusual P&L volatility',
+        headline: 'Meridian compliance flags unusual P&L volatility',
         context: () => {
             const eq = _equity();
             const swing = Math.abs(eq - portfolio.peakValue);
-            return `Your book just swung $${(swing / 1000).toFixed(1)}k in a single period. That's more than most PMs make in a quarter. Compliance has flagged the activity for review. They're not accusing you of anything — yet — but the pattern of outsized moves triggers their surveillance algorithms. Expect a call from the surveillance team and a formal review of your recent trades.`;
+            return `Your book just swung $${(swing / 1000).toFixed(1)}k in a single period. That's more than most PMs at Meridian make in a quarter. Compliance has flagged the activity for review. They're not accusing you of anything — yet — but the pattern of outsized moves triggers Meridian's surveillance algorithms. Expect a call from the surveillance team and a formal review of your recent trades.`;
         },
         choices: [
             {
@@ -785,11 +799,11 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 300,
         era: 'mid',
         popup: true,
-        headline: 'A headhunter slides into your DMs',
+        headline: 'A headhunter wants to poach you from Meridian',
         context: () => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `"I represent a multi-strategy fund that's building out its macro desk. Your track record — up ${pct}% net over three quarters — is exactly what they're looking for. Guaranteed $2M first year, full P&L autonomy, and a 20% payout on everything above hurdle." The message arrives on your personal phone at 10pm. Flattering. Also suspicious timing.`;
+            return `"I represent a multi-strategy fund that's building out its macro desk. Your track record at Meridian — up ${pct}% net over three quarters — is exactly what they're looking for. Guaranteed $2M first year, full P&L autonomy, and a 20% payout on everything above hurdle." The message arrives on your personal phone at 10pm. Flattering. Also suspicious timing.`;
         },
         choices: [
             {
@@ -863,11 +877,11 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 600,  // basically once
         era: 'early',
         popup: true,
-        headline: 'Your reputation is established',
+        headline: 'The Meridian Brief mentions you by name',
         context: () => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `Up ${pct}%. For the first time, people on the floor know your name for the right reasons. The head of trading mentioned you in the morning meeting. A sellside salesman sent a bottle of Macallan to your desk. Your Bloomberg handle shows up in three different chat groups. You're no longer "the new kid" — you're "that trader who called the move." Enjoy it. This is the moment that defines careers.`;
+            return `Up ${pct}%. For the first time, people on the Meridian floor know your name for the right reasons. The head of trading mentioned you in the morning brief. A sellside salesman sent a bottle of Macallan to your desk. Your MarketWire handle shows up in three different chat groups. You're no longer "the new kid" — you're "that trader who called the move." Enjoy it. This is the moment that defines careers.`;
         },
         choices: [
             {
@@ -901,10 +915,17 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 250,
         popup: true,
-        headline: 'A lobbyist wants to discuss "regulatory alignment"',
+        headline: 'K Street lobbyist: "Lassiter\'s Commerce Committee wants Meridian at the table"',
         context: (sim, world) => {
             const party = world.congress.senate.federalist >= 50 ? 'Federalist' : 'Farmer-Labor';
-            return `Campaign season is heating up and a K Street lobbyist has reached out. She represents a coalition of financial firms concerned about the ${party} regulatory agenda. "We're not asking for a donation — we're asking for a seat at the table. Your firm's market position gives you unique insight into how these regulations affect liquidity." The subtext is clear: your money and your access are both on the menu.`;
+            const convIds = getConvictionIds();
+            if (convIds.includes('washington_insider')) {
+                return `Campaign season is heating up. A K Street lobbyist you know by name has called directly — she's organizing a roundtable with Sen. Lassiter's Commerce Committee staff. "Roy remembers Meridian's input on the Financial Freedom Act. He wants your people in the room when the ${party} platform on markets gets drafted." Your connections make this a natural fit.`;
+            }
+            if (convIds.includes('ghost_protocol')) {
+                return `Campaign season is heating up. An unsigned invitation arrives at Meridian's front desk — a roundtable with Sen. Lassiter's Commerce Committee staff on the ${party} regulatory agenda. Nobody remembers forwarding it. You could attend without leaving a trace.`;
+            }
+            return `Campaign season is heating up and a K Street lobbyist has reached out. She represents a coalition of financial firms concerned about the ${party} regulatory agenda and is organizing a roundtable with Sen. Lassiter's Commerce Committee staff. "We're not asking for a donation — we're asking for a seat at the table. Meridian's market position gives you unique insight into how these regulations affect liquidity." The subtext is clear: your money and your access are both on the menu.`;
         },
         choices: [
             {
@@ -943,11 +964,14 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 300,
         popup: true,
-        headline: 'Election night positioning',
+        headline: 'Midterm night — Barron\'s Federalists vs. Clay\'s Farmer-Labor',
         context: (sim, world) => {
             const fedSenate = world.congress.senate.federalist;
             const fedHouse = world.congress.house.federalist;
-            return `Midterm elections are imminent. The Federalists hold ${fedSenate} Senate seats and ${fedHouse} House seats. Every PM on the floor is either hedging or speculating on the outcome. The vol surface is inverted — short-dated puts are trading at a massive premium. Your book is exposed. Do you want to be positioned, or do you want to be flat when the results come in?`;
+            const okaforLine = world.investigations.okaforProbeStage > 0
+                ? ' Okafor\'s Senate probe hangs over the Federalist ticket.'
+                : '';
+            return `Midterm elections are imminent. The Federalists hold ${fedSenate} Senate seats and ${fedHouse} House seats.${okaforLine} Every PM on the Meridian floor is either hedging or speculating on the outcome. Marcus Cole's Sentinel coverage says Federalist sweep; Priya Sharma's MarketWire polling model says toss-up. The vol surface is inverted — short-dated puts are trading at a massive premium. Your book is exposed.`;
         },
         choices: [
             {
@@ -984,11 +1008,15 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 300,
         era: 'late',
         popup: true,
-        headline: 'End of an era — legacy positioning',
-        context: (sim) => {
+        headline: 'End of the Barron era — legacy positioning',
+        context: (sim, world) => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `The Barron administration is in its final weeks. Your total return stands at ${pct > 0 ? '+' : ''}${pct}%. The transition team is already briefing the incoming President. Policy continuity is uncertain. Your positions need to reflect the world that's coming, not the one that's ending. How do you want to close out the Barron era?`;
+            const okaforRunning = world.election.okaforRunning;
+            const transitionLine = okaforRunning
+                ? 'Okafor\'s transition team is already briefing the incoming administration.'
+                : 'The transition team is already briefing the incoming President.';
+            return `The Barron administration is in its final weeks. Your total return stands at ${pct > 0 ? '+' : ''}${pct}%. ${transitionLine} Policy continuity is uncertain — the Financial Freedom Act, Lassiter's tariffs, Hartley's Fed tenure all hang in the balance. Your positions need to reflect the world that's coming, not the one that's ending.`;
         },
         choices: [
             {
@@ -1023,9 +1051,13 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 400,
         era: 'mid',
         popup: true,
-        headline: 'An old contact reaches out',
-        context: () => {
-            return 'Your phone buzzes at 9pm. A college friend who works in government sends a vague text: "Hey — can we talk? I\'ve come across something that might interest you. Can\'t say more here." You haven\'t spoken in months. This is either nothing, or it\'s the kind of call that changes everything.';
+        headline: 'A contact inside the Barron administration reaches out',
+        context: (sim, world) => {
+            const okaforActive = world.investigations.okaforProbeStage > 0;
+            const investigationLine = okaforActive
+                ? ' With Okafor\'s investigation active, any connection to government sources is dynamite.'
+                : '';
+            return `Your phone buzzes at 9pm. A college friend who works in the Barron White House sends a vague text: "Hey — can we talk? I've come across something that might interest you. Can't say more here." You haven't spoken in months.${investigationLine} This is either nothing, or it's the kind of call that changes everything.`;
         },
         choices: [
             {
@@ -1049,11 +1081,11 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 400,
         era: 'mid',
         popup: true,
-        headline: 'Bloomberg terminal: "Meridian\'s macro desk posts record quarter"',
+        headline: 'MarketWire: "Meridian Capital\'s macro desk posts record quarter"',
         context: () => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            return `The newswire picked up your desk's results: +${pct}%. Your name isn't in the story, but everyone on the street knows who's driving the P&L. Two hedge fund managers sent congratulations. Your MD is using your returns in the investor presentation. The question now: do you let the success speak for itself, or use the attention to build your brand?`;
+            return `Priya Sharma's MarketWire column picked up your desk's results: +${pct}%. Your name isn't in the story, but everyone on the street knows who's driving the P&L. Two hedge fund managers sent congratulations. Your MD is using your returns in the investor presentation. The question now: do you let the success speak for itself, or use the attention to build your brand?`;
         },
         choices: [
             {
@@ -1084,15 +1116,15 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 300,
         popup: true,
-        headline: 'Profiting from geopolitical crisis draws scrutiny',
+        headline: 'The Continental investigates "Meridian\'s crisis profits"',
         context: (sim, world) => {
-            const crisis = world.geopolitical.oilCrisis ? 'oil crisis' : 'Middle East escalation';
+            const crisis = world.geopolitical.oilCrisis ? 'Farsistan oil crisis' : 'Farsistan escalation';
             const tone = complianceTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
                 : '';
-            return prefix + `The ${crisis} is deepening. You're short and making money. An investigative journalist from ProPublica is writing about "Wall Street winners in wartime." Your firm's compliance team received a FOIA request for communication records. Nobody is accusing you of anything illegal — shorting during a crisis is perfectly legal — but the court of public opinion operates by different rules.`;
+            return prefix + `The ${crisis} is deepening. You're short and making money. Rachel Tan at The Continental is writing about "Wall Street winners in wartime" — her editor told Meridian's PR team to expect a FOIA request for communication records. Nobody is accusing you of anything illegal — shorting during a crisis is perfectly legal — but Tan's investigative pieces have a way of becoming congressional inquiries.`;
         },
         choices: [
             {
@@ -1124,15 +1156,16 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 200,
         era: 'mid',
         popup: true,
-        headline: 'Compliance requires documentation on bond position during hiking cycle',
-        context: (sim) => {
+        headline: 'Compliance requires documentation during Hartley\'s hiking cycle',
+        context: (sim, world) => {
             const bondNot = _bondNotional();
             const tone = complianceTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
                 : '';
-            return prefix + `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure during an active Fed hiking cycle. Every FOMC meeting is a binary event for your book. Compliance is requiring pre-trade documentation for all duration trades until the cycle ends. Every trade needs a written rationale filed before execution. It's bureaucratic, but it's also protection if anyone ever questions your timing.`;
+            const chair = world.fed.hartleyFired ? (world.fed.vaneAppointed ? 'Vane' : 'the acting chair') : 'Hartley';
+            return prefix + `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure during ${chair}'s active hiking cycle. Every FOMC meeting is a binary event for your book — Priya Sharma's MarketWire preview alone can move yields 5 basis points. Compliance is requiring pre-trade documentation for all duration trades until the cycle ends. Every trade needs a written rationale filed before execution. It's bureaucratic, but it's protection if anyone ever questions your timing.`;
         },
         choices: [
             {
@@ -1162,11 +1195,16 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 400,
         era: 'late',
         popup: true,
-        headline: 'Senator\'s office calls about a fundraising dinner',
+        headline: 'Sen. Lassiter\'s office calls about a Commerce Committee dinner',
         context: (sim, world) => {
             const party = world.election.barronApproval > 45 ? 'Federalist' : 'Farmer-Labor';
             const eq = _equity();
-            return `A ${party} senator's chief of staff called your office. There's a fundraising dinner next week — $10,000 a plate — and they want Meridian represented. "The Senator values the perspective of market participants," she says. Translation: they want your money and your implicit endorsement. Your P&L makes you attractive to both sides. You have $${(eq / 1000).toFixed(0)}k in equity. A $10k dinner is a rounding error — but the political entanglement isn't.`;
+            const convIds = getConvictionIds();
+            if (convIds.includes('washington_insider')) {
+                return `Lassiter's chief of staff calls directly — she knows you by name. The Commerce Committee reception is tomorrow, $10,000 a plate. "Roy specifically asked if you'd be there. He wants Meridian's read on the tariff situation." You have $${(eq / 1000).toFixed(0)}k in equity. Your connections make this natural.`;
+            }
+            const senator = party === 'Federalist' ? 'Sen. Lassiter' : 'Sen. Okafor';
+            return `${senator}'s chief of staff called your office. There's a fundraising dinner next week — $10,000 a plate — and they want Meridian Capital represented. "The Senator values the perspective of market participants," she says. Translation: they want your money and your implicit endorsement. Your P&L makes you attractive to both sides. You have $${(eq / 1000).toFixed(0)}k in equity. A $10k dinner is a rounding error — but the political entanglement isn't.`;
         },
         choices: [
             {
@@ -1207,9 +1245,9 @@ export const PORTFOLIO_POPUPS = [
         },
         cooldown: 200,
         popup: true,
-        headline: 'A sellside analyst wants to meet for coffee',
+        headline: 'A sellside analyst wants to meet before Malhotra\'s earnings call',
         context: () => {
-            return 'A well-known analyst sends a cryptic message: "I have some data you\'ll want to see before the print. Not on Bloomberg, not in any filing. Coffee tomorrow? Just us." The invitation is casual. The implication is not.';
+            return 'A well-known PNTH analyst sends a cryptic message: "I have some data you\'ll want to see before Malhotra\'s print. Not on MarketWire, not in any filing. Coffee tomorrow? Just us." The invitation is casual. The implication is not.';
         },
         choices: [
             {
@@ -1237,8 +1275,8 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 200,
         era: 'mid',
         popup: true,
-        headline: 'Financial Times Inquiry',
-        context: 'A reporter from the Financial Times has been asking questions about unusual trading patterns from the Meridian derivatives desk. Your name came up. The compliance department wants to know how you\u2019d like to handle it.',
+        headline: 'Rachel Tan is asking questions about Meridian\'s derivatives desk',
+        context: 'Rachel Tan at The Continental has been asking questions about unusual trading patterns from the Meridian derivatives desk. Your name came up. When Tan starts digging, stories follow — and her stories have a way of reaching Okafor\'s committee. The compliance department wants to know how you\u2019d like to handle it.',
         choices: [
             {
                 label: 'No comment',
@@ -1292,8 +1330,8 @@ export const PORTFOLIO_POPUPS = [
         cooldown: 400,
         era: 'late',
         popup: true,
-        headline: 'Federal Subpoena',
-        context: 'A process server has delivered a federal subpoena to Meridian Capital\u2019s general counsel. The SEC has escalated to a formal investigation. You have been named as a person of interest. Congressional staffers are making calls.',
+        headline: 'Federal Subpoena — Okafor\'s committee names you',
+        context: 'A process server has delivered a federal subpoena to Meridian Capital\u2019s general counsel. The SEC has escalated to a formal investigation. You have been named as a person of interest. Okafor\u2019s Special Investigations Committee staffers are coordinating with the SEC. Rachel Tan has the story.',
         choices: [
             {
                 label: 'Testify fully',
@@ -1318,7 +1356,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'SEC Enforcement Action',
         context: () => {
             const level = getScrutinyLevel();
-            if (level >= 4) return 'The SEC has filed a formal enforcement action against you personally. The complaint alleges insider trading, market manipulation, and failure to supervise. Meridian\u2019s board has called an emergency session. Your options are narrowing.';
+            if (level >= 4) return 'The SEC has filed a formal enforcement action against you personally. The complaint alleges insider trading, market manipulation, and failure to supervise. Marcus Cole is running the story on The Sentinel\u2019s prime-time show. Meridian\u2019s board has called an emergency session. Your options are narrowing.';
             return 'The SEC is pursuing enforcement proceedings related to your trading activity. Meridian\u2019s legal team advises immediate action.';
         },
         choices: [
