@@ -26,7 +26,9 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 **Module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator. `market.js` is shared mutable state (single-writer main.js via `syncMarket`, multiple readers).
 
-**Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains), event-pool.js (~277 toast-only events), popup-events.js (~30 interactive popup decisions), world-state.js (congress/PNTH/geopolitical/Fed), compliance.js, convictions.js (8 permanent modifiers), regulations.js (10 dynamic trading rules), scrutiny.js (hidden SEC investigation arc), compound-triggers.js (12 cross-domain one-shot triggers), lobbying.js (2 PAC-funding pills: +Fed/+F-L, nudge `barronApproval` ±2 and `lobbyMomentum` ±1 capped ±3), interjections.js, epilogue.js (4-page ending).
+**Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains + filibuster/media recurring pulses + conviction-aware likelihood weighting), event-pool.js (~320 toast events with lore-specific headlines), popup-events.js (~30 interactive popup decisions with conviction-aware context variants), world-state.js (congress/PNTH/geopolitical/Fed/media), compliance.js, convictions.js (12 permanent modifiers), regulations.js (11 dynamic trading rules including filibuster uncertainty), scrutiny.js (hidden SEC investigation arc), compound-triggers.js (18 cross-domain one-shot triggers), lobbying.js (2 PAC-funding pills with bill-specific descriptions), interjections.js (lore-aware atmospheric text), epilogue.js (4-page ending with product/geopolitical/conviction-specific narratives).
+
+**Lore bible**: `lore.md` at project root — canonical creative reference for all named characters, nations, products, legislation, publications, and journalists. Not consumed by runtime code. Consult when writing new events or modifying narrative text.
 
 ## Data Flow
 
@@ -43,7 +45,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 ### Reset
 
-`_resetCore()` must call all narrative resets: `resetConvictions()`, `resetRegulations()`, `resetScrutiny()`, `resetCompoundTriggers()`, `resetLobbying()`, `resetInterjections()`, `resetAudio()`, `resetImpactState()`, `resetPopupCooldowns()`, `resetCompliance()`. Also reset `dayInProgress`, `chart._lerp.day = -1`.
+`_resetCore()` must call all narrative resets: `resetConvictions()`, `resetRegulations()`, `resetScrutiny()`, `resetCompoundTriggers()`, `resetLobbying()`, `resetInterjections()`, `resetAudio()`, `resetImpactState()`, `resetPopupCooldowns()`, `resetCompliance()`. Also reset `dayInProgress`, `chart._lerp.day = -1`, `_lobbyCount = 0`.
 
 ## Key Conventions
 
@@ -70,7 +72,7 @@ Impact is an **overlay** on `sim.S` — never mutates it. `getStockImpact(sigma)
 
 ### Popups vs Toasts
 
-Event-pool events (~277) fire as **toasts only**. Interactive popup decisions live exclusively in `popup-events.js`. `showToast(message, duration)` — duration is numeric ms, no severity parameter.
+Event-pool events (~320) fire as **toasts only**. Interactive popup decisions live exclusively in `popup-events.js`. `showToast(message, duration)` — duration is numeric ms, no severity parameter. Long toasts auto-detect multiline and switch from pill to rounded-rect shape.
 
 ### Positions
 
@@ -119,7 +121,27 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - Nested `.glass` — backdrop-filter stacks make inner elements opaque; use `bg-hover`/`bg-elevated`
 - Lobby overlay / `lobbyOverlay` / `_lobbyTrapCleanup` — lobbying is inline pill buttons in `#lobby-bar`, no overlay
 - Lobby actions that directly set congress seats — use `barronApproval` ±2 and `lobbyMomentum` ±1 instead
+- `chinaRelations` — renamed to `sericaRelations` everywhere
+- Dark overlay backgrounds on popups — use blur-only (`background: none`), never `rgba(0,0,0,...)`
 
 ### Lore Reference
 
-President John Barron (Federalist) vs Robin Clay (Farmer-Labor). VP Jay Bowman. Fed Chair Hayden Hartley. Palanthropic (PNTH): Chairwoman Andrea Dirks vs CEO Eugene Gottlieb. Player is at Meridian Capital. Term ends live day 1008. Midterm elections at live day 504.
+See `lore.md` for the full world bible. Key cast:
+
+**Federal States of Columbia**. President John Barron (Federalist) vs Robin Clay (Farmer-Labor). VP Jay Bowman. Fed Chair Hayden Hartley. Player is at Meridian Capital. Term ends live day 1008. Midterm elections at live day 504.
+
+**Congress**: Sen. Roy Lassiter (F-SC, trade hawk), Sen. Peggy Haines (F-WY, deficit hawk/swing vote), Rep. Vincent Tao (F-TX, Majority Leader), Rep. Diane Whittaker (F-OH, moderate), Sen. James Whitfield (F-L, MA, filibuster master), Rep. Carmen Reyes (F-L, CA, firebrand), Sen. Patricia Okafor (F-L, IL, investigations). Key bills: Big Beautiful Bill (omnibus), Serican Reciprocal Tariff Act, Financial Freedom Act, Digital Markets Accountability Act.
+
+**PNTH**: Chairwoman Andrea Dirks vs CEO Eugene Gottlieb. CTO Mira Kassis, CFO Raj Malhotra, board kingmaker David Zhen. Products: Atlas Sentinel (enterprise), Atlas Aegis (military), Atlas Companion (consumer), Atlas Foundry (infrastructure), Covenant AI (Gottlieb's rival).
+
+**Geopolitics**: Serica (Premier Liang Wei), Khasuria (President Volkov), Farsistan (Emir al-Farhan, Strait of Farsis), Boliviara (President Madero), Meridia (PM Navon).
+
+**Media**: The Continental (Rachel Tan, Tom Driscoll), The Sentinel (Marcus Cole), MarketWire (Priya Sharma), The Meridian Brief (internal).
+
+### World State Domains
+
+`congress` (seats + `filibusterActive` + `bigBillStatus` 0–4), `pnth` (board + products: `sentinelLaunched`/`aegisDeployed`/`companionLaunched`/`foundryLaunched` + `companionScandal`/`aegisControversy` 0–3), `geopolitical` (`sericaRelations` ±3, `farsistanEscalation`/`khasurianCrisis` 0–3, `straitClosed`), `fed`, `investigations`, `election`, `media` (`tanCredibility`/`sentinelRating` 0–10, `pressFreedomIndex` 0–10, `leakCount` 0–5).
+
+### Exercise Netting
+
+`exerciseOption` nets delivered stock into existing stock positions (same `strategyName`). Call exercise buys stock (covers shorts first), put exercise sells stock (sells longs first, creates short if none). Exercise creates price impact via `recordStockTrade`.
