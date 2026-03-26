@@ -72,15 +72,14 @@ main {
 
 /* --- Lobby Pill Bar --- */
 .lobby-bar {
-    position: absolute;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
     display: flex;
     align-items: center;
+    justify-content: center;
+    align-self: center;
     padding: 4px 8px;
     border-radius: var(--radius-pill);
     z-index: 20;
+    flex-shrink: 0;
 }
 .lobby-bar .substrate-pill {
     display: flex;
@@ -696,7 +695,7 @@ main {
         left: 10px;
     }
     .lobby-bar {
-        bottom: 8px;
+        padding: 2px 6px;
     }
 
     #sidebar {
