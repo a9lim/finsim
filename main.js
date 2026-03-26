@@ -71,6 +71,7 @@ import {
 } from './src/scrutiny.js';
 import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
+import { getAvailableActions, executeLobbyAction, resetLobbying } from './src/lobbying.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -535,6 +536,18 @@ function init() {
     updateDynamicSections($, DEFAULT_PRESET);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
+    if ($.lobbyBtn) $.lobbyBtn.style.display = eventEngine ? '' : 'none';
+
+    $.lobbyBtn.addEventListener('click', () => {
+        if (!eventEngine) {
+            showToast('Lobbying requires Dynamic mode.', 3000);
+            return;
+        }
+        _renderLobbyActions();
+        $.lobbyOverlay.classList.remove('hidden');
+        if (typeof trapFocus === 'function') trapFocus($.lobbyOverlay);
+    });
+    $.lobbyClose.addEventListener('click', () => $.lobbyOverlay.classList.add('hidden'));
 
     updateUI();
 
@@ -754,6 +767,40 @@ function _onSubstepTick() {
 function _onSubstepUI() {
     const substepMargin = checkMargin(sim.S, market.sigma, sim.r, sim.day, sim.q);
     updateSubstepUI(substepMargin);
+}
+
+function _renderLobbyActions() {
+    const day = sim.history.maxDay;
+    const actions = getAvailableActions(day, portfolio.cash);
+    $.lobbyActions.textContent = '';
+    for (const { action, cost, available, cooldownRemaining } of actions) {
+        const btn = document.createElement('button');
+        btn.className = 'popup-choice-btn lobby-action-btn';
+        btn.dataset.action = action.id;
+        btn.disabled = !available;
+        const lbl = document.createElement('span');
+        lbl.className = 'popup-choice-label';
+        const cdText = cooldownRemaining > 0 ? ` (${cooldownRemaining}d cooldown)` : '';
+        lbl.textContent = `${action.name} — $${cost}k${cdText}`;
+        const desc = document.createElement('span');
+        desc.className = 'popup-choice-desc';
+        desc.textContent = action.description;
+        btn.appendChild(lbl);
+        btn.appendChild(desc);
+        btn.addEventListener('click', () => {
+            if (btn.disabled) return;
+            const result = executeLobbyAction(action.id, day, eventEngine.world);
+            if (result) {
+                portfolio.cash -= result.cost;
+                addScrutiny(1, 'Lobbying: ' + result.action.name, day);
+                playerChoices['lobbied_' + action.id.replace('lobby_', '')] = day;
+                showToast('Lobbying: ' + result.action.name + ' (-$' + result.cost + 'k)', 3000);
+                $.lobbyOverlay.classList.add('hidden');
+                dirty = true;
+            }
+        });
+        $.lobbyActions.appendChild(btn);
+    }
 }
 
 /** Called after all 16 sub-steps complete — runs portfolio/chain/margin checks. */
@@ -1559,6 +1606,7 @@ function _resetCore(index) {
     document.getElementById('epilogue-overlay')?.classList.add('hidden');
     document.getElementById('fraud-overlay')?.classList.add('hidden');
     document.getElementById('popup-event-overlay')?.classList.add('hidden');
+    document.getElementById('lobby-overlay')?.classList.add('hidden');
     _popupQueue.length = 0;
     for (const k in playerChoices) delete playerChoices[k];
     impactHistory.length = 0;
@@ -1569,6 +1617,7 @@ function _resetCore(index) {
     resetRegulations();
     resetScrutiny();
     resetCompoundTriggers();
+    resetLobbying();
     resetAudio();
     sim.reset(index);
     resetPortfolio();
@@ -1614,6 +1663,7 @@ function loadPreset(index) {
     }
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
+    if ($.lobbyBtn) $.lobbyBtn.style.display = eventEngine ? '' : 'none';
 
     updateUI();
     _repositionCamera();

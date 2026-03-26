@@ -161,6 +161,10 @@ export function cacheDOMElements($) {
     $.houseDiagram       = document.getElementById('house-diagram');
     $.senateLegend       = document.getElementById('senate-legend');
     $.houseLegend        = document.getElementById('house-legend');
+    $.lobbyBtn           = document.getElementById('lobby-btn');
+    $.lobbyOverlay       = document.getElementById('lobby-overlay');
+    $.lobbyClose         = document.getElementById('lobby-close');
+    $.lobbyActions       = document.getElementById('lobby-actions');
 }
 
 // ---------------------------------------------------------------------------

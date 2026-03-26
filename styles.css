@@ -1136,3 +1136,7 @@ main {
     background: var(--bg-elevated); border: 1px solid var(--border);
     color: var(--text-secondary); cursor: help;
 }
+
+/* -- Lobbying ---------------------------------------------------------------- */
+.lobby-action-btn { width: 100%; text-align: left; }
+.lobby-action-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
