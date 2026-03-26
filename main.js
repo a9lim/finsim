@@ -14,7 +14,7 @@ import {
     chargeBorrowInterest, processDividends, checkMargin, aggregateGreeks,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
-    computeBidAsk, computeNetDelta, computeGrossNotional,
+    computeBidAsk, computeNetDelta, computeGrossNotional, portfolioValue,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
