@@ -1128,13 +1128,13 @@ main {
 @keyframes blink { 50% { opacity: 0; } }
 
 /* -- Regulations ------------------------------------------------------------ */
-.regulations-section { margin-top: 12px; }
-.regulations-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.regulations-section { margin-top: 12px; margin-bottom: 16px; }
+.regulations-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .regulation-badge {
-    font-size: 0.72rem; font-weight: 500;
-    padding: 3px 8px; border-radius: var(--radius-pill);
-    background: var(--bg-elevated); border: 1px solid var(--border);
-    color: var(--text-secondary); cursor: help;
+    font-size: 0.72rem; font-weight: 600;
+    padding: 3px 10px; border-radius: var(--radius-pill);
+    background: var(--bg-elevated); border: 1px solid currentColor;
+    cursor: help; opacity: 0.85;
 }
 
 /* -- Lobbying ---------------------------------------------------------------- */
