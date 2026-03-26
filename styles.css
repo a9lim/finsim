@@ -1094,8 +1094,6 @@ main {
     line-height: 1.4;
 }
 
-/* -- Audio volume ----------------------------------------------------------- */
-#volume-slider { margin-top: 4px; }
 
 /* -- Convictions ------------------------------------------------------------ */
 .convictions-section { margin-top: 12px; }
