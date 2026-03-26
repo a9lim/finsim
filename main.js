@@ -50,7 +50,6 @@ import {
     resolveLegs, computeNetCost, legsToRelative, nextAutoName,
 } from './src/strategy-store.js';
 import { applyStructuredEffects, congressHelpers } from './src/world-state.js';
-import { checkCompoundTriggers, resetCompoundTriggers } from './src/compound-triggers.js';
 import { evaluatePortfolioPopups, resetPopupCooldowns, pickTip } from './src/popup-events.js';
 import { getEventById } from './src/event-pool.js';
 import {
@@ -1198,6 +1197,11 @@ function _onDayComplete() {
 
     // Fire dynamic events
     if (eventEngine) {
+        eventEngine.setPlayerContext(
+            playerChoices,
+            factions,
+            getActiveRegulations().map(r => r.id)
+        );
         const netDelta = computeNetDelta();
         const { fired, popups } = eventEngine.maybeFire(sim, sim.day, netDelta);
         for (const ev of popups) _popupQueue.push(ev);
@@ -1257,38 +1261,6 @@ function _onDayComplete() {
         for (const id of regChanges.deactivated) {
             const reg = getRegulation(id);
             if (reg) showToast('Regulation repealed: ' + reg.name, 3000);
-        }
-    }
-
-    if (eventEngine) {
-        const congress = congressHelpers(eventEngine.world);
-        const compoundEvents = checkCompoundTriggers(
-            eventEngine.world, congress, playerChoices,
-            getRegLevel(),
-            getActiveRegulations().map(r => r.id),
-        );
-        for (const evt of compoundEvents) {
-            if (evt.params) eventEngine.applyDeltas(sim, evt.params);
-            if (typeof evt.effects === 'function') evt.effects(eventEngine.world);
-            else if (Array.isArray(evt.effects)) applyStructuredEffects(eventEngine.world, evt.effects);
-            eventEngine.eventLog.push({
-                day: sim.history.maxDay,
-                headline: evt.headline,
-                magnitude: evt.magnitude || 'moderate',
-                params: evt.params || {},
-            });
-            showToast(evt.headline, 5000);
-            const mu = evt.params?.mu || 0;
-            if (mu > 0.02) playStinger('positive');
-            else if (mu < -0.02) playStinger('negative');
-            else playStinger('alert');
-        }
-        if (compoundEvents.length > 0) {
-            sim.recomputeK();
-            syncMarket(sim);
-            syncSettingsUI($, _simSettingsObj());
-            updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
-            updateCongressDiagrams($, eventEngine.world);
         }
     }
 
@@ -1662,7 +1634,7 @@ function _resetCore(index) {
     if (eventEngine) eventEngine.world.factions = factions;
     resetConvictions();
     resetRegulations();
-    resetCompoundTriggers();
+    if (eventEngine) eventEngine.resetOneShot();
     resetLobbying();
     resetInterjections();
     resetAudio();

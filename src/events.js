@@ -261,6 +261,11 @@ export class EventEngine {
         this._firedOneShot.clear();
     }
 
+    /** Return ids of all one-shot events that have fired this game. */
+    getFiredOneShotIds() {
+        return [...this._firedOneShot];
+    }
+
     // -- Internal ---------------------------------------------------------
 
     _fireEvent(event, sim, day, depth, netDelta = 0) {
