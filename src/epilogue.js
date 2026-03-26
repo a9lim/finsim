@@ -489,7 +489,7 @@ function _pageWorld(world, sim, impactHistory) {
 
 // -- Page 4: Your Legacy -----------------------------------------------------
 
-function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason = null, convictionIds = [], scrutinyState = null) {
+function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason = null, convictionIds = [], factionState = null) {
     // Compute equity
     let equity = portfolio.cash;
     for (const pos of portfolio.positions) {
@@ -587,18 +587,24 @@ function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, qua
         }
     }
 
-    if (scrutinyState && scrutinyState.level >= 2) {
+    if (factionState) {
+        const regLevel = factionState.regulatoryExposure >= 90 ? 4 :
+            factionState.regulatoryExposure >= 75 ? 3 :
+            factionState.regulatoryExposure >= 50 ? 2 :
+            factionState.regulatoryExposure >= 25 ? 1 : 0;
+        if (regLevel >= 2) {
         body += _h3('Regulatory Scrutiny');
-        if (scrutinyState.settled) {
+        if (factionState.settled) {
             body += _p('The SEC enforcement action cast a long shadow over your final years at Meridian. The settlement \u2014 substantial, public, humiliating \u2014 closed the investigation but not the whispers. Compliance conferences would cite your case for years. The fine was a number. The reputation cost was incalculable.');
-        } else if (scrutinyState.cooperating) {
+        } else if (factionState.cooperating) {
             body += _p('Your decision to cooperate with federal investigators earned you no friends on the trading floor, but it earned you something rarer: a second chance. The SEC closed its file with a note about "exemplary cooperation." Meridian\u2019s legal team called it the best possible outcome. You called it survival.');
-        } else if (scrutinyState.level >= 4) {
+        } else if (regLevel >= 4) {
             body += _p('The unresolved SEC investigation hung over your career like a storm cloud that never quite broke. Every quarter, Meridian\u2019s legal department asked for updates. Every quarter, the answer was the same: pending. You traded under a microscope, knowing that somewhere in a government building, someone was reading your order flow.');
         } else {
             body += _p('The SEC\u2019s interest in your trading patterns faded as quietly as it had arrived. No charges, no settlement, no public statement \u2014 just a file in a cabinet somewhere in Washington. Whether they lost interest or simply found bigger fish was a question you learned not to ask.');
         }
-    }
+        } // end regLevel >= 2
+    } // end factionState
 
     // -- Financial scorecard --------------------------------------------------
     body += _statSection('Portfolio Performance', [
@@ -673,11 +679,11 @@ function _absDeltaSum(evt) {
 
 // -- Main export --------------------------------------------------------------
 
-export function generateEpilogue(world, sim, portfolio, eventLog, playerChoices = {}, impactHistory = [], quarterlyReviews = [], terminationReason = null, convictionIds = [], scrutinyState = null) {
+export function generateEpilogue(world, sim, portfolio, eventLog, playerChoices = {}, impactHistory = [], quarterlyReviews = [], terminationReason = null, convictionIds = [], factionState = null) {
     return [
         _pageElection(world, playerChoices),
         _pagePNTH(world, playerChoices),
         _pageWorld(world, sim, impactHistory),
-        _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason, convictionIds, scrutinyState),
+        _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason, convictionIds, factionState),
     ];
 }
