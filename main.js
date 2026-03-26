@@ -70,7 +70,7 @@ import {
     settleScrutiny, cooperateScrutiny, resetScrutiny,
 } from './src/scrutiny.js';
 import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
-import { initAudio, setAmbientMood, playStinger, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
+import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -107,6 +107,14 @@ const _popupQueue = [];
 const playerChoices = {};
 const impactHistory = [];
 const quarterlyReviews = [];
+
+const SUPEREVENT_IDS = new Set([
+    'midterm_election_fed_gain', 'midterm_election_fed_hold',
+    'midterm_election_fed_loss_house', 'midterm_election_fed_loss_both',
+    'compound_stagflation', 'compound_constitutional_crisis',
+    'compound_pnth_perfect_storm', 'compound_dollar_crisis',
+    'compound_energy_war', 'scrutiny_enforcement',
+]);
 
 // ---------------------------------------------------------------------------
 // Rate sparkline helpers
@@ -766,11 +774,22 @@ function _processPopupQueue() {
 
     const popupCat = event.category || (event.id && event.id.startsWith('desk_') ? 'desk' : '');
     playStinger('alert');
-    // Compliance pre-processing: check profitability since last review
+
+    const isSuperevent = SUPEREVENT_IDS.has(event.id) ||
+        (event.magnitude === 'major' && event.id?.startsWith('compound_'));
+
+    if (isSuperevent) {
+        const _seMu = event.params?.mu || (event.choices?.[0]?.deltas?.mu) || 0;
+        if (_seMu > 0) playMusic('triumph');
+        else if (_seMu < -0.03) playMusic('collapse');
+        else playMusic('tension');
+    }
+
     if (event.choices && event.choices.some(c => c.complianceTier)) {
         onComplianceTriggered(_portfolioEquity(), sim.day);
     }
     showPopupEvent($, event.headline, contextText, event.choices, (idx) => {
+        if (isSuperevent) stopMusic(2000);
         const choice = event.choices[idx];
         if (choice.deltas && eventEngine) {
             eventEngine.applyDeltas(sim, choice.deltas);
@@ -928,7 +947,7 @@ function _processPopupQueue() {
             loadPreset(DEFAULT_PRESET);
         }
         dirty = true;
-    }, popupCat, event.magnitude);
+    }, popupCat, event.magnitude, isSuperevent);
 }
 
 function _showGameOver(contextText) {
@@ -1102,6 +1121,14 @@ function _onDayComplete() {
         const netDelta = computeNetDelta();
         const { fired, popups } = eventEngine.maybeFire(sim, sim.day, netDelta);
         for (const ev of popups) _popupQueue.push(ev);
+        const hasSupereventPopups = popups.some(ev => ev.superevent);
+        if (hasSupereventPopups) {
+            sim.recomputeK();
+            syncMarket(sim);
+            syncSettingsUI($, _simSettingsObj());
+            updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+            updateCongressDiagrams($, eventEngine.world);
+        }
         if (fired.length > 0) {
             sim.recomputeK();
             syncMarket(sim);

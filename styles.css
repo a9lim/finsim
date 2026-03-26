@@ -1110,6 +1110,23 @@ main {
 }
 .conviction-name { font-weight: 600; color: var(--text); }
 
+/* -- Superevent presentation ------------------------------------------------ */
+#popup-event-overlay.superevent { background: rgba(0, 0, 0, 0.7); transition: background 1.5s ease; }
+#popup-event-overlay.superevent .popup-event-body { max-width: 600px; border-top-width: 4px; animation: superEventIn 1.5s ease both; }
+#popup-event-overlay.superevent .popup-headline { font-size: 1.5rem; line-height: 1.3; }
+#popup-event-overlay.superevent .popup-context { font-size: 0.9rem; line-height: 1.7; }
+@keyframes superEventIn {
+    0% { opacity: 0; transform: translateY(20px) scale(0.97); }
+    40% { opacity: 0; transform: translateY(20px) scale(0.97); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.typewriter-cursor {
+    display: inline-block; width: 2px; height: 1em;
+    background: var(--text); animation: blink 0.8s step-end infinite;
+    vertical-align: text-bottom; margin-left: 1px;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
 /* -- Regulations ------------------------------------------------------------ */
 .regulations-section { margin-top: 12px; }
 .regulations-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }

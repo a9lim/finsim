@@ -1088,7 +1088,7 @@ const _popupCategoryMeta = {
     gameover:       { label: 'Game Over',           color: 'var(--ext-red)' },
 };
 
-export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude) {
+export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude, superevent = false) {
     // Category badge + accent color
     const meta = _popupCategoryMeta[category] || _popupCategoryMeta.desk;
     const panel = $.popupOverlay.querySelector('.sim-overlay-panel');
@@ -1115,7 +1115,31 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
     tag.style.borderColor = meta.color;
 
     $.popupHeadline.textContent = headline;
-    $.popupContext.textContent = context;
+    if (superevent) {
+        $.popupOverlay.classList.add('superevent');
+        $.popupContext.textContent = '';
+        $.popupChoices.style.display = 'none';
+        const fullContext = context;
+        let charIdx = 0;
+        const cursor = document.createElement('span');
+        cursor.className = 'typewriter-cursor';
+        $.popupContext.appendChild(cursor);
+        const typeInterval = setInterval(() => {
+            if (charIdx < fullContext.length) {
+                cursor.before(document.createTextNode(fullContext[charIdx]));
+                charIdx++;
+            } else {
+                clearInterval(typeInterval);
+                cursor.remove();
+                $.popupChoices.style.display = '';
+                const firstBtn = $.popupChoices.querySelector('button');
+                if (firstBtn) firstBtn.focus();
+            }
+        }, 25);
+    } else {
+        $.popupOverlay.classList.remove('superevent');
+        $.popupContext.textContent = context;
+    }
     $.popupChoices.textContent = '';
     choices.forEach((c, i) => {
         const btn = document.createElement('button');
@@ -1134,6 +1158,7 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
             panel.style.borderTopColor = '';
             $.popupOverlay.style.background = '';
             $.popupOverlay.style.backdropFilter = '';
+            $.popupOverlay.classList.remove('superevent');
             if (_popupTrapCleanup) { _popupTrapCleanup(); _popupTrapCleanup = null; }
             if (_popupPrevFocus && _popupPrevFocus.focus) { _popupPrevFocus.focus(); _popupPrevFocus = null; }
             onChoice(i);

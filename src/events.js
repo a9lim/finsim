@@ -223,7 +223,38 @@ export class EventEngine {
     // -- Internal ---------------------------------------------------------
 
     _fireEvent(event, sim, day, depth, netDelta = 0) {
-        // If popup event, queue for player choice instead of applying immediately
+        if (event.popup && event.superevent) {
+            const coupling = this._computeCoupling(netDelta, event.params);
+            if (event.params && coupling !== 1.0) {
+                const scaled = {};
+                for (const k in event.params) scaled[k] = event.params[k] * coupling;
+                this.applyDeltas(sim, scaled);
+            } else {
+                this.applyDeltas(sim, event.params);
+            }
+            if (typeof event.effects === 'function') event.effects(this.world);
+            else if (Array.isArray(event.effects)) applyStructuredEffects(this.world, event.effects);
+
+            this.eventLog.push({ day, headline: event.headline, magnitude: event.magnitude || 'major', params: event.params || {} });
+            if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
+
+            if (event.followups && depth < MAX_CHAIN_DEPTH) {
+                const chainId = event.id || ('chain_' + day);
+                for (const fu of event.followups) {
+                    const delay = this._followupDelay(fu.mtth);
+                    this._pendingFollowups.push({
+                        event: getEventById(fu.id) || fu,
+                        chainId,
+                        targetDay: day + Math.max(1, delay),
+                        weight: fu.weight ?? 1,
+                        depth: depth + 1,
+                    });
+                }
+            }
+
+            return { queued: true, event: { ...event } };
+        }
+
         if (event.popup && event.choices) {
             const coupling = this._computeCoupling(netDelta, event.params);
             const queuedEvent = { ...event };
@@ -474,6 +505,9 @@ export class EventEngine {
             params,
             magnitude: 'major',
             effects,
+            popup: true,
+            superevent: true,
+            choices: [{ label: 'Acknowledged', desc: 'The markets have spoken.' }],
         };
 
         w.election.midtermComplete = true;
