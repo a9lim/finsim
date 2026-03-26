@@ -541,6 +541,7 @@ function init() {
         } else {
             eventEngine = new EventEngine('offline');
         }
+        eventEngine.world.factions = factions;
     }
     updateDynamicSections($, DEFAULT_PRESET);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
@@ -1658,6 +1659,7 @@ function _resetCore(index) {
     quarterlyReviews.length = 0;
     resetPopupCooldowns();
     resetFactions();
+    if (eventEngine) eventEngine.world.factions = factions;
     resetConvictions();
     resetRegulations();
     resetCompoundTriggers();
@@ -1703,6 +1705,7 @@ function loadPreset(index) {
         } else {
             eventEngine = new EventEngine('offline');
         }
+        eventEngine.world.factions = factions;
     } else {
         eventEngine = null;
     }
