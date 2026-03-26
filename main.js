@@ -558,7 +558,7 @@ function init() {
             const result = executeLobbyAction(actionId, day, eventEngine.world);
             if (result) {
                 portfolio.cash -= result.cost;
-                addScrutiny(1, 'Lobbying: ' + result.action.name, day);
+                shiftFaction('regulatoryExposure', 7);
                 playerChoices['lobbied_' + actionId.replace('lobby_', '')] = day;
                 _lobbyCount++;
                 showToast('Lobbying: ' + result.action.name + ' (-$' + result.cost + 'k)', 3000);
@@ -841,7 +841,8 @@ function _processPopupQueue() {
     }
 
     if (event.choices && event.choices.some(c => c.complianceTier)) {
-        onComplianceTriggered(_portfolioEquity(), sim.day);
+        factions.equityAtLastReview = _portfolioEquity();
+        factions.lastReviewDay = sim.day;
     }
     showPopupEvent($, event.headline, contextText, event.choices, (idx) => {
         if (isSuperevent) stopMusic(2000);
@@ -856,19 +857,19 @@ function _processPopupQueue() {
             playerChoices[choice.playerFlag] = sim.day;
         }
         if (choice.playerFlag === 'pursued_insider_tip' || choice.playerFlag === 'pursued_pnth_tip') {
-            addScrutiny(2, 'Insider tip accepted', sim.day);
+            shiftFaction('regulatoryExposure', 13);
         } else if (choice.playerFlag === 'pursued_analyst_tip') {
-            addScrutiny(1.5, 'Analyst information edge used', sim.day);
+            shiftFaction('regulatoryExposure', 10);
         }
         if (choice.playerFlag === 'settled_sec') {
             portfolio.cash -= 2000;
-            settleScrutiny();
+            settleRegulatory();
         }
         if (choice.playerFlag === 'informed_sec') {
-            cooperateScrutiny();
+            cooperateRegulatory();
         }
         if (choice.playerFlag === 'fought_sec') {
-            addScrutiny(2, 'Fighting SEC enforcement', sim.day);
+            shiftFaction('regulatoryExposure', 13);
         }
         if (choice.followups && eventEngine) {
             for (const fu of choice.followups) {
@@ -943,11 +944,8 @@ function _processPopupQueue() {
         }
         // -- Compliance tier processing --
         if (choice.complianceTier) {
-            onComplianceChoice(choice.complianceTier);
-            if (choice.complianceTier === 'defiant') {
-                addScrutiny(0.5, 'Compliance defiance', sim.day);
-            }
-            if (effectiveHeat() >= COMPLIANCE_GAME_OVER_HEAT) {
+            applyComplianceChoice(choice.complianceTier);
+            if (getFaction('firmStanding') <= 0) {
                 _showComplianceTermination();
             }
         }
@@ -959,7 +957,7 @@ function _processPopupQueue() {
             showToast(`"Word is ${tip.hint}."`, 6000);
             eventEngine.scheduleFollowup({ id: eventId, mtth: 14 }, sim.day);
             if (isReal) {
-                compliance.heat += 1;
+                shiftFaction('firmStanding', -5);
             }
         }
         // Margin call actions
@@ -1262,7 +1260,7 @@ function _onDayComplete() {
         const congress = congressHelpers(eventEngine.world);
         const compoundEvents = checkCompoundTriggers(
             eventEngine.world, congress, playerChoices,
-            getScrutinyLevel(),
+            getRegLevel(),
             getActiveRegulations().map(r => r.id),
         );
         for (const evt of compoundEvents) {
@@ -1307,7 +1305,7 @@ function _onDayComplete() {
     const toast = selectImpactToast(grossRatio, hasOptions ? 'option' : 'stock', sim.day);
     if (toast) showToast(toast, 3000);
 
-    if (grossRatio > 0.75) addScrutiny(0.1, 'Sustained high-volume activity', sim.history.maxDay);
+    if (grossRatio > 0.75) shiftFaction('regulatoryExposure', 1);
 
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     chainDirty = true;
@@ -2155,7 +2153,7 @@ function updateStrategyBuilder() {
 // ---------------------------------------------------------------------------
 
 function _showEpilogue(terminationReason = null) {
-    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason, getConvictionIds(), getScrutinyState());
+    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason, getConvictionIds(), getFactionState());
     let currentPage = 0;
 
     const overlay = document.getElementById('epilogue-overlay');
