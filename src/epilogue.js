@@ -51,6 +51,8 @@ function _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, p
     if (flags.includes('tipped_bowman'))        scores.insider += 2;
     if (flags.includes('desk_accepted_tip'))    scores.insider += 3;
     if (flags.includes('desk_used_channel'))    scores.insider += 2;
+    if (flags.includes('stonewalled_sec')) scores.insider += 2;
+    if (flags.includes('invoked_fifth')) scores.insider += 1;
 
     // Principled
     if (flags.includes('reported_insider_tip'))  scores.principled += 3;
@@ -58,6 +60,9 @@ function _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, p
     if (flags.includes('donated_relief'))        scores.principled += 2;
     if (flags.includes('desk_reported_tip'))     scores.principled += 3;
     if (flags.includes('declined_fundraiser'))   scores.principled += 1;
+    if (flags.includes('cooperated_sec_letter')) scores.principled += 1;
+    if (flags.includes('testified_fully')) scores.principled += 2;
+    if (flags.includes('informed_sec')) scores.principled += 3;
 
     // Speculator
     if (impactHistory.length >= 10) scores.speculator += 3;
@@ -76,6 +81,8 @@ function _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, p
     if (flags.includes('met_okafor_aide'))   scores.kingmaker += 2;
     if (flags.includes('gave_interview'))    scores.kingmaker += 1;
     if (flags.includes('desk_attended_fundraiser')) scores.kingmaker += 2;
+    if (flags.includes('lobbied_congress_federalist') || flags.includes('lobbied_congress_farmerlabor')) scores.kingmaker += 2;
+    if (flags.includes('lobbied_president_crypto')) scores.kingmaker += 1;
 
     // Ghost
     if (flags.length <= 2) scores.ghost += 4;
