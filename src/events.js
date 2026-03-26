@@ -12,7 +12,7 @@ import {
     NON_FED_COOLDOWN_MIN, NON_FED_COOLDOWN_MAX, FED_MEETING_JITTER,
     BOREDOM_THRESHOLD, TERM_END_DAY,
     PNTH_EARNINGS_INTERVAL, PNTH_EARNINGS_JITTER,
-    ADV, EVENT_COUPLING_CAP,
+    ADV, EVENT_COUPLING_CAP, HISTORY_CAPACITY,
 } from './config.js';
 
 import { createWorldState, congressHelpers, applyStructuredEffects } from './world-state.js';
@@ -395,6 +395,9 @@ export class EventEngine {
                 if (ev.era === 'mid' && (day < 500 || day > 800)) return false;
                 if (ev.era === 'late' && day < 800) return false;
             }
+            const liveDay = day - HISTORY_CAPACITY;
+            if (ev.minDay != null && liveDay < ev.minDay) return false;
+            if (ev.maxDay != null && liveDay > ev.maxDay) return false;
             return !ev.when || ev.when(sim, this.world, congress);
         });
     }
