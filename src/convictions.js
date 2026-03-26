@@ -21,7 +21,7 @@ const CONVICTIONS = [
             if (f.pursued_analyst_tip) score++;
             return score >= 2;
         },
-        effects: { eventHintArrows: true, complianceCooldownMult: 0.8 },
+        effects: { eventHintArrows: true, firmCooldownMult: 0.8 },
     },
     {
         id: 'market_always_right',
@@ -37,7 +37,7 @@ const CONVICTIONS = [
             if (f.passed_channel_check) score++;
             return score >= 3;
         },
-        effects: { complianceThresholdMult: 1.3, couplingCapMult: 0.5 },
+        effects: { firmThresholdMult: 1.3, couplingCapMult: 0.5 },
     },
     {
         id: 'contrarian_instinct',
@@ -53,9 +53,9 @@ const CONVICTIONS = [
         condition: (ctx) => {
             const f = ctx.playerChoices;
             return f.donated_during_recession && f.cooperated_with_compliance &&
-                   ctx.compliance.credibility >= 3;
+                   ctx.factions.firmStanding >= 60;
         },
-        effects: { popupFrequencyMult: 1.5, tipAccuracy: 0 },
+        effects: { firmCooldownMult: 1.5, tipAccuracy: 0 },
     },
     {
         id: 'master_of_leverage',
@@ -65,7 +65,7 @@ const CONVICTIONS = [
             const strong = ctx.quarterlyReviews.filter(r => r.rating === 'strong');
             return strong.length >= 3 && ctx.impactHistory.length >= 5;
         },
-        effects: { couplingCapMult: 1.5, scrutinyMult: 1.3 },
+        effects: { couplingCapMult: 1.5, regExposureMult: 1.3 },
     },
     {
         id: 'political_operator',
@@ -90,9 +90,9 @@ const CONVICTIONS = [
         condition: (ctx) => {
             const flags = Object.keys(ctx.playerChoices);
             return flags.length <= 3 && ctx.impactHistory.length <= 2 &&
-                   ctx.daysSinceLiveTrade > 200;
+                   ctx.daysSinceLiveTrade > 200 && ctx.factions.regulatoryExposure < 25;
         },
-        effects: { scrutinyMult: 0.5, popupFrequencyMult: 2.0 },
+        effects: { regExposureMult: 0.5, firmCooldownMult: 2.0 },
     },
     {
         id: 'volatility_addict',
@@ -146,10 +146,10 @@ const CONVICTIONS = [
             if (f.declined_insider_tip) score++;
             const strongReviews = (ctx.quarterlyReviews || []).filter(r => r.rating === 'strong').length;
             if (strongReviews >= 2) score++;
-            if (ctx.compliance && ctx.compliance.credibility >= 4) score++;
+            if (ctx.factions && ctx.factions.firmStanding >= 70) score++;
             return score >= 3;
         },
-        effects: { complianceThresholdMult: 1.5, popupFrequencyMult: 1.8 },
+        effects: { firmThresholdMult: 1.5, firmCooldownMult: 1.8 },
     },
     {
         id: 'crisis_profiteer',
@@ -164,7 +164,7 @@ const CONVICTIONS = [
             if (f.profited_impeachment) score++;
             return score >= 2;
         },
-        effects: { scrutinyMult: 1.5, boredomImmune: true },
+        effects: { regExposureMult: 1.5, boredomImmune: true },
     },
 ];
 
