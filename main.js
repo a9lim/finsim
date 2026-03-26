@@ -49,7 +49,8 @@ import {
     listStrategies, getStrategy, saveStrategy, deleteStrategy,
     resolveLegs, computeNetCost, legsToRelative, nextAutoName,
 } from './src/strategy-store.js';
-import { applyStructuredEffects } from './src/world-state.js';
+import { applyStructuredEffects, congressHelpers } from './src/world-state.js';
+import { checkCompoundTriggers, resetCompoundTriggers } from './src/compound-triggers.js';
 import { evaluatePortfolioPopups, resetPopupCooldowns, pickTip } from './src/popup-events.js';
 import { getEventById } from './src/event-pool.js';
 import {
@@ -1152,6 +1153,38 @@ function _onDayComplete() {
         }
     }
 
+    if (eventEngine) {
+        const congress = congressHelpers(eventEngine.world);
+        const compoundEvents = checkCompoundTriggers(
+            eventEngine.world, congress, playerChoices,
+            getScrutinyLevel(),
+            getActiveRegulations().map(r => r.id),
+        );
+        for (const evt of compoundEvents) {
+            if (evt.params) eventEngine.applyDeltas(sim, evt.params);
+            if (typeof evt.effects === 'function') evt.effects(eventEngine.world);
+            else if (Array.isArray(evt.effects)) applyStructuredEffects(eventEngine.world, evt.effects);
+            eventEngine.eventLog.push({
+                day: sim.history.maxDay,
+                headline: evt.headline,
+                magnitude: evt.magnitude || 'moderate',
+                params: evt.params || {},
+            });
+            showToast(evt.headline, 5000);
+            const mu = evt.params?.mu || 0;
+            if (mu > 0.02) playStinger('positive');
+            else if (mu < -0.02) playStinger('negative');
+            else playStinger('alert');
+        }
+        if (compoundEvents.length > 0) {
+            sim.recomputeK();
+            syncMarket(sim);
+            syncSettingsUI($, _simSettingsObj());
+            updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+            updateCongressDiagrams($, eventEngine.world);
+        }
+    }
+
     // Update ambient mood based on market regime
     const _ambientVol = Math.sqrt(sim.v);
     if (_ambientVol > 0.35 || sim.lambda > 5) setAmbientMood('crisis');
@@ -1508,6 +1541,7 @@ function _resetCore(index) {
     resetConvictions();
     resetRegulations();
     resetScrutiny();
+    resetCompoundTriggers();
     resetAudio();
     sim.reset(index);
     resetPortfolio();
