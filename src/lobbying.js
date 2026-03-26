@@ -19,7 +19,15 @@ const LOBBY_ACTIONS = [
     {
         id: 'lobby_federalist',
         name: 'Fund Federalist PACs',
-        description: 'Channel funds through shell companies to Federalist-aligned PACs. Boosts Barron\'s approval and tilts elections toward Federalists.',
+        description: (world) => {
+            if (world.congress.filibusterActive) {
+                return 'Fund the Federalist PAC during the filibuster fight. Your money goes to pressuring Haines and Whittaker to vote for cloture. Barron approval +2, lobby momentum +1.';
+            }
+            if (world.congress.bigBillStatus <= 1) {
+                return 'Fund the Federalist PAC. Your donation supports the Big Beautiful Bill\'s path through Congress. Barron approval +2, lobby momentum +1.';
+            }
+            return 'Fund the Federalist PAC. Lassiter\'s Commerce Committee thanks you. Barron approval +2, lobby momentum +1.';
+        },
         baseCost: 400,
         effects: (world) => {
             world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
@@ -30,7 +38,15 @@ const LOBBY_ACTIONS = [
     {
         id: 'lobby_farmerlabor',
         name: 'Fund Farmer-Labor PACs',
-        description: 'Quietly fund Farmer-Labor candidates through intermediary organizations. Hurts Barron\'s approval and tilts elections toward Farmer-Labor.',
+        description: (world) => {
+            if (world.congress.filibusterActive) {
+                return 'Fund the Farmer-Labor PAC during the filibuster. Your money supports Whitfield\'s floor fight and Okafor\'s investigations. Barron approval -2, lobby momentum -1.';
+            }
+            if (world.investigations.okaforProbeStage >= 2) {
+                return 'Fund the Farmer-Labor PAC. Okafor\'s investigation intensifies. Your donation signals which side you\'re on. Barron approval -2, lobby momentum -1.';
+            }
+            return 'Fund the Farmer-Labor PAC. Reyes and Okafor appreciate the support. Barron approval -2, lobby momentum -1.';
+        },
         baseCost: 400,
         effects: (world) => {
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);

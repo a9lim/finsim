@@ -798,7 +798,10 @@ function _updateLobbyPills() {
         if (!btn) continue;
         btn.disabled = !available;
         const cdText = cooldownRemaining > 0 ? ` (${cooldownRemaining}d cooldown)` : '';
-        btn.title = `${action.name} — $${cost}k${cdText}`;
+        const desc = typeof action.description === 'function'
+            ? action.description(eventEngine.world)
+            : action.description;
+        btn.title = `${action.name} — $${cost}k${cdText}\n${desc}`;
     }
 }
 
