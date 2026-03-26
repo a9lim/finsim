@@ -697,37 +697,54 @@ export function exerciseOption(positionId, currentPrice, currentDay, currentVol,
     const absQty = pos.qty;
     let stockPos = null;
 
-    if (pos.type === 'call') {
-        // Must pay strike per share; receive a long stock position
-        // Allowed on margin -- cash can go negative (up to initial margin limit)
-        const cost = pos.strike * absQty;
-        if (currentVol != null && currentRate != null) {
-            if (!_checkInitialMarginDebit(-cost, currentPrice, currentVol, currentRate, currentDay, q)) return null;
-        }
-        portfolio.cash -= cost;
-        // Net into existing stock position if one exists with the same strategy
-        const existingStock = portfolio.positions.find(p =>
-            p.type === 'stock' && (p.strategyName || null) === (pos.strategyName || null)
-        );
-        if (existingStock) {
-            // Weighted-average entry price
-            existingStock.entryPrice = (existingStock.entryPrice * existingStock.qty + pos.strike * absQty) / (existingStock.qty + absQty);
-            existingStock.qty += absQty;
-            stockPos = existingStock;
+    // Both call and put exercise deliver stock at the strike price.
+    // Call: buy stock (signedDelta = +absQty), pay strike*qty cash.
+    // Put:  sell stock (signedDelta = -absQty), receive strike*qty cash.
+    const signedDelta = pos.type === 'call' ? absQty : -absQty;
+    const cashEffect  = -signedDelta * pos.strike; // call: pay; put: receive
+
+    if (pos.type === 'call' && currentVol != null && currentRate != null) {
+        if (!_checkInitialMarginDebit(cashEffect, currentPrice, currentVol, currentRate, currentDay, q)) return null;
+    }
+    portfolio.cash += cashEffect;
+
+    // Net into existing stock position with same strategy
+    const stratKey = pos.strategyName || null;
+    const existingStock = portfolio.positions.find(p =>
+        p.type === 'stock' && (p.strategyName || null) === stratKey
+    );
+
+    if (existingStock) {
+        const oldQty = existingStock.qty;
+        const newQty = oldQty + signedDelta;
+
+        if (newQty === 0) {
+            // Fully netted — remove the position
+            const removeIdx = portfolio.positions.indexOf(existingStock);
+            if (removeIdx !== -1) portfolio.positions.splice(removeIdx, 1);
+            stockPos = null;
         } else {
-            stockPos = {
-                id:          _nextPositionId++,
-                type:        'stock',
-                qty:         absQty,
-                entryPrice:  pos.strike,
-                entryDay:    currentDay,
-                strategyName: pos.strategyName || null,
-            };
-            portfolio.positions.push(stockPos);
+            // Update entry price only when extending in same direction
+            if (Math.sign(oldQty) === Math.sign(signedDelta)) {
+                existingStock.entryPrice = (existingStock.entryPrice * Math.abs(oldQty) + pos.strike * absQty) / (Math.abs(oldQty) + absQty);
+            } else if (Math.sign(newQty) !== Math.sign(oldQty)) {
+                // Flipped direction — new entry price is the strike
+                existingStock.entryPrice = pos.strike;
+            }
+            existingStock.qty = newQty;
+            existingStock.entryDay = currentDay;
+            stockPos = existingStock;
         }
     } else {
-        // Put: receive strike per share in cash
-        portfolio.cash += pos.strike * absQty;
+        stockPos = {
+            id:          _nextPositionId++,
+            type:        'stock',
+            qty:         signedDelta,
+            entryPrice:  pos.strike,
+            entryDay:    currentDay,
+            strategyName: stratKey,
+        };
+        portfolio.positions.push(stockPos);
     }
 
     // Remove the option position
