@@ -104,6 +104,68 @@ const CONVICTIONS = [
         },
         effects: { eventHintArrows: true },
     },
+    {
+        id: 'media_darling',
+        name: 'Media Darling',
+        description: 'Your name appears in The Continental, The Sentinel, and MarketWire — sometimes all on the same day.',
+        condition: (ctx) => {
+            const f = ctx.playerChoices;
+            let score = 0;
+            if (f.did_ft_interview) score++;
+            if (f.accepted_panel_media) score++;
+            if (f.accepted_profile_piece) score++;
+            if (ctx.impactHistory.length >= 5) score++;
+            return score >= 3;
+        },
+        effects: { eventHintArrows: true },
+    },
+    {
+        id: 'washington_insider',
+        name: 'Washington Insider',
+        description: 'You know which senators answer their phones and which lobbyists return calls. Meridian Capital has a seat at the table.',
+        condition: (ctx) => {
+            const f = ctx.playerChoices;
+            let score = 0;
+            if (f.attended_fundraiser) score++;
+            if (f.attended_political_dinner) score++;
+            if (f.did_ft_interview) score++;
+            if ((f.lobbyCount || 0) >= 3) score++;
+            return score >= 3;
+        },
+        effects: { lobbyingCostMult: 0.6 },
+    },
+    {
+        id: 'risk_manager',
+        name: 'Risk Manager',
+        description: 'You file your reports on time, hedge your positions, and cooperate with compliance. The desk trusts you.',
+        condition: (ctx) => {
+            const f = ctx.playerChoices;
+            let score = 0;
+            if (f.cooperated_with_compliance) score++;
+            if (f.filed_fomc_docs) score++;
+            if (f.declined_insider_tip) score++;
+            const strongReviews = (ctx.quarterlyReviews || []).filter(r => r.rating === 'strong').length;
+            if (strongReviews >= 2) score++;
+            if (ctx.compliance && ctx.compliance.credibility >= 4) score++;
+            return score >= 3;
+        },
+        effects: { complianceThresholdMult: 1.5, popupFrequencyMult: 1.8 },
+    },
+    {
+        id: 'crisis_profiteer',
+        name: 'Crisis Profiteer',
+        description: 'Every catastrophe is a trade. When the Strait closes, when the border falls, when the hearings begin — you\'re already positioned.',
+        condition: (ctx) => {
+            const f = ctx.playerChoices;
+            let score = 0;
+            if (f.profited_recession) score++;
+            if (f.profited_oil_crisis) score++;
+            if (f.profited_war_escalation) score++;
+            if (f.profited_impeachment) score++;
+            return score >= 2;
+        },
+        effects: { scrutinyMult: 1.5, boredomImmune: true },
+    },
 ];
 
 export function evaluateConvictions(ctx) {

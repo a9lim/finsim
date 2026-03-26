@@ -108,6 +108,7 @@ let _savedOverlays = {};
 const _popupQueue = [];
 const playerChoices = {};
 const impactHistory = [];
+let _lobbyCount = 0;
 const quarterlyReviews = [];
 
 const SUPEREVENT_IDS = new Set([
@@ -553,6 +554,7 @@ function init() {
                 portfolio.cash -= result.cost;
                 addScrutiny(1, 'Lobbying: ' + result.action.name, day);
                 playerChoices['lobbied_' + actionId.replace('lobby_', '')] = day;
+                _lobbyCount++;
                 showToast('Lobbying: ' + result.action.name + ' (-$' + result.cost + 'k)', 3000);
                 _updateLobbyPills();
                 dirty = true;
@@ -1147,6 +1149,18 @@ function _onDayComplete() {
         chainDirty = true;
     }
 
+    // Crisis profit tracking for conviction system
+    if (eventEngine) {
+        const _eq = portfolioValue(market.S, Math.sqrt(market.v), market.r, market.day, market.q);
+        if (_eq > portfolio.initialCapital * 1.1) {
+            const _w = eventEngine.world;
+            if (_w.geopolitical.recessionDeclared) playerChoices.profited_recession = true;
+            if (_w.geopolitical.oilCrisis) playerChoices.profited_oil_crisis = true;
+            if (_w.geopolitical.farsistanEscalation >= 2) playerChoices.profited_war_escalation = true;
+            if (_w.investigations.impeachmentStage >= 2) playerChoices.profited_impeachment = true;
+        }
+    }
+
     const _convCtx = {
         playerChoices,
         impactHistory,
@@ -1154,6 +1168,7 @@ function _onDayComplete() {
         compliance,
         portfolio,
         daysSinceLiveTrade: sim.history.maxDay - HISTORY_CAPACITY,
+        lobbyCount: _lobbyCount,
     };
     const newConvictions = evaluateConvictions(_convCtx);
     for (const id of newConvictions) {
@@ -1628,6 +1643,7 @@ function _resetCore(index) {
     document.getElementById('popup-event-overlay')?.classList.add('hidden');
     _popupQueue.length = 0;
     for (const k in playerChoices) delete playerChoices[k];
+    _lobbyCount = 0;
     impactHistory.length = 0;
     quarterlyReviews.length = 0;
     resetPopupCooldowns();
