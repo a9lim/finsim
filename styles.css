@@ -70,6 +70,55 @@ main {
     cursor: grab;
 }
 
+/* --- Lobby Pill Bar --- */
+.lobby-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: var(--radius-pill);
+    z-index: 20;
+}
+.lobby-bar .substrate-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border: none;
+    background: transparent;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: clamp(0.72rem, 1vw, 0.82rem);
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+    white-space: nowrap;
+    outline: none;
+    -webkit-appearance: none;
+}
+.lobby-pill-fed { color: var(--ext-orange); }
+.lobby-pill-fl  { color: var(--ext-lime); }
+.lobby-bar .substrate-pill-left  { border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
+.lobby-bar .substrate-pill-right { border-radius: 0 var(--radius-pill) var(--radius-pill) 0; }
+.lobby-bar .substrate-pill:hover:not(:disabled) {
+    background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.lobby-bar .substrate-pill:active:not(:disabled) {
+    transform: scale(0.96);
+}
+.lobby-bar .substrate-pill:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.lobby-bar .substrate-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    flex-shrink: 0;
+}
+
 /* --- Time Slider (below chart in strategy mode) --- */
 .time-slider-row {
     display: flex;
@@ -646,6 +695,9 @@ main {
         bottom: 8px;
         left: 10px;
     }
+    .lobby-bar {
+        bottom: 8px;
+    }
 
     #sidebar {
         top: auto;
@@ -1135,9 +1187,6 @@ main {
     cursor: help; opacity: 0.85;
 }
 
-/* -- Lobbying ---------------------------------------------------------------- */
-.lobby-action-btn { width: 100%; text-align: left; }
-.lobby-action-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
 
 /* -- Interjections ---------------------------------------------------------- */
 .toast.interjection-toast {

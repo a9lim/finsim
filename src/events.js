@@ -454,6 +454,9 @@ export class EventEngine {
         if (w.geopolitical.recessionDeclared) score -= 15;
         if (w.geopolitical.mideastEscalation >= 2 || w.geopolitical.southAmericaOps >= 2) score -= 8;
 
+        // Lobby momentum: each point shifts the score by 3
+        score += (w.election.lobbyMomentum || 0) * 3;
+
         // Noise: +-10
         score += (Math.random() - 0.5) * 20;
 

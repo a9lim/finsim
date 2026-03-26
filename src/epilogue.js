@@ -81,8 +81,7 @@ function _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, p
     if (flags.includes('met_okafor_aide'))   scores.kingmaker += 2;
     if (flags.includes('gave_interview'))    scores.kingmaker += 1;
     if (flags.includes('desk_attended_fundraiser')) scores.kingmaker += 2;
-    if (flags.includes('lobbied_congress_federalist') || flags.includes('lobbied_congress_farmerlabor')) scores.kingmaker += 2;
-    if (flags.includes('lobbied_president_crypto')) scores.kingmaker += 1;
+    if (flags.includes('lobbied_federalist') || flags.includes('lobbied_farmerlabor')) scores.kingmaker += 2;
 
     // Ghost
     if (flags.length <= 2) scores.ghost += 4;

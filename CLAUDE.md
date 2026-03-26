@@ -26,7 +26,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 **Module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator. `market.js` is shared mutable state (single-writer main.js via `syncMarket`, multiple readers).
 
-**Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains), event-pool.js (~277 toast-only events), popup-events.js (~30 interactive popup decisions), world-state.js (congress/PNTH/geopolitical/Fed), compliance.js, convictions.js (8 permanent modifiers), regulations.js (10 dynamic trading rules), scrutiny.js (hidden SEC investigation arc), compound-triggers.js (12 cross-domain one-shot triggers), lobbying.js, interjections.js, epilogue.js (4-page ending).
+**Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains), event-pool.js (~277 toast-only events), popup-events.js (~30 interactive popup decisions), world-state.js (congress/PNTH/geopolitical/Fed), compliance.js, convictions.js (8 permanent modifiers), regulations.js (10 dynamic trading rules), scrutiny.js (hidden SEC investigation arc), compound-triggers.js (12 cross-domain one-shot triggers), lobbying.js (2 PAC-funding pills: +Fed/+F-L, nudge `barronApproval` ±2 and `lobbyMomentum` ±1 capped ±3), interjections.js, epilogue.js (4-page ending).
 
 ## Data Flow
 
@@ -35,7 +35,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 1. `frame()` applies Layer 3 param overlays, calls `sim.beginDay()`
 2. 16 sub-steps per day: `sim.substep()` → rate ceiling/floor clamp → `decayImpactVolumes()` → `syncMarket()` → `rehedgeMM()` → `_onSubstepTick()` (pending orders) → `chart.setLiveCandle()`
 3. After substep batch: `_onSubstepUI()` (reprice chain sidebar, update portfolio display)
-4. After all 16: `sim.finalizeDay()`, overlays removed. `_onDayComplete()` runs: borrow interest, expiry, dividends, quarterly review, conviction eval, epilogue check, event engine, regulation eval, portfolio popups, compound triggers (with `recomputeK`/`syncMarket`), Layer 3 shifts, scrutiny, ambient mood, rogue trading check, margin check, interjection check, popup queue drain
+4. After all 16: `sim.finalizeDay()`, overlays removed. `_onDayComplete()` runs: borrow interest, expiry, dividends, quarterly review, conviction eval, epilogue check, event engine, regulation eval, portfolio popups, compound triggers (with `recomputeK`/`syncMarket`), Layer 3 shifts, scrutiny, ambient mood, rogue trading check, margin check, lobby pill update, interjection check, popup queue drain
 
 ### Bootstrap
 
@@ -94,7 +94,6 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - Chain table rebuilt every call — never cache cell refs; delegation bound once via `_chainClicksBound`
 - Trade dialog confirm button cloned on each open to avoid stacking listeners
 - `initAudio()` must be called from a user gesture handler (in `_intro.init`'s `onDismiss` callback)
-- Lobby overlay focus trap must be cleaned up on close (`_lobbyTrapCleanup`)
 - `scheduleFollowup` must use `{ event, chainId, targetDay, weight, depth }` — NOT `{ id, fireDay }`
 
 ### Semantic Traps
@@ -118,6 +117,8 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - `speed` variable — use `SPEED_OPTIONS[speedIndex]`
 - `$.totalPnl` references — Total P&L row removed from HTML
 - Nested `.glass` — backdrop-filter stacks make inner elements opaque; use `bg-hover`/`bg-elevated`
+- Lobby overlay / `lobbyOverlay` / `_lobbyTrapCleanup` — lobbying is inline pill buttons in `#lobby-bar`, no overlay
+- Lobby actions that directly set congress seats — use `barronApproval` ±2 and `lobbyMomentum` ±1 instead
 
 ### Lore Reference
 

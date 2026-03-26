@@ -161,10 +161,7 @@ export function cacheDOMElements($) {
     $.houseDiagram       = document.getElementById('house-diagram');
     $.senateLegend       = document.getElementById('senate-legend');
     $.houseLegend        = document.getElementById('house-legend');
-    $.lobbyBtn           = document.getElementById('lobby-btn');
-    $.lobbyOverlay       = document.getElementById('lobby-overlay');
-    $.lobbyClose         = document.getElementById('lobby-close');
-    $.lobbyActions       = document.getElementById('lobby-actions');
+    $.lobbyBar           = document.getElementById('lobby-bar');
 }
 
 // ---------------------------------------------------------------------------
@@ -235,12 +232,16 @@ export function bindEvents($, handlers) {
 
     // Buy/sell mode toggle button
     const modeBtn = document.getElementById('mode-btn');
+    const modeIconBuy  = document.getElementById('mode-icon-buy');
+    const modeIconSell = document.getElementById('mode-icon-sell');
     if (modeBtn) {
         modeBtn.addEventListener('click', () => {
             sellMode = !sellMode;
             modeBtn.setAttribute('aria-pressed', String(sellMode));
             modeBtn.setAttribute('aria-label', sellMode ? 'Sell mode' : 'Buy mode');
             modeBtn.title = sellMode ? 'Sell mode (X)' : 'Buy mode (X)';
+            modeIconBuy.style.display  = sellMode ? 'none' : '';
+            modeIconSell.style.display = sellMode ? '' : 'none';
             modeBtn.style.color = sellMode ? 'var(--accent)' : '';
         });
     }

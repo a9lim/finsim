@@ -2383,7 +2383,7 @@ const CONGRESSIONAL_EVENTS = [
         likelihood: 0.3,
         headline: 'Rep. Calloway switches from Federalist to Farmer-Labor on House floor: "I can no longer support a party that has abandoned its principles"',
         magnitude: 'moderate',
-        when: (sim, world) => world.congress.house.federalist >= 216 && world.election.barronApproval < 45,
+        when: (sim, world) => world.congress.house.federalist >= 216 && world.election.barronApproval < 45 - (world.election.lobbyMomentum || 0) * 2,
         params: { mu: -0.01, theta: 0.005, lambda: 0.1 },
         effects: [ { path: 'congress.house.federalist', op: 'add', value: -1 }, { path: 'congress.house.farmerLabor', op: 'add', value: 1 }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
         followups: [ { id: 'defection_fallout_fed', mtth: 12, weight: 0.4 }, ],
@@ -2420,7 +2420,7 @@ const CONGRESSIONAL_EVENTS = [
         headline: 'Conservative Farmer-Labor Rep. Hendricks switches to Federalist Party: "The radical left has taken over my party." Barron celebrates on social media',
         params: { mu: 0.015, theta: -0.005, lambda: -0.1 },
         magnitude: 'moderate',
-        when: (sim, world) => world.congress.house.farmerLabor >= 210 && world.election.barronApproval > 45,
+        when: (sim, world) => world.congress.house.farmerLabor >= 210 && world.election.barronApproval > 45 - (world.election.lobbyMomentum || 0) * 2,
         effects: (world) => {
             world.congress.house.farmerLabor -= 1;
             world.congress.house.federalist += 1;
@@ -2435,7 +2435,7 @@ const CONGRESSIONAL_EVENTS = [
         params: { mu: -0.03, theta: 0.015, lambda: 0.5, sigmaR: 0.003 },
         magnitude: 'major',
         minDay: 300,
-        when: (sim, world) => world.congress.senate.federalist >= 50 && world.election.barronApproval < 42,
+        when: (sim, world) => world.congress.senate.federalist >= 50 && world.election.barronApproval < 42 - (world.election.lobbyMomentum || 0) * 2,
         effects: (world) => {
             world.congress.senate.federalist -= 1;
             world.congress.senate.farmerLabor += 1;

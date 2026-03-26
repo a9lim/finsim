@@ -57,6 +57,7 @@ export function createWorldState() {
             midtermComplete:  false,
             midtermResult:    null,
             barronApproval:   50,
+            lobbyMomentum:    0,
             primarySeason:    false,
             okaforRunning:    false,
             presidentialResult: null,
@@ -128,6 +129,7 @@ export const WORLD_STATE_RANGES = {
     // election
     'election.midtermComplete':         { type: 'boolean' },
     'election.barronApproval':          { min: 0,   max: 100, type: 'number' },
+    'election.lobbyMomentum':           { min: -3,  max: 3,   type: 'number' },
     'election.primarySeason':           { type: 'boolean' },
     'election.okaforRunning':           { type: 'boolean' },
 };
