@@ -322,7 +322,7 @@ const MACRO_EVENTS = [
         id: 'trade_retaliation',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Beijing retaliates with matching tariffs on U.S. agriculture and energy; Liang Wei\'s Zhaowei announces "strategic decoupling plan"',
+        headline: 'Liang Wei announces matching tariffs on Columbian agriculture and energy exports. Zhaowei unveils a "strategic decoupling plan." Lassiter on The Sentinel: "I warned you — pass the Serican Reciprocal Tariff Act now."',
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 1,
         params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.01 },
@@ -350,7 +350,7 @@ const MACRO_EVENTS = [
         id: 'rare_earth_crisis',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Beijing restricts rare earth exports to U.S. in retaliation; chip manufacturers warn of 6-month supply shortage. Defense stocks crater',
+        headline: 'Liang Wei restricts rare earth exports to Columbia in retaliation for the Zhaowei ban. Atlas Foundry warns of a six-month semiconductor supply shortage. Malhotra: "We are exploring alternative sourcing." Defense stocks crater',
         params: { mu: -0.08, theta: 0.04, lambda: 2.0, muJ: -0.05, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 3 && world.geopolitical.sericaRelations <= -2,
@@ -383,7 +383,7 @@ const MACRO_EVENTS = [
             if (sim.day > 750) base += 0.3;
             return base;
         },
-        headline: 'Barron and Beijing announce "Phase One" trade deal framework; tariffs to be rolled back over 18 months. Barron: "The biggest deal in history, maybe ever"',
+        headline: 'Barron and Liang Wei announce a "Phase One" trade framework at the Meridia Summit. Tariffs to be rolled back over 18 months. Barron: "The biggest deal in history, maybe ever." Lassiter walks out of the briefing.',
         magnitude: 'major',
         minDay: 400,
         when: (sim, world) => world.geopolitical.tradeWarStage >= 2 && world.geopolitical.tradeWarStage < 4,
@@ -392,13 +392,13 @@ const MACRO_EVENTS = [
     },
 
     // =====================================================================
-    //  ARC 4: MIDDLE EAST QUAGMIRE
+    //  ARC 4: OPERATION DUSTWALKER (FARSISTAN / MERIDIA)
     // =====================================================================
     {
         id: 'mideast_strikes',
         category: 'macro',
         likelihood: 0.6,
-        headline: 'U.S. launches precision strikes using PNTH Atlas AI targeting; Department of War calls it "surgical, zero collateral." Barron: "Mission accomplished"',
+        headline: 'Operation Dustwalker begins: U.S. and Meridia launch precision strikes on Farsistani military targets using PNTH Atlas Aegis targeting. DoW: "Surgical, zero collateral." Navon: "We stand with our allies." Barron: "Mission accomplished."',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.mideastEscalation === 0,
@@ -415,7 +415,7 @@ const MACRO_EVENTS = [
         id: 'mideast_civilian_casualties',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Al Jazeera footage contradicts DoW "zero collateral" claims; 47 civilian casualties confirmed. Gottlieb calls it "a betrayal of everything Atlas was built for"',
+        headline: 'Leaked drone footage contradicts DoW "zero collateral" claims from Operation Dustwalker. 47 Farsistani civilians confirmed dead. Gottlieb: "This is a betrayal of everything Atlas was built for." Al-Farhan demands an emergency UN session.',
         params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.mideastEscalation >= 1,
@@ -430,14 +430,14 @@ const MACRO_EVENTS = [
         id: 'mideast_oil_spike',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Oil prices surge 12% as strikes threaten Strait shipping lanes; energy stocks rally but consumer discretionary tanks',
+        headline: 'Oil surges 12% as Operation Dustwalker threatens Strait of Farsis shipping lanes. Al-Farhan warns: "Any further provocation and the Strait closes." Energy stocks rally but consumer discretionary tanks.',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.004 },
         magnitude: 'moderate',
         portfolioFlavor: (portfolio) => {
             const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
             const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
             if (stockQty > 10) return 'Your long equity book is taking heat as energy costs crush margins across the board.';
-            if (hasOptions) return 'Your options book is getting re-marked as implied vol spikes on the oil shock.';
+            if (hasOptions) return 'Your options book is getting re-marked as implied vol spikes on the Farsistan oil shock.';
             return null;
         },
     },
@@ -445,7 +445,7 @@ const MACRO_EVENTS = [
         id: 'mideast_ground_deployment',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Barron deploys 15,000 troops for "stability operations"; largest ground deployment in 20 years. Defense stocks surge, but consumer confidence plummets',
+        headline: 'Barron deploys 15,000 troops to Meridia for "stability operations" along the Farsistani border. Largest ground deployment in 20 years. Navon: "We welcome our allies." Okafor: "This is mission creep." Defense stocks surge, consumer confidence plummets.',
         params: { mu: -0.04, theta: 0.025, lambda: 1.2, muJ: -0.03, sigmaR: 0.005 },
         magnitude: 'major',
         minDay: 150,
@@ -462,7 +462,7 @@ const MACRO_EVENTS = [
         id: 'mideast_quagmire',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Pentagon briefing leaked: 200+ casualties, $2B/month burn rate, no exit strategy. Okafor: "This is Vietnam with drones." Barron approval craters',
+        headline: 'Pentagon briefing leaked: 200+ Dustwalker casualties, $2B/month burn rate, no exit strategy. Farsistani militias control the border highlands. Okafor: "This is Vietnam with drones." Barron approval craters.',
         params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02 },
         magnitude: 'major',
         minDay: 300,
@@ -480,7 +480,7 @@ const MACRO_EVENTS = [
         id: 'mideast_ceasefire',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Ceasefire brokered by Turkey and UAE; Barron takes credit despite opposition from his own DoW advisors. Markets rally on de-escalation hopes',
+        headline: 'Ceasefire brokered by Bowman and al-Farhan\'s envoy. Operation Dustwalker paused indefinitely. Barron takes credit despite opposition from his own DoW advisors. Navon: "A pause is not a peace." Markets rally on de-escalation hopes.',
         params: { mu: 0.04, theta: -0.02, lambda: -0.8, sigmaR: -0.003 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.mideastEscalation >= 1,
@@ -493,7 +493,7 @@ const MACRO_EVENTS = [
         id: 'mideast_withdrawal',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Under bipartisan pressure, Barron announces phased withdrawal: "We\'ve achieved our objectives." Polls show 68% support pulling out',
+        headline: 'Under bipartisan pressure, Barron announces phased withdrawal from Meridia. Operation Dustwalker "concluded successfully." Polls show 68% support pulling out. Navon is visibly furious at the joint press conference.',
         params: { mu: 0.03, theta: -0.015, lambda: -0.5 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.mideastEscalation >= 2 && world.election.barronApproval < 35,
@@ -504,13 +504,13 @@ const MACRO_EVENTS = [
     },
 
     // =====================================================================
-    //  ARC 8: SOUTH AMERICA OPERATIONS
+    //  ARC 8: SOUTHERN HEMISPHERE INITIATIVE (BOLIVIARA)
     // =====================================================================
     {
         id: 'south_america_covert_exposed',
         category: 'macro',
         likelihood: 0.5,
-        headline: 'The Continental reveals CIA-PNTH covert operations in South America; leaked memos show Atlas AI used for surveillance of civilian population',
+        headline: 'The Continental reveals the Southern Hemisphere Initiative: CIA and Palanthropic covert operations in Boliviara. Leaked memos show Atlas Sentinel used for surveillance of Madero\'s political opposition. Madero: "Columbia treats our nation as a laboratory."',
         params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.southAmericaOps === 0,
@@ -527,7 +527,7 @@ const MACRO_EVENTS = [
         id: 'south_america_advisors',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Barron deploys 500 "military advisors" to South American nation; DoW insists they are "non-combat trainers." Congress skeptical',
+        headline: 'Barron deploys 500 "military advisors" to Boliviara to "assist with counter-narcotics." DoW insists they are non-combat trainers. Madero expels the Columbian ambassador. Okafor: "This is the Southern Hemisphere Initiative with a new coat of paint."',
         params: { mu: -0.02, theta: 0.015, lambda: 0.5, sigmaR: 0.003 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.southAmericaOps === 1,
@@ -543,7 +543,7 @@ const MACRO_EVENTS = [
         id: 'south_america_collapse',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'South American government collapses; transitional council installed under U.S. military protection. Street protests against "American puppets" spread regionally',
+        headline: 'Madero\'s government collapses after a military coup. Transitional council installed under Columbian military protection. Protests erupt across Boliviara: "Yankee puppets out!" Lithium mines resume operations within 48 hours.',
         params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02 },
         magnitude: 'major',
         minDay: 250,
@@ -561,7 +561,7 @@ const MACRO_EVENTS = [
         id: 'south_america_insurgency',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Insurgency intensifies in South America; U.S. advisors come under fire, three killed. Barron doubles down: "We will not be driven out by thugs"',
+        headline: 'Boliviaran insurgency intensifies. Columbian advisors come under fire in the lithium belt — three killed. Madero broadcasts from exile: "The resistance will prevail." Barron doubles down: "We will not be driven out by thugs."',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.southAmericaOps === 3,
@@ -573,7 +573,7 @@ const MACRO_EVENTS = [
         id: 'south_america_withdrawal',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'White House announces withdrawal of all military advisors from South America; operation quietly deemed "complete" despite no stated objectives being met',
+        headline: 'White House announces withdrawal of all advisors from Boliviara. The Southern Hemisphere Initiative is quietly deemed "complete" despite no stated objectives being met. Madero supporters celebrate in the streets.',
         params: { mu: 0.02, theta: -0.01, lambda: -0.3 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.southAmericaOps >= 2,
@@ -586,7 +586,7 @@ const MACRO_EVENTS = [
         id: 'un_condemns_south_america',
         category: 'macro',
         likelihood: 1.0,
-        headline: 'UN General Assembly passes non-binding resolution condemning U.S. operations in South America 124-8; Barron calls it "meaningless theater"',
+        headline: 'UN General Assembly passes non-binding resolution condemning Columbian operations in Boliviara, 124-8. Liang Wei co-sponsors the resolution. Barron calls it "meaningless theater from meaningless countries."',
         params: { mu: -0.01, theta: 0.005 },
         magnitude: 'minor',
         when: (sim, world) => world.geopolitical.southAmericaOps >= 1,
@@ -599,7 +599,7 @@ const MACRO_EVENTS = [
         id: 'oil_shock_opec',
         category: 'macro',
         likelihood: 0.35,
-        headline: 'OPEC+ announces surprise 2M barrel/day production cut; oil surges 18% in a single session. Energy costs ripple through supply chains',
+        headline: 'Al-Farhan brokers a surprise 2M barrel/day OPEC+ production cut. Oil surges 18% in a single session. Priya Sharma: "Farsistan just reminded everyone who controls the spigot." Energy costs ripple through supply chains.',
         magnitude: 'major',
         when: (sim, world) => !world.geopolitical.oilCrisis,
         params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, b: 0.008, sigmaR: 0.006, q: -0.001 },
@@ -609,7 +609,7 @@ const MACRO_EVENTS = [
         id: 'energy_sanctions',
         category: 'macro',
         likelihood: 0.3,
-        headline: 'Barron imposes energy sanctions on major oil-exporting state; "They will feel the full force of American economic power." Crude jumps 8%',
+        headline: 'Barron imposes energy sanctions on Farsistan after al-Farhan refuses to reverse the production cut. "They will feel the full force of Columbian economic power." Crude jumps 8%. Navon publicly endorses the sanctions.',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.005, q: -0.001 },
         magnitude: 'moderate',
         when: (sim, world) => !world.geopolitical.sanctionsActive,
@@ -672,7 +672,7 @@ const MACRO_EVENTS = [
         id: 'sovereign_debt_scare',
         category: 'macro',
         likelihood: 0.25,
-        headline: 'Major European sovereign downgraded two notches; contagion fears spike as CDS spreads widen across periphery. Flight to quality drives Treasury yields down',
+        headline: 'Khasurian sovereign debt downgraded two notches as Volkov\'s military spending spirals. Contagion fears spike across Eastern European CDS markets. Flight to quality drives Columbian Treasury yields down.',
         params: { mu: -0.04, theta: 0.025, lambda: 1.5, muJ: -0.03, b: -0.005, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
     },
@@ -720,12 +720,173 @@ const MACRO_EVENTS = [
         id: 'ceasefire_general',
         category: 'macro',
         likelihood: 0.8,
-        headline: 'Diplomatic breakthrough: ceasefire agreement signed at Camp David after weeks of secret negotiations. Barron takes full credit in primetime address',
+        headline: 'Diplomatic breakthrough: Bowman brokers a ceasefire at Camp David after weeks of secret back-channel talks with al-Farhan and Madero\'s envoys. Barron takes full credit in a primetime address. Priya Sharma: "The VP just saved the presidency."',
         params: { mu: 0.03, theta: -0.015, lambda: -0.5 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.mideastEscalation >= 1 || world.geopolitical.southAmericaOps >= 1,
         effects: (world) => {
             world.election.barronApproval = Math.min(100, world.election.barronApproval + 2);
+        },
+    },
+
+    // =====================================================================
+    //  ARC 9: KHASURIAN BORDER ESCALATION
+    // =====================================================================
+    {
+        id: 'khasuria_border_probe',
+        category: 'macro',
+        headline: 'Khasurian reconnaissance drones cross the border accord line for the third time this month. Volkov\'s spokesman: "Equipment malfunction." The Meridian Brief: "Equipment doesn\'t malfunction this precisely."',
+        likelihood: 2,
+        params: { theta: 0.005, b: 0.005 },
+        magnitude: 'minor',
+        when: (sim, world) => world.geopolitical.khasurianCrisis === 0,
+        effects: (world) => { world.geopolitical.khasurianCrisis = 1; },
+        era: 'early',
+        followups: [
+            { id: 'khasuria_troop_buildup', mtth: 60, weight: 1 },
+        ],
+    },
+    {
+        id: 'khasuria_troop_buildup',
+        category: 'macro',
+        headline: 'Satellite imagery shows Khasurian armored divisions massing 40km from the border. Volkov claims "defensive repositioning." Barron dispatches the Secretary of State. Bond markets price in risk.',
+        likelihood: 0,
+        params: { mu: -0.02, theta: 0.01, b: 0.008, sigmaR: 0.003 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.khasurianCrisis === 1,
+        effects: (world) => { world.geopolitical.khasurianCrisis = 2; },
+        followups: [
+            { id: 'khasuria_incursion', mtth: 45, weight: 2 },
+            { id: 'khasuria_backs_down', mtth: 45, weight: 1 },
+        ],
+    },
+    {
+        id: 'khasuria_incursion',
+        category: 'macro',
+        headline: 'Khasurian forces cross the border in a "limited security operation." Three border towns occupied. The Khasurian Border Accord is officially dead. Barron faces his first real foreign policy crisis.',
+        likelihood: 0,
+        params: { mu: -0.04, theta: 0.03, lambda: 2.0, b: 0.015 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.khasurianCrisis === 2,
+        effects: (world) => { world.geopolitical.khasurianCrisis = 3; },
+    },
+    {
+        id: 'khasuria_backs_down',
+        category: 'macro',
+        headline: 'Volkov recalls troops from the Khasurian border after Barron\'s back-channel threat of energy sanctions. "Exercises concluded successfully," his spokesman says. Markets exhale.',
+        likelihood: 0,
+        params: { mu: 0.02, theta: -0.01, b: -0.005 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.khasurianCrisis === 2,
+        effects: (world) => { world.geopolitical.khasurianCrisis = 1; },
+    },
+
+    // =====================================================================
+    //  ARC 10: FARSISTAN / STRAIT OF FARSIS ESCALATION
+    // =====================================================================
+    {
+        id: 'farsistan_tanker_inspections',
+        category: 'macro',
+        headline: 'Al-Farhan orders "security inspections" of all tankers transiting the Strait of Farsis. Transit times double. Oil creeps up $8/barrel. Priya Sharma: "This is the warning shot."',
+        likelihood: 2,
+        params: { b: 0.008, mu: -0.01 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.farsistanEscalation === 0,
+        effects: (world) => { world.geopolitical.farsistanEscalation = 1; },
+        era: 'mid',
+        followups: [
+            { id: 'farsistan_partial_closure', mtth: 50, weight: 1 },
+        ],
+    },
+    {
+        id: 'farsistan_partial_closure',
+        category: 'macro',
+        headline: 'Farsistan closes the Strait of Farsis to non-allied shipping. Meridia-flagged tankers turned back. Oil surges past $120. Barron: "We will ensure free navigation." Navon: "We\'re ready."',
+        likelihood: 0,
+        params: { mu: -0.03, b: 0.015, theta: 0.015, sigmaR: 0.004 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.farsistanEscalation === 1,
+        effects: (world) => { world.geopolitical.farsistanEscalation = 2; },
+        followups: [
+            { id: 'farsistan_full_closure', mtth: 40, weight: 1 },
+            { id: 'farsistan_negotiation', mtth: 40, weight: 1 },
+        ],
+    },
+    {
+        id: 'farsistan_full_closure',
+        category: 'macro',
+        headline: 'Al-Farhan seals the Strait completely. "No ship passes without Farsistani consent." Oil gaps to $145. Emergency SPR release announced. The Sentinel runs a war countdown clock.',
+        likelihood: 0,
+        params: { mu: -0.06, b: 0.025, theta: 0.03, lambda: 2.0, sigmaR: 0.006 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.farsistanEscalation === 2,
+        effects: (world) => {
+            world.geopolitical.farsistanEscalation = 3;
+            world.geopolitical.straitClosed = true;
+            world.geopolitical.oilCrisis = true;
+        },
+    },
+    {
+        id: 'farsistan_negotiation',
+        category: 'macro',
+        headline: 'Back-channel talks between Bowman and al-Farhan\'s envoy produce a framework: Farsistan reopens the Strait in exchange for sanctions relief and a PNTH sovereign wealth fund stake. Markets rally cautiously.',
+        likelihood: 0,
+        params: { mu: 0.03, b: -0.01, theta: -0.01 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.farsistanEscalation === 2,
+        effects: (world) => { world.geopolitical.farsistanEscalation = 1; },
+    },
+
+    // =====================================================================
+    //  SERICA TRADE EVENTS
+    // =====================================================================
+    {
+        id: 'serica_retaliatory_tariffs',
+        category: 'macro',
+        headline: 'Liang Wei announces 25% tariffs on Columbian agricultural exports. Iowa soybean futures limit down. Lassiter goes on The Sentinel: "This proves we need to hit them harder." Oduya calls for auto worker protections.',
+        likelihood: 2,
+        params: { mu: -0.02, theta: 0.01 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.tradeWarStage >= 1 && world.geopolitical.sericaRelations < 0,
+    },
+    {
+        id: 'zhaowei_chip_ban',
+        category: 'macro',
+        headline: 'Serica bans Zhaowei from exporting semiconductors to Columbia. The Zhaowei Semiconductor Accord is dead. Atlas Foundry faces a hardware supply crisis. Malhotra: "We have six months of inventory."',
+        likelihood: 2,
+        params: { mu: -0.03, theta: 0.02, lambda: 1.0 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.tradeWarStage >= 3,
+        effects: (world) => { world.geopolitical.sericaRelations = Math.max(-3, world.geopolitical.sericaRelations - 1); },
+        era: 'mid',
+    },
+
+    // =====================================================================
+    //  BOLIVIARA EVENTS
+    // =====================================================================
+    {
+        id: 'boliviara_nationalization',
+        category: 'macro',
+        headline: 'Madero nationalizes Boliviara\'s lithium reserves on live television. "These minerals belong to the Boliviaran people, not to Columbian corporations." Three mining stocks halt. Rare earth futures spike.',
+        likelihood: 2,
+        params: { mu: -0.02, theta: 0.01 },
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.southAmericaOps >= 1,
+        era: 'mid',
+        followups: [
+            { id: 'boliviara_sentinel_leak', mtth: 60, weight: 1 },
+        ],
+    },
+    {
+        id: 'boliviara_sentinel_leak',
+        category: 'macro',
+        headline: 'Rachel Tan publishes Atlas Sentinel deployment logs from the Southern Hemisphere Initiative. "Palanthropic\'s AI Helped the CIA Target Boliviaran Dissidents." Madero holds a press conference demanding extradition.',
+        likelihood: 0,
+        params: { mu: -0.03, theta: 0.02, lambda: 1.5 },
+        magnitude: 'major',
+        when: (sim, world) => world.geopolitical.southAmericaOps >= 2 && world.pnth.sentinelLaunched,
+        effects: (world) => {
+            world.media.tanCredibility = Math.min(10, world.media.tanCredibility + 1);
         },
     },
 ];
