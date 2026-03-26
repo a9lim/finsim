@@ -81,9 +81,9 @@ main {
     border-radius: var(--radius-pill);
     z-index: 20;
 }
-/* Reserve space at bottom of chart so candles don't clip under lobby bar */
+/* Nudge chart up so x-axis labels don't clip under lobby bar */
 #chart-container:has(.lobby-bar:not([style*="display: none"])) #chart-canvas {
-    bottom: 44px;
+    bottom: 20px;
 }
 .lobby-bar .substrate-pill {
     display: flex;
