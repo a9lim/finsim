@@ -708,6 +708,9 @@ export function exerciseOption(positionId, currentPrice, currentDay, currentVol,
     }
     portfolio.cash += cashEffect;
 
+    // Exercise delivers stock — record price impact
+    if (currentVol != null) recordStockTrade(signedDelta, currentVol);
+
     // Net into existing stock position with same strategy
     const stratKey = pos.strategyName || null;
     const existingStock = portfolio.positions.find(p =>
