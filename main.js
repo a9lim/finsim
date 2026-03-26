@@ -639,8 +639,15 @@ function init() {
 
     // Audio volume control
     if ($.volumeSlider) {
+        const volVal = document.getElementById('volume-slider-val');
         $.volumeSlider.value = Math.round(getVolume() * 100);
-        $.volumeSlider.addEventListener('input', () => setVolume($.volumeSlider.value / 100));
+        if (typeof _forms !== 'undefined') {
+            _forms.bindSlider($.volumeSlider, volVal, (v) => {
+                setVolume(v / 100);
+            }, (v) => Math.round(v) + '%');
+        } else {
+            $.volumeSlider.addEventListener('input', () => setVolume($.volumeSlider.value / 100));
+        }
     }
 
     // 19. Start animation loop

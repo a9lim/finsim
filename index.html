@@ -491,8 +491,9 @@
                         </div>
                         <canvas class="rate-sparkline" id="rate-sparkline" width="280" height="40"></canvas>
                         <div class="ctrl-row">
-                            <label class="ctrl-label" for="volume-slider">Volume</label>
-                            <input type="range" id="volume-slider" min="0" max="100" value="30" class="sim-slider">
+                            <label class="stat-label" for="volume-slider">Volume</label>
+                            <input type="range" id="volume-slider" min="0" max="100" step="1" value="30">
+                            <span class="slider-value" id="volume-slider-val">30%</span>
                         </div>
                     </div>
                     <div id="llm-settings-section" class="stat-group hidden">
