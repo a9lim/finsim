@@ -705,15 +705,26 @@ export function exerciseOption(positionId, currentPrice, currentDay, currentVol,
             if (!_checkInitialMarginDebit(-cost, currentPrice, currentVol, currentRate, currentDay, q)) return null;
         }
         portfolio.cash -= cost;
-        stockPos = {
-            id:          _nextPositionId++,
-            type:        'stock',
-            qty:         absQty,
-            entryPrice:  pos.strike,
-            entryDay:    currentDay,
-            strategyName: pos.strategyName || null,
-        };
-        portfolio.positions.push(stockPos);
+        // Net into existing stock position if one exists with the same strategy
+        const existingStock = portfolio.positions.find(p =>
+            p.type === 'stock' && (p.strategyName || null) === (pos.strategyName || null)
+        );
+        if (existingStock) {
+            // Weighted-average entry price
+            existingStock.entryPrice = (existingStock.entryPrice * existingStock.qty + pos.strike * absQty) / (existingStock.qty + absQty);
+            existingStock.qty += absQty;
+            stockPos = existingStock;
+        } else {
+            stockPos = {
+                id:          _nextPositionId++,
+                type:        'stock',
+                qty:         absQty,
+                entryPrice:  pos.strike,
+                entryDay:    currentDay,
+                strategyName: pos.strategyName || null,
+            };
+            portfolio.positions.push(stockPos);
+        }
     } else {
         // Put: receive strike per share in cash
         portfolio.cash += pos.strike * absQty;
