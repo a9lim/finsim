@@ -68,7 +68,7 @@ import {
     evaluateRegulations, getActiveRegulations, getRegulation,
     getRegulationEffect, resetRegulations,
 } from './src/regulations.js';
-import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
+import { TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 import { getAvailableActions, executeLobbyAction, resetLobbying } from './src/lobbying.js';
 import { checkInterjections, resetInterjections } from './src/interjections.js';
@@ -1134,11 +1134,14 @@ function _onDayComplete() {
 
         quarterlyReviews.push({ day: sim.day, pnl: actualPnl, vsBenchmark, rating });
 
+        // Adjust firmStanding based on quarterly performance
+        onQuarterlyReview(_portfolioEquity(), sim.day);
+
         const texts = {
             strong: 'Quarterly Desk Review: Meridian\'s risk committee notes exceptional returns.',
             solid: 'Quarterly Desk Review: Solid quarter. Book within risk parameters.',
             underperform: 'Quarterly Desk Review: Returns lag benchmark. Risk committee requests position summary.',
-            poor: 'Quarterly Desk Review: Managing Director Liu wants a meeting about your book.',
+            poor: 'Quarterly Desk Review: Managing Director Vasquez wants a meeting about your book.',
         };
         let text = texts[rating];
         if (playerChoices.cooperated_sec || playerChoices.silent_sec || playerChoices.accepted_insider_tip) {
@@ -1172,7 +1175,7 @@ function _onDayComplete() {
         playerChoices,
         impactHistory,
         quarterlyReviews,
-        compliance,
+        factions,
         portfolio,
         daysSinceLiveTrade: sim.history.maxDay - HISTORY_CAPACITY,
         lobbyCount: _lobbyCount,
