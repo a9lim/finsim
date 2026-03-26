@@ -16,6 +16,7 @@ import { unitPrice } from './position-value.js';
 import {
     cooldownMultiplier, thresholdMultiplier, complianceTone,
 } from './compliance.js';
+import { getConvictionEffect } from './convictions.js';
 
 const _cooldowns = {}; // id → last fired day
 
@@ -1233,7 +1234,7 @@ export const PORTFOLIO_POPUPS = [
 export function evaluatePortfolioPopups(sim, world, portfolio, day) {
     const triggered = [];
     for (const pp of PORTFOLIO_POPUPS) {
-        if (_cooldowns[pp.id] && day - _cooldowns[pp.id] < pp.cooldown * cooldownMultiplier()) continue;
+        if (_cooldowns[pp.id] && day - _cooldowns[pp.id] < pp.cooldown * cooldownMultiplier() * getConvictionEffect('popupFrequencyMult', 1)) continue;
         if (pp.era === 'early' && _liveDay(day) > 500) continue;
         if (pp.era === 'mid'   && (_liveDay(day) < 500 || _liveDay(day) > 800)) continue;
         if (pp.era === 'late'  && _liveDay(day) < 800) continue;

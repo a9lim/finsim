@@ -56,6 +56,10 @@ import {
     compliance, resetCompliance, effectiveHeat,
     onComplianceTriggered, onComplianceChoice,
 } from './src/compliance.js';
+import {
+    evaluateConvictions, getActiveConvictions, getConviction,
+    getConvictionEffect, resetConvictions, getConvictionIds,
+} from './src/convictions.js';
 import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 
@@ -175,6 +179,8 @@ function _priceExpiryGreeks(idx) {
 
 cacheDOMElements($);
 $.volumeSlider = document.getElementById('volume-slider');
+$.convictionsSection = document.getElementById('convictions-section');
+$.convictionsList = document.getElementById('convictions-list');
 initTheme();
 init();
 
@@ -919,6 +925,29 @@ function _showComplianceTermination() {
     _showEpilogue('compliance');
 }
 
+function _updateConvictionDisplay() {
+    const convictions = getActiveConvictions();
+    const section = $.convictionsSection;
+    const list = $.convictionsList;
+    if (!section || !list) return;
+    if (convictions.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+    section.classList.remove('hidden');
+    list.textContent = '';
+    for (const c of convictions) {
+        const item = document.createElement('div');
+        item.className = 'conviction-item';
+        item.title = c.description;
+        const name = document.createElement('span');
+        name.className = 'conviction-name';
+        name.textContent = c.name;
+        item.appendChild(name);
+        list.appendChild(item);
+    }
+}
+
 function _portfolioEquity() {
     let equity = portfolio.cash;
     for (const p of portfolio.positions) {
@@ -991,6 +1020,20 @@ function _onDayComplete() {
         chainDirty = true;
     }
 
+    const _convCtx = {
+        playerChoices,
+        impactHistory,
+        quarterlyReviews,
+        compliance,
+        portfolio,
+        daysSinceLiveTrade: sim.history.maxDay - HISTORY_CAPACITY,
+    };
+    const newConvictions = evaluateConvictions(_convCtx);
+    for (const id of newConvictions) {
+        const conv = getConviction(id);
+        if (conv) showToast(`Conviction unlocked: ${conv.name}`, 4000);
+    }
+
     // Epilogue check (before regular events)
     if (eventEngine && eventEngine.isEpilogueReady(sim.day)) {
         playing = false;
@@ -1018,6 +1061,11 @@ function _onDayComplete() {
                     if (ev.portfolioFlavor) {
                         const flavor = ev.portfolioFlavor(portfolio);
                         if (flavor) headline += ' ' + flavor;
+                    }
+                    if (getConvictionEffect('eventHintArrows', false) && ev.params) {
+                        const _hintMu = ev.params.mu || 0;
+                        if (_hintMu > 0) headline += ' \u2191';
+                        else if (_hintMu < 0) headline += ' \u2193';
                     }
                     const duration = ev.magnitude === 'major' ? 8000
                         : ev.magnitude === 'moderate' ? 5000 : 3000;
@@ -1120,6 +1168,7 @@ function _onDayComplete() {
     if (portfolioHistory) pushSparkSample(portfolioHistory, _portfolioEquity());
 
     updateUI(margin);
+    _updateConvictionDisplay();
     dirty = true;
 
     _processPopupQueue();
@@ -1376,6 +1425,7 @@ function _resetCore(index) {
     quarterlyReviews.length = 0;
     resetPopupCooldowns();
     resetCompliance();
+    resetConvictions();
     resetAudio();
     sim.reset(index);
     resetPortfolio();
@@ -1868,7 +1918,7 @@ function updateStrategyBuilder() {
 // ---------------------------------------------------------------------------
 
 function _showEpilogue(terminationReason = null) {
-    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason);
+    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason, getConvictionIds());
     let currentPage = 0;
 
     const overlay = document.getElementById('epilogue-overlay');

@@ -417,7 +417,7 @@ function _pageWorld(world, sim, impactHistory) {
 
 // -- Page 4: Your Legacy -----------------------------------------------------
 
-function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason = null) {
+function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason = null, convictionIds = []) {
     // Compute equity
     let equity = portfolio.cash;
     for (const pos of portfolio.positions) {
@@ -485,6 +485,22 @@ function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, qua
     }
 
     body += `<div class="epilogue-rating">${rating}</div>`;
+
+    if (convictionIds.length > 0) {
+        const names = {
+            information_edge: 'Information Is Everything',
+            market_always_right: 'The Market Is Always Right',
+            contrarian_instinct: 'Contrarian Instinct',
+            desk_protects: 'The Desk Protects Its Own',
+            master_of_leverage: 'Master of Leverage',
+            political_operator: 'Political Operator',
+            ghost_protocol: 'Ghost Protocol',
+            volatility_addict: 'Volatility Addict',
+        };
+        const convNames = convictionIds.map(id => names[id] || id).join(', ');
+        body += _h3('Trading Philosophy');
+        body += _p('Over four years, certain convictions crystallized into permanent fixtures of your trading mind: ' + convNames + '.');
+    }
 
     // -- Financial scorecard --------------------------------------------------
     body += _statSection('Portfolio Performance', [
@@ -557,11 +573,11 @@ function _absDeltaSum(evt) {
 
 // -- Main export --------------------------------------------------------------
 
-export function generateEpilogue(world, sim, portfolio, eventLog, playerChoices = {}, impactHistory = [], quarterlyReviews = [], terminationReason = null) {
+export function generateEpilogue(world, sim, portfolio, eventLog, playerChoices = {}, impactHistory = [], quarterlyReviews = [], terminationReason = null, convictionIds = []) {
     return [
         _pageElection(world, playerChoices),
         _pagePNTH(world, playerChoices),
         _pageWorld(world, sim, impactHistory),
-        _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason),
+        _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, terminationReason, convictionIds),
     ];
 }
