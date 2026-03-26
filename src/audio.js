@@ -44,8 +44,8 @@ const STINGER_DEFS = {
     superevent: { freqStart: 220, freqEnd: 55, duration: 1.5, type: 'sawtooth', gain: 0.12 },
 };
 
-function _ensureCtx() {
-    if (_ctx) return _ctx.state !== 'suspended';
+function _createCtx() {
+    if (_ctx) return;
     try {
         _ctx = new (window.AudioContext || window.webkitAudioContext)();
         _master = _ctx.createGain();
@@ -63,16 +63,19 @@ function _ensureCtx() {
         _musicGain = _ctx.createGain();
         _musicGain.gain.value = 1;
         _musicGain.connect(_master);
-        return true;
-    } catch { return false; }
+    } catch { /* AudioContext unavailable */ }
+}
+
+function _isReady() {
+    return _ctx && _ctx.state === 'running';
 }
 
 export function initAudio() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches && !localStorage.getItem('shoals_audio_volume')) {
         _volume = 0;
     }
-    if (!_ensureCtx()) return;
-    if (_ctx.state === 'suspended') _ctx.resume();
+    _createCtx();
+    if (_ctx && _ctx.state === 'suspended') _ctx.resume();
 }
 
 function _stopAmbient(fadeMs = 1000) {
@@ -94,7 +97,7 @@ function _stopAmbient(fadeMs = 1000) {
 }
 
 export function setAmbientMood(mood) {
-    if (!_ensureCtx() || mood === _currentMood) return;
+    if (!_isReady() || mood === _currentMood) return;
     const def = AMBIENT_MOODS[mood];
     if (!def) return;
 
@@ -127,7 +130,7 @@ export function setAmbientMood(mood) {
 }
 
 export function playStinger(type) {
-    if (!_ensureCtx()) return;
+    if (!_isReady()) return;
     const def = STINGER_DEFS[type];
     if (!def) return;
 
@@ -155,7 +158,7 @@ export function playStinger(type) {
 }
 
 export function playMusic(track) {
-    if (!_ensureCtx()) return;
+    if (!_isReady()) return;
     stopMusic(500);
 
     const now = _ctx.currentTime;
