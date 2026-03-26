@@ -26,7 +26,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 **Module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator. `market.js` is shared mutable state (single-writer main.js via `syncMarket`, multiple readers).
 
-**Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains + filibuster/media recurring pulses + conviction-aware likelihood weighting), event-pool.js (~320 toast events with lore-specific headlines), popup-events.js (~30 interactive popup decisions with conviction-aware context variants), world-state.js (congress/PNTH/geopolitical/Fed/media), faction-standing.js (unified 6-faction standing system: firmStanding, regulatoryExposure, federalistSupport, farmerLaborSupport, mediaTrust, fedRelations), convictions.js (12 permanent modifiers), regulations.js (11 dynamic trading rules including filibuster uncertainty), compound-triggers.js (18 cross-domain one-shot triggers), lobbying.js (2 PAC-funding pills with bill-specific descriptions), interjections.js (lore-aware atmospheric text), epilogue.js (4-page ending with product/geopolitical/conviction-specific narratives).
+**Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains + filibuster/media recurring pulses + conviction-aware likelihood weighting), event-pool.js (~320 toast events with lore-specific headlines + 18 cross-domain one-shot triggers as `oneShot` events), popup-events.js (~30 interactive popup decisions with conviction-aware context variants), world-state.js (congress/PNTH/geopolitical/Fed/media), faction-standing.js (unified 6-faction standing system: firmStanding, regulatoryExposure, federalistSupport, farmerLaborSupport, mediaTrust, fedRelations), convictions.js (12 permanent modifiers), regulations.js (11 dynamic trading rules including filibuster uncertainty), lobbying.js (2 PAC-funding pills with bill-specific descriptions), interjections.js (lore-aware atmospheric text), epilogue.js (4-page ending with product/geopolitical/conviction-specific narratives).
 
 **Audio**: `audio.js` — all Web Audio API synthesis, no external audio files. Three layers: (1) chiptune jazz loop (128 BPM, 16-bar Am diatonic circle: walking bass, shell-voicing comps, swung hi-hat, nocturne-influenced melody head), (2) continuous Am drone pad (sine/triangle/sawtooth oscillators), (3) event stingers + superevent chord stabs. `setAmbientMood(mood)` crossfades between jazz and drone: calm = full jazz, tense = jazz 55% / drone 45%, crisis = jazz 15% / drone 85%. Jazz loop uses a look-ahead scheduler (`_jazzSchedule`) that keeps 4s of audio queued. `playMusic(track)` ducks both jazz and drone to silence for superevent chord stabs, `stopMusic` restores them to the current mood mix. Volume slider is in the Settings group of the Info tab.
 
@@ -39,7 +39,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 1. `frame()` applies Layer 3 param overlays, calls `sim.beginDay()`
 2. 16 sub-steps per day: `sim.substep()` → rate ceiling/floor clamp → `decayImpactVolumes()` → `syncMarket()` → `rehedgeMM()` → `_onSubstepTick()` (pending orders) → `chart.setLiveCandle()`
 3. After substep batch: `_onSubstepUI()` (reprice chain sidebar, update portfolio display)
-4. After all 16: `sim.finalizeDay()`, overlays removed. `_onDayComplete()` runs: borrow interest, expiry, dividends, quarterly review, conviction eval, epilogue check, event engine, regulation eval, portfolio popups, compound triggers (with `recomputeK`/`syncMarket`), Layer 3 shifts, scrutiny, ambient mood, rogue trading check, margin check, lobby pill update, interjection check, popup queue drain
+4. After all 16: `sim.finalizeDay()`, overlays removed. `_onDayComplete()` runs: borrow interest, expiry, dividends, quarterly review, conviction eval, epilogue check, event engine, regulation eval, portfolio popups, Layer 3 shifts, scrutiny, ambient mood, rogue trading check, margin check, lobby pill update, interjection check, popup queue drain
 
 ### Bootstrap
 
@@ -47,7 +47,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 ### Reset
 
-`_resetCore()` must call all narrative resets: `resetConvictions()`, `resetRegulations()`, `resetFactions()`, `resetCompoundTriggers()`, `resetLobbying()`, `resetInterjections()`, `resetAudio()`, `resetImpactState()`, `resetPopupCooldowns()`. Also reset `dayInProgress`, `chart._lerp.day = -1`, `_lobbyCount = 0`. After `resetFactions()`, re-wire `eventEngine.world.factions = factions`.
+`_resetCore()` must call all narrative resets: `resetConvictions()`, `resetRegulations()`, `resetFactions()`, `resetLobbying()`, `resetInterjections()`, `resetAudio()`, `resetImpactState()`, `resetPopupCooldowns()`. Also reset `dayInProgress`, `chart._lerp.day = -1`, `_lobbyCount = 0`. After `resetFactions()`, re-wire `eventEngine.world.factions = factions`.
 
 ## Key Conventions
 
@@ -112,7 +112,7 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - `minDay`/`maxDay` use live trading days (`day - 252`), different from `era` which uses absolute `day`
 - `getConvictionEffect(key, defaultVal)` multiplies all active effects onto defaultVal (boolean: any true wins)
 - `getRegulationEffect(key, defaultVal)` — mult keys: product; add: sum; ceiling: min; floor: max; boolean: any true
-- Compound triggers fire at most once per game (`_fired` Set)
+- One-shot events (migrated compound triggers) fire at most once per game — tracked by event id in `EventEngine._firedOneShots` Set
 
 ### Do NOT Re-add
 
@@ -127,6 +127,7 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - Dark overlay backgrounds on popups — use blur-only (`background: none`), never `rgba(0,0,0,...)`
 - `AMBIENT_MOODS` / `_stopAmbient` / `_ambientNodes` / `_ambientGain` — old drone-only ambient system replaced by jazz loop + drone crossfade via `MOOD_MIX`
 - `_jazzFilter` for mood — mood is now a jazz↔drone crossfade, not a lowpass filter
+- `compound-triggers.js` / `checkCompoundTriggers` / `resetCompoundTriggers` / `getFiredTriggerIds` — deleted; all 18 triggers migrated to `event-pool.js` as `oneShot: true` events, fired by the standard EventEngine one-shot pre-pass
 
 ### Lore Reference
 
