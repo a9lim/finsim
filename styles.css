@@ -1109,3 +1109,13 @@ main {
     cursor: help;
 }
 .conviction-name { font-weight: 600; color: var(--text); }
+
+/* -- Regulations ------------------------------------------------------------ */
+.regulations-section { margin-top: 12px; }
+.regulations-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.regulation-badge {
+    font-size: 0.72rem; font-weight: 500;
+    padding: 3px 8px; border-radius: var(--radius-pill);
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    color: var(--text-secondary); cursor: help;
+}

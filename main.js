@@ -60,6 +60,10 @@ import {
     evaluateConvictions, getActiveConvictions, getConviction,
     getConvictionEffect, resetConvictions, getConvictionIds,
 } from './src/convictions.js';
+import {
+    evaluateRegulations, getActiveRegulations, getRegulation,
+    getRegulationEffect, resetRegulations,
+} from './src/regulations.js';
 import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 
@@ -181,6 +185,7 @@ cacheDOMElements($);
 $.volumeSlider = document.getElementById('volume-slider');
 $.convictionsSection = document.getElementById('convictions-section');
 $.convictionsList = document.getElementById('convictions-list');
+$.regulationsList = document.getElementById('regulations-list');
 initTheme();
 init();
 
@@ -663,6 +668,10 @@ function frame(now) {
             let stepped = false;
             while (sim.substepsDone < targetSteps) {
                 sim.substep();
+                const _rateCeil = getRegulationEffect('rateCeiling', null);
+                const _rateFlr = getRegulationEffect('rateFloor', null);
+                if (_rateCeil !== null && sim.r > _rateCeil) sim.r = _rateCeil;
+                if (_rateFlr !== null && sim.r < _rateFlr) sim.r = _rateFlr;
                 decayImpactVolumes();
                 syncMarket(sim);
                 rehedgeMM(portfolio.positions);
@@ -948,6 +957,28 @@ function _updateConvictionDisplay() {
     }
 }
 
+function _updateRegulationDisplay() {
+    const list = $.regulationsList;
+    if (!list) return;
+    const regs = getActiveRegulations();
+    list.textContent = '';
+    if (regs.length === 0) {
+        const span = document.createElement('span');
+        span.className = 'text-muted';
+        span.style.fontSize = '0.78rem';
+        span.textContent = 'None';
+        list.appendChild(span);
+        return;
+    }
+    for (const r of regs) {
+        const badge = document.createElement('div');
+        badge.className = 'regulation-badge';
+        badge.title = r.description;
+        badge.textContent = r.name;
+        list.appendChild(badge);
+    }
+}
+
 function _portfolioEquity() {
     let equity = portfolio.cash;
     for (const p of portfolio.positions) {
@@ -1087,6 +1118,18 @@ function _onDayComplete() {
         for (const pp of portfolioPopups) _popupQueue.push(pp);
     }
 
+    if (eventEngine) {
+        const regChanges = evaluateRegulations(eventEngine.world);
+        for (const id of regChanges.activated) {
+            const reg = getRegulation(id);
+            if (reg) showToast('Regulation enacted: ' + reg.name, 4000);
+        }
+        for (const id of regChanges.deactivated) {
+            const reg = getRegulation(id);
+            if (reg) showToast('Regulation repealed: ' + reg.name, 3000);
+        }
+    }
+
     // Update ambient mood based on market regime
     const _ambientVol = Math.sqrt(sim.v);
     if (_ambientVol > 0.35 || sim.lambda > 5) setAmbientMood('crisis');
@@ -1169,6 +1212,7 @@ function _onDayComplete() {
 
     updateUI(margin);
     _updateConvictionDisplay();
+    _updateRegulationDisplay();
     dirty = true;
 
     _processPopupQueue();
@@ -1184,6 +1228,10 @@ function tick() {
         // Finish remaining sub-steps instantly
         while (!sim.dayComplete) {
             sim.substep();
+            const _rateCeil = getRegulationEffect('rateCeiling', null);
+            const _rateFlr = getRegulationEffect('rateFloor', null);
+            if (_rateCeil !== null && sim.r > _rateCeil) sim.r = _rateCeil;
+            if (_rateFlr !== null && sim.r < _rateFlr) sim.r = _rateFlr;
             decayImpactVolumes();
             syncMarket(sim);
             rehedgeMM(portfolio.positions);
@@ -1196,6 +1244,10 @@ function tick() {
         sim.beginDay();
         for (let i = 0; i < INTRADAY_STEPS; i++) {
             sim.substep();
+            const _rateCeil = getRegulationEffect('rateCeiling', null);
+            const _rateFlr = getRegulationEffect('rateFloor', null);
+            if (_rateCeil !== null && sim.r > _rateCeil) sim.r = _rateCeil;
+            if (_rateFlr !== null && sim.r < _rateFlr) sim.r = _rateFlr;
             decayImpactVolumes();
             syncMarket(sim);
             rehedgeMM(portfolio.positions);
@@ -1378,6 +1430,10 @@ function step() {
 
     // Advance one substep
     sim.substep();
+    const _rateCeil = getRegulationEffect('rateCeiling', null);
+    const _rateFlr = getRegulationEffect('rateFloor', null);
+    if (_rateCeil !== null && sim.r > _rateCeil) sim.r = _rateCeil;
+    if (_rateFlr !== null && sim.r < _rateFlr) sim.r = _rateFlr;
     decayImpactVolumes();
     syncMarket(sim);
     rehedgeMM(portfolio.positions);
@@ -1426,6 +1482,7 @@ function _resetCore(index) {
     resetPopupCooldowns();
     resetCompliance();
     resetConvictions();
+    resetRegulations();
     resetAudio();
     sim.reset(index);
     resetPortfolio();

@@ -19,6 +19,7 @@ import {
 
 import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
 import { recordStockTrade, recordOptionTrade } from './price-impact.js';
+import { getRegulationEffect } from './regulations.js';
 
 let _greekTrees = null;
 import { computePositionValue, unitPrice } from './position-value.js';
@@ -90,6 +91,9 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
     const ba = (type === 'call' || type === 'put')
         ? computeOptionBidAsk(mid, currentPrice, strike, currentVol)
         : computeBidAsk(mid, currentVol);
+    const sMult = getRegulationEffect('spreadMult', 1);
+    ba.ask = mid + (ba.ask - mid) * sMult;
+    ba.bid = mid - (mid - ba.bid) * sMult;
     const spreadFill = side === 'long' ? ba.ask : ba.bid;
 
     const signedQty = side === 'long' ? qty : -qty;
@@ -269,6 +273,7 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
     // Add the proposed short position's MTM to equity
     equity += shortMtm;
 
+    required *= getRegulationEffect('marginMult', 1);
     return equity >= required;
 }
 
@@ -300,6 +305,11 @@ export function executeMarketOrder(
     currentPrice, currentVol, currentRate, currentDay,
     strike, expiryDay, strategyName, q
 ) {
+    if (side === 'short' && type === 'stock' && getRegulationEffect('shortStockDisabled', false)) {
+        if (typeof showToast !== 'undefined') showToast('Short stock sales currently banned by regulation.', 3000);
+        return null;
+    }
+
     // Convert to signed qty: long = +qty, short = -qty
     const signedQty = side === 'long' ? qty : -qty;
 
@@ -731,7 +741,8 @@ export function exerciseOption(positionId, currentPrice, currentDay, currentVol,
  */
 export function chargeBorrowInterest(currentPrice, currentVol, currentRate, borrowSpread, currentDay) {
     let totalCharged = 0;
-    const annualRate = Math.max(currentRate, 0) + borrowSpread * currentVol;
+    const regBorrowAdd = getRegulationEffect('borrowSpreadAdd', 0);
+    const annualRate = Math.max(currentRate, 0) + (borrowSpread + regBorrowAdd) * currentVol;
     const dailyRate = annualRate / TRADING_DAYS_PER_YEAR;
 
     // Charge interest on short stock/bond positions
@@ -948,6 +959,7 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
         required += MAINTENANCE_MARGIN * Math.abs(portfolio.cash);
     }
 
+    required *= getRegulationEffect('marginMult', 1);
     const triggered = required > 0 && equity < required;
     return { triggered, equity, required };
 }
