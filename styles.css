@@ -1140,3 +1140,10 @@ main {
 /* -- Lobbying ---------------------------------------------------------------- */
 .lobby-action-btn { width: 100%; text-align: left; }
 .lobby-action-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+/* -- Interjections ---------------------------------------------------------- */
+.toast.interjection-toast {
+    font-style: italic; color: var(--text-muted);
+    border-color: transparent; background: var(--bg-panel);
+    font-size: 0.8rem; max-width: 360px; text-align: center;
+}

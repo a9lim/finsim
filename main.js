@@ -72,6 +72,7 @@ import {
 import { COMPLIANCE_GAME_OVER_HEAT, TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 import { getAvailableActions, executeLobbyAction, resetLobbying } from './src/lobbying.js';
+import { checkInterjections, resetInterjections } from './src/interjections.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -1076,6 +1077,15 @@ function _portfolioEquity() {
     return equity;
 }
 
+function _showInterjection(text) {
+    const container = document.getElementById('toast-container');
+    showToast(text, 6000);
+    requestAnimationFrame(() => {
+        const last = container?.lastElementChild;
+        if (last) last.classList.add('interjection-toast');
+    });
+}
+
 function _recordImpact(day, direction, magnitude, context) {
     if (Math.abs(magnitude) < 0.5) return;
     impactHistory.push({ day, direction, magnitude, context });
@@ -1345,6 +1355,18 @@ function _onDayComplete() {
     _updateConvictionDisplay();
     _updateRegulationDisplay();
     dirty = true;
+
+    const ijCtx = {
+        sim,
+        portfolio,
+        equity: _portfolioEquity(),
+        peakEquity: portfolio.peakValue || portfolio.initialCapital,
+        liveDay: sim.history.maxDay - HISTORY_CAPACITY,
+        quarterlyReviews,
+        impactHistory,
+    };
+    const interjection = checkInterjections(ijCtx, sim.history.maxDay);
+    if (interjection) _showInterjection(interjection);
 
     _processPopupQueue();
 }
@@ -1618,6 +1640,7 @@ function _resetCore(index) {
     resetScrutiny();
     resetCompoundTriggers();
     resetLobbying();
+    resetInterjections();
     resetAudio();
     sim.reset(index);
     resetPortfolio();
