@@ -1176,6 +1176,13 @@ main {
     vertical-align: text-bottom; margin-left: 1px;
 }
 @keyframes blink { 50% { opacity: 0; } }
+.popup-choice-btn.choice-animate-in {
+    animation: choiceFadeIn 0.4s ease both;
+}
+@keyframes choiceFadeIn {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
 
 /* -- Regulations ------------------------------------------------------------ */
 .regulations-section { margin-top: 12px; margin-bottom: 16px; }

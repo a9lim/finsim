@@ -1099,12 +1099,10 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
     const panel = $.popupOverlay.querySelector('.sim-overlay-panel');
     panel.style.borderTopColor = meta.color;
 
-    // Magnitude-based backdrop
+    // Magnitude-based backdrop (blur only, no darkening)
     if (magnitude === 'major') {
-        $.popupOverlay.style.background = 'rgba(0,0,0,0.55)';
         $.popupOverlay.style.backdropFilter = 'blur(8px) saturate(1.2)';
     } else {
-        $.popupOverlay.style.background = '';
         $.popupOverlay.style.backdropFilter = '';
     }
 
@@ -1136,9 +1134,20 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
             } else {
                 clearInterval(typeInterval);
                 cursor.remove();
+                // Staggered fade-in for each choice button
                 $.popupChoices.style.display = '';
-                const firstBtn = $.popupChoices.querySelector('button');
-                if (firstBtn) firstBtn.focus();
+                const btns = $.popupChoices.querySelectorAll('.popup-choice-btn');
+                btns.forEach((btn, i) => {
+                    btn.classList.add('choice-animate-in');
+                    btn.style.animationDelay = (i * 150) + 'ms';
+                });
+                const lastBtn = btns[btns.length - 1];
+                if (lastBtn) {
+                    lastBtn.addEventListener('animationend', () => {
+                        const firstBtn = $.popupChoices.querySelector('button');
+                        if (firstBtn) firstBtn.focus();
+                    }, { once: true });
+                }
             }
         }, 25);
     } else {
