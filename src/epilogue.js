@@ -117,6 +117,20 @@ function _pageElection(world, playerChoices) {
         body += _p('The midterms had changed little, preserving the status quo in Washington. Neither party could claim a mandate, and governing lurched forward on inertia and executive orders. The real drama, as it turned out, was always going to be about what happened outside the Capitol.');
     }
 
+    // Big Beautiful Bill outcome
+    if (world.congress && world.congress.bigBillStatus === 3) {
+        body += _p('The Big Beautiful Bill \u2014 Barron\'s signature legislation \u2014 became law after Tao broke the filibuster. Lassiter called it "the most consequential economic reform in a generation." Haines voted yes in the end, but her hesitation cost Barron three months of momentum.');
+    } else if (world.congress && world.congress.bigBillStatus === 4) {
+        body += _p('The Big Beautiful Bill died on the Senate floor. Whitfield\'s filibuster held. Haines crossed the aisle. Barron never forgave her, and the Federalist base never forgave Congress.');
+    }
+
+    // Media framing
+    if (world.media && world.media.sentinelRating >= 7 && world.media.tanCredibility <= 4) {
+        body += _p('Cole\'s Sentinel framed the election as a referendum on Columbian strength. Without The Continental\'s investigative counterweight, the narrative held.');
+    } else if (world.media && world.media.tanCredibility >= 7) {
+        body += _p('Tan\'s Continental investigations defined the campaign\'s final weeks. Cole fought back on The Sentinel, but the documents spoke for themselves.');
+    }
+
     // Main election narrative
     switch (result) {
         case 'barron_removed':
@@ -305,6 +319,31 @@ function _pagePNTH(world, playerChoices) {
         }
     }
 
+    // Atlas Aegis
+    if (p.aegisDeployed) {
+        if (p.aegisControversy >= 3) {
+            body += _p('Atlas Aegis was grounded by executive order after the Operation Dustwalker casualty reports. Kassis\'s leaked decision logs \u2014 published in full by Rachel Tan \u2014 made continued deployment politically impossible.');
+        } else if (p.aegisControversy >= 1) {
+            body += _p('Atlas Aegis remained operational in the Farsistan theater, a quiet engine of Pentagon funding and boardroom power for Dirks\'s faction.');
+        }
+    }
+
+    // Atlas Companion
+    if (p.companionLaunched) {
+        if (p.companionScandal >= 3) {
+            body += _p('Atlas Companion\'s 200 million users learned their conversations had been accessible to Farsistani intelligence through a sovereign wealth fund side-letter nobody had disclosed. The class-action lawsuit was the largest in tech history.');
+        } else if (p.companionScandal >= 1) {
+            body += _p('Atlas Companion reshaped daily life for hundreds of millions. The "AI boyfriend" headlines faded into background noise. The revenue didn\'t.');
+        }
+    }
+
+    // Board fight details
+    if (p.boardDirks > p.boardGottlieb) {
+        body += _p('Zhen cast the deciding vote for Dirks. Malhotra, who had backed Gottlieb for months, switched sides in the parking lot after seeing the quarterly numbers.');
+    } else if (p.boardGottlieb > p.boardDirks) {
+        body += _p('Zhen sided with Gottlieb in the end. "The company needs a conscience," he told the board. Dirks resigned by email the same night.');
+    }
+
     // Player involvement in Okafor hearings
     if (playerChoices.okafor_cooperated || playerChoices.met_okafor_aide || playerChoices.gave_interview) {
         body += _p('The Okafor hearings produced one memorable witness \u2014 a Meridian derivatives trader whose testimony helped unravel the Bowman connection.');
@@ -364,6 +403,33 @@ function _pageWorld(world, sim, impactHistory) {
         } else {
             body += _p('The South American operations remained in the shadows, a footnote in a presidency defined by louder conflicts. Intelligence cooperation, some equipment transfers, a few advisors in places that the State Department preferred not to name. It was the smallest of Barron\'s military ventures, and the one most likely to be forgotten by history. Whether this was a mercy depended on which side of the operations you were on.');
         }
+    }
+
+    // Khasuria
+    const khasuria = geo.khasurianCrisis || 0;
+    if (khasuria >= 3) {
+        body += _h3('Khasuria');
+        body += _p('Volkov\'s forces never withdrew from the border territories. The Khasurian Border Accord was dead, and the international community\'s statements of "grave concern" were indistinguishable from silence. The new status quo \u2014 armed occupation dressed in diplomatic language \u2014 would outlast the Barron presidency and define the next one.');
+    } else if (khasuria >= 2) {
+        body += _h3('Khasuria');
+        body += _p('The Khasurian border crisis subsided without resolution. Volkov withdrew his armored divisions but left intelligence assets in place. The ceasefire held, technically, though no one on either side pretended it meant peace.');
+    } else if (khasuria >= 1) {
+        body += _h3('Khasuria');
+        body += _p('Volkov tested the border and found Barron\'s red line credible \u2014 or at least unpredictable enough to respect. The Khasurian Border Accord limped forward, a document that existed primarily as proof that diplomacy had been attempted.');
+    }
+
+    // Farsistan Strait
+    if (geo.straitClosed) {
+        body += _p('The Strait of Farsis remained closed. Al-Farhan extracted concessions that reshaped Middle Eastern power dynamics for a generation. Oil never returned to its pre-closure price.');
+    } else if ((geo.farsistanEscalation || 0) >= 2) {
+        body += _p('Al-Farhan\'s Strait of Farsis brinkmanship ended in a back-channel deal. Bowman\'s negotiation \u2014 his one genuine diplomatic achievement \u2014 was overshadowed by everything else.');
+    }
+
+    // Serica
+    if ((geo.sericaRelations || 0) >= 1) {
+        body += _p('The Transpacific Commerce Framework held. Liang Wei and Barron traded insults publicly and concessions privately. Lassiter called it "surrender." The markets called it "stability."');
+    } else if ((geo.sericaRelations || 0) <= -2) {
+        body += _p('Decoupling from Serica became permanent. Zhaowei chips vanished from Columbian supply chains. Liang Wei pivoted to Khasuria and Farsistan. The semiconductor cold war had begun.');
     }
 
     // The Fed (always included)
@@ -506,6 +572,19 @@ function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, qua
         const convNames = convictionIds.map(id => names[id] || id).join(', ');
         body += _h3('Trading Philosophy');
         body += _p('Over four years, certain convictions crystallized into permanent fixtures of your trading mind: ' + convNames + '.');
+
+        if (convictionIds.includes('washington_insider')) {
+            body += _p('After Meridian, you joined the revolving door. K Street welcomed you. Lassiter\'s former chief of staff made the introduction. Your first client was, naturally, Palanthropic.');
+        }
+        if (convictionIds.includes('crisis_profiteer')) {
+            body += _p('The SEC investigation followed you into retirement. It never resulted in charges \u2014 the trades were legal, if unsavory \u2014 but the deposition transcripts leaked. Tan wrote about them. Cole defended you on The Sentinel.');
+        }
+        if (convictionIds.includes('media_darling')) {
+            body += _p('Sharma profiled you in MarketWire\'s "Traders Who Shaped the Barron Era" series. Cole invited you on The Sentinel. You accepted. Tan, characteristically, declined to comment.');
+        }
+        if (convictionIds.includes('risk_manager')) {
+            body += _p('Meridian\'s compliance department gave you the highest exit rating in desk history. The SEC examiner who reviewed your book called it "the cleanest I\'ve seen in twenty years." You framed the letter.');
+        }
     }
 
     if (scrutinyState && scrutinyState.level >= 2) {
@@ -549,6 +628,8 @@ function _pageLegacy(sim, portfolio, eventLog, playerChoices, impactHistory, qua
             body += `<div class="epilogue-timeline-row"><span class="epilogue-timeline-day">${dayLabel}</span><span class="epilogue-timeline-text">${evt.headline}</span></div>`;
         }
     }
+
+    body += _p('The Meridian Brief the morning after your departure was two words: "Desk quiet."');
 
     return { title: 'Your Legacy', body };
 }
