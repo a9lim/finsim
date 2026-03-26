@@ -17,7 +17,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_deregulation_rush',
             category: 'political',
-            headline: 'With Hartley gone and both chambers aligned, Barron signs sweeping Financial Freedom Act; margin rules relaxed across the board',
+            headline: 'The Financial Freedom Act meets a Federalist trifecta — Lassiter and Tao gut banking oversight in a 48-hour legislative blitz. MarketWire calls it "the most consequential deregulation since 1999."',
             magnitude: 'major',
             params: { theta: -0.02, lambda: 0.5 },
             effects: (world) => { world.election.barronApproval += 3; },
@@ -30,7 +30,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_pnth_war_profits',
             category: 'pnth',
-            headline: 'Palanthropic Atlas AI deployed in Middle East theater; defense revenue surges as Dirks faction consolidates control',
+            headline: 'Atlas Aegis drone footage from Operation Dustwalker leaks to The Continental. PNTH stock surges on expanded Pentagon contracts even as Gottlieb issues a rare public dissent. "This is not what I built this company for."',
             magnitude: 'major',
             params: { mu: 0.04, theta: 0.01 },
             effects: (world) => {
@@ -46,7 +46,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_stagflation',
             category: 'macro',
-            headline: 'Economists declare stagflation as tariff-driven inflation meets recessionary contraction; markets face worst of both worlds',
+            headline: 'Lassiter\'s tariffs meet recession head-on. Premier Liang Wei retaliates with semiconductor export controls. Priya Sharma\'s MarketWire column: "Stagflation is no longer a textbook exercise."',
             magnitude: 'major',
             params: { mu: -0.08, theta: 0.04, lambda: 2.0, xi: 0.15 },
             effects: (world) => {
@@ -62,7 +62,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_okafor_connection',
             category: 'political',
-            headline: 'Sen. Okafor\'s campaign acknowledges "productive conversations with key financial sector voices"; your name appears in donor filings',
+            headline: 'Your attendance at the Okafor fundraiser pays an unexpected dividend. Sources close to the senator indicate her committee will "look favorably" on cooperative witnesses from Meridian Capital.',
             magnitude: 'moderate',
             params: { mu: 0.01 },
         },
@@ -75,7 +75,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_tan_has_evidence',
             category: 'investigation',
-            headline: 'Rachel Tan publishes investigative piece linking Meridian trading patterns to material nonpublic information; compliance department launches internal review',
+            headline: 'Rachel Tan\'s Continental investigation connects the insider tip you pursued to a pattern of suspicious trading flagged by the SEC. Her three-part series drops Sunday. Your name isn\'t in it — yet.',
             magnitude: 'major',
             params: { theta: 0.015 },
         },
@@ -87,7 +87,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_constitutional_crisis',
             category: 'political',
-            headline: 'Constitutional crisis meets economic collapse; markets whipsaw as impeachment proceedings continue through recession',
+            headline: 'Okafor\'s impeachment proceedings collide with recession. The Sentinel calls it a "partisan coup during an economic emergency." The Continental calls it "accountability." Bond markets call it a 300-basis-point risk premium.',
             magnitude: 'major',
             params: { mu: -0.06, theta: 0.03, lambda: 3.0, xi: 0.2, rho: -0.1 },
             effects: (world) => {
@@ -102,7 +102,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_pnth_perfect_storm',
             category: 'pnth',
-            headline: 'DOJ, Senate, and whistleblower actions converge on Palanthropic simultaneously; board calls emergency session as share price enters free fall',
+            headline: 'DOJ suit. Okafor subpoena. Kassis\'s whistleblower filing. Palanthropic faces simultaneous legal assault on three fronts. Malhotra\'s emergency earnings call lasts eleven minutes. Zhen cancels all meetings.',
             magnitude: 'major',
             params: { mu: -0.05, theta: 0.03, lambda: 2.0 },
             effects: (world) => {
@@ -119,7 +119,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_covenant_sanctions',
             category: 'pnth',
-            headline: 'Gottlieb\'s Covenant AI faces sanctions review for Chinese partnerships; trade war threatens to split the AI industry along geopolitical lines',
+            headline: 'Gottlieb\'s Covenant AI lands its first major contract — a Serican firm sanctioned under Lassiter\'s trade regime. The irony is not lost on The Continental: "Palanthropic\'s Prodigal Son Sells to the Enemy."',
             magnitude: 'moderate',
             params: { theta: 0.01, lambda: 0.5 },
         },
@@ -131,7 +131,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_energy_war',
             category: 'macro',
-            headline: 'Full-scale Middle East conflict disrupts global energy supply chains; oil prices spike as strategic reserves are tapped',
+            headline: 'Al-Farhan closes the Strait of Farsis as Meridia border tensions peak. Oil gaps above $140. Barron tweets: "The Emir will learn what Columbia does when you cut our energy supply." Bond vigilantes are already moving.',
             magnitude: 'major',
             params: { mu: -0.06, theta: 0.03, lambda: 2.5, b: 0.02, sigmaR: 0.005 },
         },
@@ -143,7 +143,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_dollar_crisis',
             category: 'fed',
-            headline: 'Fed credibility collapse triggers dollar sell-off; foreign central banks begin diversifying reserves as markets question U.S. monetary independence',
+            headline: 'With Hartley fired and Fed credibility in free fall, the dollar index breaks multi-year support. Priya Sharma: "We are witnessing the unthinkable — a reserve currency confidence crisis in real time."',
             magnitude: 'major',
             params: { mu: -0.04, theta: 0.02, sigmaR: 0.008, b: -0.01 },
         },
@@ -155,7 +155,7 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_campaign_subpoena_risk',
             category: 'investigation',
-            headline: 'Congressional oversight committee requests trading records from "individuals of interest" at major banks; your desk is on the list',
+            headline: 'Your elevated SEC scrutiny profile makes you a liability during primary season. Tom Driscoll reports that Okafor\'s committee has subpoenaed trading records from "a prominent Meridian Capital derivatives desk."',
             magnitude: 'moderate',
             params: { theta: 0.005 },
         },
@@ -167,12 +167,92 @@ const COMPOUND_TRIGGERS = [
         event: {
             id: 'compound_pnth_south_america',
             category: 'pnth',
-            headline: 'Leaked cables reveal Palanthropic Atlas AI active in South American operations; Gottlieb faction demands emergency board vote on military contracts',
+            headline: 'The Continental publishes leaked Atlas Sentinel deployment logs from the Southern Hemisphere Initiative. Madero holds a press conference in Caracas demanding Columbia extradite "the corporate spies." PNTH stock halts trading.',
             magnitude: 'moderate',
             params: { theta: 0.01 },
             effects: (world) => {
                 world.pnth.boardGottlieb = Math.min(12, world.pnth.boardGottlieb + 1);
             },
+        },
+    },
+    {
+        id: 'filibuster_big_bill_collapse',
+        condition: (world) =>
+            world.congress.bigBillStatus === 4 &&
+            world.election.barronApproval < 45,
+        event: {
+            id: 'compound_big_bill_death',
+            category: 'political',
+            headline: 'The Big Beautiful Bill dies on the Senate floor after Whitfield\'s 14-hour filibuster. Haines crossed the aisle on the spending provisions. Barron calls it "a betrayal by cowards." His approval craters.',
+            magnitude: 'major',
+            params: { mu: -0.04, theta: 0.02 },
+        },
+    },
+    {
+        id: 'companion_farsistan_data',
+        condition: (world) =>
+            world.pnth.companionLaunched &&
+            world.pnth.companionScandal >= 2 &&
+            world.geopolitical.farsistanEscalation >= 1,
+        event: {
+            id: 'compound_companion_intelligence',
+            category: 'pnth',
+            headline: 'Rachel Tan publishes proof that Atlas Companion user data was accessible to Farsistani intelligence via a sovereign wealth fund side-letter. 200 million users. Zero disclosure. Okafor schedules emergency hearings.',
+            magnitude: 'major',
+            params: { mu: -0.06, theta: 0.03, lambda: 2.0 },
+        },
+    },
+    {
+        id: 'strait_closure_oil_emergency',
+        condition: (world) =>
+            world.geopolitical.straitClosed &&
+            world.geopolitical.farsistanEscalation >= 3,
+        event: {
+            id: 'compound_strait_war_footing',
+            category: 'macro',
+            headline: 'Al-Farhan seals the Strait of Farsis completely. Navon puts Meridia on war footing. Barron authorizes naval escort operations. Oil hits $160. The Sentinel runs a countdown clock: "Days Since the Strait Closed."',
+            magnitude: 'major',
+            params: { mu: -0.08, b: 0.03, sigmaR: 0.008, theta: 0.04, lambda: 3.0 },
+        },
+    },
+    {
+        id: 'media_credibility_collapse',
+        condition: (world) =>
+            world.media.pressFreedomIndex <= 2 &&
+            world.media.leakCount >= 4,
+        event: {
+            id: 'compound_press_crisis',
+            category: 'political',
+            headline: 'Barron revokes The Continental\'s press credentials after Driscoll\'s fifth consecutive leak story. Tan publishes from home. Cole celebrates on The Sentinel. Press freedom organizations issue emergency statements.',
+            magnitude: 'moderate',
+            params: { theta: 0.015, xi: 0.08 },
+        },
+    },
+    {
+        id: 'aegis_civilian_casualties',
+        condition: (world) =>
+            world.pnth.aegisDeployed &&
+            world.pnth.aegisControversy >= 2 &&
+            world.geopolitical.farsistanEscalation >= 2,
+        event: {
+            id: 'compound_aegis_war_crime',
+            category: 'pnth',
+            headline: 'An Atlas Aegis autonomous targeting decision kills 34 civilians in a Farsistani border village. Kassis leaks the decision logs to The Continental. Gottlieb calls for Dirks\'s resignation. Navon denies involvement.',
+            magnitude: 'major',
+            params: { mu: -0.05, theta: 0.03, lambda: 2.5 },
+        },
+    },
+    {
+        id: 'khasuria_full_breach',
+        condition: (world) =>
+            world.geopolitical.khasurianCrisis >= 3 &&
+            world.pnth.aegisDeployed,
+        event: {
+            id: 'compound_khasuria_invasion',
+            category: 'macro',
+            headline: 'Volkov sends armored columns across the Khasurian border at dawn. Barron holds an emergency NSC meeting. Hartley — or his replacement — signals emergency rate action. Atlas Aegis redeployment from Farsistan to Eastern Europe is on the table.',
+            magnitude: 'major',
+            params: { mu: -0.06, theta: 0.04, lambda: 3.0, b: 0.02, sigmaR: 0.006 },
         },
     },
 ];
