@@ -131,11 +131,42 @@ The `_convCtx` object is updated to include `factions: world.factions` instead o
 Factions create natural tension:
 - Funding Federalist PACs raises `federalistSupport` but may lower `farmerLaborSupport`
 - High `mediaTrust` + leaking information raises `regulatoryExposure` if traced
-- High `regulatoryExposure` drags down `firmStanding`: when `regulatoryExposure` crosses a level threshold (25/50/75/90), `firmStanding` takes a one-time hit of -5/-8/-12/-15. This is a discrete event (compound trigger), not continuous coupling.
+- High `regulatoryExposure` drags down `firmStanding`: when `regulatoryExposure` crosses a level threshold (25/50/75/90), `firmStanding` takes a one-time hit of -5/-8/-12/-15. This is a discrete one-shot event, not continuous coupling.
 - High `firmStanding` unlocks the firm's Washington lobbyist, which makes political faction shifts more effective
 - Attending political events raises the relevant party faction but may raise `regulatoryExposure` if you're already under investigation
 
-Cross-faction effects are expressed as structured effects in event/popup outcomes or as compound triggers — no hidden continuous coupling logic.
+Cross-faction effects are expressed as structured effects in event/popup outcomes or as one-shot events with multi-domain guards — no hidden continuous coupling logic.
+
+### Event System Unification
+
+The current codebase has two parallel narrative engines: the event system (`events.js` + `event-pool.js`) for probabilistic/scheduled events, and `compound-triggers.js` for deterministic one-shot cross-domain events. These are unified into a single event system.
+
+**The problem:** Compound triggers are mechanically equivalent to one-shot events with multi-domain `when()` guards, but the event engine's guard signature is too narrow — `when(sim, world, congress)` doesn't expose `playerChoices`, faction state, or active regulations.
+
+**The fix:** Widen the event guard signature with a context bag:
+
+```javascript
+// Old: when(sim, world, congress)
+// New: when(sim, world, congress, ctx)
+// ctx = { playerChoices, factions, activeRegIds }
+```
+
+Existing events that don't need context simply ignore the 4th argument — no existing guards break. The context bag is set once per day via `eventEngine.setPlayerContext(playerChoices, factions, activeRegIds)` before `maybeFire()` is called.
+
+**New event schema field: `oneShot: true`**
+
+Events with `oneShot: true` fire at most once per game, tracked in a `_firedOneShot` Set on the engine. This replaces the compound trigger `_fired` Set.
+
+**Evaluation order in `maybeFire()`:**
+
+1. **Deterministic pre-pass:** Filter eligible one-shot events (unfired, `when()` passes). If any match, fire the highest-priority one deterministically. This preserves compound trigger behavior — they fire reliably when conditions are met.
+2. **Pulse schedule:** FOMC meetings, PNTH earnings, filibuster cycle, media cycle (existing behavior).
+3. **Followup queue:** Pending MTTH-based followups (existing behavior).
+4. **Poisson random draw:** Regular probabilistic events from the pool (existing behavior).
+
+**Migration:** The 18 existing compound triggers move into `event-pool.js` as events with `oneShot: true` and multi-domain `when()` guards that read from `ctx`. `compound-triggers.js` is deleted. `checkCompoundTriggers()` call in main.js is removed. All new RPG expansion triggers (firm crisis, testimony, perjury, regulatory-to-firm drag, conviction-specific) go directly into the event pool as one-shot events.
+
+**What this enables:** Any event can now check player choices, faction state, or active regulations in its guard. The entire narrative system speaks one language. A future event refactor can further enrich guards without architectural changes.
 
 ### Faction-Derived NPC Dispositions
 
@@ -255,7 +286,7 @@ What firmStanding determines:
 - **Congressional subpoena** — `regulatoryExposure >= 75` during active Okafor investigation triggers Meridian subpoena. `firmStanding -15`, crisis briefing fires.
 - **Client pressure** — large PNTH positions during antitrust probe or visible lobbying: `firmStanding -5` per incident.
 - **Reputational contagion** — Tan naming you in a Continental story: `firmStanding -8`, `mediaTrust +3` (you're more interesting now).
-- **Firm crisis** — compound trigger: `firmStanding < 25` AND `regulatoryExposure > 60` AND any of (active subpoena, client complaints > 2, media exposure > 3). Board considers shutting the derivatives desk. This gates the Firm Collapse ending.
+- **Firm crisis** — one-shot event: `firmStanding < 25` AND `regulatoryExposure > 60` AND any of (active subpoena, client complaints > 2, media exposure > 3). Board considers shutting the derivatives desk. This gates the Firm Collapse ending.
 
 ### Quarterly Reviews (Part of Briefing System)
 
@@ -318,7 +349,7 @@ The current 2 blanket PAC actions become targeted politician/caucus funding. You
 **Tier 3 — Requires faction score > 75 with relevant power center:**
 - **Broker a deal** — Requires `federalistSupport > 60` AND `farmerLaborSupport > 60`. Costs 1200 × `lobbyingCostMult`. Advances the current bill one stage if both sides are near agreement (`bigBillStatus` or tariff act). `federalistSupport +3`, `farmerLaborSupport +3`, `regulatoryExposure +5`. Sets `playerChoices.brokered_deal` flag.
 - **Leak to media** — Requires `mediaTrust > 70`. No direct cost. Player selects target (politician, bill, or investigation). `mediaTrust -20` if traced (50% chance, modified by Ghost Protocol conviction). `regulatoryExposure +15` if traced. If successful: target's approval or bill status shifts, `mediaTrust +5`. Sets `playerChoices.leaked_to_media` flag.
-- **Counsel the Fed** — Requires `fedRelations > 75`. No direct cost. Player can nudge rate guidance (±25bp ceiling/floor suggestion). If adopted: rate guidance shifts, `fedRelations +5`. If discovered (compound trigger: media leak OR investigation): `regulatoryExposure +20`, `firmStanding -15`, `fedRelations` drops to 10. Sets `playerChoices.counseled_fed` flag.
+- **Counsel the Fed** — Requires `fedRelations > 75`. No direct cost. Player can nudge rate guidance (±25bp ceiling/floor suggestion). If adopted: rate guidance shifts, `fedRelations +5`. If discovered (one-shot event: media leak OR investigation): `regulatoryExposure +20`, `firmStanding -15`, `fedRelations` drops to 10. Sets `playerChoices.counseled_fed` flag.
 
 ### Consequences That Find You
 
@@ -340,7 +371,7 @@ Example — Congressional testimony during Okafor's investigation:
 3. "She asks whether your PNTH positions were informed by non-public information." — Absolutely not, my analysis is public record (honest if true, sets `liedInTestimony` if insider tip was pursued) / I'd like to consult with my attorney (`regulatoryExposure +5`) / My positions reflect professional judgment (neutral)
 4. "Will you cooperate with the committee's ongoing investigation?" — Fully (`regulatoryExposure -10`, `farmerLaborSupport +5`, but opens your records) / With limitations (neutral) / I'll review with counsel (`regulatoryExposure +3`)
 
-Lying successfully is possible but creates a ticking time bomb — if contradictory evidence surfaces later (compound trigger: `liedInTestimony` AND relevant investigation advances), `regulatoryExposure +25` and Criminal Indictment ending becomes available.
+Lying successfully is possible but creates a ticking time bomb — if contradictory evidence surfaces later (one-shot event: `liedInTestimony` AND relevant investigation advances), `regulatoryExposure +25` and Criminal Indictment ending becomes available.
 
 ---
 
@@ -361,7 +392,7 @@ Threads introduced:
 
 **Act II: Escalation (Days 253-756, Years 2-3)**
 
-Crises overlap. Player's faction scores are high enough that the world reacts to them specifically. Midterms reshape Congress. PNTH schism goes public. Geopolitical crises compound. Compound triggers start firing.
+Crises overlap. Player's faction scores are high enough that the world reacts to them specifically. Midterms reshape Congress. PNTH schism goes public. Geopolitical crises compound. One-shot cross-domain events start firing.
 
 Key shifts:
 - Faction scores gate meaningful content — Tier 2 lobbying unlocks for active players
@@ -375,7 +406,7 @@ Key shifts:
 Everything converges. Presidential election looms. PNTH board war resolves. Geopolitical crises climax. Accumulated choices produce final consequences.
 
 Key features:
-- Late-game compound triggers requiring conditions from all three acts
+- Late-game one-shot events requiring conditions accumulated across all three acts
 - Tier 3 lobbying available for players who built extreme faction scores — the most powerful and dangerous moves
 - "Point of no return" decisions that lock in endings
 - Faction scores at peak consequence — high firmStanding means Vasquez testifies for you; low means she testifies against
@@ -400,7 +431,7 @@ When multiple endings are simultaneously eligible, the first match in this order
 
 ### Endings Triggered by External Pressure
 
-**Criminal Indictment** — `regulatoryExposure >= 95` AND `liedInTestimony` flag set AND contradictory evidence surfaces (compound trigger). SEC refers to DOJ. Epilogue framed as courtroom retrospective: what prosecution presented, what defense argued, what the jury never saw.
+**Criminal Indictment** — `regulatoryExposure >= 95` AND `liedInTestimony` flag set AND contradictory evidence surfaces (one-shot event). SEC refers to DOJ. Epilogue framed as courtroom retrospective: what prosecution presented, what defense argued, what the jury never saw.
 
 **Firm Collapse** — `firmStanding < 15` AND `regulatoryExposure > 60` AND accumulated firm crisis conditions (subpoena + client complaints + media exposure). Meridian institutional health bottoms out. Epilogue framed as post-mortem: a Priya Sharma MarketWire feature on "What Killed Meridian Capital." Vasquez, Webb, Riggs each get a paragraph on where they landed.
 
@@ -446,15 +477,15 @@ Premature endings compress pages 1-3 into shorter summaries. Pages 4-5 always ge
 
 ### Expanded Existing Modules
 
-- **`main.js`** — All compliance/scrutiny call sites refactored to faction API. `_convCtx` updated to include `factions: world.factions`. `_resetCore()` calls `resetFactions()`. Quarterly review toast replaced by briefing trigger. `SUPEREVENT_IDS` expanded for crisis briefing triggers. `onComplianceTriggered`/`onComplianceChoice` calls replaced with `onQuarterlyReview`/`applyComplianceChoice`. Direct `compliance.heat` mutation replaced with `shiftFaction()`.
+- **`main.js`** — All compliance/scrutiny call sites refactored to faction API. `_convCtx` updated to include `factions: world.factions`. `_resetCore()` calls `resetFactions()`. Quarterly review toast replaced by briefing trigger. `SUPEREVENT_IDS` expanded for crisis briefing triggers. `onComplianceTriggered`/`onComplianceChoice` calls replaced with `onQuarterlyReview`/`applyComplianceChoice`. Direct `compliance.heat` mutation replaced with `shiftFaction()`. `checkCompoundTriggers()` call removed — one-shot events handled by the event engine. Player context set per day via `eventEngine.setPlayerContext()`.
 
-- **`events.js`** — New event categories for firm dynamics, faction-gated political events, conviction-specific events. Event `when()` guards check `world.factions.*` scores. Event effects shift factions via structured effects.
+- **`events.js`** — Event guard signature widened to `when(sim, world, congress, ctx)` where `ctx = { playerChoices, factions, activeRegIds }`. New `oneShot: true` schema field with `_firedOneShot` Set tracking. Deterministic pre-pass for one-shot events before Poisson draw. `setPlayerContext(playerChoices, factions, activeRegIds)` method added. New event categories for firm dynamics, faction-gated political events, conviction-specific events. Event effects shift factions via structured effects.
 
 - **`popup-events.js`** — All 15 `thresholdMultiplier()` call sites updated to `firmThresholdMult()`. `cooldownMultiplier()` updated to `firmCooldownMult()`. 12 `complianceTone()` sites updated to `firmTone()`. Imports changed from `compliance.js` to `faction-standing.js`. New testimony sequences, firm confrontation scenes, NPC-specific decision popups added. All context text consistent with experienced-veteran player characterization.
 
 - **`lobbying.js`** — Expanded from 2 blanket PAC actions to targeted politician/caucus funding with 3 tiers. Tier gating reads faction scores and reputation tags. Each action calls `shiftFaction()` for relevant factions. `addScrutiny` calls replaced with `shiftFaction('regulatoryExposure', ...)` at rescaled amounts.
 
-- **`compound-triggers.js`** — New triggers: firm crisis (`firmStanding < 25` AND `regulatoryExposure > 60`), testimony trigger (`regulatoryExposure > 75` during active investigation), perjury bomb (`liedInTestimony` AND evidence surfaces), regulatory-to-firm drag (one-time hits when regulatoryExposure crosses level thresholds), conviction-specific late-game triggers.
+- **`event-pool.js`** — Absorbs all 18 existing compound triggers as `oneShot: true` events with multi-domain `when()` guards reading from `ctx`. New one-shot events added: firm crisis, testimony trigger, perjury bomb, regulatory-to-firm drag (one-time hits when regulatoryExposure crosses level thresholds), conviction-specific late-game triggers. Regular events also gain access to `ctx` in their guards for richer conditional logic.
 
 - **`world-state.js`** — New `factions` domain with six scores, boolean flags, and review state. Added to `WORLD_STATE_RANGES` for structured effects validation (all scores: `{ min: 0, max: 100, type: 'number' }`). Old compliance/scrutiny state removed from any world-state references.
 
@@ -466,6 +497,7 @@ Premature endings compress pages 1-3 into shorter summaries. Pages 4-5 always ge
 
 - **`compliance.js`** — Deleted. All functionality moved to `faction-standing.js`. All consumers refactored.
 - **`scrutiny.js`** — Deleted. All functionality moved to `faction-standing.js`. All consumers refactored.
+- **`compound-triggers.js`** — Deleted. All 18 triggers migrated to `event-pool.js` as `oneShot: true` events. `checkCompoundTriggers()` call removed from main.js.
 - **`epilogue.js`** — Deleted. Replaced by `endings.js` with expanded 5-page structure and 6 ending variants.
 
 ### UI Changes
@@ -486,5 +518,5 @@ The audio system is listed as unchanged, but crisis briefings, testimony sequenc
 - Trading engine (simulation.js, portfolio.js, strategy.js, chart.js, pricing)
 - Core game loop and sub-step pipeline (except call site refactoring in `_onDayComplete`)
 - Regulations system (reads world state, not compliance/scrutiny directly)
-- Event/toast/popup infrastructure (new content plugs into existing vocabulary)
+- Event/toast/popup infrastructure (new content plugs into existing vocabulary; guard signature widened but backward-compatible)
 - Shared modules (shared-*.js, shared-base.css)
