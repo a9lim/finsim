@@ -1096,3 +1096,16 @@ main {
 
 /* -- Audio volume ----------------------------------------------------------- */
 #volume-slider { margin-top: 4px; }
+
+/* -- Convictions ------------------------------------------------------------ */
+.convictions-section { margin-top: 12px; }
+.convictions-list { display: flex; flex-direction: column; gap: 4px; }
+.conviction-item {
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    border-left: 2px solid var(--accent);
+    background: var(--bg-hover);
+    border-radius: var(--radius-sm);
+    cursor: help;
+}
+.conviction-name { font-weight: 600; color: var(--text); }
