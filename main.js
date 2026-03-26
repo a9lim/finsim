@@ -490,9 +490,10 @@ function init() {
     });
 
     // 11. Wire intro screen
-    _intro.init($.introScreen, $.introStart);
-    initAudio();
-    setAmbientMood('calm');
+    _intro.init($.introScreen, $.introStart, () => {
+        initAudio();
+        setAmbientMood('calm');
+    });
 
     // 12. Wire info tips for slider labels
     wireInfoTips();
