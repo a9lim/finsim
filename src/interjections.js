@@ -14,17 +14,17 @@ let _lastInterjectionDay = -999;
 const INTERJECTIONS = [
     {
         id: 'vol_spike',
-        text: 'Your hands remember 2008. The vol surface is screaming.',
+        text: 'Your hands remember 2008. But this isn\'t 2008 — this is whatever Barron and al-Farhan are building between them. The screens are redder than you\'ve seen in months.',
         condition: (ctx) => Math.sqrt(ctx.sim.v) > Math.sqrt(ctx.sim.theta) * 2.5,
     },
     {
         id: 'sidelines',
-        text: 'You\u2019re watching from the sidelines. The desk notices.',
+        text: 'You\'re watching from the sidelines while Malhotra talks up PNTH earnings and Lassiter passes tariffs. The Meridian Brief keeps printing. The desk keeps trading. You keep watching.',
         condition: (ctx) => ctx.portfolio.positions.length === 0 && ctx.liveDay > 100,
     },
     {
         id: 'own_press',
-        text: 'You\u2019re starting to believe your own press clippings.',
+        text: 'You\'re starting to believe your own press. Three strong quarters. Sharma mentioned your desk in a MarketWire column. Cole wants an interview. Be careful.',
         condition: (ctx) => {
             const strong = ctx.quarterlyReviews.filter(r => r.rating === 'strong');
             return strong.length >= 3;
@@ -46,7 +46,7 @@ const INTERJECTIONS = [
     },
     {
         id: 'late_game',
-        text: 'Four years. You can feel the weight of every trade.',
+        text: 'Four years. Barron\'s term — your term — is ending. Lassiter, Okafor, Hartley, Dirks, al-Farhan — all of them shaped the tape you traded. And you shaped it back.',
         condition: (ctx) => ctx.liveDay > 900 && ctx.impactHistory.length > 5,
     },
     {
@@ -56,14 +56,14 @@ const INTERJECTIONS = [
     },
     {
         id: 'crisis_profits',
-        text: 'Someone is always on the other side of a crisis trade. Today it\u2019s you.',
+        text: 'Someone is always on the other side of a crisis trade. Today it\'s pension funds in the Midwest, municipal bondholders in Ohio, Whittaker\'s constituents. You try not to think about it.',
         condition: (ctx) => {
             return ctx.sim.lambda > 5 && ctx.equity > ctx.portfolio.initialCapital * 1.3;
         },
     },
     {
         id: 'empty_desk',
-        text: 'The floor is quiet. Everyone else went home. You\u2019re still watching the screen.',
+        text: 'The floor is quiet. The junior traders went home at six. The cleaning crew is vacuuming around you. The Meridian Brief won\'t publish for twelve hours. Just you and the screens and the numbers.',
         condition: (ctx) => ctx.liveDay > 500 && ctx.portfolio.positions.length > 10,
     },
     {
