@@ -1414,7 +1414,10 @@ export const CONGRESS_EVENTS = [
             {
                 label: 'Attend the fundraiser',
                 desc: 'Network with power. Understand the regulatory landscape.',
-                onChoose: () => { shiftFaction('federalistSupport', +5); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +4 : +2); },
+                factionShifts: [
+                    { faction: 'federalistSupport', value: 5 },
+                    { faction: 'regulatoryExposure', value: 2, when: { hasTrait: 'under_scrutiny' }, bonus: 2 },
+                ],
                 deltas: { mu: 0.005 },
                 effects: [
                     { path: 'election.barronApproval', op: 'add', value: -1 },
@@ -1432,7 +1435,10 @@ export const CONGRESS_EVENTS = [
             {
                 label: 'Report to compliance',
                 desc: 'This feels like it crosses a line. Better to disclose.',
-                onChoose: () => { shiftFaction('firmStanding', +3); shiftFaction('regulatoryExposure', -2); },
+                factionShifts: [
+                    { faction: 'firmStanding', value: 3 },
+                    { faction: 'regulatoryExposure', value: -2 },
+                ],
                 deltas: {},
                 playerFlag: 'reported_lobbyist',
                 resultToast: 'Compliance thanks you and opens a file. The lobbyist is flagged.',
@@ -1552,7 +1558,10 @@ export const CONGRESS_EVENTS = [
             {
                 label: 'Attend the dinner',
                 desc: 'Access is currency. Play the long game.',
-                onChoose: () => { shiftFaction('federalistSupport', +8); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3); },
+                factionShifts: [
+                    { faction: 'federalistSupport', value: 8 },
+                    { faction: 'regulatoryExposure', value: 3, when: { hasTrait: 'under_scrutiny' }, bonus: 3 },
+                ],
                 deltas: { mu: 0.003 },
                 effects: [
                     { path: 'election.barronApproval', op: 'add', value: -2 },
@@ -1570,7 +1579,10 @@ export const CONGRESS_EVENTS = [
             {
                 label: 'Decline everything',
                 desc: 'You trade markets. You don\'t play politics.',
-                onChoose: () => { shiftFaction('federalistSupport', -1); shiftFaction('farmerLaborSupport', -1); },
+                factionShifts: [
+                    { faction: 'federalistSupport', value: -1 },
+                    { faction: 'farmerLaborSupport', value: -1 },
+                ],
                 deltas: {},
                 playerFlag: 'declined_political',
                 resultToast: 'The chief of staff is disappointed but professional. Your compliance record stays pristine.',

@@ -359,7 +359,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Ignore the email',
                 desc: 'Delete it. You don\'t answer to paper-pushers.',
-                onChoose: () => { shiftFaction('firmStanding', -3); },
+                factionShifts: [{ faction: 'firmStanding', value: -3 }],
                 complianceTier: 'defiant',
                 deltas: { xi: 0.02, theta: 0.005 },
                 playerFlag: 'ignored_compliance',
@@ -502,7 +502,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Push back hard',
                 desc: '"I\'m the one making money on this floor." Risky, but maybe they back off.',
-                onChoose: () => { shiftFaction('firmStanding', -5); },
+                factionShifts: [{ faction: 'firmStanding', value: -5 }],
                 complianceTier: 'defiant',
                 deltas: { xi: 0.015 },
                 playerFlag: 'pushed_back_risk_desk',
@@ -600,7 +600,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Push back',
                 desc: 'The position is sized appropriately for the thesis. You\'ll manage the risk.',
-                onChoose: () => { shiftFaction('firmStanding', -3); },
+                factionShifts: [{ faction: 'firmStanding', value: -3 }],
                 complianceTier: 'defiant',
                 playerFlag: 'defied_unlimited_risk',
                 resultToast: 'Risk desk notes your refusal. The file grows thicker.',
@@ -744,7 +744,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Close everything',
                 desc: 'Liquidate all positions. Rebuild from cash.',
-                onChoose: () => { shiftFaction('firmStanding', +5); },
+                factionShifts: [{ faction: 'firmStanding', value: 5 }],
                 trades: [{ action: 'close_all' }],
                 complianceTier: 'full',
                 playerFlag: 'liquidated_for_committee',
@@ -761,7 +761,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Blame the market',
                 desc: 'It was an unprecedented move. Nobody saw it coming. The model was fine.',
-                onChoose: () => { shiftFaction('firmStanding', -8); },
+                factionShifts: [{ faction: 'firmStanding', value: -8 }],
                 complianceTier: 'defiant',
                 deltas: { xi: 0.02 },
                 playerFlag: 'blamed_market',
@@ -787,7 +787,10 @@ export const FIRM_EVENTS = [
             {
                 label: 'Donate to charity publicly',
                 desc: 'Pledge a portion of profits to recession relief. Good optics.',
-                onChoose: () => { shiftFaction('mediaTrust', +2 + (hasTrait('media_figure') ? 2 : 0)); shiftFaction('farmerLaborSupport', +2); },
+                factionShifts: [
+                    { faction: 'mediaTrust', value: 2, when: { hasTrait: 'media_figure' }, bonus: 2 },
+                    { faction: 'farmerLaborSupport', value: 2 },
+                ],
                 deltas: {},
                 effects: [
                     { path: 'election.barronApproval', op: 'add', value: 1 },
@@ -805,7 +808,11 @@ export const FIRM_EVENTS = [
             {
                 label: 'Go on The Sentinel to defend capitalism',
                 desc: 'Marcus Cole\'s show. Markets allocate risk. Your profits are price discovery. Someone has to say it.',
-                onChoose: () => { shiftFaction('mediaTrust', +3 + (hasTrait('media_figure') ? 2 : 0)); shiftFaction('federalistSupport', +3); shiftFaction('farmerLaborSupport', -5); },
+                factionShifts: [
+                    { faction: 'mediaTrust', value: 3, when: { hasTrait: 'media_figure' }, bonus: 2 },
+                    { faction: 'federalistSupport', value: 3 },
+                    { faction: 'farmerLaborSupport', value: -5 },
+                ],
                 deltas: { xi: 0.015 },
                 effects: [{ path: 'media.sentinelRating', op: 'add', value: 1 }],
                 playerFlag: 'defended_capitalism_tv',
@@ -838,7 +845,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Promise to flatten',
                 desc: '"I\'ll reduce risk and rebuild from a clean book."',
-                onChoose: () => { shiftFaction('firmStanding', +3); },
+                factionShifts: [{ faction: 'firmStanding', value: 3 }],
                 trades: [{ action: 'close_all' }],
                 complianceTier: 'full',
                 deltas: { theta: -0.005, xi: -0.01 },
@@ -856,7 +863,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Show conviction',
                 desc: '"The positions are right. I need more time and a bit more risk budget."',
-                onChoose: () => { shiftFaction('firmStanding', -2); },
+                factionShifts: [{ faction: 'firmStanding', value: -2 }],
                 complianceTier: 'defiant',
                 playerFlag: 'showed_conviction_early',
                 resultToast: 'Your MD nods slowly. "Don\'t make me regret this."',
@@ -884,7 +891,10 @@ export const FIRM_EVENTS = [
             {
                 label: 'Cooperate fully',
                 desc: 'Open your books. Show them everything. Transparency is your friend.',
-                onChoose: () => { shiftFaction('firmStanding', +2); shiftFaction('regulatoryExposure', -2); },
+                factionShifts: [
+                    { faction: 'firmStanding', value: 2 },
+                    { faction: 'regulatoryExposure', value: -2 },
+                ],
                 deltas: {},
                 playerFlag: 'cooperated_unusual_activity',
                 resultToast: 'Review completed. No issues found. The flag is cleared.',
@@ -892,7 +902,10 @@ export const FIRM_EVENTS = [
             {
                 label: 'Lawyer up',
                 desc: 'Call your personal attorney before responding. Protect yourself.',
-                onChoose: () => { shiftFaction('firmStanding', -3); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3); },
+                factionShifts: [
+                    { faction: 'firmStanding', value: -3 },
+                    { faction: 'regulatoryExposure', value: 3, when: { hasTrait: 'under_scrutiny' }, bonus: 3 },
+                ],
                 deltas: { xi: 0.005 },
                 playerFlag: 'lawyered_up_unusual',
                 resultToast: 'The lawyer tells compliance you\'ll respond in writing within 5 business days. Tension rises.',
@@ -920,7 +933,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Take the meeting',
                 desc: 'What\'s the harm? Always good to know your market value.',
-                onChoose: () => { shiftFaction('firmStanding', -3); },
+                factionShifts: [{ faction: 'firmStanding', value: -3 }],
                 deltas: {},
                 playerFlag: 'took_headhunter_meeting',
                 resultToast: 'You meet at a discreet restaurant in Midtown. The offer is real. Now you have leverage.',
@@ -928,7 +941,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Tell your MD',
                 desc: 'Loyalty play. Let Meridian match or beat the offer.',
-                onChoose: () => { shiftFaction('firmStanding', +5); },
+                factionShifts: [{ faction: 'firmStanding', value: 5 }],
                 deltas: {},
                 effects: [
                     { path: 'fed.credibilityScore', op: 'add', value: 0 },  // no-op but shows loyalty
@@ -970,7 +983,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Swing bigger',
                 desc: 'You survived the worst. Time to press your edge harder.',
-                onChoose: () => { shiftFaction('firmStanding', -3); },
+                factionShifts: [{ faction: 'firmStanding', value: -3 }],
                 deltas: { xi: 0.01 },
                 playerFlag: 'comeback_aggressive',
                 resultToast: 'The comeback trader goes on the offensive. Your MD raises an eyebrow.',

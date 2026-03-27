@@ -213,10 +213,10 @@ export const MEDIA_EVENTS = [
             {
                 label: 'Do the interview',
                 desc: 'Enjoy the spotlight. You earned it.',
-                onChoose: () => {
-                    shiftFaction('mediaTrust', +8 + (hasTrait('media_figure') ? 2 : 0));
-                    shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3);
-                },
+                factionShifts: [
+                    { faction: 'mediaTrust', value: 8, when: { hasTrait: 'media_figure' }, bonus: 2 },
+                    { faction: 'regulatoryExposure', value: 3, when: { hasTrait: 'under_scrutiny' }, bonus: 3 },
+                ],
                 deltas: { xi: 0.01 },
                 playerFlag: 'did_ft_interview',
                 resultToast: 'The profile runs in The Continental. Your LinkedIn explodes. The floor treats you differently now.',
@@ -224,7 +224,7 @@ export const MEDIA_EVENTS = [
             {
                 label: 'Decline politely',
                 desc: 'Stay anonymous. The best traders are the ones nobody\'s heard of.',
-                onChoose: () => { shiftFaction('mediaTrust', -2); },
+                factionShifts: [{ faction: 'mediaTrust', value: -2 }],
                 deltas: {},
                 playerFlag: 'declined_ft_interview',
                 resultToast: 'The Continental runs a piece about Meridian anyway, but without your name. Smart.',
@@ -248,7 +248,7 @@ export const MEDIA_EVENTS = [
             {
                 label: 'Stay in the shadows',
                 desc: 'The work is the brand. Let the returns compound.',
-                onChoose: () => { shiftFaction('mediaTrust', -1); },
+                factionShifts: [{ faction: 'mediaTrust', value: -1 }],
                 deltas: {},
                 playerFlag: 'stayed_shadows_media',
                 resultToast: 'Silent and profitable. The way the old guard did it.',
@@ -256,7 +256,10 @@ export const MEDIA_EVENTS = [
             {
                 label: 'Accept a panel invitation',
                 desc: 'A macro conference wants you on their "New Voices" panel.',
-                onChoose: () => { shiftFaction('mediaTrust', +5 + (hasTrait('media_figure') ? 2 : 0)); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +4 : +2); },
+                factionShifts: [
+                    { faction: 'mediaTrust', value: 5, when: { hasTrait: 'media_figure' }, bonus: 2 },
+                    { faction: 'regulatoryExposure', value: 2, when: { hasTrait: 'under_scrutiny' }, bonus: 2 },
+                ],
                 deltas: { xi: 0.005 },
                 playerFlag: 'accepted_panel_media',
                 resultToast: 'The panel goes well. You\'re now a "voice" in macro. The attention cuts both ways.',
@@ -297,7 +300,10 @@ export const MEDIA_EVENTS = [
             {
                 label: 'Hold the position',
                 desc: 'You have a fiduciary duty to your investors. The position is legal and well-reasoned.',
-                onChoose: () => { shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3); shiftFaction('mediaTrust', -2); },
+                factionShifts: [
+                    { faction: 'regulatoryExposure', value: 3, when: { hasTrait: 'under_scrutiny' }, bonus: 3 },
+                    { faction: 'mediaTrust', value: -2 },
+                ],
                 complianceTier: 'defiant',
                 deltas: { xi: 0.01 },
                 playerFlag: 'held_crisis_short',
