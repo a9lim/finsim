@@ -247,9 +247,7 @@
                 </button>
             </div>
             <div id="lobby-bar" class="lobby-bar glass" style="display:none">
-                <button class="substrate-pill substrate-pill-left lobby-pill lobby-pill-fed" data-lobby="lobby_federalist" title="Fund Federalist PACs">+Fed</button>
-                <span class="substrate-divider"></span>
-                <button class="substrate-pill substrate-pill-right lobby-pill lobby-pill-fl" data-lobby="lobby_farmerlabor" title="Fund Farmer-Labor PACs">+F-L</button>
+                <div id="lobby-actions"></div>
             </div>
         </div>
         <div id="time-slider-bar" class="time-slider-bar hidden">
@@ -549,6 +547,11 @@
                             <span class="text-muted" style="font-size:0.78rem">None</span>
                         </div>
                     </div>
+                    <div id="standings-section" class="stat-group hidden">
+                        <div class="group-label">Standings</div>
+                        <div id="standings-world"></div>
+                        <div id="standings-factions"></div>
+                    </div>
                     <div class="stat-group">
                         <div class="group-label">Settings</div>
                         <div class="control-group">
@@ -688,6 +691,7 @@
             <div class="epilogue-footer">
                 <div class="epilogue-dots">
                     <span class="epilogue-dot active"></span>
+                    <span class="epilogue-dot"></span>
                     <span class="epilogue-dot"></span>
                     <span class="epilogue-dot"></span>
                     <span class="epilogue-dot"></span>
