@@ -18,7 +18,7 @@ Serve from the root — shared files load via absolute paths (`/shared-*.js`, `/
 
 ## Overview
 
-Interactive options trading simulator at **Meridian Capital**. Player is a senior derivatives trader during the Barron administration. GBM+Merton+Heston stock, Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), strategy builder, portfolio/margin system, Almgren-Chriss price impact, narrative event engine with popup decisions, political lore, chiptune jazz soundtrack, and 4-page epilogue. Zero dependencies, vanilla ES6 modules, no build step.
+Interactive options trading simulator at **Meridian Capital**. Player is a senior derivatives trader during the Barron administration. GBM+Merton+Heston stock, Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), strategy builder, portfolio/margin system, Almgren-Chriss price impact, narrative event engine with popup decisions, political lore, chiptune jazz soundtrack, and 5-page adaptive epilogue with 6 ending types. Zero dependencies, vanilla ES6 modules, no build step.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 **Module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator. `market.js` is shared mutable state (single-writer main.js via `syncMarket`, multiple readers).
 
-**Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains + filibuster/media recurring pulses + conviction-aware likelihood weighting), event-pool.js (~320 toast events with lore-specific headlines + 18 cross-domain one-shot triggers as `oneShot` events + 15 atmospheric interjections via recurring pulse), popup-events.js (~30 interactive popup decisions with conviction-aware context variants), world-state.js (congress/PNTH/geopolitical/Fed/media), faction-standing.js (unified 6-faction standing system: firmStanding, regulatoryExposure, federalistSupport, farmerLaborSupport, mediaTrust, fedRelations), convictions.js (12 permanent modifiers), regulations.js (11 dynamic trading rules including filibuster uncertainty), lobbying.js (2 PAC-funding pills with bill-specific descriptions), epilogue.js (4-page ending with product/geopolitical/conviction-specific narratives).
+**Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains + filibuster/media/interjection recurring pulses + trait-aware likelihood weighting), event-pool.js (~350 toast events with lore-specific headlines + 18 cross-domain one-shot triggers as `oneShot` events + ~30 faction/trait/portfolio-gated events + 15 atmospheric interjections via recurring pulse), popup-events.js (~30 interactive popup decisions with trait-aware context variants and faction shifts), world-state.js (congress/PNTH/geopolitical/Fed/media), faction-standing.js (unified 6-faction standing system: firmStanding, regulatoryExposure, federalistSupport, farmerLaborSupport, mediaTrust, fedRelations + capitalMultiplier), traits.js (12 permanent convictions + 6 dynamic reputation tags), regulations.js (11 dynamic trading rules including filibuster uncertainty), lobbying.js (6-action 3-tier targeted PAC funding system), endings.js (6 ending conditions + 5-page adaptive epilogue generation).
 
 **Audio**: `audio.js` — all Web Audio API synthesis, no external audio files. Three layers: (1) background jazz loop (128 BPM, 16-bar Am diatonic circle: smooth walking bass with sub-octave sine, voice-led 3-note rootless comping (triangle mains + square ghost fills), sparse hi-hat, cross-stick, kick with phrase-building dynamics, brush sweeps at section turnarounds), (2) continuous Am drone pad (sine/triangle/sawtooth oscillators), (3) event stingers + superevent chord stabs. Voicings use smooth semitone/step voice leading throughout the progression; E7 uses b9 for film-noir tension resolving to Am7. Drums build within each 4-bar phrase (sparse→full→resolve). `setAmbientMood(mood)` crossfades between jazz and drone: calm = full jazz, tense = jazz 55% / drone 45%, crisis = jazz 15% / drone 85%. Jazz loop uses a look-ahead scheduler (`_jazzSchedule`) that keeps 4s of audio queued. `playMusic(track)` ducks both jazz and drone to silence for superevent chord stabs, `stopMusic` restores them to the current mood mix. Volume slider is in the Settings group of the Info tab.
 
@@ -39,7 +39,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 1. `frame()` applies Layer 3 param overlays, calls `sim.beginDay()`
 2. 16 sub-steps per day: `sim.substep()` → rate ceiling/floor clamp → `decayImpactVolumes()` → `syncMarket()` → `rehedgeMM()` → `_onSubstepTick()` (pending orders) → `chart.setLiveCandle()`
 3. After substep batch: `_onSubstepUI()` (reprice chain sidebar, update portfolio display)
-4. After all 16: `sim.finalizeDay()`, overlays removed. `_onDayComplete()` runs: borrow interest, expiry, dividends, quarterly review, conviction eval, epilogue check, event engine, regulation eval, portfolio popups, Layer 3 shifts, scrutiny, ambient mood, rogue trading check, margin check, lobby pill update, popup queue drain
+4. After all 16: `sim.finalizeDay()`, overlays removed. `_onDayComplete()` runs: borrow interest, expiry, dividends, quarterly review, trait eval, event engine, regulation eval, endings check, portfolio popups, Layer 3 shifts, scrutiny, ambient mood, rogue trading check, margin check, lobby pill update, standings update, popup queue drain
 
 ### Bootstrap
 
@@ -47,7 +47,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 ### Reset
 
-`_resetCore()` must call all narrative resets: `resetConvictions()`, `resetRegulations()`, `resetFactions()`, `resetLobbying()`, `resetAudio()`, `resetImpactState()`, `resetPopupCooldowns()`. Also reset `dayInProgress`, `chart._lerp.day = -1`, `_lobbyCount = 0`. After `resetFactions()`, re-wire `eventEngine.world.factions = factions`.
+`_resetCore()` must call all narrative resets: `resetTraits()`, `resetRegulations()`, `resetFactions()`, `resetLobbying()`, `resetAudio()`, `resetImpactState()`, `resetPopupCooldowns()`. Also reset `dayInProgress`, `chart._lerp.day = -1`, `_lobbyCount = 0`. After `resetFactions()`, re-wire `eventEngine.world.factions = factions`.
 
 ## Key Conventions
 
@@ -110,7 +110,7 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - Event deltas are additive and clamped to `PARAM_RANGES` — never set absolute values
 - Superevent params apply at fire time (in `_fireEvent`), not choice time — popup is informational only
 - `minDay`/`maxDay` use live trading days (`day - 252`), different from `era` which uses absolute `day`
-- `getConvictionEffect(key, defaultVal)` multiplies all active effects onto defaultVal (boolean: any true wins)
+- `getTraitEffect(key, defaultVal)` multiplies all active effects onto defaultVal (boolean: any true wins)
 - `getRegulationEffect(key, defaultVal)` — mult keys: product; add: sum; ceiling: min; floor: max; boolean: any true
 - One-shot events (migrated compound triggers) fire at most once per game — tracked by event id in `EventEngine._firedOneShots` Set
 
@@ -128,6 +128,9 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - `AMBIENT_MOODS` / `_stopAmbient` / `_ambientNodes` / `_ambientGain` — old drone-only ambient system replaced by jazz loop + drone crossfade via `MOOD_MIX`
 - `_jazzFilter` for mood — mood is now a jazz↔drone crossfade, not a lowpass filter
 - `compound-triggers.js` / `checkCompoundTriggers` / `resetCompoundTriggers` / `getFiredTriggerIds` — deleted; all 18 triggers migrated to `event-pool.js` as `oneShot: true` events, fired by the standard EventEngine one-shot pre-pass
+- `interjections.js` / `checkInterjections` / `resetInterjections` — deleted; all interjections migrated to `event-pool.js` as `category: 'interjection'` events with recurring pulse in events.js
+- `epilogue.js` / `generateEpilogue` — deleted; replaced by `endings.js` with `checkEndings` + `generateEnding` supporting 6 ending types and 5-page adaptive epilogue
+- `convictions.js` / `getConvictionEffect` / `getConvictionIds` / `evaluateConvictions` / `resetConvictions` — renamed to `traits.js` with `getTraitEffect` / `getActiveTraitIds` / `evaluateTraits` / `resetTraits`
 
 ### Lore Reference
 
