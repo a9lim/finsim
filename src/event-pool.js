@@ -3246,6 +3246,80 @@ const CONGRESSIONAL_EVENTS = [
         },
     },
 
+    // -- Okafor-Whitfield Revenue Package lifecycle ---------------------------
+    {
+        id: 'transaction_tax_introduced',
+        category: 'congressional',
+        likelihood: 0.5,
+        headline: 'Okafor and Whitfield introduce the Revenue Stabilization Act: a 0.1% tax on all securities transactions. "Wall Street should pay its fair share," Okafor says. Lassiter calls it "a declaration of war on capital markets."',
+        magnitude: 'moderate',
+        when: (sim, world, congress) => !congress.trifecta && getPipelineStatus('transaction_tax') === null,
+        params: { mu: -0.015, theta: 0.005 },
+        effects: () => { advanceBill('transaction_tax', 'introduced'); shiftFaction('farmerLaborSupport', 2); },
+        followups: [
+            { id: 'transaction_tax_committee', mtth: 25, weight: 1 },
+            { id: 'transaction_tax_lobbying', mtth: 10, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'transaction_tax_lobbying',
+        category: 'congressional',
+        likelihood: 2,
+        headline: 'Wall Street lobbying blitz against the transaction tax: $40M in two weeks. Meridian Capital\'s government affairs team is working overtime. The Meridian Brief: "If this passes, every desk in the building feels it."',
+        magnitude: 'minor',
+        when: (sim, world) => getPipelineStatus('transaction_tax') === 'introduced',
+        params: {},
+    },
+    {
+        id: 'transaction_tax_committee',
+        category: 'congressional',
+        likelihood: 3,
+        headline: 'Senate Finance Committee advances the transaction tax 12-10 on a party-line vote. Lassiter vows to filibuster. Whitfield: "Let him. We have the patience." MarketWire: "Markets pricing in a wider spread regime."',
+        magnitude: 'moderate',
+        when: (sim, world) => getPipelineStatus('transaction_tax') === 'introduced',
+        params: { mu: -0.01, theta: 0.005 },
+        effects: () => { advanceBill('transaction_tax', 'committee'); },
+        followups: [
+            { id: 'transaction_tax_passes', mtth: 30, weight: 0.5 },
+            { id: 'transaction_tax_fails', mtth: 30, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'transaction_tax_passes',
+        category: 'congressional',
+        headline: 'The Okafor-Whitfield Revenue Package passes 52-48. Every Farmer-Labor senator votes yes. Lassiter\'s filibuster attempt collapses after six hours. Barron vetoes — but Okafor has the override votes. Spreads widen immediately.',
+        likelihood: (sim, world, congress) => {
+            let w = !congress.fedControlsSenate ? 3 : 0.3;
+            w *= (1 - (world.election.lobbyMomentum || 0) * 0.15);
+            return Math.max(0.1, w);
+        },
+        magnitude: 'major',
+        when: (sim, world) => getPipelineStatus('transaction_tax') === 'committee',
+        params: { mu: -0.02, theta: 0.01 },
+        effects: (world) => {
+            shiftFaction('farmerLaborSupport', 4);
+            shiftFaction('firmStanding', -3);
+            advanceBill('transaction_tax', 'active');
+        },
+    },
+    {
+        id: 'transaction_tax_fails',
+        category: 'congressional',
+        headline: 'The transaction tax fails 47-53 as three moderate Farmer-Labor senators defect, citing impact on pension funds. Okafor: "We will be back." Lassiter pops champagne on the Senate steps — The Continental photographs it.',
+        likelihood: (sim, world, congress) => {
+            let w = congress.fedControlsSenate ? 3 : 0.8;
+            w *= (1 + (world.election.lobbyMomentum || 0) * 0.15);
+            return Math.max(0.1, w);
+        },
+        magnitude: 'major',
+        when: (sim, world) => getPipelineStatus('transaction_tax') === 'committee',
+        params: { mu: 0.015, theta: -0.003 },
+        effects: (world) => {
+            shiftFaction('firmStanding', 2);
+            advanceBill('transaction_tax', 'failed');
+        },
+    },
+
     // -- Big Beautiful Bill lifecycle -----------------------------------------
     {
         id: 'big_bill_house_passes',
