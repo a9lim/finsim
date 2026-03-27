@@ -20,6 +20,7 @@ import {
 import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
 import { recordStockTrade, recordOptionTrade } from './price-impact.js';
 import { getRegulationEffect } from './regulations.js';
+import { capitalMultiplier } from './faction-standing.js';
 
 let _greekTrees = null;
 import { computePositionValue, unitPrice } from './position-value.js';
@@ -186,8 +187,8 @@ function _checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRa
     // equity is roughly unchanged. Compute current equity as the baseline.
     const equity = portfolioValue(currentPrice, currentVol, currentRate, currentDay, q);
 
-    // Initial margin: equity must cover REG_T_MARGIN of the debit
-    return equity >= REG_T_MARGIN * Math.abs(newCash);
+    // Initial margin: equity must cover REG_T_MARGIN of the debit (scaled by capital allocation)
+    return equity >= REG_T_MARGIN * Math.abs(newCash) / capitalMultiplier();
 }
 
 /**
@@ -273,7 +274,7 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
     // Add the proposed short position's MTM to equity
     equity += shortMtm;
 
-    required *= getRegulationEffect('marginMult', 1);
+    required *= getRegulationEffect('marginMult', 1) / capitalMultiplier();
     return equity >= required;
 }
 
@@ -990,7 +991,7 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
         required += MAINTENANCE_MARGIN * Math.abs(portfolio.cash);
     }
 
-    required *= getRegulationEffect('marginMult', 1);
+    required *= getRegulationEffect('marginMult', 1) / capitalMultiplier();
     const triggered = required > 0 && equity < required;
     return { triggered, equity, required };
 }
