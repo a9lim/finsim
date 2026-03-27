@@ -12,7 +12,7 @@
    Leaf module. No DOM access.
    =================================================== */
 
-import { getFaction, shiftFaction, factions } from './faction-standing.js';
+import { getFaction, shiftFaction } from './faction-standing.js';
 import { hasTrait, getTraitEffect } from './traits.js';
 
 const LOBBY_COOLDOWN = 30;
