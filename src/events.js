@@ -16,11 +16,11 @@ import {
 } from './config.js';
 
 import { createWorldState, congressHelpers, applyStructuredEffects } from './world-state.js';
-import { OFFLINE_EVENTS, PARAM_RANGES, getEventById } from './event-pool.js';
+import { OFFLINE_EVENTS, PARAM_RANGES, getEventById } from './events/index.js';
 import { getTraitEffect, getActiveTraitIds } from './traits.js';
 
 // -- Re-export for backwards compat -------------------------------------
-export { PARAM_RANGES } from './event-pool.js';
+export { PARAM_RANGES } from './events/index.js';
 
 const MAX_LOG = MAX_EVENT_LOG;
 const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;

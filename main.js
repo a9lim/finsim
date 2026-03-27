@@ -51,7 +51,7 @@ import {
 } from './src/strategy-store.js';
 import { applyStructuredEffects, congressHelpers } from './src/world-state.js';
 import { evaluatePortfolioPopups, resetPopupCooldowns, pickTip } from './src/popup-events.js';
-import { getEventById } from './src/event-pool.js';
+import { getEventById } from './src/events/index.js';
 import {
     factions, resetFactions, getFaction,
     onQuarterlyReview, applyComplianceChoice,
