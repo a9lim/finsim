@@ -162,6 +162,10 @@ export function cacheDOMElements($) {
     $.senateLegend       = document.getElementById('senate-legend');
     $.houseLegend        = document.getElementById('house-legend');
     $.lobbyBar           = document.getElementById('lobby-bar');
+    $.lobbyActions       = document.getElementById('lobby-actions');
+    $.standingsSection   = document.getElementById('standings-section');
+    $.standingsWorld     = document.getElementById('standings-world');
+    $.standingsFactions  = document.getElementById('standings-factions');
 }
 
 // ---------------------------------------------------------------------------

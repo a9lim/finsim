@@ -33,7 +33,7 @@ import {
 import { initTheme, toggleTheme } from './src/theme.js';
 import { EventEngine } from './src/events.js';
 import { LLMEventSource } from './src/llm.js';
-import { generateEpilogue } from './src/epilogue.js';
+import { checkEndings, generateEnding } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
@@ -558,10 +558,10 @@ function init() {
             const result = executeLobbyAction(actionId, day, eventEngine.world);
             if (result) {
                 portfolio.cash -= result.cost;
-                shiftFaction('regulatoryExposure', 7);
-                playerChoices['lobbied_' + actionId.replace('lobby_', '')] = day;
+                if (result.playerFlag) playerChoices[result.playerFlag] = day;
+                else playerChoices['lobbied_' + actionId] = day;
                 _lobbyCount++;
-                showToast('Lobbying: ' + result.action.name + ' (-$' + result.cost + 'k)', 3000);
+                showToast('Lobbying: ' + result.action.name + (result.cost > 0 ? ' (-$' + result.cost + 'k)' : ''), 3000);
                 _updateLobbyPills();
                 dirty = true;
             }
@@ -796,18 +796,24 @@ function _onSubstepUI() {
 }
 
 function _updateLobbyPills() {
-    if (!$.lobbyBar) return;
+    if (!$.lobbyBar || !$.lobbyActions) return;
     const day = sim.history.maxDay;
     const actions = getAvailableActions(day, portfolio.cash);
-    for (const { action, cost, available, cooldownRemaining } of actions) {
-        const btn = $.lobbyBar.querySelector(`[data-lobby="${action.id}"]`);
-        if (!btn) continue;
-        btn.disabled = !available;
-        const cdText = cooldownRemaining > 0 ? ` (${cooldownRemaining}d cooldown)` : '';
-        const desc = typeof action.description === 'function'
-            ? action.description(eventEngine.world)
-            : action.description;
-        btn.title = `${action.name} — $${cost}k${cdText}\n${desc}`;
+    // Clear existing buttons
+    while ($.lobbyActions.firstChild) $.lobbyActions.removeChild($.lobbyActions.firstChild);
+    if (actions.length === 0) {
+        $.lobbyBar.style.display = 'none';
+        return;
+    }
+    $.lobbyBar.style.display = eventEngine ? '' : 'none';
+    for (const action of actions) {
+        const btn = document.createElement('button');
+        btn.className = 'lobby-pill';
+        btn.dataset.lobby = action.id;
+        btn.disabled = !action.affordable || !action.cooldownReady;
+        btn.textContent = action.name + (action.cost > 0 ? ` ($${action.cost}k)` : '');
+        btn.title = action.desc;
+        $.lobbyActions.appendChild(btn);
     }
 }
 
@@ -1026,7 +1032,9 @@ function _showComplianceTermination() {
     playing = false;
     updatePlayBtn($, playing);
     playerChoices['compliance_terminated'] = sim.day;
-    _showEpilogue('compliance');
+    const pages = generateEnding('forced_resignation', eventEngine?.world ?? {}, sim, portfolio,
+        eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews);
+    _showEpilogue(pages);
 }
 
 function _updateTraitDisplay() {
@@ -1190,15 +1198,6 @@ function _onDayComplete() {
         if (trait) showToast(`${trait.permanent ? 'Conviction unlocked' : 'Reputation earned'}: ${trait.name}`, 4000);
     }
 
-    // Epilogue check (before regular events)
-    if (eventEngine && eventEngine.isEpilogueReady(sim.day)) {
-        playing = false;
-        updatePlayBtn($, playing);
-        eventEngine.computeElectionOutcome(sim);
-        _showEpilogue();
-        return;
-    }
-
     // Fire dynamic events
     if (eventEngine) {
         eventEngine.setPlayerContext(
@@ -1265,6 +1264,20 @@ function _onDayComplete() {
         for (const id of regChanges.deactivated) {
             const reg = getRegulation(id);
             if (reg) showToast('Regulation repealed: ' + reg.name, 3000);
+        }
+    }
+
+    // Endings check (after events and faction shifts)
+    if (eventEngine) {
+        const endingId = checkEndings(sim, portfolio, eventEngine.world, playerChoices);
+        if (endingId) {
+            playing = false;
+            updatePlayBtn($, playing);
+            if (endingId === 'term_ends') eventEngine.computeElectionOutcome(sim);
+            const pages = generateEnding(endingId, eventEngine.world, sim, portfolio,
+                eventEngine.eventLog, playerChoices, impactHistory, quarterlyReviews);
+            _showEpilogue(pages);
+            return;
         }
     }
 
@@ -2134,14 +2147,21 @@ function updateStrategyBuilder() {
 // Epilogue overlay controller
 // ---------------------------------------------------------------------------
 
-function _showEpilogue(terminationReason = null) {
-    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason, getActiveTraitIds(), getFactionState());
+function _showEpilogue(pages) {
     let currentPage = 0;
 
     const overlay = document.getElementById('epilogue-overlay');
     const title = overlay.querySelector('.epilogue-title');
     const body = overlay.querySelector('.epilogue-body');
-    const dots = overlay.querySelectorAll('.epilogue-dot');
+    // Dynamically generate dots to match page count
+    const dotsContainer = overlay.querySelector('.epilogue-dots');
+    while (dotsContainer.firstChild) dotsContainer.removeChild(dotsContainer.firstChild);
+    for (let i = 0; i < pages.length; i++) {
+        const dot = document.createElement('span');
+        dot.className = 'epilogue-dot' + (i === 0 ? ' active' : '');
+        dotsContainer.appendChild(dot);
+    }
+    const dots = dotsContainer.querySelectorAll('.epilogue-dot');
     const backBtn = overlay.querySelector('#epilogue-back');
     const nextBtn = overlay.querySelector('#epilogue-next');
     const restartBtn = overlay.querySelector('#epilogue-restart');
@@ -2152,7 +2172,7 @@ function _showEpilogue(terminationReason = null) {
         body.style.opacity = '0';
         setTimeout(() => {
             title.textContent = page.title;
-            // SECURITY: page.body is generated entirely by generateEpilogue()
+            // SECURITY: page.body is generated entirely by generateEnding()
             // from trusted world state -- no user input or external data
             body.innerHTML = page.body;  // eslint-disable-line no-unsanitized/property
             body.scrollTop = 0;
