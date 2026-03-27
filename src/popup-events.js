@@ -13,7 +13,7 @@ import {
 import { computeNetDelta, computeGrossNotional, portfolio, portfolioValue } from './portfolio.js';
 import { market } from './market.js';
 import { unitPrice } from './position-value.js';
-import { getActiveTraitIds } from './traits.js';
+import { getActiveTraitIds, hasTrait } from './traits.js';
 import { firmThresholdMult, firmCooldownMult, firmTone, getRegLevel, shiftFaction } from './faction-standing.js';
 
 const _cooldowns = {}; // id → last fired day
@@ -182,7 +182,8 @@ export const PORTFOLIO_POPUPS = [
         trigger: (sim, world) => {
             const eq = _equity();
             if (eq <= 0) return false;
-            return _shortDirectionalNotional() / eq > 0.30 * firmThresholdMult() && _anyInvestigationActive(world);
+            const thresh = 0.30 * firmThresholdMult() * (hasTrait('under_scrutiny') ? 0.7 : 1);
+            return _shortDirectionalNotional() / eq > thresh && _anyInvestigationActive(world);
         },
         cooldown: 200,
         popup: true,
@@ -198,7 +199,10 @@ export const PORTFOLIO_POPUPS = [
             const subpoenaLine = okaforActive
                 ? ' Okafor\'s Special Investigations Committee has subpoena authority over trading records — Meridian\'s general counsel is already briefing outside attorneys.'
                 : ' Congressional staffers have been making informal calls to prime brokers. Meridian\'s general counsel is asking pointed questions about your information sources.';
-            return prefix + `Your net delta is ${netDelta.toFixed(0)} — deeply short — while federal investigators are circling. Compliance has pulled your trading records and wants a meeting. The optics of a large directional bet during an investigation are terrible.` + subpoenaLine;
+            const scrutinyLine = hasTrait('under_scrutiny')
+                ? `Given your current visibility, this is extremely dangerous. `
+                : '';
+            return prefix + scrutinyLine + `Your net delta is ${netDelta.toFixed(0)} — deeply short — while federal investigators are circling. Compliance has pulled your trading records and wants a meeting. The optics of a large directional bet during an investigation are terrible.` + subpoenaLine;
         },
         choices: [
             {
@@ -327,7 +331,7 @@ export const PORTFOLIO_POPUPS = [
             const eq = _equity();
             if (eq <= 0) return false;
             const gross = computeGrossNotional();
-            return (gross / eq) > 4;
+            return (gross / eq) > 4 * (hasTrait('under_scrutiny') ? 0.7 : 1);
         },
         cooldown: 120,
         popup: true,
@@ -585,7 +589,7 @@ export const PORTFOLIO_POPUPS = [
 
     {
         id: 'desk_ft_interview',
-        trigger: () => _equity() > INITIAL_CAPITAL * 1.5,
+        trigger: () => _equity() > INITIAL_CAPITAL * 1.5 || hasTrait('media_figure'),
         cooldown: 300,
         popup: true,
         headline: 'The Continental wants a profile',
@@ -599,13 +603,19 @@ export const PORTFOLIO_POPUPS = [
             if (convIds.includes('ghost_protocol')) {
                 return `Your returns are up ${pct}% and somehow The Continental's markets desk has noticed. An editor reached out to Meridian's PR team — "The Trader Nobody Knows" is their working headline. You've stayed invisible this long. A profile in The Continental would change that permanently.`;
             }
+            if (hasTrait('media_figure')) {
+                return `Your returns are up ${pct}% and your growing public profile has caught The Continental's attention. Rachel Tan's editor wants an in-depth feature — "The Meridian Trader Everyone's Watching." Between the conference panels, the MarketWire mentions, and the sellside chatter, you're already half-famous. A Continental profile would finish the job.`;
+            }
             return `Your returns are up ${pct}% and The Continental's markets desk wants an interview. "The Meridian Trader Who Bet Against the Crowd" — that's their working headline. The PR team is excited. Your MD is cautiously supportive. But every trader who's ever been profiled knows: the cover jinx is real. The moment the ink dries, the market gods come for you.`;
         },
         choices: [
             {
                 label: 'Do the interview',
                 desc: 'Enjoy the spotlight. You earned it.',
-                onChoose: () => { shiftFaction('mediaTrust', +8); shiftFaction('regulatoryExposure', +3); },
+                onChoose: () => {
+                    shiftFaction('mediaTrust', +8 + (hasTrait('media_figure') ? 2 : 0));
+                    shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3);
+                },
                 deltas: { xi: 0.01 },
                 playerFlag: 'did_ft_interview',
                 resultToast: 'The profile runs in The Continental. Your LinkedIn explodes. The floor treats you differently now.',
@@ -638,7 +648,10 @@ export const PORTFOLIO_POPUPS = [
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
                 : '';
-            return prefix + `You're down ${loss}%. The risk committee has convened an emergency session. The CRO, general counsel, and your MD are in the conference room. The conversation is short: explain the losses, present a plan, or face position limits. The compliance officer is taking notes. HR is cc'd on the meeting invite. This is not a drill.`;
+            const starLine = hasTrait('meridian_star')
+                ? `Your track record buys you time, but `
+                : '';
+            return prefix + starLine + `You're down ${loss}%. The risk committee has convened an emergency session. The CRO, general counsel, and your MD are in the conference room. The conversation is short: explain the losses, present a plan, or face position limits. The compliance officer is taking notes. HR is cc'd on the meeting invite. This is not a drill.`;
         },
         choices: [
             {
@@ -687,7 +700,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Donate to charity publicly',
                 desc: 'Pledge a portion of profits to recession relief. Good optics.',
-                onChoose: () => { shiftFaction('mediaTrust', +2); shiftFaction('farmerLaborSupport', +2); },
+                onChoose: () => { shiftFaction('mediaTrust', +2 + (hasTrait('media_figure') ? 2 : 0)); shiftFaction('farmerLaborSupport', +2); },
                 deltas: {},
                 effects: [
                     { path: 'election.barronApproval', op: 'add', value: 1 },
@@ -705,7 +718,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Go on The Sentinel to defend capitalism',
                 desc: 'Marcus Cole\'s show. Markets allocate risk. Your profits are price discovery. Someone has to say it.',
-                onChoose: () => { shiftFaction('mediaTrust', +3); shiftFaction('federalistSupport', +3); shiftFaction('farmerLaborSupport', -5); },
+                onChoose: () => { shiftFaction('mediaTrust', +3 + (hasTrait('media_figure') ? 2 : 0)); shiftFaction('federalistSupport', +3); shiftFaction('farmerLaborSupport', -5); },
                 deltas: { xi: 0.015 },
                 effects: [{ path: 'media.sentinelRating', op: 'add', value: 1 }],
                 playerFlag: 'defended_capitalism_tv',
@@ -792,7 +805,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Lawyer up',
                 desc: 'Call your personal attorney before responding. Protect yourself.',
-                onChoose: () => { shiftFaction('firmStanding', -3); shiftFaction('regulatoryExposure', +3); },
+                onChoose: () => { shiftFaction('firmStanding', -3); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3); },
                 deltas: { xi: 0.005 },
                 playerFlag: 'lawyered_up_unusual',
                 resultToast: 'The lawyer tells compliance you\'ll respond in writing within 5 business days. Tension rises.',
@@ -805,7 +818,7 @@ export const PORTFOLIO_POPUPS = [
         trigger: (sim) => {
             const eq = _equity();
             const quarters = Math.floor(_liveDay(sim.day) / QUARTERLY_CYCLE);
-            return quarters >= 3 && eq > INITIAL_CAPITAL * 1.3;
+            return quarters >= 3 && (eq > INITIAL_CAPITAL * 1.3 || hasTrait('meridian_star'));
         },
         cooldown: 300,
         era: 'mid',
@@ -925,7 +938,7 @@ export const PORTFOLIO_POPUPS = [
             const ld = _liveDay(sim.day);
             return ld >= (CAMPAIGN_START_DAY - HISTORY_CAPACITY) &&
                    ld <= (MIDTERM_DAY - HISTORY_CAPACITY) &&
-                   computeGrossNotional() > INITIAL_CAPITAL * 0.5;
+                   (computeGrossNotional() > INITIAL_CAPITAL * 0.5 || hasTrait('political_player'));
         },
         cooldown: 250,
         popup: true,
@@ -939,13 +952,16 @@ export const PORTFOLIO_POPUPS = [
             if (convIds.includes('ghost_protocol')) {
                 return `Campaign season is heating up. An unsigned invitation arrives at Meridian's front desk — a roundtable with Sen. Lassiter's Commerce Committee staff on the ${party} regulatory agenda. Nobody remembers forwarding it. You could attend without leaving a trace.`;
             }
+            if (hasTrait('political_player')) {
+                return `Campaign season is heating up. The senator asked for you by name — a K Street lobbyist relays that Lassiter's Commerce Committee staff want Meridian at a ${party} policy roundtable. "Roy's been following your positions. He thinks you understand the regulatory landscape better than most of the lobbyists." Your political reputation precedes you.`;
+            }
             return `Campaign season is heating up and a K Street lobbyist has reached out. She represents a coalition of financial firms concerned about the ${party} regulatory agenda and is organizing a roundtable with Sen. Lassiter's Commerce Committee staff. "We're not asking for a donation — we're asking for a seat at the table. Meridian's market position gives you unique insight into how these regulations affect liquidity." The subtext is clear: your money and your access are both on the menu.`;
         },
         choices: [
             {
                 label: 'Attend the fundraiser',
                 desc: 'Network with power. Understand the regulatory landscape.',
-                onChoose: () => { shiftFaction('federalistSupport', +5); shiftFaction('regulatoryExposure', +2); },
+                onChoose: () => { shiftFaction('federalistSupport', +5); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +4 : +2); },
                 deltas: { mu: 0.005 },
                 effects: [
                     { path: 'election.barronApproval', op: 'add', value: -1 },
@@ -1062,7 +1078,7 @@ export const PORTFOLIO_POPUPS = [
     {
         id: 'desk_insider_tip',
         trigger: (sim, world) => {
-            return _anyInvestigationActive(world) && portfolio.positions.length >= 3;
+            return _anyInvestigationActive(world) && portfolio.positions.length >= 3 && !hasTrait('under_scrutiny');
         },
         cooldown: 400,
         era: 'mid',
@@ -1073,6 +1089,9 @@ export const PORTFOLIO_POPUPS = [
             const investigationLine = okaforActive
                 ? ' With Okafor\'s investigation active, any connection to government sources is dynamite.'
                 : '';
+            if (hasTrait('quiet_money')) {
+                return `Your phone buzzes at 9pm. A college friend who works in the Barron White House sends a detailed text — more detailed than he should. "I know you keep things quiet. There's something moving through the West Wing that's going to hit PNTH. I trust you to be discreet."${investigationLine} He's never been this forthcoming before.`;
+            }
             return `Your phone buzzes at 9pm. A college friend who works in the Barron White House sends a vague text: "Hey — can we talk? I've come across something that might interest you. Can't say more here." You haven't spoken in months.${investigationLine} This is either nothing, or it's the kind of call that changes everything.`;
         },
         choices: [
@@ -1094,7 +1113,7 @@ export const PORTFOLIO_POPUPS = [
 
     {
         id: 'desk_media_big_win',
-        trigger: () => _equity() > INITIAL_CAPITAL * 1.8,
+        trigger: () => _equity() > INITIAL_CAPITAL * (hasTrait('media_figure') ? 1.4 : 1.8),
         cooldown: 400,
         era: 'mid',
         popup: true,
@@ -1116,7 +1135,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Accept a panel invitation',
                 desc: 'A macro conference wants you on their "New Voices" panel.',
-                onChoose: () => { shiftFaction('mediaTrust', +5); shiftFaction('regulatoryExposure', +2); },
+                onChoose: () => { shiftFaction('mediaTrust', +5 + (hasTrait('media_figure') ? 2 : 0)); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +4 : +2); },
                 deltas: { xi: 0.005 },
                 playerFlag: 'accepted_panel_media',
                 resultToast: 'The panel goes well. You\'re now a "voice" in macro. The attention cuts both ways.',
@@ -1157,7 +1176,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Hold the position',
                 desc: 'You have a fiduciary duty to your investors. The position is legal and well-reasoned.',
-                onChoose: () => { shiftFaction('regulatoryExposure', +3); shiftFaction('mediaTrust', -2); },
+                onChoose: () => { shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3); shiftFaction('mediaTrust', -2); },
                 complianceTier: 'defiant',
                 deltas: { xi: 0.01 },
                 playerFlag: 'held_crisis_short',
@@ -1210,7 +1229,7 @@ export const PORTFOLIO_POPUPS = [
         id: 'desk_political_donation',
         trigger: (sim, world) => {
             const ld = _liveDay(sim.day);
-            return ld > 700 && _equity() > INITIAL_CAPITAL * 1.4;
+            return ld > 700 && (_equity() > INITIAL_CAPITAL * 1.4 || hasTrait('political_player'));
         },
         cooldown: 400,
         era: 'late',
@@ -1230,7 +1249,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Attend the dinner',
                 desc: 'Access is currency. Play the long game.',
-                onChoose: () => { shiftFaction('federalistSupport', +8); shiftFaction('regulatoryExposure', +3); },
+                onChoose: () => { shiftFaction('federalistSupport', +8); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3); },
                 deltas: { mu: 0.003 },
                 effects: [
                     { path: 'election.barronApproval', op: 'add', value: -2 },
@@ -1263,7 +1282,7 @@ export const PORTFOLIO_POPUPS = [
             const eq = _equity();
             if (eq <= 0) return false;
             const optNotional = _totalOptionsNotional();
-            return daysToEarnings <= 15 && daysToEarnings >= 5 && optNotional / eq >= 0.15;
+            return daysToEarnings <= 15 && daysToEarnings >= 5 && optNotional / eq >= 0.15 && !hasTrait('under_scrutiny');
         },
         cooldown: 200,
         popup: true,
@@ -1311,7 +1330,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Cooperate with compliance review',
                 desc: 'Open your books to the internal review team. Proactive transparency.',
-                onChoose: () => { shiftFaction('mediaTrust', +3); shiftFaction('regulatoryExposure', -2); },
+                onChoose: () => { shiftFaction('mediaTrust', +3 + (hasTrait('media_figure') ? 2 : 0)); shiftFaction('regulatoryExposure', -2); },
                 playerFlag: 'cooperated_scrutiny_review',
                 complianceTier: 'full',
                 resultToast: 'Internal review finds nothing actionable. For now.',
@@ -1344,7 +1363,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Stonewall',
                 desc: 'Delay, obfuscate, and challenge the scope of the request.',
-                onChoose: () => { shiftFaction('regulatoryExposure', +5); shiftFaction('firmStanding', -5); },
+                onChoose: () => { shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +10 : +5); shiftFaction('firmStanding', -5); },
                 effects: [{ path: 'investigations.okaforProbeStage', op: 'add', value: 1 }],
                 playerFlag: 'stonewalled_sec',
                 complianceTier: 'defiant',
@@ -1372,7 +1391,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Invoke the Fifth',
                 desc: 'Exercise your constitutional right against self-incrimination.',
-                onChoose: () => { shiftFaction('regulatoryExposure', +5); shiftFaction('farmerLaborSupport', -5); },
+                onChoose: () => { shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +10 : +5); shiftFaction('farmerLaborSupport', -5); },
                 playerFlag: 'invoked_fifth',
                 resultToast: 'You decline to answer on Fifth Amendment grounds. The cameras flash.',
             },
@@ -1400,7 +1419,10 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Fight it',
                 desc: 'Contest the charges in court. This will get worse before it gets better.',
-                onChoose: () => { shiftFaction('regulatoryExposure', +5); shiftFaction('firmStanding', +3); },
+                onChoose: () => {
+                    shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +10 : +5);
+                    shiftFaction('firmStanding', +3 + (hasTrait('meridian_star') ? 3 : 0));
+                },
                 playerFlag: 'fought_sec',
                 complianceTier: 'defiant',
                 resultToast: 'Your legal team files a motion to dismiss. The SEC doubles down.',
