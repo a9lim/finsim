@@ -4120,6 +4120,32 @@ export const OFFLINE_EVENTS = [
         magnitude: 'major',
         params: { mu: -0.06, theta: 0.04, lambda: 3.0, b: 0.02, sigmaR: 0.006 },
     },
+
+    // -- Firm dynamics events -------------------------------------------------
+    {
+        id: 'firm_congressional_subpoena',
+        category: 'investigation',
+        headline: 'Okafor subpoenas Meridian Capital trading records.',
+        magnitude: 'major',
+        oneShot: true,
+        when: (sim, world, congress, ctx) =>
+            ctx.factions.regulatoryExposure >= 75 && world.investigations.okaforProbeStage >= 1,
+        params: { xi: 0.01 },
+    },
+    {
+        id: 'firm_crisis',
+        category: 'investigation',
+        headline: 'Meridian board considers shutting the derivatives desk.',
+        magnitude: 'major',
+        oneShot: true,
+        superevent: true,
+        crisisBriefing: true,
+        when: (sim, world, congress, ctx) =>
+            ctx.factions.firmStanding < 25 &&
+            ctx.factions.regulatoryExposure > 60 &&
+            (world.investigations.okaforProbeStage >= 1 || world.media.leakCount >= 2),
+        effects: [],
+    },
 ];
 
 // -- Event-by-id lookup ---------------------------------------------------
