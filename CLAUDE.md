@@ -26,7 +26,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 **Module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator. `market.js` is shared mutable state (single-writer main.js via `syncMarket`, multiple readers).
 
-**Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains + filibuster/media/interjection recurring pulses + trait-aware likelihood weighting), event-pool.js (~350 toast events with lore-specific headlines + 18 cross-domain one-shot triggers as `oneShot` events + ~30 faction/trait/portfolio-gated events + 15 atmospheric interjections via recurring pulse), popup-events.js (~30 interactive popup decisions with trait-aware context variants and faction shifts), world-state.js (congress/PNTH/geopolitical/Fed/media), faction-standing.js (unified 6-faction standing system: firmStanding, regulatoryExposure, federalistSupport, farmerLaborSupport, mediaTrust, fedRelations + capitalMultiplier), traits.js (12 permanent convictions + 6 dynamic reputation tags), regulations.js (event-driven regulatory pipeline — legislative bills move through introduced→committee→floor→active/failed, executive orders auto-expire via daily tick; no condition-based activation), lobbying.js (6-action 3-tier targeted PAC funding system), endings.js (6 ending conditions + 5-page adaptive epilogue generation).
+**Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains + filibuster/media/interjection recurring pulses + trait-aware likelihood weighting + `evaluateTriggers` for portfolio-triggered events), `src/events/` directory (12 domain files: fed.js, macro.js, pnth.js, congress.js, investigation.js, media.js, market.js, firm.js, tips.js, interjections.js, traits.js — all events share a unified schema; index.js merges pools with by-id lookup and followup chain validation; `_helpers.js` provides portfolio calculation helpers for trigger functions; `param-ranges.js` exports canonical parameter clamping ranges), world-state.js (congress/PNTH/geopolitical/Fed/media), faction-standing.js (unified 6-faction standing system: firmStanding, regulatoryExposure, federalistSupport, farmerLaborSupport, mediaTrust, fedRelations + capitalMultiplier), traits.js (12 permanent convictions + 6 dynamic reputation tags), regulations.js (event-driven regulatory pipeline — legislative bills move through introduced→committee→floor→active/failed, executive orders auto-expire via daily tick; no condition-based activation), lobbying.js (6-action 3-tier targeted PAC funding system), endings.js (6 ending conditions + 5-page adaptive epilogue generation).
 
 **Audio**: `audio.js` — all Web Audio API synthesis, no external audio files. Three layers: (1) background jazz loop (128 BPM, 16-bar Am diatonic circle: smooth walking bass with sub-octave sine, voice-led 3-note rootless comping (triangle mains + square ghost fills), sparse hi-hat, cross-stick, kick with phrase-building dynamics, brush sweeps at section turnarounds), (2) continuous Am drone pad (sine/triangle/sawtooth oscillators), (3) event stingers + superevent chord stabs. Voicings use smooth semitone/step voice leading throughout the progression; E7 uses b9 for film-noir tension resolving to Am7. Drums build within each 4-bar phrase (sparse→full→resolve). `setAmbientMood(mood)` crossfades between jazz and drone: calm = full jazz, tense = jazz 55% / drone 45%, crisis = jazz 15% / drone 85%. Jazz loop uses a look-ahead scheduler (`_jazzSchedule`) that keeps 4s of audio queued. `playMusic(track)` ducks both jazz and drone to silence for superevent chord stabs, `stopMusic` restores them to the current mood mix. Volume slider is in the Settings group of the Info tab.
 
@@ -47,7 +47,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 ### Reset
 
-`_resetCore()` must call all narrative resets: `resetTraits()`, `resetRegulations()`, `resetFactions()`, `resetLobbying()`, `resetAudio()`, `resetImpactState()`, `resetPopupCooldowns()`. Also reset `dayInProgress`, `chart._lerp.day = -1`, `_lobbyCount = 0`. After `resetFactions()`, re-wire `eventEngine.world.factions = factions`.
+`_resetCore()` must call all narrative resets: `resetTraits()`, `resetRegulations()`, `resetFactions()`, `resetLobbying()`, `resetAudio()`, `resetImpactState()`, `eventEngine.resetTriggerCooldowns()`, `resetUsedTips()`. Also reset `dayInProgress`, `chart._lerp.day = -1`, `_lobbyCount = 0`. After `resetFactions()`, re-wire `eventEngine.world.factions = factions`.
 
 ## Key Conventions
 
@@ -74,7 +74,7 @@ Impact is an **overlay** on `sim.S` — never mutates it. `getStockImpact(sigma)
 
 ### Popups vs Toasts
 
-Event-pool events (~320) fire as **toasts only**. Interactive popup decisions live exclusively in `popup-events.js`. `showToast(message, duration)` — duration is numeric ms, no severity parameter. Long toasts auto-detect multiline and switch from pill to rounded-rect shape.
+Events are unified under `src/events/`. Toast-only events have `headline` + `params` but no `choices`. Popup events have `popup: true` + `choices`. Portfolio-triggered popups have `trigger` + `cooldown` (evaluated daily by `EventEngine.evaluateTriggers`). Superevents have `superevent: true` (full-screen treatment + chord stab). `showToast(message, duration)` — duration is numeric ms, no severity parameter. Long toasts auto-detect multiline and switch from pill to rounded-rect shape.
 
 ### Positions
 
@@ -115,6 +115,9 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - One-shot events (migrated compound triggers) fire at most once per game — tracked by event id in `EventEngine._firedOneShots` Set
 - `advanceBill(id, 'failed')` and `advanceBill(id, 'repealed')` both remove from pipeline AND _active — they are terminal states, not display states
 - `getPipelineStatus(id)` returns null if the regulation was never introduced or was removed — event guards must check for null, not 'inactive'
+- `trigger` (portfolio-triggered, daily eval) vs `when` (world-state eligibility guard) — events with `trigger` are never Poisson-drawn
+- `factionShifts` on choices are additive — conditional bonuses (`when.hasTrait`) add to the base `value`, not replace it
+- `superevent: true` on event objects is the sole source of truth — no hardcoded sets or heuristics
 
 ### Do NOT Re-add
 
@@ -129,11 +132,15 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - Dark overlay backgrounds on popups — use blur-only (`background: none`), never `rgba(0,0,0,...)`
 - `AMBIENT_MOODS` / `_stopAmbient` / `_ambientNodes` / `_ambientGain` — old drone-only ambient system replaced by jazz loop + drone crossfade via `MOOD_MIX`
 - `_jazzFilter` for mood — mood is now a jazz↔drone crossfade, not a lowpass filter
-- `compound-triggers.js` / `checkCompoundTriggers` / `resetCompoundTriggers` / `getFiredTriggerIds` — deleted; all 18 triggers migrated to `event-pool.js` as `oneShot: true` events, fired by the standard EventEngine one-shot pre-pass
-- `interjections.js` / `checkInterjections` / `resetInterjections` — deleted; all interjections migrated to `event-pool.js` as `category: 'interjection'` events with recurring pulse in events.js
+- `compound-triggers.js` / `checkCompoundTriggers` / `resetCompoundTriggers` / `getFiredTriggerIds` — deleted; all 18 triggers migrated to domain files under `src/events/` as `oneShot: true` events, fired by the standard EventEngine one-shot pre-pass
+- `interjections.js` / `checkInterjections` / `resetInterjections` — deleted; all interjections migrated to `src/events/interjections.js` as `category: 'interjection'` events with recurring pulse in events.js
 - `epilogue.js` / `generateEpilogue` — deleted; replaced by `endings.js` with `checkEndings` + `generateEnding` supporting 6 ending types and 5-page adaptive epilogue
 - `convictions.js` / `getConvictionEffect` / `getConvictionIds` / `evaluateConvictions` / `resetConvictions` — renamed to `traits.js` with `getTraitEffect` / `getActiveTraitIds` / `evaluateTraits` / `resetTraits`
 - `evaluateRegulations` / condition-based regulation activation — regulations are now exclusively activated by events via `activateRegulation()` / `advanceBill()`, not by polling world state
+- `event-pool.js` / `popup-events.js` as monolithic files — events live in `src/events/*.js` domain files
+- `onChoose` on popup event choices — use declarative `factionShifts` arrays instead
+- `SUPEREVENT_IDS` set in main.js — use `superevent: true` on the event object
+- `resetPopupCooldowns` / `evaluatePortfolioPopups` — use `eventEngine.resetTriggerCooldowns()` and `eventEngine.evaluateTriggers()`
 
 ### Lore Reference
 
