@@ -964,6 +964,7 @@ export const PNTH_EVENTS = [
             world.pnth.militaryContractActive && world.geopolitical.mideastEscalation >= 2,
         headline: 'Atlas Aegis drone footage from Operation Dustwalker leaks to The Continental. PNTH stock surges on expanded Pentagon contracts even as Gottlieb issues a rare public dissent. "This is not what I built this company for."',
         magnitude: 'major',
+        superevent: true,
         params: { mu: 0.04, theta: 0.01 },
         effects: (world) => {
             world.pnth.boardDirks = Math.min(12, world.pnth.boardDirks + 1);
@@ -979,6 +980,7 @@ export const PNTH_EVENTS = [
             world.pnth.dojSuitFiled && world.pnth.senateProbeLaunched && world.pnth.whistleblowerFiled,
         headline: 'DOJ suit. Okafor subpoena. Kassis\'s whistleblower filing. Palanthropic faces simultaneous legal assault on three fronts. Malhotra\'s emergency earnings call lasts eleven minutes. Zhen cancels all meetings.',
         magnitude: 'major',
+        superevent: true,
         params: { mu: -0.05, theta: 0.03, lambda: 2.0 },
         effects: (world) => {
             world.pnth.ethicsBoardIntact = false;
@@ -1022,6 +1024,7 @@ export const PNTH_EVENTS = [
             world.geopolitical.farsistanEscalation >= 1,
         headline: 'Rachel Tan publishes proof that Atlas Companion user data was accessible to Farsistani intelligence via a sovereign wealth fund side-letter. 200 million users. Zero disclosure. Okafor schedules emergency hearings.',
         magnitude: 'major',
+        superevent: true,
         params: { mu: -0.06, theta: 0.03, lambda: 2.0 },
     },
     {
@@ -1035,6 +1038,7 @@ export const PNTH_EVENTS = [
             world.geopolitical.farsistanEscalation >= 2,
         headline: 'An Atlas Aegis autonomous targeting decision kills 34 civilians in a Farsistani border village. Kassis leaks the decision logs to The Continental. Gottlieb calls for Dirks\'s resignation. Navon denies involvement.',
         magnitude: 'major',
+        superevent: true,
         params: { mu: -0.05, theta: 0.03, lambda: 2.5 },
     },
 ];

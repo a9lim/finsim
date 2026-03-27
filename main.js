@@ -126,13 +126,6 @@ const impactHistory = [];
 let _lobbyCount = 0;
 const quarterlyReviews = [];
 
-const SUPEREVENT_IDS = new Set([
-    'midterm_election_fed_gain', 'midterm_election_fed_hold',
-    'midterm_election_fed_loss_house', 'midterm_election_fed_loss_both',
-    'compound_stagflation', 'compound_constitutional_crisis',
-    'compound_pnth_perfect_storm', 'compound_dollar_crisis',
-    'compound_energy_war', 'scrutiny_enforcement',
-]);
 
 // ---------------------------------------------------------------------------
 // Rate sparkline helpers
@@ -868,8 +861,7 @@ function _processPopupQueue() {
     const popupCat = event.category || (event.id && event.id.startsWith('desk_') ? 'desk' : '');
     playStinger('alert');
 
-    const isSuperevent = SUPEREVENT_IDS.has(event.id) ||
-        (event.magnitude === 'major' && event.id?.startsWith('compound_'));
+    const isSuperevent = !!event.superevent;
 
     if (isSuperevent) {
         const _seMu = event.params?.mu || (event.choices?.[0]?.deltas?.mu) || 0;

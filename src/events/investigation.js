@@ -236,6 +236,7 @@ export const INVESTIGATION_EVENTS = [
             world.investigations.tanBowmanStory >= 2,
         headline: 'Rachel Tan\'s Continental investigation connects the insider tip you pursued to a pattern of suspicious trading flagged by the SEC. Her three-part series drops Sunday. Your name isn\'t in it — yet.',
         magnitude: 'major',
+        superevent: true,
         params: { theta: 0.015 },
     },
     {
@@ -399,6 +400,7 @@ export const INVESTIGATION_EVENTS = [
         trigger: (sim, world, portfolio) => getRegLevel() >= 4,
         cooldown: 9999,
         popup: true,
+        superevent: true,
         headline: 'SEC Enforcement Action',
         context: () => {
             const level = getRegLevel();

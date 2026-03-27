@@ -641,6 +641,7 @@ export const MACRO_EVENTS = [
             world.geopolitical.tradeWarStage >= 3 && world.geopolitical.recessionDeclared,
         headline: 'Lassiter\'s tariffs meet recession head-on. Premier Liang Wei retaliates with semiconductor export controls. Priya Sharma\'s MarketWire column: "Stagflation is no longer a textbook exercise."',
         magnitude: 'major',
+        superevent: true,
         params: { mu: -0.08, theta: 0.04, lambda: 2.0, xi: 0.15 },
         effects: (world) => {
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 10);
@@ -658,6 +659,7 @@ export const MACRO_EVENTS = [
             world.geopolitical.oilCrisis && world.geopolitical.mideastEscalation >= 3,
         headline: 'Al-Farhan closes the Strait of Farsis as Meridia border tensions peak. Oil gaps above $140. Barron tweets: "The Emir will learn what Columbia does when you cut our energy supply." Bond vigilantes are already moving.',
         magnitude: 'major',
+        superevent: true,
         params: { mu: -0.06, theta: 0.03, lambda: 2.5, b: 0.02, sigmaR: 0.005 },
     },
     {
@@ -670,6 +672,7 @@ export const MACRO_EVENTS = [
             world.geopolitical.farsistanEscalation >= 3,
         headline: 'Al-Farhan seals the Strait of Farsis completely. Navon puts Meridia on war footing. Barron authorizes naval escort operations. Oil hits $160. The Sentinel runs a countdown clock: "Days Since the Strait Closed."',
         magnitude: 'major',
+        superevent: true,
         params: { mu: -0.08, b: 0.03, sigmaR: 0.008, theta: 0.04, lambda: 3.0 },
     },
     {
@@ -682,6 +685,7 @@ export const MACRO_EVENTS = [
             world.pnth.aegisDeployed,
         headline: 'Volkov sends armored columns across the Khasurian border at dawn. Barron holds an emergency NSC meeting. Hartley — or his replacement — signals emergency rate action. Atlas Aegis redeployment from Farsistan to Eastern Europe is on the table.',
         magnitude: 'major',
+        superevent: true,
         params: { mu: -0.06, theta: 0.04, lambda: 3.0, b: 0.02, sigmaR: 0.006 },
     },
 ];

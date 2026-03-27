@@ -334,6 +334,7 @@ export const FED_EVENTS = [
             world.fed.credibilityScore <= 3 && world.fed.hartleyFired,
         headline: 'With Hartley fired and Fed credibility in free fall, the dollar index breaks multi-year support. Priya Sharma: "We are witnessing the unthinkable — a reserve currency confidence crisis in real time."',
         magnitude: 'major',
+        superevent: true,
         params: { mu: -0.04, theta: 0.02, sigmaR: 0.008, b: -0.01 },
     },
 ];

@@ -1297,6 +1297,7 @@ export const CONGRESS_EVENTS = [
             world.fed.hartleyFired && congress.trifecta && getPipelineStatus('deregulation_act') === null,
         headline: 'The Financial Freedom Act meets a Federalist trifecta — Lassiter and Tao gut banking oversight in a 48-hour legislative blitz. MarketWire calls it "the most consequential deregulation since 1999."',
         magnitude: 'major',
+        superevent: true,
         params: { theta: -0.02, lambda: 0.5 },
         effects: (world) => { world.election.barronApproval += 3; shiftFaction('federalistSupport', 4); shiftFaction('regulatoryExposure', -3); activateRegulation('deregulation_act'); },
     },
@@ -1320,6 +1321,7 @@ export const CONGRESS_EVENTS = [
             world.investigations.impeachmentStage >= 2 && world.geopolitical.recessionDeclared,
         headline: 'Okafor\'s impeachment proceedings collide with recession. The Sentinel calls it a "partisan coup during an economic emergency." The Continental calls it "accountability." Bond markets call it a 300-basis-point risk premium.',
         magnitude: 'major',
+        superevent: true,
         params: { mu: -0.06, theta: 0.03, lambda: 3.0, xi: 0.2, rho: -0.1 },
         effects: (world) => {
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 15);
@@ -1337,6 +1339,7 @@ export const CONGRESS_EVENTS = [
             world.election.barronApproval < 45,
         headline: 'The Big Beautiful Bill dies on the Senate floor after Whitfield\'s 14-hour filibuster. Haines crossed the aisle on the spending provisions. Barron calls it "a betrayal by cowards." His approval craters.',
         magnitude: 'major',
+        superevent: true,
         params: { mu: -0.04, theta: 0.02 },
     },
     {
@@ -1349,6 +1352,7 @@ export const CONGRESS_EVENTS = [
             world.media.leakCount >= 4,
         headline: 'Barron revokes The Continental\'s press credentials after Driscoll\'s fifth consecutive leak story. Tan publishes from home. Cole celebrates on The Sentinel. Press freedom organizations issue emergency statements.',
         magnitude: 'moderate',
+        superevent: true,
         params: { theta: 0.015, xi: 0.08 },
     },
 
