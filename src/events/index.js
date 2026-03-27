@@ -57,6 +57,3 @@ for (const ev of ALL_EVENTS) {
         console.warn(`[events] '${ev.id}' has followupOnly but is never referenced as a followup`);
     }
 }
-
-// -- Backwards compat alias (will be removed in Task 5) --
-export const OFFLINE_EVENTS = ALL_EVENTS;

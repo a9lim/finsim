@@ -50,7 +50,6 @@ import {
     resolveLegs, computeNetCost, legsToRelative, nextAutoName,
 } from './src/strategy-store.js';
 import { applyStructuredEffects, congressHelpers } from './src/world-state.js';
-import { evaluatePortfolioPopups, resetPopupCooldowns } from './src/popup-events.js';
 import { pickTip, resetUsedTips } from './src/events/tips.js';
 import { getEventById } from './src/events/index.js';
 import {
@@ -1314,7 +1313,7 @@ function _onDayComplete() {
 
     // Portfolio-triggered popup events
     if (eventEngine) {
-        const portfolioPopups = evaluatePortfolioPopups(sim, eventEngine.world, portfolio, sim.day);
+        const portfolioPopups = eventEngine.evaluateTriggers(sim, sim.day);
         for (const pp of portfolioPopups) _popupQueue.push(pp);
     }
 
@@ -1693,7 +1692,7 @@ function _resetCore(index) {
     _lobbyCount = 0;
     impactHistory.length = 0;
     quarterlyReviews.length = 0;
-    resetPopupCooldowns();
+    if (eventEngine) eventEngine.resetTriggerCooldowns();
     resetUsedTips();
     resetFactions();
     if (eventEngine) eventEngine.world.factions = factions;
