@@ -16,8 +16,9 @@ import {
 } from './config.js';
 
 import { createWorldState, congressHelpers, applyStructuredEffects } from './world-state.js';
-import { OFFLINE_EVENTS, PARAM_RANGES, getEventById } from './events/index.js';
+import { ALL_EVENTS, PARAM_RANGES, getEventById } from './events/index.js';
 import { getTraitEffect, getActiveTraitIds } from './traits.js';
+import { firmCooldownMult } from './faction-standing.js';
 
 // -- Re-export for backwards compat -------------------------------------
 export { PARAM_RANGES } from './events/index.js';
@@ -54,15 +55,19 @@ export class EventEngine {
         this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [], traitIds: [], portfolio: {} };
         this._firedOneShot = new Set();
 
-        // Pre-filter pools from OFFLINE_EVENTS (exclude followupOnly events)
+        // Pre-filter pools from ALL_EVENTS (exclude followupOnly events)
         this._pools = {
-            fed:            OFFLINE_EVENTS.filter(e => e.category === 'fed' && !e.followupOnly),
-            pnth_earnings:  OFFLINE_EVENTS.filter(e => e.category === 'pnth_earnings' && !e.followupOnly),
-            random:         OFFLINE_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category) && !e.followupOnly),
-            filibuster:     OFFLINE_EVENTS.filter(e => e.category === 'filibuster' && !e.followupOnly),
-            media:          OFFLINE_EVENTS.filter(e => e.category === 'media' && !e.followupOnly),
-            interjection:   OFFLINE_EVENTS.filter(e => e.category === 'interjection' && !e.followupOnly),
+            fed:            ALL_EVENTS.filter(e => e.category === 'fed' && !e.followupOnly),
+            pnth_earnings:  ALL_EVENTS.filter(e => e.category === 'pnth_earnings' && !e.followupOnly),
+            random:         ALL_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category) && !e.followupOnly),
+            filibuster:     ALL_EVENTS.filter(e => e.category === 'filibuster' && !e.followupOnly),
+            media:          ALL_EVENTS.filter(e => e.category === 'media' && !e.followupOnly),
+            interjection:   ALL_EVENTS.filter(e => e.category === 'interjection' && !e.followupOnly),
         };
+
+        // Portfolio-triggered event pool (evaluated daily, not Poisson-drawn)
+        this._triggerPool = ALL_EVENTS.filter(e => typeof e.trigger === 'function');
+        this._triggerCooldowns = {};
 
         // Pulse schedule
         this._pulses = [
@@ -242,6 +247,7 @@ export class EventEngine {
         this._epilogueFired = false;
         this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [], traitIds: [], portfolio: {} };
         this._firedOneShot.clear();
+        this._triggerCooldowns = {};
 
         // Reset all pulse states
         for (const pulse of this._pulses) {
@@ -266,6 +272,31 @@ export class EventEngine {
     /** Return ids of all one-shot events that have fired this game. */
     getFiredOneShotIds() {
         return [...this._firedOneShot];
+    }
+
+    /** Evaluate portfolio-triggered events. Returns array of triggered event objects. */
+    evaluateTriggers(sim, day) {
+        const triggered = [];
+        for (const ev of this._triggerPool) {
+            const cd = this._triggerCooldowns[ev.id];
+            if (cd && day - cd < ev.cooldown * firmCooldownMult()) continue;
+            const liveDay = day - HISTORY_CAPACITY;
+            if (ev.era === 'early' && liveDay > 500) continue;
+            if (ev.era === 'mid'   && (liveDay < 500 || liveDay > 800)) continue;
+            if (ev.era === 'late'  && liveDay < 800) continue;
+            try {
+                if (ev.trigger(sim, this.world, this._playerCtx)) {
+                    this._triggerCooldowns[ev.id] = day;
+                    triggered.push(ev);
+                }
+            } catch (e) { /* guard — portfolio state may be inconsistent mid-reset */ }
+        }
+        return triggered;
+    }
+
+    /** Reset trigger cooldowns (call on game reset). */
+    resetTriggerCooldowns() {
+        this._triggerCooldowns = {};
     }
 
     // -- Internal ---------------------------------------------------------
