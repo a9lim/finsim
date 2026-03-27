@@ -50,7 +50,8 @@ import {
     resolveLegs, computeNetCost, legsToRelative, nextAutoName,
 } from './src/strategy-store.js';
 import { applyStructuredEffects, congressHelpers } from './src/world-state.js';
-import { evaluatePortfolioPopups, resetPopupCooldowns, pickTip } from './src/popup-events.js';
+import { evaluatePortfolioPopups, resetPopupCooldowns } from './src/popup-events.js';
+import { pickTip, resetUsedTips } from './src/events/tips.js';
 import { getEventById } from './src/events/index.js';
 import {
     factions, resetFactions, getFaction,
@@ -1693,6 +1694,7 @@ function _resetCore(index) {
     impactHistory.length = 0;
     quarterlyReviews.length = 0;
     resetPopupCooldowns();
+    resetUsedTips();
     resetFactions();
     if (eventEngine) eventEngine.world.factions = factions;
     resetTraits();

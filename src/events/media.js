@@ -1,6 +1,9 @@
 /* media.js -- Media ecosystem events. */
 
-import { shiftFaction } from '../faction-standing.js';
+import { equity, shortDirectionalNotional } from './_helpers.js';
+import { firmThresholdMult, firmTone, shiftFaction } from '../faction-standing.js';
+import { getActiveTraitIds, hasTrait } from '../traits.js';
+import { INITIAL_CAPITAL } from '../config.js';
 
 export const MEDIA_EVENTS = [
     {
@@ -179,5 +182,127 @@ export const MEDIA_EVENTS = [
         when: (sim, world, congress, ctx) => ctx.factions.mediaTrust <= 20 && ctx.factions.regulatoryExposure >= 40,
         params: { xi: 0.005 },
         effects: () => { shiftFaction('regulatoryExposure', 5); shiftFaction('firmStanding', -3); },
+    },
+
+    // ===================================================================
+    //  MEDIA POPUP EVENTS (migrated from popup-events.js)
+    // ===================================================================
+
+    {
+        id: 'desk_ft_interview',
+        trigger: () => equity() > INITIAL_CAPITAL * 1.5 || hasTrait('media_figure'),
+        cooldown: 300,
+        popup: true,
+        headline: 'The Continental wants a profile',
+        context: (sim, world) => {
+            const eq = equity();
+            const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
+            const convIds = getActiveTraitIds();
+            if (convIds.includes('media_darling')) {
+                return `Your returns are up ${pct}% and Rachel Tan's editor at The Continental wants to run a feature. "The Meridian Trader Who Bet Against the Crowd." You already have a reputation — MarketWire, The Sentinel, and now The Continental. Tan's profiles are the gold standard. The PR team is thrilled. But the cover jinx is real.`;
+            }
+            if (convIds.includes('ghost_protocol')) {
+                return `Your returns are up ${pct}% and somehow The Continental's markets desk has noticed. An editor reached out to Meridian's PR team — "The Trader Nobody Knows" is their working headline. You've stayed invisible this long. A profile in The Continental would change that permanently.`;
+            }
+            if (hasTrait('media_figure')) {
+                return `Your returns are up ${pct}% and your growing public profile has caught The Continental's attention. Rachel Tan's editor wants an in-depth feature — "The Meridian Trader Everyone's Watching." Between the conference panels, the MarketWire mentions, and the sellside chatter, you're already half-famous. A Continental profile would finish the job.`;
+            }
+            return `Your returns are up ${pct}% and The Continental's markets desk wants an interview. "The Meridian Trader Who Bet Against the Crowd" — that's their working headline. The PR team is excited. Your MD is cautiously supportive. But every trader who's ever been profiled knows: the cover jinx is real. The moment the ink dries, the market gods come for you.`;
+        },
+        choices: [
+            {
+                label: 'Do the interview',
+                desc: 'Enjoy the spotlight. You earned it.',
+                onChoose: () => {
+                    shiftFaction('mediaTrust', +8 + (hasTrait('media_figure') ? 2 : 0));
+                    shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3);
+                },
+                deltas: { xi: 0.01 },
+                playerFlag: 'did_ft_interview',
+                resultToast: 'The profile runs in The Continental. Your LinkedIn explodes. The floor treats you differently now.',
+            },
+            {
+                label: 'Decline politely',
+                desc: 'Stay anonymous. The best traders are the ones nobody\'s heard of.',
+                onChoose: () => { shiftFaction('mediaTrust', -2); },
+                deltas: {},
+                playerFlag: 'declined_ft_interview',
+                resultToast: 'The Continental runs a piece about Meridian anyway, but without your name. Smart.',
+            },
+        ],
+    },
+
+    {
+        id: 'desk_media_big_win',
+        trigger: () => equity() > INITIAL_CAPITAL * (hasTrait('media_figure') ? 1.4 : 1.8),
+        cooldown: 400,
+        era: 'mid',
+        popup: true,
+        headline: 'MarketWire: "Meridian Capital\'s macro desk posts record quarter"',
+        context: () => {
+            const eq = equity();
+            const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
+            return `Priya Sharma's MarketWire column picked up your desk's results: +${pct}%. Your name isn't in the story, but everyone on the street knows who's driving the P&L. Two hedge fund managers sent congratulations. Your MD is using your returns in the investor presentation. The question now: do you let the success speak for itself, or use the attention to build your brand?`;
+        },
+        choices: [
+            {
+                label: 'Stay in the shadows',
+                desc: 'The work is the brand. Let the returns compound.',
+                onChoose: () => { shiftFaction('mediaTrust', -1); },
+                deltas: {},
+                playerFlag: 'stayed_shadows_media',
+                resultToast: 'Silent and profitable. The way the old guard did it.',
+            },
+            {
+                label: 'Accept a panel invitation',
+                desc: 'A macro conference wants you on their "New Voices" panel.',
+                onChoose: () => { shiftFaction('mediaTrust', +5 + (hasTrait('media_figure') ? 2 : 0)); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +4 : +2); },
+                deltas: { xi: 0.005 },
+                playerFlag: 'accepted_panel_media',
+                resultToast: 'The panel goes well. You\'re now a "voice" in macro. The attention cuts both ways.',
+            },
+        ],
+    },
+
+    {
+        id: 'desk_crisis_profiteer',
+        trigger: (sim, world) => {
+            const eq = equity();
+            if (eq <= 0) return false;
+            return (world.geopolitical.mideastEscalation >= 2 || world.geopolitical.oilCrisis) &&
+                eq > INITIAL_CAPITAL * 1.1 &&
+                shortDirectionalNotional() / eq > 0.15 * firmThresholdMult();
+        },
+        cooldown: 300,
+        popup: true,
+        headline: 'The Continental investigates "Meridian\'s crisis profits"',
+        context: (sim, world) => {
+            const crisis = world.geopolitical.oilCrisis ? 'Farsistan oil crisis' : 'Farsistan escalation';
+            const tone = firmTone();
+            const prefix = tone === 'warm' ? 'Routine review — '
+                : tone === 'pointed' ? 'We need to talk again — '
+                : tone === 'final_warning' ? 'This is being escalated to HR — '
+                : '';
+            return prefix + `The ${crisis} is deepening. You're short and making money. Rachel Tan at The Continental is writing about "Wall Street winners in wartime" — her editor told Meridian's PR team to expect a FOIA request for communication records. Nobody is accusing you of anything illegal — shorting during a crisis is perfectly legal — but Tan's investigative pieces have a way of becoming congressional inquiries.`;
+        },
+        choices: [
+            {
+                label: 'Cover all shorts',
+                desc: 'Close all short directional exposure. Take profits and remove the target.',
+                trades: [{ action: 'close_short' }],
+                complianceTier: 'full',
+                playerFlag: 'covered_crisis_short',
+                resultToast: 'Short positions closed. The story runs without your firm\'s name.',
+            },
+            {
+                label: 'Hold the position',
+                desc: 'You have a fiduciary duty to your investors. The position is legal and well-reasoned.',
+                onChoose: () => { shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3); shiftFaction('mediaTrust', -2); },
+                complianceTier: 'defiant',
+                deltas: { xi: 0.01 },
+                playerFlag: 'held_crisis_short',
+                resultToast: 'You hold. The article mentions Meridian in paragraph 14.',
+            },
+        ],
     },
 ];

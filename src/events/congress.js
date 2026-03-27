@@ -1,7 +1,13 @@
 /* congress.js -- Congressional, political, filibuster, and midterm events. */
 
+import { liveDay, equity, computeGrossNotional, portfolio } from './_helpers.js';
 import { shiftFaction } from '../faction-standing.js';
+import { getActiveTraitIds, hasTrait } from '../traits.js';
 import { activateRegulation, deactivateRegulation, advanceBill, getPipelineStatus } from '../regulations.js';
+import {
+    HISTORY_CAPACITY, CAMPAIGN_START_DAY, MIDTERM_DAY, TERM_END_DAY,
+    INITIAL_CAPITAL,
+} from '../config.js';
 
 export const CONGRESS_EVENTS = [
     // -- Political events --
@@ -1373,5 +1379,202 @@ export const CONGRESS_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world, congress, ctx) => ctx.factions.federalistSupport >= 50 && ctx.factions.farmerLaborSupport >= 50 && world.congress.bigBillStatus >= 1 && world.congress.bigBillStatus < 4,
         effects: () => { shiftFaction('federalistSupport', 2); shiftFaction('farmerLaborSupport', 2); shiftFaction('regulatoryExposure', 4); },
+    },
+
+    // ===================================================================
+    //  POLITICAL POPUP EVENTS (migrated from popup-events.js)
+    // ===================================================================
+
+    {
+        id: 'desk_campaign_donor',
+        trigger: (sim, world) => {
+            const ld = liveDay(sim.day);
+            return ld >= (CAMPAIGN_START_DAY - HISTORY_CAPACITY) &&
+                   ld <= (MIDTERM_DAY - HISTORY_CAPACITY) &&
+                   (computeGrossNotional() > INITIAL_CAPITAL * 0.5 || hasTrait('political_player'));
+        },
+        cooldown: 250,
+        popup: true,
+        headline: 'K Street lobbyist: "Lassiter\'s Commerce Committee wants Meridian at the table"',
+        context: (sim, world) => {
+            const party = world.congress.senate.federalist >= 50 ? 'Federalist' : 'Farmer-Labor';
+            const convIds = getActiveTraitIds();
+            if (convIds.includes('washington_insider')) {
+                return `Campaign season is heating up. A K Street lobbyist you know by name has called directly — she's organizing a roundtable with Sen. Lassiter's Commerce Committee staff. "Roy remembers Meridian's input on the Financial Freedom Act. He wants your people in the room when the ${party} platform on markets gets drafted." Your connections make this a natural fit.`;
+            }
+            if (convIds.includes('ghost_protocol')) {
+                return `Campaign season is heating up. An unsigned invitation arrives at Meridian's front desk — a roundtable with Sen. Lassiter's Commerce Committee staff on the ${party} regulatory agenda. Nobody remembers forwarding it. You could attend without leaving a trace.`;
+            }
+            if (hasTrait('political_player')) {
+                return `Campaign season is heating up. The senator asked for you by name — a K Street lobbyist relays that Lassiter's Commerce Committee staff want Meridian at a ${party} policy roundtable. "Roy's been following your positions. He thinks you understand the regulatory landscape better than most of the lobbyists." Your political reputation precedes you.`;
+            }
+            return `Campaign season is heating up and a K Street lobbyist has reached out. She represents a coalition of financial firms concerned about the ${party} regulatory agenda and is organizing a roundtable with Sen. Lassiter's Commerce Committee staff. "We're not asking for a donation — we're asking for a seat at the table. Meridian's market position gives you unique insight into how these regulations affect liquidity." The subtext is clear: your money and your access are both on the menu.`;
+        },
+        choices: [
+            {
+                label: 'Attend the fundraiser',
+                desc: 'Network with power. Understand the regulatory landscape.',
+                onChoose: () => { shiftFaction('federalistSupport', +5); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +4 : +2); },
+                deltas: { mu: 0.005 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -1 },
+                ],
+                playerFlag: 'attended_fundraiser',
+                resultToast: 'You shook hands with two senators. Whether that\'s an asset or a liability depends on what happens next.',
+            },
+            {
+                label: 'Decline politely',
+                desc: 'You trade markets, not favors.',
+                deltas: {},
+                playerFlag: 'declined_fundraiser',
+                resultToast: 'The lobbyist moves on. Your compliance record stays clean.',
+            },
+            {
+                label: 'Report to compliance',
+                desc: 'This feels like it crosses a line. Better to disclose.',
+                onChoose: () => { shiftFaction('firmStanding', +3); shiftFaction('regulatoryExposure', -2); },
+                deltas: {},
+                playerFlag: 'reported_lobbyist',
+                resultToast: 'Compliance thanks you and opens a file. The lobbyist is flagged.',
+            },
+        ],
+    },
+
+    {
+        id: 'desk_midterm_pressure',
+        trigger: (sim) => {
+            const ld = liveDay(sim.day);
+            const midterm = MIDTERM_DAY - HISTORY_CAPACITY;
+            return Math.abs(ld - midterm) <= 5 && portfolio.positions.length > 0;
+        },
+        cooldown: 300,
+        popup: true,
+        headline: 'Midterm night — Barron\'s Federalists vs. Clay\'s Farmer-Labor',
+        context: (sim, world) => {
+            const fedSenate = world.congress.senate.federalist;
+            const fedHouse = world.congress.house.federalist;
+            const okaforLine = world.investigations.okaforProbeStage > 0
+                ? ' Okafor\'s Senate probe hangs over the Federalist ticket.'
+                : '';
+            return `Midterm elections are imminent. The Federalists hold ${fedSenate} Senate seats and ${fedHouse} House seats.${okaforLine} Every PM on the Meridian floor is either hedging or speculating on the outcome. Marcus Cole's Sentinel coverage says Federalist sweep; Priya Sharma's MarketWire polling model says toss-up. The vol surface is inverted — short-dated puts are trading at a massive premium. Your book is exposed.`;
+        },
+        choices: [
+            {
+                label: 'Buy protection',
+                desc: 'Purchase short-dated puts. Sleep well on election night.',
+                deltas: { xi: 0.01, theta: 0.005 },
+                playerFlag: 'bought_election_protection',
+                resultToast: 'Puts purchased. Expensive, but you\'ll sleep tonight.',
+            },
+            {
+                label: 'Sell the vol',
+                desc: 'Everyone is scared. Be greedy when others are fearful.',
+                deltas: { xi: -0.005, theta: 0.003 },
+                playerFlag: 'sold_election_vol',
+                resultToast: 'You\'re collecting premium. If the election is orderly, you\'ll clean up.',
+            },
+            {
+                label: 'Go flat',
+                desc: 'Close everything. Watch from the sidelines.',
+                deltas: { theta: -0.005 },
+                playerFlag: 'flattened_for_election',
+                resultToast: 'All positions closed. You watch the results with zero P&L risk and a glass of bourbon.',
+            },
+        ],
+    },
+
+    {
+        id: 'desk_legacy_positioning',
+        trigger: (sim) => {
+            const ld = liveDay(sim.day);
+            const termEnd = TERM_END_DAY - HISTORY_CAPACITY;
+            return ld > termEnd - 60 && computeGrossNotional() > INITIAL_CAPITAL * 0.3;
+        },
+        cooldown: 300,
+        era: 'late',
+        popup: true,
+        headline: 'End of the Barron era — legacy positioning',
+        context: (sim, world) => {
+            const eq = equity();
+            const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
+            const okaforRunning = world.election.okaforRunning;
+            const transitionLine = okaforRunning
+                ? 'Okafor\'s transition team is already briefing the incoming administration.'
+                : 'The transition team is already briefing the incoming President.';
+            return `The Barron administration is in its final weeks. Your total return stands at ${pct > 0 ? '+' : ''}${pct}%. ${transitionLine} Policy continuity is uncertain — the Financial Freedom Act, Lassiter's tariffs, Hartley's Fed tenure all hang in the balance. Your positions need to reflect the world that's coming, not the one that's ending.`;
+        },
+        choices: [
+            {
+                label: 'Position for continuity',
+                desc: 'The new administration will largely maintain current policy.',
+                deltas: { mu: 0.005 },
+                playerFlag: 'positioned_continuity',
+                resultToast: 'You\'re betting on stability. If the transition is smooth, you\'re well placed.',
+            },
+            {
+                label: 'Position for disruption',
+                desc: 'New president, new priorities. Volatility is coming.',
+                deltas: { xi: 0.015, theta: 0.008 },
+                playerFlag: 'positioned_disruption',
+                resultToast: 'Long vol into the transition. If the new regime shakes things up, you\'re ready.',
+            },
+            {
+                label: 'Wind down gracefully',
+                desc: 'You\'ve played this administration\'s market. Take your chips off the table.',
+                deltas: { theta: -0.005 },
+                playerFlag: 'wound_down_gracefully',
+                resultToast: 'Positions reduced. Your P&L is locked in. Time to write the final chapter.',
+            },
+        ],
+    },
+
+    {
+        id: 'desk_political_donation',
+        trigger: (sim, world) => {
+            const ld = liveDay(sim.day);
+            return ld > 700 && (equity() > INITIAL_CAPITAL * 1.4 || hasTrait('political_player'));
+        },
+        cooldown: 400,
+        era: 'late',
+        popup: true,
+        headline: 'Sen. Lassiter\'s office calls about a Commerce Committee dinner',
+        context: (sim, world) => {
+            const party = world.election.barronApproval > 45 ? 'Federalist' : 'Farmer-Labor';
+            const eq = equity();
+            const convIds = getActiveTraitIds();
+            if (convIds.includes('washington_insider')) {
+                return `Lassiter's chief of staff calls directly — she knows you by name. The Commerce Committee reception is tomorrow, $10,000 a plate. "Roy specifically asked if you'd be there. He wants Meridian's read on the tariff situation." You have $${(eq / 1000).toFixed(0)}k in equity. Your connections make this natural.`;
+            }
+            const senator = party === 'Federalist' ? 'Sen. Lassiter' : 'Sen. Okafor';
+            return `${senator}'s chief of staff called your office. There's a fundraising dinner next week — $10,000 a plate — and they want Meridian Capital represented. "The Senator values the perspective of market participants," she says. Translation: they want your money and your implicit endorsement. Your P&L makes you attractive to both sides. You have $${(eq / 1000).toFixed(0)}k in equity. A $10k dinner is a rounding error — but the political entanglement isn't.`;
+        },
+        choices: [
+            {
+                label: 'Attend the dinner',
+                desc: 'Access is currency. Play the long game.',
+                onChoose: () => { shiftFaction('federalistSupport', +8); shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +6 : +3); },
+                deltas: { mu: 0.003 },
+                effects: [
+                    { path: 'election.barronApproval', op: 'add', value: -2 },
+                ],
+                playerFlag: 'attended_political_dinner',
+                resultToast: 'You dined with power. The Senator remembers names, and now she knows yours.',
+            },
+            {
+                label: 'Send a check, skip the dinner',
+                desc: 'Support the cause without the photo ops.',
+                deltas: {},
+                playerFlag: 'sent_check_no_dinner',
+                resultToast: 'The check clears. No photos, no handshakes, no complications.',
+            },
+            {
+                label: 'Decline everything',
+                desc: 'You trade markets. You don\'t play politics.',
+                onChoose: () => { shiftFaction('federalistSupport', -1); shiftFaction('farmerLaborSupport', -1); },
+                deltas: {},
+                playerFlag: 'declined_political',
+                resultToast: 'The chief of staff is disappointed but professional. Your compliance record stays pristine.',
+            },
+        ],
     },
 ];
