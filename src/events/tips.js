@@ -195,6 +195,7 @@ export const TIP_EVENTS = [
                 label: 'Call back',
                 desc: 'Curiosity wins. You step outside and dial.',
                 effects: [{ path: 'media.leakCount', op: 'add', value: 1 }],
+                factionShifts: [{ faction: 'regulatoryExposure', value: 13 }],
                 playerFlag: 'pursued_insider_tip',
                 _tipAction: true,
             },
@@ -226,6 +227,7 @@ export const TIP_EVENTS = [
             {
                 label: 'Take the meeting',
                 desc: 'Information is the currency of this business. Hear what he has.',
+                factionShifts: [{ faction: 'regulatoryExposure', value: 10 }],
                 playerFlag: 'pursued_analyst_tip',
                 _tipAction: true,
             },

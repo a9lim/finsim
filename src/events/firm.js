@@ -673,6 +673,7 @@ export const FIRM_EVENTS = [
             {
                 label: 'Ask what he\'s hearing',
                 desc: 'The curiosity is killing you.',
+                factionShifts: [{ faction: 'regulatoryExposure', value: 13 }],
                 playerFlag: 'pursued_pnth_tip',
                 _tipAction: true,
             },
