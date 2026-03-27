@@ -105,6 +105,23 @@ let _savedOverlays = {};
 
 const _popupQueue = [];
 const playerChoices = {};
+
+const _LOBBY_COLORS = {
+    pac_federalist: 'lobby-pill-fed',
+    pac_farmerlabor: 'lobby-pill-fl',
+    host_fundraiser: 'lobby-pill-pol',
+    broker_deal: 'lobby-pill-pol',
+    leak_to_media: 'lobby-pill-media',
+    counsel_fed: 'lobby-pill-fed-rel',
+};
+const _LOBBY_LABELS = {
+    pac_federalist: '+Fed',
+    pac_farmerlabor: '+F-L',
+    host_fundraiser: 'Host',
+    broker_deal: 'Deal',
+    leak_to_media: 'Leak',
+    counsel_fed: 'Fed',
+};
 const impactHistory = [];
 let _lobbyCount = 0;
 const quarterlyReviews = [];
@@ -795,23 +812,6 @@ function _onSubstepUI() {
     const substepMargin = checkMargin(sim.S, market.sigma, sim.r, sim.day, sim.q);
     updateSubstepUI(substepMargin);
 }
-
-const _LOBBY_COLORS = {
-    pac_federalist: 'lobby-pill-fed',
-    pac_farmerlabor: 'lobby-pill-fl',
-    host_fundraiser: 'lobby-pill-pol',
-    broker_deal: 'lobby-pill-pol',
-    leak_to_media: 'lobby-pill-media',
-    counsel_fed: 'lobby-pill-fed-rel',
-};
-const _LOBBY_LABELS = {
-    pac_federalist: '+Fed',
-    pac_farmerlabor: '+F-L',
-    host_fundraiser: 'Host',
-    broker_deal: 'Deal',
-    leak_to_media: 'Leak',
-    counsel_fed: 'Fed',
-};
 
 function _updateLobbyPills() {
     if (!$.lobbyBar || !$.lobbyActions) return;
