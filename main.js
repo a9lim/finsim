@@ -64,8 +64,8 @@ import {
     getTraitEffect, resetTraits, getActiveTraitIds,
 } from './src/traits.js';
 import {
-    evaluateRegulations, getActiveRegulations, getRegulation,
-    getRegulationEffect, resetRegulations,
+    tickRegulations, getActiveRegulations, getRegulation,
+    getRegulationEffect, resetRegulations, getRegulationPipeline,
 } from './src/regulations.js';
 import { TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
@@ -1095,9 +1095,9 @@ function _updateTraitDisplay() {
 function _updateRegulationDisplay() {
     const list = $.regulationsList;
     if (!list) return;
-    const regs = getActiveRegulations();
+    const pipeline = getRegulationPipeline();
     list.textContent = '';
-    if (regs.length === 0) {
+    if (pipeline.length === 0) {
         const span = document.createElement('span');
         span.className = 'text-muted';
         span.style.fontSize = '0.78rem';
@@ -1105,14 +1105,25 @@ function _updateRegulationDisplay() {
         list.appendChild(span);
         return;
     }
-    for (const r of regs) {
+    for (const entry of pipeline) {
         const badge = document.createElement('div');
         badge.className = 'regulation-badge';
-        badge.dataset.tooltip = r.description;
-        badge.textContent = r.name;
-        if (r.color) badge.style.color = r.color;
+        const reg = getRegulation(entry.id);
+        badge.dataset.tooltip = reg ? reg.description : '';
+        badge.textContent = entry.name + ' — ' + _regStatusLabel(entry);
+        if (entry.color) badge.style.color = entry.color;
         list.appendChild(badge);
     }
+}
+
+function _regStatusLabel(entry) {
+    if (entry.status === 'active' && entry.remainingDays != null) {
+        const months = entry.remainingDays / 21;
+        if (months < 1) return '<1mo';
+        return Math.round(months) + 'mo';
+    }
+    const labels = { introduced: 'Introduced', committee: 'Committee', floor: 'Floor', active: 'Active' };
+    return labels[entry.status] || entry.status;
 }
 
 function _portfolioEquity() {
@@ -1307,14 +1318,10 @@ function _onDayComplete() {
     }
 
     if (eventEngine) {
-        const regChanges = evaluateRegulations(eventEngine.world);
-        for (const id of regChanges.activated) {
+        const { expired } = tickRegulations();
+        for (const id of expired) {
             const reg = getRegulation(id);
-            if (reg) showToast('Regulation enacted: ' + reg.name, 4000);
-        }
-        for (const id of regChanges.deactivated) {
-            const reg = getRegulation(id);
-            if (reg) showToast('Regulation repealed: ' + reg.name, 3000);
+            if (reg) showToast('Regulation expired: ' + reg.name, 3000);
         }
     }
 
