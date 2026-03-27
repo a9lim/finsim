@@ -5,6 +5,7 @@
 
 import { shiftFaction } from './faction-standing.js';
 import { hasTrait } from './traits.js';
+import { activateRegulation, deactivateRegulation, advanceBill, getPipelineStatus } from './regulations.js';
 
 // -- Canonical parameter clamping ranges --------------------------------
 export const PARAM_RANGES = {
@@ -152,7 +153,7 @@ const FED_EVENTS = [
         minDay: 300,
         when: (sim, world) => !world.fed.qeActive && sim.b < 0.02,
         params: { mu: 0.05, theta: -0.015, b: -0.01, sigmaR: -0.003, lambda: -0.5, q: 0.002 },
-        effects: (world) => { world.fed.qeActive = true; shiftFaction('fedRelations', 2); },
+        effects: (world) => { world.fed.qeActive = true; shiftFaction('fedRelations', 2); activateRegulation('qe_floor'); },
     },
 
     // -- Minutes leaks -------------------------------------------------------
@@ -223,7 +224,7 @@ const FED_EVENTS = [
         minDay: 400,
         when: (sim, world, congress) => congress.trifecta && world.fed.credibilityScore <= 4 && !world.fed.hartleyFired,
         params: { mu: -0.05, theta: 0.05, sigmaR: 0.025, lambda: 3.5 },
-        effects: (world) => { world.fed.hartleyFired = true; world.fed.credibilityScore = 0; world.election.barronApproval = Math.max(0, world.election.barronApproval - 10); shiftFaction('fedRelations', -10); },
+        effects: (world) => { world.fed.hartleyFired = true; world.fed.credibilityScore = 0; world.election.barronApproval = Math.max(0, world.election.barronApproval - 10); shiftFaction('fedRelations', -10); activateRegulation('rate_ceiling'); },
         followups: [ { id: 'markets_panic_hartley_fired', mtth: 3, weight: 0.95 }, { id: 'vane_nominated', mtth: 10, weight: 0.8 }, { id: 'scotus_hartley_case', mtth: 40, weight: 0.5 }, ],
     },
     {
@@ -269,6 +270,7 @@ const FED_EVENTS = [
             world.fed.cutCycle = true;
             world.fed.hikeCycle = false;
             shiftFaction('fedRelations', -5);
+            deactivateRegulation('rate_ceiling');
         },
     },
     {
@@ -642,7 +644,7 @@ const MACRO_EVENTS = [
         magnitude: 'major',
         when: (sim, world) => !world.geopolitical.oilCrisis,
         params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, b: 0.008, sigmaR: 0.006, q: -0.001 },
-        effects: (world) => { world.geopolitical.oilCrisis = true; shiftFaction('fedRelations', -2); },
+        effects: (world) => { world.geopolitical.oilCrisis = true; shiftFaction('fedRelations', -2); activateRegulation('oil_emergency'); },
     },
     {
         id: 'energy_sanctions',
@@ -655,6 +657,7 @@ const MACRO_EVENTS = [
         effects: (world) => {
             world.geopolitical.sanctionsActive = true;
             shiftFaction('federalistSupport', 2);
+            activateRegulation('sanctions_compliance');
         },
     },
     {
@@ -706,7 +709,7 @@ const MACRO_EVENTS = [
         minDay: 200,
         when: (sim, world) => sim.mu < -0.05 && sim.theta > 0.12 && !world.geopolitical.recessionDeclared,
         params: { mu: -0.07, theta: 0.035, lambda: 1.8, muJ: -0.05, b: -0.012, q: -0.005 },
-        effects: (world) => { world.geopolitical.recessionDeclared = true; world.election.barronApproval = Math.max(0, world.election.barronApproval - 8); shiftFaction('firmStanding', -5); },
+        effects: (world) => { world.geopolitical.recessionDeclared = true; world.election.barronApproval = Math.max(0, world.election.barronApproval - 8); shiftFaction('firmStanding', -5); activateRegulation('short_sale_ban'); },
     },
     {
         id: 'sovereign_debt_scare',
@@ -870,6 +873,7 @@ const MACRO_EVENTS = [
             world.geopolitical.straitClosed = true;
             world.geopolitical.oilCrisis = true;
             shiftFaction('fedRelations', -3);
+            activateRegulation('oil_emergency');
         },
     },
     {
@@ -3127,6 +3131,7 @@ const CONGRESSIONAL_EVENTS = [
         effects: (world) => {
             world.congress.bigBillStatus = 2;
             world.congress.filibusterActive = true;
+            activateRegulation('filibuster_uncertainty');
         },
     },
 ];
@@ -3198,6 +3203,7 @@ const FILIBUSTER_EVENTS = [
             world.congress.filibusterActive = false;
             world.congress.bigBillStatus = 3;
             shiftFaction('federalistSupport', 4);
+            deactivateRegulation('filibuster_uncertainty');
         },
     },
     {
@@ -3213,6 +3219,7 @@ const FILIBUSTER_EVENTS = [
             world.congress.bigBillStatus = 4;
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
             shiftFaction('farmerLaborSupport', 3);
+            deactivateRegulation('filibuster_uncertainty');
         },
     },
 ];
