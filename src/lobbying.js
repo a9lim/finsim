@@ -9,7 +9,7 @@
    Leaf module. No DOM access.
    =================================================== */
 
-import { getConvictionEffect } from './convictions.js';
+import { getTraitEffect } from './traits.js';
 
 let _cooldown = 0;
 const LOBBY_COOLDOWN = 30;
@@ -57,7 +57,7 @@ const LOBBY_ACTIONS = [
 ];
 
 export function getAvailableActions(day, cash) {
-    const costMult = getConvictionEffect('lobbyingCostMult', 1);
+    const costMult = getTraitEffect('lobbyingCostMult', 1);
     const cooldownRemaining = Math.max(0, _cooldown - day);
     return LOBBY_ACTIONS.map(action => {
         const cost = Math.round(action.baseCost * costMult);
@@ -73,7 +73,7 @@ export function getAvailableActions(day, cash) {
 export function executeLobbyAction(actionId, day, world) {
     const entry = LOBBY_ACTIONS.find(a => a.id === actionId);
     if (!entry) return null;
-    const costMult = getConvictionEffect('lobbyingCostMult', 1);
+    const costMult = getTraitEffect('lobbyingCostMult', 1);
     const cost = Math.round(entry.baseCost * costMult);
     if (day < _cooldown) return null;
     entry.effects(world);

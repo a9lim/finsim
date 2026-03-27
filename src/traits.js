@@ -1,17 +1,23 @@
 /* ===================================================
-   convictions.js -- Player conviction system. Persistent
-   gameplay modifiers unlocked by accumulated choices
-   and trading behavior. Does NOT change market params.
+   traits.js -- Unified trait system. Permanent convictions
+   (gameplay modifiers unlocked by accumulated choices)
+   plus dynamic reputation tags (faction-derived, narrative
+   gating). Does NOT change market params.
 
    Leaf module. No DOM access.
    =================================================== */
 
-const _active = new Set();
+import { getFaction } from './faction-standing.js';
 
-const CONVICTIONS = [
+const _active = new Set();
+let _quietMoneyLost = false;
+
+const TRAITS = [
+    // ── Permanent convictions (gameplay modifiers) ─────────────
     {
         id: 'information_edge',
         name: 'Information Is Everything',
+        permanent: true,
         description: 'Event toasts show parameter direction hints. Compliance watches more closely.',
         condition: (ctx) => {
             const f = ctx.playerChoices;
@@ -26,6 +32,7 @@ const CONVICTIONS = [
     {
         id: 'market_always_right',
         name: 'The Market Is Always Right',
+        permanent: true,
         description: 'Compliance treats you well. Event coupling is dampened.',
         condition: (ctx) => {
             const f = ctx.playerChoices;
@@ -42,6 +49,7 @@ const CONVICTIONS = [
     {
         id: 'contrarian_instinct',
         name: 'Contrarian Instinct',
+        permanent: true,
         description: 'You thrive in chaos. Layer 3 thresholds raised. Boredom boost disabled.',
         condition: (ctx) => ctx.impactHistory.length >= 8,
         effects: { boredomImmune: true, layerThresholdMult: 1.25 },
@@ -49,6 +57,7 @@ const CONVICTIONS = [
     {
         id: 'desk_protects',
         name: 'The Desk Protects Its Own',
+        permanent: true,
         description: 'Compliance popup frequency reduced. Insider tip events stop firing.',
         condition: (ctx) => {
             const f = ctx.playerChoices;
@@ -60,6 +69,7 @@ const CONVICTIONS = [
     {
         id: 'master_of_leverage',
         name: 'Master of Leverage',
+        permanent: true,
         description: 'Event coupling amplified. Scrutiny builds faster.',
         condition: (ctx) => {
             const strong = ctx.quarterlyReviews.filter(r => r.rating === 'strong');
@@ -70,6 +80,7 @@ const CONVICTIONS = [
     {
         id: 'political_operator',
         name: 'Political Operator',
+        permanent: true,
         description: 'Lobbying costs reduced. Regulatory events reference you by name.',
         condition: (ctx) => {
             const f = ctx.playerChoices;
@@ -86,6 +97,7 @@ const CONVICTIONS = [
     {
         id: 'ghost_protocol',
         name: 'Ghost Protocol',
+        permanent: true,
         description: 'Scrutiny gain halved. Compliance rarely triggers. You are invisible.',
         condition: (ctx) => {
             const flags = Object.keys(ctx.playerChoices);
@@ -97,6 +109,7 @@ const CONVICTIONS = [
     {
         id: 'volatility_addict',
         name: 'Volatility Addict',
+        permanent: true,
         description: 'You see the vol surface more clearly. Straddle/strangle strategies highlighted.',
         condition: (ctx) => {
             const optionTrades = ctx.impactHistory.filter(h => h.context && h.context.includes('option'));
@@ -107,6 +120,7 @@ const CONVICTIONS = [
     {
         id: 'media_darling',
         name: 'Media Darling',
+        permanent: true,
         description: 'Your name appears in The Continental, The Sentinel, and MarketWire — sometimes all on the same day.',
         condition: (ctx) => {
             const f = ctx.playerChoices;
@@ -122,6 +136,7 @@ const CONVICTIONS = [
     {
         id: 'washington_insider',
         name: 'Washington Insider',
+        permanent: true,
         description: 'You know which senators answer their phones and which lobbyists return calls. Meridian Capital has a seat at the table.',
         condition: (ctx) => {
             const f = ctx.playerChoices;
@@ -137,6 +152,7 @@ const CONVICTIONS = [
     {
         id: 'risk_manager',
         name: 'Risk Manager',
+        permanent: true,
         description: 'You file your reports on time, hedge your positions, and cooperate with compliance. The desk trusts you.',
         condition: (ctx) => {
             const f = ctx.playerChoices;
@@ -154,6 +170,7 @@ const CONVICTIONS = [
     {
         id: 'crisis_profiteer',
         name: 'Crisis Profiteer',
+        permanent: true,
         description: 'Every catastrophe is a trade. When the Strait closes, when the border falls, when the hearings begin — you\'re already positioned.',
         condition: (ctx) => {
             const f = ctx.playerChoices;
@@ -166,36 +183,101 @@ const CONVICTIONS = [
         },
         effects: { regExposureMult: 1.5, boredomImmune: true },
     },
+
+    // ── Reputation tags (dynamic, narrative gating) ────────────
+    {
+        id: 'market_mover',
+        name: 'Market Mover',
+        permanent: false,
+        condition: (ctx) => (ctx.flags.largeImpactTrades || 0) >= 3,
+        effects: {},
+    },
+    {
+        id: 'political_player',
+        name: 'Political Player',
+        permanent: false,
+        condition: () => getFaction('federalistSupport') > 50 || getFaction('farmerLaborSupport') > 50,
+        effects: {},
+    },
+    {
+        id: 'media_figure',
+        name: 'Media Figure',
+        permanent: false,
+        condition: (ctx) => getFaction('mediaTrust') > 60 || (ctx.flags.continentalMentions || 0) >= 2,
+        effects: {},
+    },
+    {
+        id: 'under_scrutiny',
+        name: 'Under Scrutiny',
+        permanent: false,
+        condition: () => getFaction('regulatoryExposure') > 50,
+        effects: {},
+    },
+    {
+        id: 'meridian_star',
+        name: 'Meridian Star',
+        permanent: false,
+        condition: () => getFaction('firmStanding') > 80,
+        effects: {},
+    },
+    {
+        id: 'quiet_money',
+        name: 'Quiet Money',
+        permanent: false,
+        loseForever: true,
+        condition: () =>
+            getFaction('federalistSupport') < 40 &&
+            getFaction('farmerLaborSupport') < 40 &&
+            getFaction('mediaTrust') < 40 &&
+            getFaction('regulatoryExposure') < 25,
+        effects: {},
+    },
 ];
 
-export function evaluateConvictions(ctx) {
-    if (_active.size === CONVICTIONS.length) return [];
-    const newlyUnlocked = [];
-    for (const conv of CONVICTIONS) {
-        if (_active.has(conv.id)) continue;
-        try {
-            if (conv.condition(ctx)) {
-                _active.add(conv.id);
-                newlyUnlocked.push(conv.id);
-            }
-        } catch { /* skip */ }
+export function evaluateTraits(ctx) {
+    const newlyActive = [];
+    for (const trait of TRAITS) {
+        const wasActive = _active.has(trait.id);
+
+        if (trait.permanent) {
+            if (wasActive) continue;
+            try {
+                if (trait.condition(ctx)) {
+                    _active.add(trait.id);
+                    newlyActive.push(trait.id);
+                }
+            } catch { /* skip */ }
+        } else if (trait.loseForever) {
+            if (_quietMoneyLost) { _active.delete(trait.id); continue; }
+            try {
+                if (trait.condition(ctx)) {
+                    if (!wasActive) { _active.add(trait.id); newlyActive.push(trait.id); }
+                } else {
+                    _active.delete(trait.id);
+                    _quietMoneyLost = true;
+                }
+            } catch { /* skip */ }
+        } else {
+            try {
+                if (trait.condition(ctx)) {
+                    if (!wasActive) newlyActive.push(trait.id);
+                    _active.add(trait.id);
+                } else {
+                    _active.delete(trait.id);
+                }
+            } catch { /* skip */ }
+        }
     }
-    return newlyUnlocked;
+    return newlyActive;
 }
 
-export function getActiveConvictions() {
-    return CONVICTIONS.filter(c => _active.has(c.id));
-}
+export function hasTrait(id) { return _active.has(id); }
 
-export function getConviction(id) {
-    return CONVICTIONS.find(c => c.id === id) || null;
-}
-
-export function getConvictionEffect(effectKey, defaultVal) {
+export function getTraitEffect(effectKey, defaultVal) {
     let result = defaultVal;
-    for (const conv of CONVICTIONS) {
-        if (!_active.has(conv.id)) continue;
-        const val = conv.effects[effectKey];
+    for (const trait of TRAITS) {
+        if (!_active.has(trait.id)) continue;
+        const val = trait.effects[effectKey];
         if (val === undefined) continue;
         if (typeof val === 'boolean') {
             if (val) return true;
@@ -206,12 +288,8 @@ export function getConvictionEffect(effectKey, defaultVal) {
     return result;
 }
 
-export function resetConvictions() {
-    _active.clear();
-}
-
-export function getConvictionIds() {
-    return [..._active];
-}
-
-export { CONVICTIONS };
+export function getActiveTraitIds() { return [..._active]; }
+export function getActiveTraits() { return TRAITS.filter(t => _active.has(t.id)); }
+export function getTrait(id) { return TRAITS.find(t => t.id === id) || null; }
+export function resetTraits() { _active.clear(); _quietMoneyLost = false; }
+export { TRAITS };

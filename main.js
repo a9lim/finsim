@@ -60,9 +60,9 @@ import {
     settleRegulatory, cooperateRegulatory,
 } from './src/faction-standing.js';
 import {
-    evaluateConvictions, getActiveConvictions, getConviction,
-    getConvictionEffect, resetConvictions, getConvictionIds,
-} from './src/convictions.js';
+    evaluateTraits, getActiveTraits, getTrait,
+    getTraitEffect, resetTraits, getActiveTraitIds,
+} from './src/traits.js';
 import {
     evaluateRegulations, getActiveRegulations, getRegulation,
     getRegulationEffect, resetRegulations,
@@ -1029,21 +1029,21 @@ function _showComplianceTermination() {
     _showEpilogue('compliance');
 }
 
-function _updateConvictionDisplay() {
-    const convictions = getActiveConvictions();
+function _updateTraitDisplay() {
+    const traits = getActiveTraits();
     const section = $.convictionsSection;
     const list = $.convictionsList;
     if (!section || !list) return;
-    if (convictions.length === 0) {
+    if (traits.length === 0) {
         section.classList.add('hidden');
         return;
     }
     section.classList.remove('hidden');
     list.textContent = '';
-    for (const c of convictions) {
+    for (const c of traits) {
         const item = document.createElement('div');
         item.className = 'conviction-item';
-        item.title = c.description;
+        item.title = c.description || c.name;
         const name = document.createElement('span');
         name.className = 'conviction-name';
         name.textContent = c.name;
@@ -1159,7 +1159,7 @@ function _onDayComplete() {
         chainDirty = true;
     }
 
-    // Crisis profit tracking for conviction system
+    // Crisis profit tracking for trait system
     if (eventEngine) {
         const _eq = portfolioValue(market.S, Math.sqrt(market.v), market.r, market.day, market.q);
         if (_eq > portfolio.initialCapital * 1.1) {
@@ -1171,7 +1171,7 @@ function _onDayComplete() {
         }
     }
 
-    const _convCtx = {
+    const _traitCtx = {
         playerChoices,
         impactHistory,
         quarterlyReviews,
@@ -1179,11 +1179,15 @@ function _onDayComplete() {
         portfolio,
         daysSinceLiveTrade: sim.history.maxDay - HISTORY_CAPACITY,
         lobbyCount: _lobbyCount,
+        flags: {
+            largeImpactTrades: impactHistory.length,
+            continentalMentions: playerChoices._continentalMentions || 0,
+        },
     };
-    const newConvictions = evaluateConvictions(_convCtx);
-    for (const id of newConvictions) {
-        const conv = getConviction(id);
-        if (conv) showToast(`Conviction unlocked: ${conv.name}`, 4000);
+    const newTraits = evaluateTraits(_traitCtx);
+    for (const id of newTraits) {
+        const trait = getTrait(id);
+        if (trait) showToast(`${trait.permanent ? 'Conviction unlocked' : 'Reputation earned'}: ${trait.name}`, 4000);
     }
 
     // Epilogue check (before regular events)
@@ -1227,7 +1231,7 @@ function _onDayComplete() {
                         const flavor = ev.portfolioFlavor(portfolio);
                         if (flavor) headline += ' ' + flavor;
                     }
-                    if (getConvictionEffect('eventHintArrows', false) && ev.params) {
+                    if (getTraitEffect('eventHintArrows', false) && ev.params) {
                         const _hintMu = ev.params.mu || 0;
                         if (_hintMu > 0) headline += ' \u2191';
                         else if (_hintMu < 0) headline += ' \u2193';
@@ -1347,7 +1351,7 @@ function _onDayComplete() {
     if (portfolioHistory) pushSparkSample(portfolioHistory, _portfolioEquity());
 
     updateUI(margin);
-    _updateConvictionDisplay();
+    _updateTraitDisplay();
     _updateRegulationDisplay();
     _updateLobbyPills();
     dirty = true;
@@ -1632,7 +1636,7 @@ function _resetCore(index) {
     resetPopupCooldowns();
     resetFactions();
     if (eventEngine) eventEngine.world.factions = factions;
-    resetConvictions();
+    resetTraits();
     resetRegulations();
     if (eventEngine) eventEngine.resetOneShot();
     resetLobbying();
@@ -2131,7 +2135,7 @@ function updateStrategyBuilder() {
 // ---------------------------------------------------------------------------
 
 function _showEpilogue(terminationReason = null) {
-    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason, getConvictionIds(), getFactionState());
+    const pages = generateEpilogue(eventEngine?.world ?? {}, sim, portfolio, eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews, terminationReason, getActiveTraitIds(), getFactionState());
     let currentPage = 0;
 
     const overlay = document.getElementById('epilogue-overlay');

@@ -17,7 +17,7 @@ import {
 
 import { createWorldState, congressHelpers, applyStructuredEffects } from './world-state.js';
 import { OFFLINE_EVENTS, PARAM_RANGES, getEventById } from './event-pool.js';
-import { getConvictionEffect, getConvictionIds } from './convictions.js';
+import { getTraitEffect, getActiveTraitIds } from './traits.js';
 
 // -- Re-export for backwards compat -------------------------------------
 export { PARAM_RANGES } from './event-pool.js';
@@ -410,9 +410,9 @@ export class EventEngine {
 
     _weightedPick(events, sim) {
         const congress = congressHelpers(this.world);
-        const boredomImmune = getConvictionEffect('boredomImmune', false);
+        const boredomImmune = getTraitEffect('boredomImmune', false);
         const boostNonMinor = !boredomImmune && this._consecutiveMinor >= BOREDOM_THRESHOLD;
-        const _convIds = getConvictionIds();
+        const _convIds = getActiveTraitIds();
         let totalWeight = 0;
         for (const ev of events) {
             let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
@@ -608,7 +608,7 @@ export class EventEngine {
         if (!deltas || !deltas.mu || Math.abs(netDelta) < 1) return 1.0;
         const alignment = Math.sign(netDelta) * Math.sign(deltas.mu);
         const magnitude = Math.min(1, Math.abs(netDelta) / (ADV * 0.5));
-        return 1 + alignment * magnitude * EVENT_COUPLING_CAP * getConvictionEffect('couplingCapMult', 1);
+        return 1 + alignment * magnitude * EVENT_COUPLING_CAP * getTraitEffect('couplingCapMult', 1);
     }
 
     // -- Public followup scheduling ---------------------------------------

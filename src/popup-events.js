@@ -13,7 +13,7 @@ import {
 import { computeNetDelta, computeGrossNotional, portfolio, portfolioValue } from './portfolio.js';
 import { market } from './market.js';
 import { unitPrice } from './position-value.js';
-import { getConvictionIds } from './convictions.js';
+import { getActiveTraitIds } from './traits.js';
 import { firmThresholdMult, firmCooldownMult, firmTone, getRegLevel } from './faction-standing.js';
 
 const _cooldowns = {}; // id → last fired day
@@ -589,7 +589,7 @@ export const PORTFOLIO_POPUPS = [
         context: (sim, world) => {
             const eq = _equity();
             const pct = (((eq / INITIAL_CAPITAL) - 1) * 100).toFixed(0);
-            const convIds = getConvictionIds();
+            const convIds = getActiveTraitIds();
             if (convIds.includes('media_darling')) {
                 return `Your returns are up ${pct}% and Rachel Tan's editor at The Continental wants to run a feature. "The Meridian Trader Who Bet Against the Crowd." You already have a reputation — MarketWire, The Sentinel, and now The Continental. Tan's profiles are the gold standard. The PR team is thrilled. But the cover jinx is real.`;
             }
@@ -915,7 +915,7 @@ export const PORTFOLIO_POPUPS = [
         headline: 'K Street lobbyist: "Lassiter\'s Commerce Committee wants Meridian at the table"',
         context: (sim, world) => {
             const party = world.congress.senate.federalist >= 50 ? 'Federalist' : 'Farmer-Labor';
-            const convIds = getConvictionIds();
+            const convIds = getActiveTraitIds();
             if (convIds.includes('washington_insider')) {
                 return `Campaign season is heating up. A K Street lobbyist you know by name has called directly — she's organizing a roundtable with Sen. Lassiter's Commerce Committee staff. "Roy remembers Meridian's input on the Financial Freedom Act. He wants your people in the room when the ${party} platform on markets gets drafted." Your connections make this a natural fit.`;
             }
@@ -1196,7 +1196,7 @@ export const PORTFOLIO_POPUPS = [
         context: (sim, world) => {
             const party = world.election.barronApproval > 45 ? 'Federalist' : 'Farmer-Labor';
             const eq = _equity();
-            const convIds = getConvictionIds();
+            const convIds = getActiveTraitIds();
             if (convIds.includes('washington_insider')) {
                 return `Lassiter's chief of staff calls directly — she knows you by name. The Commerce Committee reception is tomorrow, $10,000 a plate. "Roy specifically asked if you'd be there. He wants Meridian's read on the tariff situation." You have $${(eq / 1000).toFixed(0)}k in equity. Your connections make this natural.`;
             }

@@ -1,5 +1,5 @@
 // src/faction-standing.js
-import { getConvictionEffect } from './convictions.js';
+import { getTraitEffect } from './traits.js';
 
 const INITIAL_CAPITAL = 10000;
 
@@ -46,7 +46,7 @@ export function resetFactions() {
 export function shiftFaction(id, delta) {
     if (id === 'regulatoryExposure') {
         if (factions.settled && delta > 0) return; // settlement blocks increases
-        delta *= getConvictionEffect('regExposureMult', 1);
+        delta *= getTraitEffect('regExposureMult', 1);
     }
     factions[id] = Math.max(0, Math.min(100, factions[id] + delta));
 }
@@ -65,13 +65,13 @@ export function getRegLevel() {
 /** Position-size threshold multiplier. High firmStanding = more lenient triggers. */
 export function firmThresholdMult() {
     return (1 + (factions.firmStanding / 100) * 0.75) *
-        getConvictionEffect('firmThresholdMult', 1);
+        getTraitEffect('firmThresholdMult', 1);
 }
 
 /** Compliance popup cooldown multiplier. High firmStanding = less frequent popups. */
 export function firmCooldownMult() {
     return (0.5 + (factions.firmStanding / 100)) *
-        getConvictionEffect('firmCooldownMult', 1);
+        getTraitEffect('firmCooldownMult', 1);
 }
 
 const TONE_THRESHOLDS = [
