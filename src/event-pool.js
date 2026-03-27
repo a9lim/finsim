@@ -3,6 +3,8 @@
    Category arrays, pool merge, and event-by-id lookup.
    =================================================== */
 
+import { shiftFaction } from './faction-standing.js';
+
 // -- Canonical parameter clamping ranges --------------------------------
 export const PARAM_RANGES = {
     mu:     { min: -0.50, max: 0.80 },
@@ -64,7 +66,7 @@ const FED_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => sim.b < 0.15 && !world.fed.hartleyFired && !world.fed.hikeCycle,
         params: { mu: -0.015, theta: 0.005, sigmaR: 0.001 },
-        effects: [ { path: 'fed.hikeCycle', op: 'set', value: true }, { path: 'fed.cutCycle', op: 'set', value: false }, ],
+        effects: (world) => { world.fed.hikeCycle = true; world.fed.cutCycle = false; shiftFaction('fedRelations', -1); },
         followups: [{ id: 'fed_25bps_hike', mtth: 32, weight: 0.7 }],
     },
     {
@@ -99,6 +101,7 @@ const FED_EVENTS = [
         effects: (world) => {
             world.fed.credibilityScore = Math.min(10, world.fed.credibilityScore + 1);
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+            shiftFaction('fedRelations', -2);
         },
     },
     {
@@ -121,7 +124,7 @@ const FED_EVENTS = [
         params: { mu: 0.02, theta: -0.005, sigmaR: 0.002 },
         magnitude: 'moderate',
         when: (sim, world) => sim.b > -0.03 && !world.fed.hartleyFired && !world.fed.cutCycle,
-        effects: (world) => { world.fed.cutCycle = true; world.fed.hikeCycle = false; },
+        effects: (world) => { world.fed.cutCycle = true; world.fed.hikeCycle = false; shiftFaction('fedRelations', 1); },
         followups: [
             { id: 'fed_50bps_emergency_cut', mtth: 20, weight: 0.5 },
         ],
@@ -135,6 +138,7 @@ const FED_EVENTS = [
         magnitude: 'major',
         when: (sim, world) => sim.b > -0.03,
         params: { mu: 0.03, theta: 0.02, b: -0.015, sigmaR: 0.006, lambda: 1.5 },
+        effects: () => { shiftFaction('fedRelations', 2); },
     },
 
     // -- QE restart ----------------------------------------------------------
@@ -147,7 +151,7 @@ const FED_EVENTS = [
         minDay: 300,
         when: (sim, world) => !world.fed.qeActive && sim.b < 0.02,
         params: { mu: 0.05, theta: -0.015, b: -0.01, sigmaR: -0.003, lambda: -0.5, q: 0.002 },
-        effects: [ { path: 'fed.qeActive', op: 'set', value: true }, ],
+        effects: (world) => { world.fed.qeActive = true; shiftFaction('fedRelations', 2); },
     },
 
     // -- Minutes leaks -------------------------------------------------------
@@ -181,6 +185,7 @@ const FED_EVENTS = [
         when: (sim, world) => !world.fed.hartleyFired,
         effects: (world) => {
             world.fed.credibilityScore = Math.max(0, world.fed.credibilityScore - 2);
+            shiftFaction('fedRelations', -1);
         },
     },
     {
@@ -204,7 +209,7 @@ const FED_EVENTS = [
         minDay: 200,
         when: (sim, world) => world.election.barronApproval > 40 && !world.fed.hartleyFired,
         params: { mu: -0.02, theta: 0.015, sigmaR: 0.006, lambda: 0.8 },
-        effects: [ { path: 'fed.credibilityScore', op: 'add', value: -3 }, ],
+        effects: (world) => { world.fed.credibilityScore = Math.max(0, world.fed.credibilityScore - 3); shiftFaction('fedRelations', -2); },
         followups: [{ id: 'barron_fires_hartley', mtth: 30, weight: 0.2 }],
     },
     {
@@ -217,7 +222,7 @@ const FED_EVENTS = [
         minDay: 400,
         when: (sim, world, congress) => congress.trifecta && world.fed.credibilityScore <= 4 && !world.fed.hartleyFired,
         params: { mu: -0.05, theta: 0.05, sigmaR: 0.025, lambda: 3.5 },
-        effects: [ { path: 'fed.hartleyFired', op: 'set', value: true }, { path: 'fed.credibilityScore', op: 'set', value: 0 }, { path: 'election.barronApproval', op: 'add', value: -10 }, ],
+        effects: (world) => { world.fed.hartleyFired = true; world.fed.credibilityScore = 0; world.election.barronApproval = Math.max(0, world.election.barronApproval - 10); shiftFaction('fedRelations', -10); },
         followups: [ { id: 'markets_panic_hartley_fired', mtth: 3, weight: 0.95 }, { id: 'vane_nominated', mtth: 10, weight: 0.8 }, { id: 'scotus_hartley_case', mtth: 40, weight: 0.5 }, ],
     },
     {
@@ -243,6 +248,7 @@ const FED_EVENTS = [
         params: { mu: 0.01, theta: 0.01, sigmaR: 0.005 },
         magnitude: 'moderate',
         when: (sim, world) => world.fed.hartleyFired,
+        effects: () => { shiftFaction('fedRelations', -5); },
         followups: [
             { id: 'vane_confirmed', mtth: 30, weight: 0.6 },
             { id: 'vane_rejected', mtth: 30, weight: 0.4 },
@@ -261,6 +267,7 @@ const FED_EVENTS = [
             world.fed.vaneAppointed = true;
             world.fed.cutCycle = true;
             world.fed.hikeCycle = false;
+            shiftFaction('fedRelations', -5);
         },
     },
     {
@@ -317,7 +324,7 @@ const MACRO_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 0,
         params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
-        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 1 }, { path: 'geopolitical.sericaRelations', op: 'add', value: -1 }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
+        effects: (world) => { world.geopolitical.tradeWarStage = 1; world.geopolitical.sericaRelations = Math.max(-3, world.geopolitical.sericaRelations - 1); world.election.barronApproval = Math.max(0, world.election.barronApproval - 2); shiftFaction('federalistSupport', -2); },
         followups: [ { id: 'trade_retaliation', mtth: 18, weight: 0.7 }, { id: 'tariff_selloff', mtth: 3, weight: 0.5 }, ],
     },
     {
@@ -353,6 +360,7 @@ const MACRO_EVENTS = [
         effects: (world) => {
             world.geopolitical.tradeWarStage = 3;
             world.geopolitical.sericaRelations = -3;
+            shiftFaction('federalistSupport', -2);
         },
         followups: [
             { id: 'rare_earth_crisis', mtth: 25, weight: 0.7 },
@@ -402,7 +410,7 @@ const MACRO_EVENTS = [
         minDay: 400,
         when: (sim, world) => world.geopolitical.tradeWarStage >= 2 && world.geopolitical.tradeWarStage < 4,
         params: { mu: 0.04, theta: -0.015, lambda: -0.6, muJ: 0.008, q: 0.002 },
-        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 4 }, { path: 'geopolitical.sericaRelations', op: 'add', value: 2 }, { path: 'election.barronApproval', op: 'add', value: 3 }, ],
+        effects: (world) => { world.geopolitical.tradeWarStage = 4; world.geopolitical.sericaRelations = Math.min(3, world.geopolitical.sericaRelations + 2); world.election.barronApproval = Math.min(100, world.election.barronApproval + 3); shiftFaction('federalistSupport', 3); },
     },
 
     // =====================================================================
@@ -419,6 +427,7 @@ const MACRO_EVENTS = [
         effects: (world) => {
             world.geopolitical.mideastEscalation = 1;
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+            shiftFaction('fedRelations', -1);
         },
         followups: [
             { id: 'mideast_civilian_casualties', mtth: 15, weight: 0.7 },
@@ -470,6 +479,8 @@ const MACRO_EVENTS = [
         effects: (world) => {
             world.geopolitical.mideastEscalation = 2;
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 6);
+            shiftFaction('fedRelations', -2);
+            shiftFaction('farmerLaborSupport', 2);
         },
         followups: [
             { id: 'mideast_quagmire', mtth: 40, weight: 0.6 },
@@ -488,6 +499,8 @@ const MACRO_EVENTS = [
         effects: (world) => {
             world.geopolitical.mideastEscalation = 3;
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
+            shiftFaction('farmerLaborSupport', 3);
+            shiftFaction('mediaTrust', 2);
         },
         followups: [
             { id: 'mideast_ceasefire', mtth: 50, weight: 0.5 },
@@ -628,7 +641,7 @@ const MACRO_EVENTS = [
         magnitude: 'major',
         when: (sim, world) => !world.geopolitical.oilCrisis,
         params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, b: 0.008, sigmaR: 0.006, q: -0.001 },
-        effects: [ { path: 'geopolitical.oilCrisis', op: 'set', value: true }, ],
+        effects: (world) => { world.geopolitical.oilCrisis = true; shiftFaction('fedRelations', -2); },
     },
     {
         id: 'energy_sanctions',
@@ -640,6 +653,7 @@ const MACRO_EVENTS = [
         when: (sim, world) => !world.geopolitical.sanctionsActive,
         effects: (world) => {
             world.geopolitical.sanctionsActive = true;
+            shiftFaction('federalistSupport', 2);
         },
     },
     {
@@ -691,7 +705,7 @@ const MACRO_EVENTS = [
         minDay: 200,
         when: (sim, world) => sim.mu < -0.05 && sim.theta > 0.12 && !world.geopolitical.recessionDeclared,
         params: { mu: -0.07, theta: 0.035, lambda: 1.8, muJ: -0.05, b: -0.012, q: -0.005 },
-        effects: [ { path: 'geopolitical.recessionDeclared', op: 'set', value: true }, { path: 'election.barronApproval', op: 'add', value: -8 }, ],
+        effects: (world) => { world.geopolitical.recessionDeclared = true; world.election.barronApproval = Math.max(0, world.election.barronApproval - 8); shiftFaction('firmStanding', -5); },
     },
     {
         id: 'sovereign_debt_scare',
@@ -795,7 +809,7 @@ const MACRO_EVENTS = [
         params: { mu: -0.04, theta: 0.03, lambda: 2.0, b: 0.015 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.khasurianCrisis === 2,
-        effects: (world) => { world.geopolitical.khasurianCrisis = 3; },
+        effects: (world) => { world.geopolitical.khasurianCrisis = 3; shiftFaction('fedRelations', -2); },
     },
     {
         id: 'khasuria_backs_down',
@@ -835,7 +849,7 @@ const MACRO_EVENTS = [
         params: { mu: -0.03, b: 0.015, theta: 0.015, sigmaR: 0.004 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.farsistanEscalation === 1,
-        effects: (world) => { world.geopolitical.farsistanEscalation = 2; },
+        effects: (world) => { world.geopolitical.farsistanEscalation = 2; shiftFaction('fedRelations', -2); },
         followups: [
             { id: 'farsistan_full_closure', mtth: 40, weight: 1 },
             { id: 'farsistan_negotiation', mtth: 40, weight: 1 },
@@ -854,6 +868,7 @@ const MACRO_EVENTS = [
             world.geopolitical.farsistanEscalation = 3;
             world.geopolitical.straitClosed = true;
             world.geopolitical.oilCrisis = true;
+            shiftFaction('fedRelations', -3);
         },
     },
     {
@@ -919,6 +934,7 @@ const MACRO_EVENTS = [
         when: (sim, world) => world.geopolitical.southAmericaOps >= 2 && world.pnth.sentinelLaunched,
         effects: (world) => {
             world.media.tanCredibility = Math.min(10, world.media.tanCredibility + 1);
+            shiftFaction('mediaTrust', 2);
         },
     },
 ];
@@ -975,6 +991,7 @@ const PNTH_EVENTS = [
         when: (sim, world) => world.pnth.ceoIsGottlieb && world.pnth.boardDirks >= 8,
         effects: (world) => {
             world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+            shiftFaction('firmStanding', -2);
         },
         followups: [
             { id: 'gottlieb_resigns', mtth: 25, weight: 0.6 },
@@ -1057,6 +1074,7 @@ const PNTH_EVENTS = [
         effects: (world) => {
             world.pnth.ctoIsMira = false;
             world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+            shiftFaction('firmStanding', -2);
         },
     },
 
@@ -1071,7 +1089,7 @@ const PNTH_EVENTS = [
         minDay: 250,
         when: (sim, world) => world.pnth.ceoIsGottlieb,
         params: { mu: -0.03, theta: 0.02, lambda: 1.0, muJ: -0.02 },
-        effects: [ { path: 'pnth.ceoIsGottlieb', op: 'set', value: false }, { path: 'pnth.boardGottlieb', op: 'add', value: -1 }, { path: 'pnth.boardDirks', op: 'add', value: 1 }, ],
+        effects: (world) => { world.pnth.ceoIsGottlieb = false; world.pnth.boardGottlieb = Math.max(0, world.pnth.boardGottlieb - 1); world.pnth.boardDirks = Math.min(12, world.pnth.boardDirks + 1); shiftFaction('firmStanding', -3); },
         followups: [ { id: 'successor_search', mtth: 20, weight: 0.8 }, { id: 'gottlieb_covenant_ai', mtth: 60, weight: 0.4 }, ],
     },
     {
@@ -1126,6 +1144,7 @@ const PNTH_EVENTS = [
         effects: (world) => {
             world.pnth.gottliebStartedRival = true;
             world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+            shiftFaction('firmStanding', -2);
         },
     },
 
@@ -1298,7 +1317,7 @@ const PNTH_EVENTS = [
         minDay: 150,
         when: (sim, world) => !world.pnth.senateProbeLaunched,
         params: { mu: -0.04, theta: 0.02, lambda: 0.8, muJ: -0.02 },
-        effects: [ { path: 'pnth.senateProbeLaunched', op: 'set', value: true }, { path: 'investigations.okaforProbeStage', op: 'set', value: 1 }, ],
+        effects: (world) => { world.pnth.senateProbeLaunched = true; world.investigations.okaforProbeStage = 1; shiftFaction('regulatoryExposure', 5); shiftFaction('farmerLaborSupport', 2); },
         followups: [{ id: 'congressional_hearing_pnth', mtth: 25, weight: 0.7 }],
     },
     {
@@ -1312,6 +1331,7 @@ const PNTH_EVENTS = [
         when: (sim, world) => !world.pnth.dojSuitFiled && world.pnth.militaryContractActive,
         effects: (world) => {
             world.pnth.dojSuitFiled = true;
+            shiftFaction('regulatoryExposure', 8);
         },
         portfolioFlavor: (portfolio) => {
             const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
@@ -1370,7 +1390,7 @@ const PNTH_EVENTS = [
         minDay: 250,
         when: (sim, world) => !world.pnth.whistleblowerFiled,
         params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.03 },
-        effects: [ { path: 'pnth.whistleblowerFiled', op: 'set', value: true }, { path: 'pnth.boardDirks', op: 'add', value: -1 }, { path: 'pnth.boardGottlieb', op: 'add', value: 1 }, ],
+        effects: (world) => { world.pnth.whistleblowerFiled = true; world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1); world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1); shiftFaction('regulatoryExposure', 5); shiftFaction('firmStanding', -5); },
     },
 
     // =====================================================================
@@ -1384,7 +1404,7 @@ const PNTH_EVENTS = [
         magnitude: 'major',
         when: (sim, world) => !world.pnth.militaryContractActive && !world.pnth.acquired,
         params: { mu: 0.04, theta: -0.005, lambda: -0.2 },
-        effects: [ { path: 'pnth.militaryContractActive', op: 'set', value: true }, { path: 'pnth.commercialMomentum', op: 'add', value: -1 }, ],
+        effects: (world) => { world.pnth.militaryContractActive = true; world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1); shiftFaction('firmStanding', 3); },
     },
     {
         id: 'defense_contract_cancelled',
@@ -1394,7 +1414,7 @@ const PNTH_EVENTS = [
         magnitude: 'major',
         when: (sim, world) => world.pnth.militaryContractActive,
         params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.02 },
-        effects: [ { path: 'pnth.militaryContractActive', op: 'set', value: false }, ],
+        effects: (world) => { world.pnth.militaryContractActive = false; shiftFaction('firmStanding', -2); },
     },
     {
         id: 'dhs_contract_renewal',
@@ -1415,6 +1435,7 @@ const PNTH_EVENTS = [
         when: (sim, world) => world.pnth.ceoIsGottlieb && !world.pnth.acquired,
         effects: (world) => {
             world.pnth.commercialMomentum = Math.min(2, world.pnth.commercialMomentum + 1);
+            shiftFaction('firmStanding', 2);
         },
     },
     {
@@ -1645,6 +1666,8 @@ const PNTH_EVENTS = [
         effects: (world) => {
             world.pnth.aegisDeployed = true;
             world.pnth.aegisControversy = 1;
+            shiftFaction('firmStanding', 2);
+            shiftFaction('regulatoryExposure', 2);
         },
         era: 'mid',
         followups: [
@@ -1690,7 +1713,7 @@ const PNTH_EVENTS = [
         params: { mu: 0.04 },
         magnitude: 'major',
         when: (sim, world) => !world.pnth.companionLaunched && world.pnth.commercialMomentum >= 1,
-        effects: (world) => { world.pnth.companionLaunched = true; },
+        effects: (world) => { world.pnth.companionLaunched = true; shiftFaction('firmStanding', 3); },
         era: 'mid',
         followups: [
             { id: 'companion_200m', mtth: 60, weight: 1 },
@@ -1731,7 +1754,7 @@ const PNTH_EVENTS = [
         params: { theta: 0.008 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.companionScandal >= 1,
-        effects: (world) => { world.pnth.companionScandal = Math.min(3, world.pnth.companionScandal + 1); },
+        effects: (world) => { world.pnth.companionScandal = Math.min(3, world.pnth.companionScandal + 1); shiftFaction('regulatoryExposure', 2); shiftFaction('firmStanding', -2); },
     },
 
     // =====================================================================
@@ -1760,6 +1783,7 @@ const PNTH_EVENTS = [
         params: { mu: -0.03, theta: 0.02, lambda: 1.0 },
         magnitude: 'major',
         when: (sim, world) => world.pnth.foundryLaunched,
+        effects: () => { shiftFaction('firmStanding', -2); },
         followups: [
             { id: 'foundry_zhaowei_leverage', mtth: 30, weight: 1 },
         ],
@@ -2100,6 +2124,8 @@ const POLITICAL_EVENTS = [
         effects: (world) => {
             world.investigations.okaforProbeStage = Math.max(1, world.investigations.okaforProbeStage);
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+            shiftFaction('farmerLaborSupport', 3);
+            shiftFaction('regulatoryExposure', 3);
         },
         followups: [
             { id: 'okafor_popularity_surge', mtth: 10, weight: 0.7 },
@@ -2126,7 +2152,7 @@ const POLITICAL_EVENTS = [
         minDay: 700,
         when: (sim, world) => sim.day > 750 && !world.election.okaforRunning,
         params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
-        effects: [ { path: 'election.okaforRunning', op: 'set', value: true }, { path: 'election.barronApproval', op: 'add', value: -2 }, ],
+        effects: (world) => { world.election.okaforRunning = true; world.election.barronApproval = Math.max(0, world.election.barronApproval - 2); shiftFaction('farmerLaborSupport', 4); },
     },
     {
         id: 'okafor_scandal',
@@ -2136,7 +2162,7 @@ const POLITICAL_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => world.election.okaforRunning || world.investigations.okaforProbeStage >= 1,
         params: { mu: 0.015, theta: 0.008 },
-        effects: [ { path: 'election.barronApproval', op: 'add', value: 2 }, ],
+        effects: (world) => { world.election.barronApproval = Math.min(100, world.election.barronApproval + 2); shiftFaction('farmerLaborSupport', -3); shiftFaction('federalistSupport', 2); },
     },
 
     // =====================================================================
@@ -2249,7 +2275,7 @@ const POLITICAL_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.trifecta,
         params: { mu: 0.025, theta: -0.003, b: 0.005, q: 0.002 },
-        effects: [ { path: 'election.barronApproval', op: 'add', value: 2 }, ],
+        effects: (world) => { world.election.barronApproval = Math.min(100, world.election.barronApproval + 2); shiftFaction('federalistSupport', 3); },
     },
     {
         id: 'clay_opposition_rally',
@@ -2271,7 +2297,7 @@ const POLITICAL_EVENTS = [
         magnitude: 'moderate',
         minDay: 150,
         params: { mu: -0.015, theta: 0.008, sigmaR: 0.003 },
-        effects: [ { path: 'election.barronApproval', op: 'add', value: -2 }, ],
+        effects: (world) => { world.election.barronApproval = Math.max(0, world.election.barronApproval - 2); shiftFaction('mediaTrust', 2); },
     },
 ];
 const INVESTIGATION_EVENTS = [
@@ -2287,7 +2313,7 @@ const INVESTIGATION_EVENTS = [
         maxDay: 600,
         when: (sim, world) => world.investigations.tanBowmanStory === 0,
         params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
-        effects: [ { path: 'investigations.tanBowmanStory', op: 'set', value: 1 }, { path: 'election.barronApproval', op: 'add', value: -3 }, ],
+        effects: (world) => { world.investigations.tanBowmanStory = 1; world.election.barronApproval = Math.max(0, world.election.barronApproval - 3); shiftFaction('mediaTrust', 3); shiftFaction('regulatoryExposure', 3); },
         followups: [ { id: 'bowman_denial', mtth: 3, weight: 0.9 }, { id: 'tan_bowman_followup', mtth: 25, weight: 0.6 }, ],
     },
     {
@@ -2314,7 +2340,7 @@ const INVESTIGATION_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.tanBowmanStory === 1,
         params: { mu: -0.04, theta: 0.02, lambda: 0.6, muJ: -0.02 },
-        effects: [ { path: 'investigations.tanBowmanStory', op: 'set', value: 2 }, { path: 'election.barronApproval', op: 'add', value: -5 }, ],
+        effects: (world) => { world.investigations.tanBowmanStory = 2; world.election.barronApproval = Math.max(0, world.election.barronApproval - 5); shiftFaction('mediaTrust', 3); shiftFaction('regulatoryExposure', 5); },
         followups: [ { id: 'doj_bowman_referral', mtth: 30, weight: 0.5 }, { id: 'tan_bombshell_recording', mtth: 40, weight: 0.4 }, ],
     },
     {
@@ -2327,7 +2353,7 @@ const INVESTIGATION_EVENTS = [
         minDay: 300,
         when: (sim, world) => world.investigations.tanBowmanStory >= 2,
         params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
-        effects: [ { path: 'investigations.tanBowmanStory', op: 'set', value: 3 }, { path: 'election.barronApproval', op: 'add', value: -8 }, { path: 'pnth.boardDirks', op: 'add', value: -1 }, { path: 'pnth.boardGottlieb', op: 'add', value: 1 }, ],
+        effects: (world) => { world.investigations.tanBowmanStory = 3; world.election.barronApproval = Math.max(0, world.election.barronApproval - 8); world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1); world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1); shiftFaction('mediaTrust', 3); shiftFaction('regulatoryExposure', 8); },
         followups: [{ id: 'bowman_resigns', mtth: 20, weight: 0.5 }],
     },
     {
@@ -2341,6 +2367,8 @@ const INVESTIGATION_EVENTS = [
         when: (sim, world) => world.investigations.tanNsaStory === 0 && world.investigations.tanBowmanStory >= 1,
         effects: (world) => {
             world.investigations.tanNsaStory = 1;
+            shiftFaction('mediaTrust', 2);
+            shiftFaction('regulatoryExposure', 3);
         },
         followups: [
             { id: 'tan_nsa_followup', mtth: 30, weight: 0.5 },
@@ -2359,6 +2387,8 @@ const INVESTIGATION_EVENTS = [
             world.investigations.tanNsaStory = 2;
             world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
             world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
+            shiftFaction('mediaTrust', 3);
+            shiftFaction('regulatoryExposure', 5);
         },
     },
 
@@ -2384,7 +2414,7 @@ const INVESTIGATION_EVENTS = [
         minDay: 250,
         when: (sim, world) => world.investigations.okaforProbeStage >= 1,
         params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
-        effects: [ { path: 'investigations.okaforProbeStage', op: 'set', value: 2 }, ],
+        effects: (world) => { world.investigations.okaforProbeStage = 2; shiftFaction('regulatoryExposure', 5); shiftFaction('farmerLaborSupport', 2); },
     },
     {
         id: 'okafor_criminal_referral',
@@ -2395,7 +2425,7 @@ const INVESTIGATION_EVENTS = [
         minDay: 400,
         when: (sim, world) => world.investigations.okaforProbeStage >= 2,
         params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
-        effects: [ { path: 'investigations.okaforProbeStage', op: 'set', value: 3 }, { path: 'election.barronApproval', op: 'add', value: -3 }, ],
+        effects: (world) => { world.investigations.okaforProbeStage = 3; world.election.barronApproval = Math.max(0, world.election.barronApproval - 3); shiftFaction('regulatoryExposure', 10); shiftFaction('farmerLaborSupport', 3); },
     },
 
     // =====================================================================
@@ -2421,7 +2451,7 @@ const INVESTIGATION_EVENTS = [
         minDay: 400,
         when: (sim, world) => world.investigations.tanBowmanStory >= 2,
         params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.03 },
-        effects: [ { path: 'election.barronApproval', op: 'add', value: -5 }, ],
+        effects: (world) => { world.election.barronApproval = Math.max(0, world.election.barronApproval - 5); shiftFaction('regulatoryExposure', 5); },
     },
     {
         id: 'bowman_indicted',
@@ -2434,6 +2464,7 @@ const INVESTIGATION_EVENTS = [
         when: (sim, world) => world.investigations.tanBowmanStory >= 3 && world.investigations.okaforProbeStage >= 2,
         effects: (world) => {
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
+            shiftFaction('regulatoryExposure', 8);
         },
         portfolioFlavor: (portfolio) => {
             const optQty = portfolio.positions.filter(p => p.type === 'call' || p.type === 'put').reduce((s, p) => s + Math.abs(p.qty), 0);
@@ -2454,7 +2485,7 @@ const INVESTIGATION_EVENTS = [
         minDay: 400,
         when: (sim, world, congress) => !congress.fedControlsHouse && world.investigations.impeachmentStage === 0 && world.investigations.tanBowmanStory >= 2,
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.015, sigmaR: 0.004 },
-        effects: [ { path: 'investigations.impeachmentStage', op: 'set', value: 1 }, { path: 'election.barronApproval', op: 'add', value: -3 }, ],
+        effects: (world) => { world.investigations.impeachmentStage = 1; world.election.barronApproval = Math.max(0, world.election.barronApproval - 3); shiftFaction('farmerLaborSupport', 4); shiftFaction('regulatoryExposure', 5); },
         followups: [{ id: 'impeachment_vote', mtth: 40, weight: 0.6 }],
     },
     {
@@ -2500,7 +2531,7 @@ const COMPOUND_EVENTS = [
         minDay: 350,
         when: (sim, world) => world.geopolitical.mideastEscalation >= 2 && world.geopolitical.recessionDeclared,
         params: { mu: -0.04, theta: 0.025, lambda: 1.0 },
-        effects: [ { path: 'election.barronApproval', op: 'add', value: -5 }, ],
+        effects: (world) => { world.election.barronApproval = Math.max(0, world.election.barronApproval - 5); shiftFaction('federalistSupport', -3); shiftFaction('firmStanding', -3); },
     },
     {
         id: 'compound_pnth_scandal_trade_war',
@@ -2514,6 +2545,8 @@ const COMPOUND_EVENTS = [
         effects: (world) => {
             world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
             world.geopolitical.sericaRelations = Math.max(-3, world.geopolitical.sericaRelations - 1);
+            shiftFaction('firmStanding', -3);
+            shiftFaction('regulatoryExposure', 3);
         },
         portfolioFlavor: (portfolio) => {
             const longStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty > 0).reduce((s, p) => s + p.qty, 0);
@@ -2551,6 +2584,7 @@ const COMPOUND_EVENTS = [
         when: (sim, world) => world.investigations.impeachmentStage >= 1 && world.geopolitical.mideastEscalation >= 2,
         effects: (world) => {
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
+            shiftFaction('firmStanding', -3);
         },
     },
     {
@@ -2602,6 +2636,7 @@ const COMPOUND_EVENTS = [
         effects: (world) => {
             world.geopolitical.recessionDeclared = false;
             world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
+            shiftFaction('firmStanding', 5);
         },
     },
     {
@@ -2675,6 +2710,7 @@ const CONGRESSIONAL_EVENTS = [
             world.congress.senate.federalist -= 1;
             world.congress.senate.farmerLabor += 1;
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+            shiftFaction('farmerLaborSupport', 3);
         },
         portfolioFlavor: (portfolio) => {
             const longStock = portfolio.positions.filter(p => p.type === 'stock' && p.qty > 0).reduce((s, p) => s + p.qty, 0);
@@ -2693,6 +2729,7 @@ const CONGRESSIONAL_EVENTS = [
         effects: (world) => {
             world.congress.senate.federalist += 1;
             world.congress.senate.farmerLabor -= 1;
+            shiftFaction('federalistSupport', 3);
         },
     },
     {
@@ -2817,6 +2854,8 @@ const CONGRESSIONAL_EVENTS = [
             world.congress.senate.federalist -= 1;
             world.congress.senate.farmerLabor += 1;
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+            shiftFaction('federalistSupport', -4);
+            shiftFaction('farmerLaborSupport', 3);
         },
     },
 
@@ -2849,6 +2888,7 @@ const CONGRESSIONAL_EVENTS = [
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, sigmaR: 0.004 },
         magnitude: 'major',
         when: (sim, world, congress) => congress.fedControlsHouse,
+        effects: () => { shiftFaction('federalistSupport', -3); },
         followups: [
             { id: 'new_speaker_elected', mtth: 12, weight: 0.7 },
             { id: 'speaker_chaos_continues', mtth: 12, weight: 0.3 },
@@ -2907,6 +2947,8 @@ const CONGRESSIONAL_EVENTS = [
         magnitude: 'major',
         effects: (world) => {
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 10);
+            shiftFaction('fedRelations', -5);
+            shiftFaction('firmStanding', -5);
         },
         followups: [
             { id: 'debt_ceiling_last_minute_deal', mtth: 5, weight: 0.9 },
@@ -2981,7 +3023,7 @@ const CONGRESSIONAL_EVENTS = [
         minDay: 250,
         when: (sim, world, congress) => congress.fedControlsSenate && world.congress.senate.federalist >= 52,
         params: { mu: -0.025, theta: 0.02, lambda: 0.6, sigmaR: 0.005 },
-        effects: [ { path: 'election.barronApproval', op: 'add', value: 2 }, ],
+        effects: (world) => { world.election.barronApproval = Math.min(100, world.election.barronApproval + 2); shiftFaction('federalistSupport', 3); shiftFaction('farmerLaborSupport', -2); },
     },
     {
         id: 'senate_rejects_barron_nominee',
@@ -3048,7 +3090,7 @@ const CONGRESSIONAL_EVENTS = [
         magnitude: 'major',
         when: (sim, world, congress) => congress.trifecta,
         params: { mu: 0.03, theta: -0.005, b: 0.002, q: 0.004 },
-        effects: [ { path: 'election.barronApproval', op: 'add', value: 3 }, ],
+        effects: (world) => { world.election.barronApproval = Math.min(100, world.election.barronApproval + 3); shiftFaction('federalistSupport', 4); shiftFaction('firmStanding', 2); },
     },
     {
         id: 'capital_gains_tax_scare',
@@ -3070,7 +3112,7 @@ const CONGRESSIONAL_EVENTS = [
         params: { mu: 0.02 },
         magnitude: 'moderate',
         when: (sim, world) => world.congress.bigBillStatus === 0,
-        effects: (world) => { world.congress.bigBillStatus = 1; },
+        effects: (world) => { world.congress.bigBillStatus = 1; shiftFaction('federalistSupport', 2); },
         era: 'early',
     },
     {
@@ -3154,6 +3196,7 @@ const FILIBUSTER_EVENTS = [
         effects: (world) => {
             world.congress.filibusterActive = false;
             world.congress.bigBillStatus = 3;
+            shiftFaction('federalistSupport', 4);
         },
     },
     {
@@ -3168,6 +3211,7 @@ const FILIBUSTER_EVENTS = [
             world.congress.filibusterActive = false;
             world.congress.bigBillStatus = 4;
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 3);
+            shiftFaction('farmerLaborSupport', 3);
         },
     },
 ];
@@ -3182,6 +3226,7 @@ const MIDTERM_EVENTS = [
         magnitude: 'moderate',
         effects: (world) => {
             world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
+            shiftFaction('federalistSupport', 5);
         },
     },
     {
@@ -3191,7 +3236,7 @@ const MIDTERM_EVENTS = [
         headline: 'Farmer-Labor elects new House Speaker; pledges immediate investigations into Barron administration. "Accountability starts now"',
         magnitude: 'moderate',
         params: { mu: -0.02, theta: 0.008, lambda: 0.3 },
-        effects: [ { path: 'election.barronApproval', op: 'add', value: -2 }, ],
+        effects: (world) => { world.election.barronApproval = Math.max(0, world.election.barronApproval - 2); shiftFaction('farmerLaborSupport', 5); },
     },
     {
         id: 'midterm_lame_duck_barron',
@@ -3200,7 +3245,7 @@ const MIDTERM_EVENTS = [
         headline: 'Barron retreats to Mar-a-Lago after historic losses; agenda effectively dead. Aides describe him as "furious and isolated." Markets rally on gridlock',
         magnitude: 'major',
         params: { mu: 0.03, theta: -0.01, lambda: -0.3, sigmaR: -0.002 },
-        effects: [ { path: 'election.barronApproval', op: 'add', value: -8 }, ],
+        effects: (world) => { world.election.barronApproval = Math.max(0, world.election.barronApproval - 8); shiftFaction('farmerLaborSupport', 5); shiftFaction('federalistSupport', -5); },
     },
     {
         id: 'midterm_status_quo',
@@ -3217,7 +3262,7 @@ const MIDTERM_EVENTS = [
         headline: 'Farmer-Labor takes Senate majority by one seat; committee chairmanships flip. Okafor gains full subpoena power over Intelligence Committee',
         magnitude: 'moderate',
         params: { mu: -0.015, theta: 0.008, lambda: 0.2 },
-        effects: [ { path: 'election.barronApproval', op: 'add', value: -3 }, ],
+        effects: (world) => { world.election.barronApproval = Math.max(0, world.election.barronApproval - 3); shiftFaction('farmerLaborSupport', 5); shiftFaction('regulatoryExposure', 3); },
     },
 ];
 
@@ -3643,6 +3688,8 @@ const MEDIA_EVENTS = [
         effects: (world) => {
             world.media.tanCredibility = Math.min(10, world.media.tanCredibility + 1);
             world.media.leakCount = Math.min(5, world.media.leakCount + 1);
+            shiftFaction('mediaTrust', 2);
+            shiftFaction('regulatoryExposure', 3);
         },
     },
     {
@@ -3669,6 +3716,7 @@ const MEDIA_EVENTS = [
         effects: (world) => {
             world.media.tanCredibility = Math.max(0, world.media.tanCredibility - 1);
             world.media.leakCount = Math.min(5, world.media.leakCount + 1);
+            shiftFaction('mediaTrust', -2);
         },
     },
     {
@@ -3690,6 +3738,7 @@ const MEDIA_EVENTS = [
         effects: (world) => {
             world.media.sentinelRating = Math.max(0, world.media.sentinelRating - 2);
             world.media.pressFreedomIndex = Math.max(0, world.media.pressFreedomIndex - 1);
+            shiftFaction('mediaTrust', -3);
         },
         era: 'mid',
     },
@@ -3703,6 +3752,7 @@ const MEDIA_EVENTS = [
         when: (sim, world) => world.media.pressFreedomIndex <= 4 && world.media.leakCount >= 3,
         effects: (world) => {
             world.media.pressFreedomIndex = Math.max(0, world.media.pressFreedomIndex - 2);
+            shiftFaction('mediaTrust', -3);
         },
         era: 'mid',
     },
@@ -3725,6 +3775,7 @@ const MEDIA_EVENTS = [
         era: 'mid',
         effects: (world) => {
             world.media.tanCredibility = Math.min(10, world.media.tanCredibility + 1);
+            shiftFaction('mediaTrust', 2);
         },
     },
     {
@@ -3903,7 +3954,7 @@ export const OFFLINE_EVENTS = [
         headline: 'The Financial Freedom Act meets a Federalist trifecta — Lassiter and Tao gut banking oversight in a 48-hour legislative blitz. MarketWire calls it "the most consequential deregulation since 1999."',
         magnitude: 'major',
         params: { theta: -0.02, lambda: 0.5 },
-        effects: (world) => { world.election.barronApproval += 3; },
+        effects: (world) => { world.election.barronApproval += 3; shiftFaction('federalistSupport', 4); shiftFaction('regulatoryExposure', -3); },
     },
     {
         id: 'compound_pnth_war_profits',
@@ -3933,6 +3984,8 @@ export const OFFLINE_EVENTS = [
         effects: (world) => {
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 10);
             world.fed.credibilityScore = Math.max(0, world.fed.credibilityScore - 2);
+            shiftFaction('firmStanding', -5);
+            shiftFaction('federalistSupport', -3);
         },
     },
     {
@@ -3970,6 +4023,8 @@ export const OFFLINE_EVENTS = [
         params: { mu: -0.06, theta: 0.03, lambda: 3.0, xi: 0.2, rho: -0.1 },
         effects: (world) => {
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 15);
+            shiftFaction('firmStanding', -5);
+            shiftFaction('fedRelations', -3);
         },
     },
     {
