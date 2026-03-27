@@ -182,6 +182,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'ffa_committee_markup',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 3,
         headline: 'Senate Banking Committee begins markup of the Financial Freedom Act. Lassiter chairs a 14-hour session. Haines proposes an amendment capping the repatriation holiday at 3 years. Lassiter kills it in committee.',
@@ -198,6 +199,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'ffa_haines_opposition',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 2,
         headline: 'Haines breaks with party leadership on the Financial Freedom Act, citing deficit projections. "I will not vote for a bill that adds $400B to the debt without offsets." Barron: "Peggy is confused again."',
@@ -208,6 +210,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'ffa_reyes_floor_speech',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 2,
         headline: 'Reyes delivers a blistering 40-minute floor speech against the Financial Freedom Act. "This bill is a permission slip for Wall Street to gamble with the economy." The Sentinel\'s Cole calls it "theatrics."',
@@ -802,6 +805,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'ffa_floor_passes',
+        followupOnly: true,
         category: 'congressional',
         headline: 'The Financial Freedom Act passes both chambers: corporate rate cut to 15%, repatriation holiday. Tao celebrates on the House floor. Reyes walks out. MarketWire: "Shareholder returns about to explode"',
         likelihood: (sim, world, congress) => {
@@ -821,6 +825,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'ffa_floor_fails',
+        followupOnly: true,
         category: 'congressional',
         headline: 'The Financial Freedom Act fails 48-52 as Haines and two other Federalist moderates defect. Lassiter storms out of the chamber. Barron: "We will primary every one of them." Tao vows to bring it back.',
         likelihood: (sim, world, congress) => {
@@ -865,6 +870,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'tariff_act_lassiter_pushes',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 2,
         headline: 'Lassiter brings Serican factory workers to testify before the Foreign Relations Committee. "These are the jobs we lost." The footage dominates The Sentinel for three days. Cole: "His best performance yet."',
@@ -875,6 +881,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'tariff_act_committee',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 3,
         headline: 'Senate Foreign Relations Committee advances the Serican Reciprocal Tariff Act 14-8 with bipartisan support. Haines votes yes. "This isn\'t about politics — it\'s about leverage," she tells MarketWire.',
@@ -889,6 +896,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'tariff_act_passes',
+        followupOnly: true,
         category: 'congressional',
         headline: 'The Serican Reciprocal Tariff Act passes 68-32 with bipartisan support. Lassiter and Whitfield both vote yes. Barron signs it in the Rose Garden. Liang Wei recalls Columbia\'s ambassador within the hour.',
         likelihood: (sim, world) => {
@@ -907,6 +915,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'tariff_act_fails',
+        followupOnly: true,
         category: 'congressional',
         headline: 'The Serican Reciprocal Tariff Act fails 45-55 as business-wing Federalists break ranks. Lassiter: "Corporate cowards." Barron threatens executive tariffs instead. Markets rally on the news.',
         likelihood: (sim, world) => {
@@ -939,6 +948,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'transaction_tax_lobbying',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 2,
         headline: 'Wall Street lobbying blitz against the transaction tax: $40M in two weeks. Meridian Capital\'s government affairs team is working overtime. The Meridian Brief: "If this passes, every desk in the building feels it."',
@@ -948,6 +958,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'transaction_tax_committee',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 3,
         headline: 'Senate Finance Committee advances the transaction tax 12-10 on a party-line vote. Lassiter vows to filibuster. Whitfield: "Let him. We have the patience." MarketWire: "Markets pricing in a wider spread regime."',
@@ -962,6 +973,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'transaction_tax_passes',
+        followupOnly: true,
         category: 'congressional',
         headline: 'The Okafor-Whitfield Revenue Package passes 52-48. Every Farmer-Labor senator votes yes. Lassiter\'s filibuster attempt collapses after six hours. Barron vetoes — but Okafor has the override votes. Spreads widen immediately.',
         likelihood: (sim, world, congress) => {
@@ -980,6 +992,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'transaction_tax_fails',
+        followupOnly: true,
         category: 'congressional',
         headline: 'The transaction tax fails 47-53 as three moderate Farmer-Labor senators defect, citing impact on pension funds. Okafor: "We will be back." Lassiter pops champagne on the Senate steps — The Continental photographs it.',
         likelihood: (sim, world, congress) => {
@@ -1013,6 +1026,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'digital_markets_tech_lobby',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 2,
         headline: 'Malhotra flies to Washington for closed-door meetings with the Commerce Committee. "Atlas Sentinel protects 200 million Columbians. Regulate us out of existence and see what happens." Three senators privately back off.',
@@ -1022,6 +1036,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'digital_markets_committee',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 3,
         headline: 'Senate Commerce Committee advances the Digital Markets Accountability Act 13-9. Whittaker\'s small-business exemption survives. Reyes: "Now let\'s see if the full Senate has the guts."',
@@ -1036,6 +1051,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'digital_markets_passes',
+        followupOnly: true,
         category: 'congressional',
         headline: 'The Digital Markets Accountability Act passes 54-46 with five Federalist defections. AI companies face mandatory safety audits and licensing. Malhotra: "Compliance costs will be material." Gottlieb calls it "long overdue."',
         likelihood: (sim, world) => {
@@ -1054,6 +1070,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'digital_markets_fails',
+        followupOnly: true,
         category: 'congressional',
         headline: 'The Digital Markets Accountability Act fails 44-56 as the tech lobby holds the line. Reyes: "Money won today." Whittaker votes no after Tao applies pressure. The Meridian Brief: "PNTH exhales."',
         likelihood: (sim, world, congress) => {
@@ -1085,6 +1102,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'campaign_finance_committee',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 3,
         headline: 'Senate Rules Committee advances the Campaign Finance Reform Act along party lines. Lassiter: "They want to muzzle the people who actually create jobs." Okafor: "We want to unmask them."',
@@ -1099,6 +1117,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'campaign_finance_passes',
+        followupOnly: true,
         category: 'congressional',
         headline: 'The Campaign Finance Reform Act squeaks through 51-49. Haines is the deciding vote. PAC disclosure requirements take effect immediately. Okafor\'s committee signals it\'s watching "Wall Street money in politics."',
         likelihood: (sim, world, congress) => !congress.fedControlsSenate ? 2.5 : 0.5,
@@ -1113,6 +1132,7 @@ export const CONGRESS_EVENTS = [
     },
     {
         id: 'campaign_finance_fails',
+        followupOnly: true,
         category: 'congressional',
         headline: 'The Campaign Finance Reform Act dies 46-54. Lassiter whips every Federalist into line. Okafor: "Dark money wins again." The Meridian Brief: "Business as usual — literally."',
         likelihood: (sim, world, congress) => congress.fedControlsSenate ? 2.5 : 0.5,
