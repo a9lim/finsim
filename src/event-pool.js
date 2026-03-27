@@ -3394,6 +3394,59 @@ const CONGRESSIONAL_EVENTS = [
         },
     },
 
+    // -- Campaign Finance Reform Act lifecycle --------------------------------
+    {
+        id: 'campaign_finance_introduced',
+        category: 'congressional',
+        likelihood: 0.4,
+        headline: 'Okafor introduces the Campaign Finance Reform Act as primary season opens. "If you want to buy a senator, you should at least have to put your name on the receipt." Lassiter calls it "a naked power grab disguised as reform."',
+        magnitude: 'moderate',
+        when: (sim, world) => world.election.primarySeason && getPipelineStatus('campaign_finance') === null,
+        params: { theta: 0.003 },
+        effects: () => { advanceBill('campaign_finance', 'introduced'); shiftFaction('farmerLaborSupport', 2); },
+        followups: [
+            { id: 'campaign_finance_committee', mtth: 20, weight: 1 },
+        ],
+    },
+    {
+        id: 'campaign_finance_committee',
+        category: 'congressional',
+        likelihood: 3,
+        headline: 'Senate Rules Committee advances the Campaign Finance Reform Act along party lines. Lassiter: "They want to muzzle the people who actually create jobs." Okafor: "We want to unmask them."',
+        magnitude: 'moderate',
+        when: (sim, world) => getPipelineStatus('campaign_finance') === 'introduced',
+        params: {},
+        effects: () => { advanceBill('campaign_finance', 'committee'); },
+        followups: [
+            { id: 'campaign_finance_passes', mtth: 25, weight: 0.4 },
+            { id: 'campaign_finance_fails', mtth: 25, weight: 0.6 },
+        ],
+    },
+    {
+        id: 'campaign_finance_passes',
+        category: 'congressional',
+        headline: 'The Campaign Finance Reform Act squeaks through 51-49. Haines is the deciding vote. PAC disclosure requirements take effect immediately. Okafor\'s committee signals it\'s watching "Wall Street money in politics."',
+        likelihood: (sim, world, congress) => !congress.fedControlsSenate ? 2.5 : 0.5,
+        magnitude: 'moderate',
+        when: (sim, world) => getPipelineStatus('campaign_finance') === 'committee',
+        params: { theta: 0.005 },
+        effects: (world) => {
+            shiftFaction('farmerLaborSupport', 3);
+            shiftFaction('regulatoryExposure', 3);
+            advanceBill('campaign_finance', 'active');
+        },
+    },
+    {
+        id: 'campaign_finance_fails',
+        category: 'congressional',
+        headline: 'The Campaign Finance Reform Act dies 46-54. Lassiter whips every Federalist into line. Okafor: "Dark money wins again." The Meridian Brief: "Business as usual — literally."',
+        likelihood: (sim, world, congress) => congress.fedControlsSenate ? 2.5 : 0.5,
+        magnitude: 'moderate',
+        when: (sim, world) => getPipelineStatus('campaign_finance') === 'committee',
+        params: {},
+        effects: () => { advanceBill('campaign_finance', 'failed'); },
+    },
+
     // -- Big Beautiful Bill lifecycle -----------------------------------------
     {
         id: 'big_bill_house_passes',
