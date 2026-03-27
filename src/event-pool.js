@@ -1904,6 +1904,7 @@ const SECTOR_EVENTS = [
         headline: 'AI regulation bill passes Congress with bipartisan support; mandates safety audits, licensing for frontier models. Malhotra on MarketWire: "Compliance costs will be material — $200M/year minimum." Gottlieb calls it "long overdue."',
         magnitude: 'moderate',
         params: { mu: -0.04, theta: 0.02, lambda: 0.6 },
+        when: (sim, world) => getPipelineStatus('antitrust_scrutiny') === 'active',
     },
     {
         id: 'doj_antitrust_cloud',
@@ -3317,6 +3318,79 @@ const CONGRESSIONAL_EVENTS = [
         effects: (world) => {
             shiftFaction('firmStanding', 2);
             advanceBill('transaction_tax', 'failed');
+        },
+    },
+
+    // -- Digital Markets Accountability Act lifecycle -------------------------
+    {
+        id: 'digital_markets_introduced',
+        category: 'congressional',
+        likelihood: 0.4,
+        headline: 'Reyes introduces the Digital Markets Accountability Act targeting AI monopolies. "Palanthropic controls the government\'s eyes, ears, and now its weapons." Whittaker co-sponsors after extracting a small-business exemption.',
+        magnitude: 'moderate',
+        when: (sim, world) => (world.pnth.companionScandal >= 1 || world.pnth.aegisControversy >= 1 || world.pnth.dojSuitFiled) && getPipelineStatus('antitrust_scrutiny') === null,
+        params: { mu: -0.015, theta: 0.008 },
+        effects: () => { advanceBill('antitrust_scrutiny', 'introduced'); shiftFaction('regulatoryExposure', 3); },
+        followups: [
+            { id: 'digital_markets_committee', mtth: 25, weight: 1 },
+            { id: 'digital_markets_tech_lobby', mtth: 12, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'digital_markets_tech_lobby',
+        category: 'congressional',
+        likelihood: 2,
+        headline: 'Malhotra flies to Washington for closed-door meetings with the Commerce Committee. "Atlas Sentinel protects 200 million Columbians. Regulate us out of existence and see what happens." Three senators privately back off.',
+        magnitude: 'minor',
+        when: (sim, world) => getPipelineStatus('antitrust_scrutiny') === 'introduced',
+        params: { mu: 0.005 },
+    },
+    {
+        id: 'digital_markets_committee',
+        category: 'congressional',
+        likelihood: 3,
+        headline: 'Senate Commerce Committee advances the Digital Markets Accountability Act 13-9. Whittaker\'s small-business exemption survives. Reyes: "Now let\'s see if the full Senate has the guts."',
+        magnitude: 'moderate',
+        when: (sim, world) => getPipelineStatus('antitrust_scrutiny') === 'introduced',
+        params: { mu: -0.01, theta: 0.005 },
+        effects: () => { advanceBill('antitrust_scrutiny', 'committee'); },
+        followups: [
+            { id: 'digital_markets_passes', mtth: 30, weight: 0.5 },
+            { id: 'digital_markets_fails', mtth: 30, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'digital_markets_passes',
+        category: 'congressional',
+        headline: 'The Digital Markets Accountability Act passes 54-46 with five Federalist defections. AI companies face mandatory safety audits and licensing. Malhotra: "Compliance costs will be material." Gottlieb calls it "long overdue."',
+        likelihood: (sim, world) => {
+            let w = world.pnth.dojSuitFiled ? 2.5 : 1;
+            if (world.pnth.senateProbeLaunched) w *= 1.5;
+            return w;
+        },
+        magnitude: 'major',
+        when: (sim, world) => getPipelineStatus('antitrust_scrutiny') === 'committee',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
+        effects: (world) => {
+            shiftFaction('regulatoryExposure', 5);
+            shiftFaction('farmerLaborSupport', 3);
+            advanceBill('antitrust_scrutiny', 'active');
+        },
+    },
+    {
+        id: 'digital_markets_fails',
+        category: 'congressional',
+        headline: 'The Digital Markets Accountability Act fails 44-56 as the tech lobby holds the line. Reyes: "Money won today." Whittaker votes no after Tao applies pressure. The Meridian Brief: "PNTH exhales."',
+        likelihood: (sim, world, congress) => {
+            let w = congress.trifecta ? 2.5 : 1;
+            return w;
+        },
+        magnitude: 'major',
+        when: (sim, world) => getPipelineStatus('antitrust_scrutiny') === 'committee',
+        params: { mu: 0.015, theta: -0.005 },
+        effects: (world) => {
+            shiftFaction('regulatoryExposure', -2);
+            advanceBill('antitrust_scrutiny', 'failed');
         },
     },
 
