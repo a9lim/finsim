@@ -70,7 +70,7 @@ import {
 import { TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 import { getAvailableActions, executeLobbyAction, resetLobbying } from './src/lobbying.js';
-import { checkInterjections, resetInterjections } from './src/interjections.js';
+
 
 // ---------------------------------------------------------------------------
 // State
@@ -1242,6 +1242,10 @@ function _onDayComplete() {
                 for (let i = 0; i < fired.length; i++) {
                     const ev = fired[i];
                     let headline = ev.headline;
+                    if (ev.interjection) {
+                        setTimeout(function() { _showInterjection(headline); }, i * 1500);
+                        continue;
+                    }
                     if (ev.portfolioFlavor) {
                         const flavor = ev.portfolioFlavor(portfolio);
                         if (flavor) headline += ' ' + flavor;
@@ -1384,18 +1388,6 @@ function _onDayComplete() {
     _updateRegulationDisplay();
     _updateLobbyPills();
     dirty = true;
-
-    const ijCtx = {
-        sim,
-        portfolio,
-        equity: _portfolioEquity(),
-        peakEquity: portfolio.peakValue || portfolio.initialCapital,
-        liveDay: sim.history.maxDay - HISTORY_CAPACITY,
-        quarterlyReviews,
-        impactHistory,
-    };
-    const interjection = checkInterjections(ijCtx, sim.history.maxDay);
-    if (interjection) _showInterjection(interjection);
 
     _processPopupQueue();
 }
@@ -1669,7 +1661,6 @@ function _resetCore(index) {
     resetRegulations();
     if (eventEngine) eventEngine.resetOneShot();
     resetLobbying();
-    resetInterjections();
     resetAudio();
     sim.reset(index);
     resetPortfolio();

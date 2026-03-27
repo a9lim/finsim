@@ -26,7 +26,7 @@ const MAX_LOG = MAX_EVENT_LOG;
 const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 
 // -- Pulse-excluded categories (not drawn by Poisson random) ------------
-const _PULSE_CATEGORIES = new Set(['fed', 'pnth_earnings', 'midterm']);
+const _PULSE_CATEGORIES = new Set(['fed', 'pnth_earnings', 'midterm', 'interjection']);
 
 // -- EventEngine --------------------------------------------------------
 export class EventEngine {
@@ -61,6 +61,7 @@ export class EventEngine {
             random:         OFFLINE_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category) && !e.followupOnly),
             filibuster:     OFFLINE_EVENTS.filter(e => e.category === 'filibuster' && !e.followupOnly),
             media:          OFFLINE_EVENTS.filter(e => e.category === 'media' && !e.followupOnly),
+            interjection:   OFFLINE_EVENTS.filter(e => e.category === 'interjection' && !e.followupOnly),
         };
 
         // Pulse schedule
@@ -69,6 +70,7 @@ export class EventEngine {
             { type: 'recurring', id: 'pnth_earnings',  interval: PNTH_EARNINGS_INTERVAL,  jitter: PNTH_EARNINGS_JITTER,  nextDay: -1, poolKey: 'pnth_earnings' },
             { type: 'recurring', id: 'filibuster_check', interval: 7,  jitter: 2, nextDay: -1, poolKey: 'filibuster' },
             { type: 'recurring', id: 'media_cycle',      interval: 21, jitter: 5, nextDay: -1, poolKey: 'media' },
+            { type: 'recurring', id: 'interjection',     interval: 50, jitter: 15, nextDay: -1, poolKey: 'interjection' },
             { type: 'fixed',     id: 'campaign_season', day: CAMPAIGN_START_DAY, fired: false, handler: '_onCampaignSeason' },
             { type: 'fixed',     id: 'midterm',         day: MIDTERM_DAY,        fired: false, handler: '_onMidterm' },
         ];
@@ -346,6 +348,7 @@ export class EventEngine {
             headline: event.headline,
             magnitude: event.magnitude || 'moderate',
             params: event.params || {},
+            interjection: event.interjection || false,
         };
         this.eventLog.push(logEntry);
         if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
