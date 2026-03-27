@@ -953,6 +953,63 @@ export function updateDynamicSections($, presetIndex) {
     if ($.congressSection) {
         $.congressSection.classList.toggle('hidden', !isDynamic);
     }
+    if ($.standingsSection) {
+        $.standingsSection.classList.toggle('hidden', !isDynamic);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Standings panel
+// ---------------------------------------------------------------------------
+
+const _FACTION_IDS = ['firmStanding', 'regulatoryExposure', 'federalistSupport', 'farmerLaborSupport', 'mediaTrust', 'fedRelations'];
+
+export function updateStandings($, world, factions, getFactionDescriptor) {
+    if (!$.standingsWorld || !$.standingsFactions) return;
+    _renderWorldState($.standingsWorld, world);
+    _renderFactionScores($.standingsFactions, factions, getFactionDescriptor);
+}
+
+function _renderWorldState(container, world) {
+    container.textContent = '';
+    const h4 = document.createElement('h4');
+    h4.textContent = 'World State';
+    container.appendChild(h4);
+    const entries = [
+        ['Barron Approval', (world?.election?.barronApproval ?? '?') + '%'],
+        ['Congress', 'Senate ' + (world?.congress?.senate?.federalist ?? '?') + 'F / ' + (world?.congress?.senate?.farmerLabor ?? '?') + 'FL'],
+        ['Big Beautiful Bill', 'Stage ' + (world?.congress?.bigBillStatus ?? 0) + '/4' + ((world?.congress?.filibusterActive) ? ' \u2014 Filibuster active' : '')],
+        ['PNTH Board', 'Dirks ' + (world?.pnth?.boardDirks ?? '?') + ' / Gottlieb ' + (10 - (world?.pnth?.boardDirks ?? 5))],
+        ['Trade War', 'Stage ' + (world?.geopolitical?.tradeWarStage ?? 0) + '/4'],
+        ['Fed', ((world?.fed?.hikeCycle) ? 'Hike' : (world?.fed?.cutCycle) ? 'Cut' : 'Hold') + ', Cred ' + (world?.fed?.credibilityScore ?? '?') + '/10'],
+    ];
+    for (const [label, value] of entries) {
+        const p = document.createElement('p');
+        const b = document.createElement('strong');
+        b.textContent = label + ': ';
+        p.appendChild(b);
+        p.appendChild(document.createTextNode(value));
+        container.appendChild(p);
+    }
+}
+
+function _renderFactionScores(container, factions, getFactionDescriptor) {
+    container.textContent = '';
+    const h4 = document.createElement('h4');
+    h4.textContent = 'Your Standing';
+    container.appendChild(h4);
+    for (const id of _FACTION_IDS) {
+        const p = document.createElement('p');
+        const label = id.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+        const b = document.createElement('strong');
+        b.textContent = label + ': ';
+        p.appendChild(b);
+        p.appendChild(document.createTextNode((factions[id] ?? 0) + '/100 \u2014 '));
+        const em = document.createElement('em');
+        em.textContent = getFactionDescriptor(id);
+        p.appendChild(em);
+        container.appendChild(p);
+    }
 }
 
 // ---------------------------------------------------------------------------
