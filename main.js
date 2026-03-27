@@ -1204,7 +1204,20 @@ function _onDayComplete() {
         eventEngine.setPlayerContext(
             playerChoices,
             factions,
-            getActiveRegulations().map(r => r.id)
+            getActiveRegulations().map(r => r.id),
+            getActiveTraitIds(),
+            {
+                equity: _portfolioEquity(),
+                peakEquity: portfolio.peakValue || portfolio.initialCapital,
+                pnlPct: (_portfolioEquity() - portfolio.initialCapital) / portfolio.initialCapital,
+                maxDrawdown: portfolio.maxDrawdown || 0,
+                grossLeverage: computeGrossNotional() / Math.max(1, _portfolioEquity()),
+                positionCount: portfolio.positions.length,
+                netDelta: computeNetDelta(),
+                cash: portfolio.cash,
+                strongQuarters: quarterlyReviews.filter(r => r.rating === 'strong').length,
+                impactTradeCount: impactHistory.length,
+            }
         );
         const netDelta = computeNetDelta();
         const { fired, popups } = eventEngine.maybeFire(sim, sim.day, netDelta);
