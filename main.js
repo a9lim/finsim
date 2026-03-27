@@ -796,24 +796,55 @@ function _onSubstepUI() {
     updateSubstepUI(substepMargin);
 }
 
+const _LOBBY_COLORS = {
+    pac_federalist: 'lobby-pill-fed',
+    pac_farmerlabor: 'lobby-pill-fl',
+    host_fundraiser: 'lobby-pill-pol',
+    broker_deal: 'lobby-pill-pol',
+    leak_to_media: 'lobby-pill-media',
+    counsel_fed: 'lobby-pill-fed-rel',
+};
+const _LOBBY_LABELS = {
+    pac_federalist: '+Fed',
+    pac_farmerlabor: '+F-L',
+    host_fundraiser: 'Host',
+    broker_deal: 'Deal',
+    leak_to_media: 'Leak',
+    counsel_fed: 'Fed',
+};
+
 function _updateLobbyPills() {
     if (!$.lobbyBar || !$.lobbyActions) return;
     const day = sim.history.maxDay;
     const actions = getAvailableActions(day, portfolio.cash);
-    // Clear existing buttons
     while ($.lobbyActions.firstChild) $.lobbyActions.removeChild($.lobbyActions.firstChild);
-    if (actions.length === 0) {
+    if (actions.length === 0 || !eventEngine) {
         $.lobbyBar.style.display = 'none';
         return;
     }
-    $.lobbyBar.style.display = eventEngine ? '' : 'none';
-    for (const action of actions) {
+    $.lobbyBar.style.display = '';
+    for (let i = 0; i < actions.length; i++) {
+        const action = actions[i];
+        if (i > 0) {
+            const div = document.createElement('span');
+            div.className = 'substrate-divider';
+            $.lobbyActions.appendChild(div);
+        }
         const btn = document.createElement('button');
-        btn.className = 'lobby-pill';
+        const colorCls = _LOBBY_COLORS[action.id] || '';
+        const isFirst = i === 0;
+        const isLast = i === actions.length - 1;
+        let radiusCls = '';
+        if (isFirst && isLast) radiusCls = 'substrate-pill-solo';
+        else if (isFirst) radiusCls = 'substrate-pill-left';
+        else if (isLast) radiusCls = 'substrate-pill-right';
+        btn.className = `substrate-pill lobby-pill ${colorCls} ${radiusCls}`.trim();
         btn.dataset.lobby = action.id;
         btn.disabled = !action.affordable || !action.cooldownReady;
-        btn.textContent = action.name + (action.cost > 0 ? ` ($${action.cost}k)` : '');
-        btn.title = action.desc;
+        const label = _LOBBY_LABELS[action.id] || action.name;
+        const cost = action.cost > 0 ? ` $${action.cost}k` : '';
+        btn.textContent = label + cost;
+        btn.title = action.desc + (action.cooldownReady ? '' : ' (cooldown)');
         $.lobbyActions.appendChild(btn);
     }
 }
