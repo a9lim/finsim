@@ -54,13 +54,13 @@ export class EventEngine {
         this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [], traitIds: [], portfolio: {} };
         this._firedOneShot = new Set();
 
-        // Pre-filter pools from OFFLINE_EVENTS
+        // Pre-filter pools from OFFLINE_EVENTS (exclude followupOnly events)
         this._pools = {
-            fed:            OFFLINE_EVENTS.filter(e => e.category === 'fed'),
-            pnth_earnings:  OFFLINE_EVENTS.filter(e => e.category === 'pnth_earnings'),
-            random:         OFFLINE_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category)),
-            filibuster:     OFFLINE_EVENTS.filter(e => e.category === 'filibuster'),
-            media:          OFFLINE_EVENTS.filter(e => e.category === 'media'),
+            fed:            OFFLINE_EVENTS.filter(e => e.category === 'fed' && !e.followupOnly),
+            pnth_earnings:  OFFLINE_EVENTS.filter(e => e.category === 'pnth_earnings' && !e.followupOnly),
+            random:         OFFLINE_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category) && !e.followupOnly),
+            filibuster:     OFFLINE_EVENTS.filter(e => e.category === 'filibuster' && !e.followupOnly),
+            media:          OFFLINE_EVENTS.filter(e => e.category === 'media' && !e.followupOnly),
         };
 
         // Pulse schedule
