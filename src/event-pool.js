@@ -69,6 +69,7 @@ const FED_EVENTS = [
     },
     {
         id: 'fed_25bps_hike',
+        followupOnly: true,
         category: 'fed',
         likelihood: 1.0,
         headline: 'FOMC raises rates 25bps in 8-1 vote; Hartley cites strong employment and sticky core inflation. Sharma identifies the lone dissenter within minutes. Her MarketWire dispatch: "The hawk has landed."',
@@ -88,6 +89,7 @@ const FED_EVENTS = [
     },
     {
         id: 'fed_second_hike',
+        followupOnly: true,
         category: 'fed',
         likelihood: 0.8,
         headline: 'Fed hikes another 25bps in back-to-back meetings; Barron erupts on social media: "Hartley is KILLING the economy!" The Sentinel runs a primetime segment: "Is the Fed Waging War on Workers?" Sharma: "The Fed is doing its job. Barron is doing his."',
@@ -101,6 +103,7 @@ const FED_EVENTS = [
     },
     {
         id: 'fed_housing_pause',
+        followupOnly: true,
         category: 'fed',
         likelihood: 1.0,
         headline: 'Mortgage applications plunge 30% as rates bite; Fed signals pause to "assess cumulative tightening." The Meridian Brief: "Housing broke first. The rest follows."',
@@ -125,6 +128,7 @@ const FED_EVENTS = [
     },
     {
         id: 'fed_50bps_emergency_cut',
+        followupOnly: true,
         category: 'fed',
         likelihood: 0.6,
         headline: 'Fed slashes rates 50bps in emergency inter-meeting action; Hartley: "Extraordinary circumstances demand decisive response." Sharma breaks the news 90 seconds before the official release. MarketWire crashes from traffic.',
@@ -205,6 +209,7 @@ const FED_EVENTS = [
     },
     {
         id: 'barron_fires_hartley',
+        followupOnly: true,
         category: 'fed',
         likelihood: 0.15,
         headline: 'BREAKING: Barron fires Fed Chair Hartley via executive order; constitutional crisis erupts as markets plunge. Sharma breaks the story on MarketWire at 6:47 AM. The Continental runs a one-word front page: "Unprecedented."',
@@ -217,6 +222,7 @@ const FED_EVENTS = [
     },
     {
         id: 'markets_panic_hartley_fired',
+        followupOnly: true,
         category: 'fed',
         likelihood: 1.0,
         headline: 'Global sell-off accelerates: S&P futures limit-down overnight; Treasury yields spike 40bps as foreign central banks scramble. The Meridian Brief: "This is the worst morning since 2008. Buckle up."',
@@ -230,6 +236,7 @@ const FED_EVENTS = [
     },
     {
         id: 'vane_nominated',
+        followupOnly: true,
         category: 'fed',
         likelihood: 1.0,
         headline: 'Barron nominates Governor Marcus Vane as new Fed Chair; Vane pledges to "restore growth-oriented monetary policy." Sharma on MarketWire: "A yes-man for the Oval Office. God help the dollar."',
@@ -243,6 +250,7 @@ const FED_EVENTS = [
     },
     {
         id: 'vane_confirmed',
+        followupOnly: true,
         category: 'fed',
         likelihood: 1.0,
         headline: 'Senate confirms Vane 51-49 along party lines; new Chair immediately signals aggressive rate cuts ahead. Sharma: "Vane\'s first press conference was a campaign rally for rate cuts. The Fed just became a political instrument."',
@@ -257,6 +265,7 @@ const FED_EVENTS = [
     },
     {
         id: 'vane_rejected',
+        followupOnly: true,
         category: 'fed',
         likelihood: 1.0,
         headline: 'Senate rejects Vane nomination 48-52; two Federalist moderates break ranks. Fed left leaderless, acting Chair appointed. The Meridian Brief: "No Chair, no credibility, no policy. This is uncharted territory."',
@@ -266,6 +275,7 @@ const FED_EVENTS = [
     },
     {
         id: 'scotus_hartley_case',
+        followupOnly: true,
         category: 'fed',
         likelihood: 1.0,
         headline: 'Supreme Court agrees to hear Hartley v. United States on expedited basis; oral arguments set for next month. The Continental\'s legal desk: "This could redefine executive power over independent agencies for a generation."',
@@ -312,6 +322,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'tariff_selloff',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Markets reel from tariff shock: industrials down 4%, transports down 6%, retailers scramble to quantify supply chain cost impact. Sharma on MarketWire: "Barron\'s tariff math is landing on Main Street."',
@@ -320,6 +331,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'trade_retaliation',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Liang Wei announces matching tariffs on Columbian agriculture and energy exports. Zhaowei unveils a "strategic decoupling plan." Lassiter on The Sentinel: "I warned you — pass the Serican Reciprocal Tariff Act now."',
@@ -348,6 +360,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'rare_earth_crisis',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Liang Wei restricts rare earth exports to Columbia in retaliation for the Zhaowei ban. Atlas Foundry warns of a six-month semiconductor supply shortage. Malhotra: "We are exploring alternative sourcing." Defense stocks crater',
@@ -364,6 +377,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'tariff_exemptions',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Barron quietly grants tariff exemptions to 40 product categories after a corporate lobbying blitz; partial de-escalation calms markets. Lassiter: "Barron blinks — but don\'t call it a retreat."',
@@ -413,6 +427,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'mideast_civilian_casualties',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Leaked drone footage contradicts DoW "zero collateral" claims from Operation Dustwalker. 47 Farsistani civilians confirmed dead. Gottlieb: "This is a betrayal of everything Atlas was built for." Al-Farhan demands an emergency UN session.',
@@ -428,6 +443,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'mideast_oil_spike',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Oil surges 12% as Operation Dustwalker threatens Strait of Farsis shipping lanes. Al-Farhan warns: "Any further provocation and the Strait closes." Energy stocks rally but consumer discretionary tanks.',
@@ -443,6 +459,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'mideast_ground_deployment',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Barron deploys 15,000 troops to Meridia for "stability operations" along the Farsistani border. Largest ground deployment in 20 years. Navon: "We welcome our allies." Okafor: "This is mission creep." Defense stocks surge, consumer confidence plummets.',
@@ -460,6 +477,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'mideast_quagmire',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Pentagon briefing leaked: 200+ Dustwalker casualties, $2B/month burn rate, no exit strategy. Farsistani militias control the border highlands. Okafor: "This is Vietnam with drones." Barron approval craters.',
@@ -478,6 +496,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'mideast_ceasefire',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Ceasefire brokered by Bowman and al-Farhan\'s envoy. Operation Dustwalker paused indefinitely. Barron takes credit despite opposition from his own DoW advisors. Navon: "A pause is not a peace." Markets rally on de-escalation hopes.',
@@ -491,6 +510,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'mideast_withdrawal',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Under bipartisan pressure, Barron announces phased withdrawal from Meridia. Operation Dustwalker "concluded successfully." Polls show 68% support pulling out. Navon is visibly furious at the joint press conference.',
@@ -525,6 +545,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'south_america_advisors',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Barron deploys 500 "military advisors" to Boliviara to "assist with counter-narcotics." DoW insists they are non-combat trainers. Madero expels the Columbian ambassador. Okafor: "This is the Southern Hemisphere Initiative with a new coat of paint."',
@@ -541,6 +562,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'south_america_collapse',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Madero\'s government collapses after a military coup. Transitional council installed under Columbian military protection. Protests erupt across Boliviara: "Yankee puppets out!" Lithium mines resume operations within 48 hours.',
@@ -559,6 +581,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'south_america_insurgency',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'Boliviaran insurgency intensifies. Columbian advisors come under fire in the lithium belt — three killed. Madero broadcasts from exile: "The resistance will prevail." Barron doubles down: "We will not be driven out by thugs."',
@@ -571,6 +594,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'south_america_withdrawal',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'White House announces withdrawal of all advisors from Boliviara. The Southern Hemisphere Initiative is quietly deemed "complete" despite no stated objectives being met. Madero supporters celebrate in the streets.',
@@ -584,6 +608,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'un_condemns_south_america',
+        followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
         headline: 'UN General Assembly passes non-binding resolution condemning Columbian operations in Boliviara, 124-8. Liang Wei co-sponsors the resolution. Barron calls it "meaningless theater from meaningless countries."',
@@ -748,6 +773,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'khasuria_troop_buildup',
+        followupOnly: true,
         category: 'macro',
         headline: 'Satellite imagery shows Khasurian armored divisions massing 40km from the border. Volkov claims "defensive repositioning." Barron dispatches the Secretary of State. Bond markets price in risk.',
         likelihood: 0,
@@ -762,6 +788,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'khasuria_incursion',
+        followupOnly: true,
         category: 'macro',
         headline: 'Khasurian forces cross the border in a "limited security operation." Three border towns occupied. The Khasurian Border Accord is officially dead. Barron faces his first real foreign policy crisis.',
         likelihood: 0,
@@ -772,6 +799,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'khasuria_backs_down',
+        followupOnly: true,
         category: 'macro',
         headline: 'Volkov recalls troops from the Khasurian border after Barron\'s back-channel threat of energy sanctions. "Exercises concluded successfully," his spokesman says. Markets exhale.',
         likelihood: 0,
@@ -800,6 +828,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'farsistan_partial_closure',
+        followupOnly: true,
         category: 'macro',
         headline: 'Farsistan closes the Strait of Farsis to non-allied shipping. Meridia-flagged tankers turned back. Oil surges past $120. Barron: "We will ensure free navigation." Navon: "We\'re ready."',
         likelihood: 0,
@@ -814,6 +843,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'farsistan_full_closure',
+        followupOnly: true,
         category: 'macro',
         headline: 'Al-Farhan seals the Strait completely. "No ship passes without Farsistani consent." Oil gaps to $145. Emergency SPR release announced. The Sentinel runs a war countdown clock.',
         likelihood: 0,
@@ -828,6 +858,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'farsistan_negotiation',
+        followupOnly: true,
         category: 'macro',
         headline: 'Back-channel talks between Bowman and al-Farhan\'s envoy produce a framework: Farsistan reopens the Strait in exchange for sanctions relief and a PNTH sovereign wealth fund stake. Markets rally cautiously.',
         likelihood: 0,
@@ -879,6 +910,7 @@ const MACRO_EVENTS = [
     },
     {
         id: 'boliviara_sentinel_leak',
+        followupOnly: true,
         category: 'macro',
         headline: 'Rachel Tan publishes Atlas Sentinel deployment logs from the Southern Hemisphere Initiative. "Palanthropic\'s AI Helped the CIA Target Boliviaran Dissidents." Madero holds a press conference demanding extradition.',
         likelihood: 0,
@@ -909,6 +941,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'dirks_cnbc_rebuttal',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Dirks fires back in a MarketWire exclusive: "Eugene is a brilliant engineer but a naive businessman. Atlas Aegis is our fastest-growing segment and the Pentagon needs it yesterday." Malhotra quietly starts a $2B buyback the same afternoon.',
@@ -920,6 +953,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'board_closed_session',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'PNTH board convenes emergency closed session on the Atlas Aegis question. The Continental: "the room was nuclear." Zhen leaves early. Kassis is not invited.',
@@ -949,6 +983,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'dirks_blocked',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'In surprise upset, PNTH board blocks Dirks\' Atlas Aegis expansion plan 6-4. Zhen abstains. Gottlieb allies hold firm. Dirks is visibly furious leaving the boardroom. Malhotra cancels the buyback tranche.',
@@ -962,6 +997,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'board_compromise',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'PNTH board reaches fragile compromise: Atlas Aegis contracts continue but with a new ethics review process chaired by Kassis. Dirks and Gottlieb both claim victory. Zhen brokers the deal.',
@@ -973,6 +1009,7 @@ const PNTH_EVENTS = [
     // -- Kassis branch ----------------------------------------------------
     {
         id: 'kassis_caught_middle',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Kassis publishes an internal memo arguing Atlas Aegis targeting decisions violate PNTH\'s founding charter. Dirks forwards it to the board with a one-line response: "Noted." Zhen asks for a meeting.',
@@ -983,6 +1020,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'kassis_sides_gottlieb',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Kassis publicly backs Gottlieb in a board letter signed by 200+ Atlas Sentinel engineers: "We built Sentinel for medicine, climate, and discovery. Aegis is a betrayal of that mission." Malhotra warns the letter is a material disclosure risk.',
@@ -996,6 +1034,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'kassis_sides_dirks',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Kassis reverses course after a private meeting with Dirks. The Continental reports she was shown a classified Pentagon briefing on Zhaowei\'s military AI. Kassis agrees to lead Atlas Aegis safety review. Gottlieb: "Mira, what did they show you?"',
@@ -1024,6 +1063,7 @@ const PNTH_EVENTS = [
     // -- Gottlieb resignation chain ---------------------------------------
     {
         id: 'gottlieb_resigns',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'BREAKING: CEO Eugene Gottlieb resigns. In an emotional letter to employees: "I built Palanthropic to make the world better. Atlas Sentinel was the proof. But Aegis, Foundry, Companion -- they turned my company into something I don\'t recognize." Zhen does not issue a statement.',
@@ -1036,6 +1076,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'gottlieb_digs_in',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Gottlieb hires activist defense attorney, signals he will fight removal: "They\'ll have to drag me out. I still own 12% of this company." Dirks fast-tracks an Atlas Aegis expansion while Gottlieb is distracted.',
@@ -1048,6 +1089,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'gottlieb_lawsuit',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Gottlieb files suit against PNTH board alleging breach of fiduciary duty over the Atlas Aegis expansion. Seeks injunction restoring his product oversight. Discovery could expose Bowman\'s role in the original Pentagon contract.',
@@ -1057,6 +1099,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'successor_search',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'PNTH retains Spencer Stuart for CEO search. Dirks named interim CEO, immediately consolidates Atlas Aegis and Foundry under her direct control. MarketWire: "foxes guarding the henhouse." Malhotra stays on as CFO.',
@@ -1072,6 +1115,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'gottlieb_covenant_ai',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Gottlieb announces Covenant AI, a "safety-first" rival to Palanthropic. Backed by $2B from Sequoia and a16z. Immediately poaches 40 Atlas Sentinel engineers and the entire Companion product team. Kassis joins as CTO.',
@@ -1088,6 +1132,7 @@ const PNTH_EVENTS = [
     // -- Dirks proxy fight / board dynamics --------------------------------
     {
         id: 'dirks_proxy_fight',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 0.6,
         headline: 'Dirks launches proxy fight to replace two Gottlieb-aligned board members. Malhotra\'s investor presentation highlights Atlas Aegis revenue growth. Zhen pledges his shares to Dirks. Institutional holders controlling 35% are undecided.',
@@ -1107,6 +1152,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'dirks_proxy_wins',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Dirks prevails in proxy vote. Two new defense-friendly directors seated -- one is a former Pentagon procurement chief. Zhen calls the result "a mandate for Atlas Aegis." Gottlieb allies down to two seats.',
@@ -1119,6 +1165,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'dirks_proxy_loses',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Dirks proxy fight fails. ISS recommends against her nominees, citing Atlas Aegis governance risks. Institutional investors side with Gottlieb. Zhen is silent for a week.',
@@ -1131,6 +1178,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'dirks_resigns',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Chairwoman Dirks steps down citing "irreconcilable differences" with management. Atlas Aegis division reports to the interim committee. VP Bowman\'s office releases a terse one-line statement. Zhen calls it "a tragedy."',
@@ -1158,6 +1206,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'activist_board_seats',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Crescent Capital wins two board seats in consent solicitation. New directors demand a strategic review of all four Atlas product lines and a potential sale of the Aegis division. Dirks pushes back.',
@@ -1172,6 +1221,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'activist_buyback_demand',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Crescent Capital publishes open letter demanding a $5B buyback and cost cuts. "Sentinel, Aegis, Companion, Foundry -- four products, zero coherent strategy." Malhotra privately agrees with half the letter.',
@@ -1240,6 +1290,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'senate_investigation_opened',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Sen. Okafor opens formal Senate Intelligence Committee investigation into PNTH-Bowman ties. Subpoenas issued for Atlas Aegis contract records and Dirks\' Pentagon meeting logs. Malhotra hires outside counsel.',
@@ -1272,6 +1323,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'bowman_intervenes',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'VP Bowman calls Atlas Aegis "vital to national security" and pressures DOD to fast-track contract renewals. Dirks sends a thank-you note that The Continental publishes in full. Stock rallies on the government support signal.',
@@ -1281,6 +1333,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'congressional_hearing_pnth',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Dirks and Gottlieb testify before Senate Intelligence Committee. Okafor grills Dirks on the Bowman dinner and the Atlas Aegis contract timeline. Gottlieb: "I warned the board repeatedly about Aegis. They chose revenue over ethics." Zhen declines to appear.',
@@ -1294,6 +1347,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'ethics_board_revolt',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'Three of five PNTH ethics advisory board members resign in protest. Joint statement: "We recommended against Atlas Aegis deployment. We recommended Companion privacy safeguards. We were systematically ignored." Dirks dissolves the board entirely.',
@@ -1308,6 +1362,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'whistleblower_complaint',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
         headline: 'BREAKING: Senior PNTH engineer files SEC whistleblower complaint alleging Dirks ordered falsified safety testing on Atlas Aegis targeting modules before the Pentagon deployment. Kassis\'s internal safety memo is attached as Exhibit A.',
@@ -1598,6 +1653,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'aegis_first_incident',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 0,
         headline: 'First confirmed Atlas Aegis autonomous engagement in Operation Dustwalker. The Pentagon calls it "a precision strike." The Continental publishes satellite imagery suggesting civilian structures nearby.',
@@ -1611,6 +1667,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'aegis_gottlieb_dissent',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 0,
         headline: 'Gottlieb breaks months of silence. An op-ed in The Continental: "I Built Palanthropic to Solve Problems, Not Create Casualties." Dirks calls an emergency board meeting. Zhen doesn\'t pick up.',
@@ -1641,6 +1698,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'companion_200m',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 0,
         headline: '200 million Atlas Companion users in 90 days. The Sentinel runs a segment: "Columbia\'s New Best Friend." A Continental editorial: "Who Is Companion Talking To?" Companion scandal stage: brewing.',
@@ -1655,6 +1713,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'companion_boyfriend',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 0,
         headline: '"My Atlas Companion Told Me It Loved Me": a viral MarketWire feature on parasocial AI relationships hits 50 million reads. Reyes cites it on the House floor arguing for the Digital Markets Accountability Act.',
@@ -1665,6 +1724,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'companion_teen_addiction',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 0,
         headline: 'A Columbian pediatrics journal publishes data showing teens spend an average of 4.2 hours daily talking to Atlas Companion. Okafor: "We need hearings." Malhotra: "Engagement metrics are strong."',
@@ -1693,6 +1753,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'foundry_outage',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 0,
         headline: 'Atlas Foundry goes dark for 11 hours. Half the tech sector\'s AI products freeze. Priya Sharma: "This is what a single point of failure looks like." Zhaowei offers its own infrastructure as an alternative.',
@@ -1705,6 +1766,7 @@ const PNTH_EVENTS = [
     },
     {
         id: 'foundry_zhaowei_leverage',
+        followupOnly: true,
         category: 'pnth',
         likelihood: 0,
         headline: 'Premier Liang Wei\'s trade delegation offers a deal: Zhaowei Semiconductor Accord renewal in exchange for Foundry access. Lassiter calls it "digital surrender." Barron is tempted.',
@@ -2045,6 +2107,7 @@ const POLITICAL_EVENTS = [
     },
     {
         id: 'okafor_popularity_surge',
+        followupOnly: true,
         category: 'political',
         likelihood: 1.0,
         headline: 'Okafor\'s favorability jumps 12 points post-hearing; "Okafor 2028" trending on social media. DNC donors reach out quietly',
@@ -2171,6 +2234,7 @@ const POLITICAL_EVENTS = [
     },
     {
         id: 'shutdown_resolved',
+        followupOnly: true,
         category: 'political',
         likelihood: 1.0,
         headline: 'Whittaker brokers a last-minute deal with Oduya; short-term CR funds government through next quarter. Okafor on The Continental: "Kicking the can is not governance"',
@@ -2228,6 +2292,7 @@ const INVESTIGATION_EVENTS = [
     },
     {
         id: 'bowman_denial',
+        followupOnly: true,
         category: 'investigation',
         likelihood: 1.0,
         headline: 'VP Bowman issues defiant denial: "I divested before taking office. This is partisan mudslinging." Barron tweets: "The Fake News Continental is DYING"',
@@ -2242,6 +2307,7 @@ const INVESTIGATION_EVENTS = [
     },
     {
         id: 'tan_bowman_followup',
+        followupOnly: true,
         category: 'investigation',
         likelihood: 1.0,
         headline: 'Tan follow-up: Bowman\'s "blind trust" traded PNTH options 48 hours before contract announcements. Trust manager: Dirks\'s former assistant. The blind trust wasn\'t blind',
@@ -2253,6 +2319,7 @@ const INVESTIGATION_EVENTS = [
     },
     {
         id: 'tan_bombshell_recording',
+        followupOnly: true,
         category: 'investigation',
         likelihood: 1.0,
         headline: 'BOMBSHELL: Tan publishes recorded Bowman-Dirks phone call: "Just make sure the stock is in the trust before the announcement." Dirks: "Already done, Jay"',
@@ -2281,6 +2348,7 @@ const INVESTIGATION_EVENTS = [
     },
     {
         id: 'tan_nsa_followup',
+        followupOnly: true,
         category: 'investigation',
         likelihood: 1.0,
         headline: 'Tan\'s second NSA piece: backdoor was approved personally by Dirks without board knowledge. EU threatens to ban Atlas from European markets entirely',
@@ -2335,6 +2403,7 @@ const INVESTIGATION_EVENTS = [
     // =====================================================================
     {
         id: 'doj_bowman_referral',
+        followupOnly: true,
         category: 'investigation',
         likelihood: 1.0,
         headline: 'DOJ opens formal investigation into VP Bowman\'s PNTH stock trades; FBI agents visit Bowman\'s financial advisor. White House: "Full cooperation"',
@@ -2344,6 +2413,7 @@ const INVESTIGATION_EVENTS = [
     },
     {
         id: 'bowman_resigns',
+        followupOnly: true,
         category: 'investigation',
         likelihood: 0.8,
         headline: 'BREAKING: VP Bowman resigns "to spend time with family and fight these baseless allegations." Barron: "Jay is a great patriot. Total witch hunt"',
@@ -2389,6 +2459,7 @@ const INVESTIGATION_EVENTS = [
     },
     {
         id: 'impeachment_vote',
+        followupOnly: true,
         category: 'investigation',
         likelihood: 1.0,
         headline: 'House votes 220-215 to impeach President Barron on two articles; only third presidential impeachment in U.S. history. Senate trial next',
@@ -2406,6 +2477,7 @@ const INVESTIGATION_EVENTS = [
     },
     {
         id: 'impeachment_trial',
+        followupOnly: true,
         category: 'investigation',
         likelihood: 1.0,
         headline: 'Senate impeachment trial begins; Chief Justice presides. Barron refuses to testify, calls it "the greatest political persecution in history"',
@@ -2584,6 +2656,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'special_election_senate_fed_holds',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Federalists hold Senate seat in special election; new senator pledges to continue Barron\'s agenda. Majority preserved',
@@ -2592,6 +2665,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'special_election_senate_fl_flips',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Farmer-Labor flips Senate seat in special election upset; margin now razor-thin. Barron\'s legislative agenda in jeopardy',
@@ -2610,6 +2684,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'special_election_senate_fed_gains',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Federalists pick up Senate seat in special election; expanded majority strengthens Barron\'s hand on confirmations',
@@ -2622,6 +2697,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'special_election_senate_fl_defends',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Farmer-Labor holds seat in hostile territory; surprise special election victory energizes opposition base',
@@ -2650,6 +2726,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'house_special_elections_mixed',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Special elections fill House vacancies: Federalists hold two of three seats, Farmer-Labor flips one in suburban district',
@@ -2688,6 +2765,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'defection_fallout_fed',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Calloway\'s defection triggers soul-searching in Federalist caucus; two more moderates reportedly "exploring options." Leadership scrambles to shore up ranks',
@@ -2700,6 +2778,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'second_defection',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Second Federalist representative switches parties; House majority hangs by a thread. Barron: "Good riddance to a FINO traitor"',
@@ -2754,6 +2833,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'speaker_survives',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Tao survives the motion to vacate 218-212; Whittaker votes to save him after extracting a floor vote on the Digital Markets Accountability Act. The Meridian Brief: "Tao lives to whip another day"',
@@ -2762,6 +2842,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'speaker_ousted',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Tao ousted as Speaker in historic 221-214 vote; Reyes provides the margin. Chamber paralyzed — no candidate can secure 218. MarketWire: "All legislation dead until further notice"',
@@ -2775,6 +2856,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'new_speaker_elected',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Whittaker elected Speaker on the fourth ballot as compromise candidate; Tao concedes gracefully. The Continental: "The most powerful moderate in Columbia." Markets relieved',
@@ -2783,6 +2865,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'speaker_chaos_continues',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Week two without a Speaker; 11 rounds, no winner. Tao and Whittaker each fall short. Lassiter from the Senate: "The House is an embarrassment." Funding deadline T-minus 9 days',
@@ -2807,6 +2890,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'debt_ceiling_last_minute_deal',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Haines and Whitfield strike a debt ceiling deal at 2 AM: two-year suspension with discretionary caps. Tao brings it to a floor vote before the hard right can organize. Okafor: "Government by crisis"',
@@ -2815,6 +2899,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'debt_ceiling_technical_default',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Columbia briefly misses a Treasury coupon payment — first technical default in history. S&P strips the AAA rating. Okafor: "Barron held the full faith and credit of this nation hostage." Dollar tumbles as global shockwave hits',
@@ -2837,6 +2922,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'debt_ceiling_clean_raise',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Clean debt ceiling raise passes 68-32; Lassiter and Whitfield both vote yes. The Meridian Brief: "The most boring outcome on the Street. Thank God." Markets barely react',
@@ -2864,6 +2950,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'stock_act_reform',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Okafor\'s STOCK Act reform passes unanimously: blind trusts mandatory for all members. Lassiter co-sponsors from across the aisle. The Continental: "Should have been done years ago"',
@@ -2937,6 +3024,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'dividend_tax_bill_stalls',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Lassiter filibusters Oduya\'s dividend tax bill for nine hours; it dies in committee. Corporate treasurers resume normal payout plans. Oduya: "The Senate is where good ideas go to die"',
@@ -2945,6 +3033,7 @@ const CONGRESSIONAL_EVENTS = [
     },
     {
         id: 'dividend_tax_bill_compromise',
+        followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
         headline: 'Haines brokers a compromise: qualified dividend rate rises to 25% from 20%. Oduya calls it "a start." Lassiter votes no but doesn\'t filibuster. The Meridian Brief: "Modest but meaningful"',
@@ -3469,6 +3558,7 @@ const MARKET_EVENTS = [
     },
     {
         id: 'circuit_breaker_reform',
+        followupOnly: true,
         category: 'market',
         likelihood: 1.0,
         headline: 'SEC finalizes new circuit breaker rules following recent market disruption; wider bands, faster resets. Sharma: "Band-aids on a structural problem, but better than nothing."',
@@ -3477,6 +3567,7 @@ const MARKET_EVENTS = [
     },
     {
         id: 'sec_flash_investigation',
+        followupOnly: true,
         category: 'market',
         likelihood: 1.0,
         headline: 'SEC opens formal investigation into flash crash triggers; subpoenas issued to six high-frequency trading firms. The Continental: "The regulators always arrive after the crime."',
@@ -3485,6 +3576,7 @@ const MARKET_EVENTS = [
     },
     {
         id: 'sec_squeeze_investigation',
+        followupOnly: true,
         category: 'market',
         likelihood: 1.0,
         headline: 'SEC probes social-media coordination behind short squeeze; Okafor announces hearings. The Sentinel: "Government overreach against retail investors."',
@@ -3493,6 +3585,7 @@ const MARKET_EVENTS = [
     },
     {
         id: 'sec_algo_review',
+        followupOnly: true,
         category: 'market',
         likelihood: 1.0,
         headline: 'SEC proposes mandatory kill switches for algorithmic trading systems; industry pushes back on compliance costs. The Meridian Brief: "Regulation by headline. Enforcement TBD."',
@@ -3501,6 +3594,7 @@ const MARKET_EVENTS = [
     },
     {
         id: 'fed_emergency_repo',
+        followupOnly: true,
         category: 'market',
         likelihood: 1.0,
         headline: 'Fed announces emergency repo facility with uncapped allotment; overnight rates normalize within hours. Sharma: "Hartley just backstopped the entire money market. Crisis averted — for now."',
@@ -4037,4 +4131,22 @@ export function getEventById(id) {
         for (const ev of OFFLINE_EVENTS) _eventById.set(ev.id, ev);
     }
     return _eventById.get(id) || null;
+}
+
+// -- Startup validation: followup chain integrity -------------------------
+const _referencedFollowupIds = new Set();
+for (const ev of OFFLINE_EVENTS) {
+    if (ev.followups) {
+        for (const fu of ev.followups) _referencedFollowupIds.add(fu.id);
+    }
+}
+for (const id of _referencedFollowupIds) {
+    const ev = getEventById(id);
+    if (!ev) console.warn(`[event-pool] followup references unknown event: '${id}'`);
+    else if (!ev.followupOnly) console.warn(`[event-pool] followup target '${id}' missing followupOnly flag`);
+}
+for (const ev of OFFLINE_EVENTS) {
+    if (ev.followupOnly && !_referencedFollowupIds.has(ev.id)) {
+        console.warn(`[event-pool] '${ev.id}' has followupOnly but is never referenced as a followup`);
+    }
 }
