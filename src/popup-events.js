@@ -14,7 +14,7 @@ import { computeNetDelta, computeGrossNotional, portfolio, portfolioValue } from
 import { market } from './market.js';
 import { unitPrice } from './position-value.js';
 import { getActiveTraitIds } from './traits.js';
-import { firmThresholdMult, firmCooldownMult, firmTone, getRegLevel } from './faction-standing.js';
+import { firmThresholdMult, firmCooldownMult, firmTone, getRegLevel, shiftFaction } from './faction-standing.js';
 
 const _cooldowns = {}; // id → last fired day
 
@@ -220,6 +220,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Ignore the email',
                 desc: 'Delete it. You don\'t answer to paper-pushers.',
+                onChoose: () => { shiftFaction('firmStanding', -3); },
                 complianceTier: 'defiant',
                 deltas: { xi: 0.02, theta: 0.005 },
                 playerFlag: 'ignored_compliance',
@@ -362,6 +363,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Push back hard',
                 desc: '"I\'m the one making money on this floor." Risky, but maybe they back off.',
+                onChoose: () => { shiftFaction('firmStanding', -5); },
                 complianceTier: 'defiant',
                 deltas: { xi: 0.015 },
                 playerFlag: 'pushed_back_risk_desk',
@@ -459,6 +461,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Push back',
                 desc: 'The position is sized appropriately for the thesis. You\'ll manage the risk.',
+                onChoose: () => { shiftFaction('firmStanding', -3); },
                 complianceTier: 'defiant',
                 playerFlag: 'defied_unlimited_risk',
                 resultToast: 'Risk desk notes your refusal. The file grows thicker.',
@@ -602,6 +605,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Do the interview',
                 desc: 'Enjoy the spotlight. You earned it.',
+                onChoose: () => { shiftFaction('mediaTrust', +8); shiftFaction('regulatoryExposure', +3); },
                 deltas: { xi: 0.01 },
                 playerFlag: 'did_ft_interview',
                 resultToast: 'The profile runs in The Continental. Your LinkedIn explodes. The floor treats you differently now.',
@@ -609,6 +613,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Decline politely',
                 desc: 'Stay anonymous. The best traders are the ones nobody\'s heard of.',
+                onChoose: () => { shiftFaction('mediaTrust', -2); },
                 deltas: {},
                 playerFlag: 'declined_ft_interview',
                 resultToast: 'The Continental runs a piece about Meridian anyway, but without your name. Smart.',
@@ -639,6 +644,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Close everything',
                 desc: 'Liquidate all positions. Rebuild from cash.',
+                onChoose: () => { shiftFaction('firmStanding', +5); },
                 trades: [{ action: 'close_all' }],
                 complianceTier: 'full',
                 playerFlag: 'liquidated_for_committee',
@@ -655,6 +661,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Blame the market',
                 desc: 'It was an unprecedented move. Nobody saw it coming. The model was fine.',
+                onChoose: () => { shiftFaction('firmStanding', -8); },
                 complianceTier: 'defiant',
                 deltas: { xi: 0.02 },
                 playerFlag: 'blamed_market',
@@ -680,6 +687,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Donate to charity publicly',
                 desc: 'Pledge a portion of profits to recession relief. Good optics.',
+                onChoose: () => { shiftFaction('mediaTrust', +2); shiftFaction('farmerLaborSupport', +2); },
                 deltas: {},
                 effects: [
                     { path: 'election.barronApproval', op: 'add', value: 1 },
@@ -697,7 +705,9 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Go on The Sentinel to defend capitalism',
                 desc: 'Marcus Cole\'s show. Markets allocate risk. Your profits are price discovery. Someone has to say it.',
+                onChoose: () => { shiftFaction('mediaTrust', +3); shiftFaction('federalistSupport', +3); shiftFaction('farmerLaborSupport', -5); },
                 deltas: { xi: 0.015 },
+                effects: [{ path: 'media.sentinelRating', op: 'add', value: 1 }],
                 playerFlag: 'defended_capitalism_tv',
                 resultToast: 'The clip from Cole\'s show goes viral. Half the finance world loves you. The other half doesn\'t.',
             },
@@ -728,6 +738,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Promise to flatten',
                 desc: '"I\'ll reduce risk and rebuild from a clean book."',
+                onChoose: () => { shiftFaction('firmStanding', +3); },
                 trades: [{ action: 'close_all' }],
                 complianceTier: 'full',
                 deltas: { theta: -0.005, xi: -0.01 },
@@ -745,6 +756,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Show conviction',
                 desc: '"The positions are right. I need more time and a bit more risk budget."',
+                onChoose: () => { shiftFaction('firmStanding', -2); },
                 complianceTier: 'defiant',
                 playerFlag: 'showed_conviction_early',
                 resultToast: 'Your MD nods slowly. "Don\'t make me regret this."',
@@ -772,6 +784,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Cooperate fully',
                 desc: 'Open your books. Show them everything. Transparency is your friend.',
+                onChoose: () => { shiftFaction('firmStanding', +2); shiftFaction('regulatoryExposure', -2); },
                 deltas: {},
                 playerFlag: 'cooperated_unusual_activity',
                 resultToast: 'Review completed. No issues found. The flag is cleared.',
@@ -779,6 +792,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Lawyer up',
                 desc: 'Call your personal attorney before responding. Protect yourself.',
+                onChoose: () => { shiftFaction('firmStanding', -3); shiftFaction('regulatoryExposure', +3); },
                 deltas: { xi: 0.005 },
                 playerFlag: 'lawyered_up_unusual',
                 resultToast: 'The lawyer tells compliance you\'ll respond in writing within 5 business days. Tension rises.',
@@ -806,6 +820,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Take the meeting',
                 desc: 'What\'s the harm? Always good to know your market value.',
+                onChoose: () => { shiftFaction('firmStanding', -3); },
                 deltas: {},
                 playerFlag: 'took_headhunter_meeting',
                 resultToast: 'You meet at a discreet restaurant in Midtown. The offer is real. Now you have leverage.',
@@ -813,6 +828,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Tell your MD',
                 desc: 'Loyalty play. Let Meridian match or beat the offer.',
+                onChoose: () => { shiftFaction('firmStanding', +5); },
                 deltas: {},
                 effects: [
                     { path: 'fed.credibilityScore', op: 'add', value: 0 },  // no-op but shows loyalty
@@ -854,6 +870,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Swing bigger',
                 desc: 'You survived the worst. Time to press your edge harder.',
+                onChoose: () => { shiftFaction('firmStanding', -3); },
                 deltas: { xi: 0.01 },
                 playerFlag: 'comeback_aggressive',
                 resultToast: 'The comeback trader goes on the offensive. Your MD raises an eyebrow.',
@@ -928,6 +945,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Attend the fundraiser',
                 desc: 'Network with power. Understand the regulatory landscape.',
+                onChoose: () => { shiftFaction('federalistSupport', +5); shiftFaction('regulatoryExposure', +2); },
                 deltas: { mu: 0.005 },
                 effects: [
                     { path: 'election.barronApproval', op: 'add', value: -1 },
@@ -945,6 +963,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Report to compliance',
                 desc: 'This feels like it crosses a line. Better to disclose.',
+                onChoose: () => { shiftFaction('firmStanding', +3); shiftFaction('regulatoryExposure', -2); },
                 deltas: {},
                 playerFlag: 'reported_lobbyist',
                 resultToast: 'Compliance thanks you and opens a file. The lobbyist is flagged.',
@@ -1066,6 +1085,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Call back',
                 desc: 'Curiosity wins. You step outside and dial.',
+                effects: [{ path: 'media.leakCount', op: 'add', value: 1 }],
                 playerFlag: 'pursued_insider_tip',
                 _tipAction: true,
             },
@@ -1088,6 +1108,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Stay in the shadows',
                 desc: 'The work is the brand. Let the returns compound.',
+                onChoose: () => { shiftFaction('mediaTrust', -1); },
                 deltas: {},
                 playerFlag: 'stayed_shadows_media',
                 resultToast: 'Silent and profitable. The way the old guard did it.',
@@ -1095,6 +1116,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Accept a panel invitation',
                 desc: 'A macro conference wants you on their "New Voices" panel.',
+                onChoose: () => { shiftFaction('mediaTrust', +5); shiftFaction('regulatoryExposure', +2); },
                 deltas: { xi: 0.005 },
                 playerFlag: 'accepted_panel_media',
                 resultToast: 'The panel goes well. You\'re now a "voice" in macro. The attention cuts both ways.',
@@ -1135,6 +1157,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Hold the position',
                 desc: 'You have a fiduciary duty to your investors. The position is legal and well-reasoned.',
+                onChoose: () => { shiftFaction('regulatoryExposure', +3); shiftFaction('mediaTrust', -2); },
                 complianceTier: 'defiant',
                 deltas: { xi: 0.01 },
                 playerFlag: 'held_crisis_short',
@@ -1207,6 +1230,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Attend the dinner',
                 desc: 'Access is currency. Play the long game.',
+                onChoose: () => { shiftFaction('federalistSupport', +8); shiftFaction('regulatoryExposure', +3); },
                 deltas: { mu: 0.003 },
                 effects: [
                     { path: 'election.barronApproval', op: 'add', value: -2 },
@@ -1224,6 +1248,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Decline everything',
                 desc: 'You trade markets. You don\'t play politics.',
+                onChoose: () => { shiftFaction('federalistSupport', -1); shiftFaction('farmerLaborSupport', -1); },
                 deltas: {},
                 playerFlag: 'declined_political',
                 resultToast: 'The chief of staff is disappointed but professional. Your compliance record stays pristine.',
@@ -1278,12 +1303,15 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'No comment',
                 desc: 'Decline the interview. The story might run anyway.',
+                onChoose: () => { shiftFaction('mediaTrust', -5); },
+                effects: [{ path: 'media.tanCredibility', op: 'add', value: 1 }],
                 playerFlag: 'declined_ft_scrutiny',
                 resultToast: 'No comment issued. The story runs with "Meridian declined to comment."',
             },
             {
                 label: 'Cooperate with compliance review',
                 desc: 'Open your books to the internal review team. Proactive transparency.',
+                onChoose: () => { shiftFaction('mediaTrust', +3); shiftFaction('regulatoryExposure', -2); },
                 playerFlag: 'cooperated_scrutiny_review',
                 complianceTier: 'full',
                 resultToast: 'Internal review finds nothing actionable. For now.',
@@ -1302,6 +1330,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Full cooperation',
                 desc: 'Provide everything requested and offer to meet voluntarily.',
+                onChoose: () => { shiftFaction('regulatoryExposure', -3); shiftFaction('firmStanding', +3); },
                 playerFlag: 'cooperated_sec_letter',
                 complianceTier: 'full',
                 resultToast: 'Meridian\u2019s legal team begins assembling the response package.',
@@ -1315,6 +1344,8 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Stonewall',
                 desc: 'Delay, obfuscate, and challenge the scope of the request.',
+                onChoose: () => { shiftFaction('regulatoryExposure', +5); shiftFaction('firmStanding', -5); },
+                effects: [{ path: 'investigations.okaforProbeStage', op: 'add', value: 1 }],
                 playerFlag: 'stonewalled_sec',
                 complianceTier: 'defiant',
                 resultToast: 'The SEC notes Meridian\u2019s "lack of cooperation" in their file.',
@@ -1333,6 +1364,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Testify fully',
                 desc: 'Appear before the committee and answer every question.',
+                onChoose: () => { shiftFaction('regulatoryExposure', -8); shiftFaction('farmerLaborSupport', +5); },
                 playerFlag: 'testified_fully',
                 complianceTier: 'full',
                 resultToast: 'Your testimony is entered into the congressional record.',
@@ -1340,6 +1372,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Invoke the Fifth',
                 desc: 'Exercise your constitutional right against self-incrimination.',
+                onChoose: () => { shiftFaction('regulatoryExposure', +5); shiftFaction('farmerLaborSupport', -5); },
                 playerFlag: 'invoked_fifth',
                 resultToast: 'You decline to answer on Fifth Amendment grounds. The cameras flash.',
             },
@@ -1360,12 +1393,14 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Settle',
                 desc: 'Pay the fine, accept the censure, and move on. It will cost $2,000k.',
+                onChoose: () => { shiftFaction('regulatoryExposure', -10); shiftFaction('firmStanding', -5); },
                 playerFlag: 'settled_sec',
                 resultToast: 'Settlement reached. $2,000k penalty paid. The investigation is closed.',
             },
             {
                 label: 'Fight it',
                 desc: 'Contest the charges in court. This will get worse before it gets better.',
+                onChoose: () => { shiftFaction('regulatoryExposure', +5); shiftFaction('firmStanding', +3); },
                 playerFlag: 'fought_sec',
                 complianceTier: 'defiant',
                 resultToast: 'Your legal team files a motion to dismiss. The SEC doubles down.',
@@ -1373,6 +1408,7 @@ export const PORTFOLIO_POPUPS = [
             {
                 label: 'Cooperate and inform',
                 desc: 'Offer full cooperation and information on broader market patterns.',
+                onChoose: () => { shiftFaction('regulatoryExposure', -15); shiftFaction('firmStanding', -8); },
                 playerFlag: 'informed_sec',
                 complianceTier: 'full',
                 resultToast: 'The SEC notes your cooperation. Scrutiny eases \u2014 for now.',
