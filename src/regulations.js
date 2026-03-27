@@ -1,30 +1,33 @@
 /* ===================================================
-   regulations.js -- Regulatory environment system.
-   Congressional control and world events create
-   persistent rule changes affecting trading mechanics.
+   regulations.js -- Event-driven regulatory system.
+   Regulations are activated/deactivated exclusively by
+   narrative events. Legislative bills move through a
+   pipeline; executive orders auto-expire.
 
    Leaf module. No DOM access.
    =================================================== */
 
-import { congressHelpers } from './world-state.js';
+const _active = new Map(); // id -> regulation object (status === 'active' only)
 
-const _active = new Map(); // id -> regulation object
+// Pipeline: tracks both pending bills and active regulations
+// id -> { status: 'introduced'|'committee'|'floor'|'active'|'failed'|'expired'|'repealed', remainingDays: number|null }
+const _pipeline = new Map();
 
 const REGULATIONS = [
     {
         id: 'transaction_tax',
-        name: 'Farmer-Labor Transaction Tax',
+        name: 'Okafor-Whitfield Revenue Package',
         description: 'The Okafor-Whitfield revenue package imposes a 0.1% levy on all securities transactions — spreads widen across the board.',
         color: 'var(--ext-rose)',
-        condition: (world, congress) => !congress.fedControlsHouse && !congress.fedControlsSenate,
+        type: 'legislative',
         effects: { spreadMult: 1.5 },
     },
     {
         id: 'deregulation_act',
-        name: 'Financial Freedom Act (Lassiter-Tao)',
-        description: 'Lassiter and Tao ram banking deregulation through the Federalist trifecta — margin requirements loosened, risk limits relaxed.',
+        name: 'Financial Freedom Act',
+        description: 'Lassiter and Tao ram banking deregulation through Congress — margin requirements loosened, risk limits relaxed.',
         color: 'var(--ext-orange)',
-        condition: (world, congress) => congress.trifecta,
+        type: 'legislative',
         effects: { marginMult: 0.8, rogueThresholdMult: 0.85 },
     },
     {
@@ -32,7 +35,8 @@ const REGULATIONS = [
         name: 'Emergency Short-Sale Ban',
         description: 'The SEC invokes emergency powers as recession grips Columbia — short stock positions temporarily prohibited.',
         color: 'var(--ext-red)',
-        condition: (world) => world.geopolitical.recessionDeclared,
+        type: 'executive',
+        duration: 90,
         effects: { shortStockDisabled: true },
     },
     {
@@ -40,7 +44,8 @@ const REGULATIONS = [
         name: 'White House Rate Guidance',
         description: 'With Hartley gone and Vane not yet confirmed, the Barron administration issues "informal guidance" capping the federal funds rate at 6%.',
         color: 'var(--ext-blue)',
-        condition: (world) => world.fed.hartleyFired && !world.fed.vaneAppointed,
+        type: 'executive',
+        duration: 120,
         effects: { rateCeiling: 0.06 },
     },
     {
@@ -48,7 +53,8 @@ const REGULATIONS = [
         name: 'Quantitative Easing Floor',
         description: 'The Fed\'s asset purchase program pins short-term rates near zero — Priya Sharma calls it "the floor that won\'t break."',
         color: 'var(--ext-blue)',
-        condition: (world) => world.fed.qeActive,
+        type: 'executive',
+        duration: 180,
         effects: { rateFloor: 0.001 },
     },
     {
@@ -56,15 +62,16 @@ const REGULATIONS = [
         name: 'Serican Sanctions Compliance',
         description: 'Lassiter\'s sanctions regime requires full counterparty screening on every trade — compliance overhead increases borrowing costs.',
         color: 'var(--ext-indigo)',
-        condition: (world) => world.geopolitical.sanctionsActive,
+        type: 'executive',
+        duration: 120,
         effects: { borrowSpreadAdd: 0.3 },
     },
     {
         id: 'antitrust_scrutiny',
-        name: 'PNTH Antitrust Scrutiny',
+        name: 'Digital Markets Accountability Act',
         description: 'The DOJ suit and Okafor\'s Senate probe create a cloud of regulatory uncertainty around Palanthropic — spreads widen on every headline.',
         color: 'var(--ext-purple)',
-        condition: (world) => world.pnth.dojSuitFiled && world.pnth.senateProbeLaunched,
+        type: 'legislative',
         effects: { spreadMult: 1.2 },
     },
     {
@@ -72,23 +79,24 @@ const REGULATIONS = [
         name: 'Strait of Farsis Emergency Margins',
         description: 'As Emir al-Farhan tightens the oil chokepoint, clearinghouses raise margin requirements across energy-linked instruments.',
         color: 'var(--ext-brown)',
-        condition: (world) => world.geopolitical.oilCrisis,
+        type: 'executive',
+        duration: 60,
         effects: { marginMult: 1.3 },
     },
     {
         id: 'trade_war_tariffs',
-        name: 'Serican Reciprocal Tariffs',
+        name: 'Serican Reciprocal Tariff Act',
         description: 'Lassiter\'s Serican Reciprocal Tariff Act is in effect — import costs rise, supply chains reroute, spreads and borrowing costs climb.',
         color: 'var(--ext-yellow)',
-        condition: (world) => world.geopolitical.tradeWarStage >= 2,
+        type: 'legislative',
         effects: { spreadMult: 1.15, borrowSpreadAdd: 0.15 },
     },
     {
         id: 'campaign_finance',
-        name: 'Campaign Finance Scrutiny',
+        name: 'Campaign Finance Reform Act',
         description: 'Primary season brings FEC scrutiny to every political donation. Okafor\'s committee signals it\'s watching "Wall Street money in politics."',
         color: 'var(--ext-magenta)',
-        condition: (world) => world.election.primarySeason,
+        type: 'legislative',
         effects: {},
     },
     {
@@ -96,33 +104,119 @@ const REGULATIONS = [
         name: 'Senate Filibuster Uncertainty',
         description: 'Whitfield holds the Senate floor. Markets hate uncertainty — spreads widen and vol ticks up while the filibuster continues.',
         color: 'var(--ext-indigo)',
-        condition: (world) => world.congress.filibusterActive,
+        type: 'executive',
+        duration: null, // special: no auto-expiry, controlled by filibuster chain
         effects: { spreadMult: 1.25 },
     },
 ];
 
+// -- Lookup helper --------------------------------------------------------
+
+const _regById = new Map(REGULATIONS.map(r => [r.id, r]));
+
 /**
- * Re-evaluate which regulations are active based on current world state.
- * @returns {{ activated: string[], deactivated: string[] }}
+ * Advance a bill through the legislative pipeline.
+ * Called by event effects to move bills between stages.
  */
-export function evaluateRegulations(world) {
-    const congress = congressHelpers(world);
-    const activated = [];
-    const deactivated = [];
+export function advanceBill(id, status) {
+    const reg = _regById.get(id);
+    if (!reg) return;
 
-    for (const reg of REGULATIONS) {
-        const shouldBeActive = reg.condition(world, congress);
-        const wasActive = _active.has(reg.id);
+    if (status === 'failed' || status === 'repealed') {
+        _pipeline.delete(id);
+        _active.delete(id);
+        return;
+    }
 
-        if (shouldBeActive && !wasActive) {
-            _active.set(reg.id, reg);
-            activated.push(reg.id);
-        } else if (!shouldBeActive && wasActive) {
-            _active.delete(reg.id);
-            deactivated.push(reg.id);
+    const entry = _pipeline.get(id) || { status: null, remainingDays: null };
+    entry.status = status;
+
+    if (status === 'active') {
+        if (reg.type === 'executive' && reg.duration != null) {
+            entry.remainingDays = reg.duration;
+        } else {
+            entry.remainingDays = null;
+        }
+        _active.set(id, reg);
+    }
+
+    _pipeline.set(id, entry);
+}
+
+/**
+ * Activate a regulation directly (shorthand for executive/Fed actions).
+ * For executive type, uses customDuration or falls back to default.
+ */
+export function activateRegulation(id, customDuration) {
+    const reg = _regById.get(id);
+    if (!reg) return;
+
+    const remainingDays = (reg.type === 'executive' && (reg.duration != null || customDuration != null))
+        ? (customDuration ?? reg.duration)
+        : null;
+
+    _pipeline.set(id, { status: 'active', remainingDays });
+    _active.set(id, reg);
+}
+
+/**
+ * Deactivate a regulation directly.
+ */
+export function deactivateRegulation(id) {
+    _pipeline.delete(id);
+    _active.delete(id);
+}
+
+/**
+ * Tick down executive regulation timers. Called once per day.
+ * @returns {{ expired: string[] }}
+ */
+export function tickRegulations() {
+    const expired = [];
+    for (const [id, entry] of _pipeline) {
+        if (entry.status !== 'active' || entry.remainingDays == null) continue;
+        entry.remainingDays--;
+        if (entry.remainingDays <= 0) {
+            entry.status = 'expired';
+            _active.delete(id);
+            expired.push(id);
         }
     }
-    return { activated, deactivated };
+    // Clean up expired entries from pipeline
+    for (const id of expired) _pipeline.delete(id);
+    return { expired };
+}
+
+/**
+ * Get pipeline entries for UI display.
+ * Returns both pending bills and active regulations.
+ */
+export function getRegulationPipeline() {
+    const result = [];
+    for (const [id, entry] of _pipeline) {
+        const reg = _regById.get(id);
+        if (!reg) continue;
+        result.push({
+            id,
+            name: reg.name,
+            color: reg.color,
+            type: reg.type,
+            status: entry.status,
+            remainingDays: entry.remainingDays,
+        });
+    }
+    // Sort: active first, then by pipeline progression
+    const ORDER = { active: 0, floor: 1, committee: 2, introduced: 3 };
+    result.sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9));
+    return result;
+}
+
+/**
+ * Get current pipeline status for a regulation (used by event guards).
+ */
+export function getPipelineStatus(id) {
+    const entry = _pipeline.get(id);
+    return entry ? entry.status : null;
 }
 
 /** Get all currently active regulation objects. */
@@ -163,11 +257,12 @@ export function getRegulationEffect(effectKey, defaultVal) {
 }
 
 export function getRegulation(id) {
-    return REGULATIONS.find(r => r.id === id) || null;
+    return _regById.get(id) || null;
 }
 
 export function resetRegulations() {
     _active.clear();
+    _pipeline.clear();
 }
 
 export { REGULATIONS };
