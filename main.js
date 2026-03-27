@@ -25,7 +25,7 @@ import {
     syncSettingsUI, toggleStrategyView, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
-    updateDynamicSections, updateEventLog, updateCongressDiagrams,
+    updateDynamicSections, updateEventLog, updateCongressDiagrams, updateStandings,
     refreshTooltip,
     updateStrategyDropdowns, updateCreditDebit,
     showPopupEvent,
@@ -56,7 +56,7 @@ import {
     factions, resetFactions, getFaction,
     onQuarterlyReview, applyComplianceChoice,
     shiftFaction, firmTone,
-    getRegLevel, getFactionState,
+    getRegLevel, getFactionState, getFactionDescriptor,
     settleRegulatory, cooperateRegulatory,
 } from './src/faction-standing.js';
 import {
@@ -545,6 +545,7 @@ function init() {
     updateDynamicSections($, DEFAULT_PRESET);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
+    if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
     if ($.lobbyBar) $.lobbyBar.style.display = eventEngine ? '' : 'none';
     _updateLobbyPills();
 
@@ -1215,6 +1216,7 @@ function _onDayComplete() {
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
             updateCongressDiagrams($, eventEngine.world);
+            updateStandings($, eventEngine.world, factions, getFactionDescriptor);
         }
         if (fired.length > 0) {
             sim.recomputeK();
@@ -1222,6 +1224,7 @@ function _onDayComplete() {
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
             updateCongressDiagrams($, eventEngine.world);
+            updateStandings($, eventEngine.world, factions, getFactionDescriptor);
             if (typeof showToast !== 'undefined') {
                 for (let i = 0; i < fired.length; i++) {
                     const ev = fired[i];
@@ -1700,6 +1703,7 @@ function loadPreset(index) {
     }
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
+    if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
     if ($.lobbyBar) $.lobbyBar.style.display = eventEngine ? '' : 'none';
 
     updateUI();
@@ -1716,6 +1720,7 @@ function resetSim() {
     if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
+    if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
 
     updateUI();
     _repositionCamera();
