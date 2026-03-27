@@ -304,7 +304,7 @@ export const INVESTIGATION_EVENTS = [
             {
                 label: 'No comment',
                 desc: 'Decline the interview. The story might run anyway.',
-                onChoose: () => { shiftFaction('mediaTrust', -5); },
+                factionShifts: [{ faction: 'mediaTrust', value: -5 }],
                 effects: [{ path: 'media.tanCredibility', op: 'add', value: 1 }],
                 playerFlag: 'declined_ft_scrutiny',
                 resultToast: 'No comment issued. The story runs with "Meridian declined to comment."',
@@ -312,7 +312,10 @@ export const INVESTIGATION_EVENTS = [
             {
                 label: 'Cooperate with compliance review',
                 desc: 'Open your books to the internal review team. Proactive transparency.',
-                onChoose: () => { shiftFaction('mediaTrust', +3 + (hasTrait('media_figure') ? 2 : 0)); shiftFaction('regulatoryExposure', -2); },
+                factionShifts: [
+                    { faction: 'mediaTrust', value: 3, when: { hasTrait: 'media_figure' }, bonus: 2 },
+                    { faction: 'regulatoryExposure', value: -2 },
+                ],
                 playerFlag: 'cooperated_scrutiny_review',
                 complianceTier: 'full',
                 resultToast: 'Internal review finds nothing actionable. For now.',
@@ -331,7 +334,10 @@ export const INVESTIGATION_EVENTS = [
             {
                 label: 'Full cooperation',
                 desc: 'Provide everything requested and offer to meet voluntarily.',
-                onChoose: () => { shiftFaction('regulatoryExposure', -3); shiftFaction('firmStanding', +3); },
+                factionShifts: [
+                    { faction: 'regulatoryExposure', value: -3 },
+                    { faction: 'firmStanding', value: 3 },
+                ],
                 playerFlag: 'cooperated_sec_letter',
                 complianceTier: 'full',
                 resultToast: 'Meridian\u2019s legal team begins assembling the response package.',
@@ -345,7 +351,10 @@ export const INVESTIGATION_EVENTS = [
             {
                 label: 'Stonewall',
                 desc: 'Delay, obfuscate, and challenge the scope of the request.',
-                onChoose: () => { shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +10 : +5); shiftFaction('firmStanding', -5); },
+                factionShifts: [
+                    { faction: 'regulatoryExposure', value: 5, when: { hasTrait: 'under_scrutiny' }, bonus: 5 },
+                    { faction: 'firmStanding', value: -5 },
+                ],
                 effects: [{ path: 'investigations.okaforProbeStage', op: 'add', value: 1 }],
                 playerFlag: 'stonewalled_sec',
                 complianceTier: 'defiant',
@@ -365,7 +374,10 @@ export const INVESTIGATION_EVENTS = [
             {
                 label: 'Testify fully',
                 desc: 'Appear before the committee and answer every question.',
-                onChoose: () => { shiftFaction('regulatoryExposure', -8); shiftFaction('farmerLaborSupport', +5); },
+                factionShifts: [
+                    { faction: 'regulatoryExposure', value: -8 },
+                    { faction: 'farmerLaborSupport', value: 5 },
+                ],
                 playerFlag: 'testified_fully',
                 complianceTier: 'full',
                 resultToast: 'Your testimony is entered into the congressional record.',
@@ -373,7 +385,10 @@ export const INVESTIGATION_EVENTS = [
             {
                 label: 'Invoke the Fifth',
                 desc: 'Exercise your constitutional right against self-incrimination.',
-                onChoose: () => { shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +10 : +5); shiftFaction('farmerLaborSupport', -5); },
+                factionShifts: [
+                    { faction: 'regulatoryExposure', value: 5, when: { hasTrait: 'under_scrutiny' }, bonus: 5 },
+                    { faction: 'farmerLaborSupport', value: -5 },
+                ],
                 playerFlag: 'invoked_fifth',
                 resultToast: 'You decline to answer on Fifth Amendment grounds. The cameras flash.',
             },
@@ -394,17 +409,20 @@ export const INVESTIGATION_EVENTS = [
             {
                 label: 'Settle',
                 desc: 'Pay the fine, accept the censure, and move on. It will cost $2,000k.',
-                onChoose: () => { shiftFaction('regulatoryExposure', -10); shiftFaction('firmStanding', -5); },
+                factionShifts: [
+                    { faction: 'regulatoryExposure', value: -10 },
+                    { faction: 'firmStanding', value: -5 },
+                ],
                 playerFlag: 'settled_sec',
                 resultToast: 'Settlement reached. $2,000k penalty paid. The investigation is closed.',
             },
             {
                 label: 'Fight it',
                 desc: 'Contest the charges in court. This will get worse before it gets better.',
-                onChoose: () => {
-                    shiftFaction('regulatoryExposure', hasTrait('under_scrutiny') ? +10 : +5);
-                    shiftFaction('firmStanding', +3 + (hasTrait('meridian_star') ? 3 : 0));
-                },
+                factionShifts: [
+                    { faction: 'regulatoryExposure', value: 5, when: { hasTrait: 'under_scrutiny' }, bonus: 5 },
+                    { faction: 'firmStanding', value: 3, when: { hasTrait: 'meridian_star' }, bonus: 3 },
+                ],
                 playerFlag: 'fought_sec',
                 complianceTier: 'defiant',
                 resultToast: 'Your legal team files a motion to dismiss. The SEC doubles down.',
@@ -412,7 +430,10 @@ export const INVESTIGATION_EVENTS = [
             {
                 label: 'Cooperate and inform',
                 desc: 'Offer full cooperation and information on broader market patterns.',
-                onChoose: () => { shiftFaction('regulatoryExposure', -15); shiftFaction('firmStanding', -8); },
+                factionShifts: [
+                    { faction: 'regulatoryExposure', value: -15 },
+                    { faction: 'firmStanding', value: -8 },
+                ],
                 playerFlag: 'informed_sec',
                 complianceTier: 'full',
                 resultToast: 'The SEC notes your cooperation. Scrutiny eases \u2014 for now.',

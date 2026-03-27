@@ -891,6 +891,13 @@ function _processPopupQueue() {
         if (choice.effects && eventEngine) {
             applyStructuredEffects(eventEngine.world, choice.effects);
         }
+        if (choice.factionShifts) {
+            for (const fs of choice.factionShifts) {
+                let value = fs.value;
+                if (fs.when?.hasTrait && hasTrait(fs.when.hasTrait)) value += (fs.bonus || 0);
+                shiftFaction(fs.faction, value);
+            }
+        }
         if (choice.playerFlag) {
             playerChoices[choice.playerFlag] = sim.day;
         }
