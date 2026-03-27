@@ -2274,13 +2274,50 @@ const POLITICAL_EVENTS = [
     },
     {
         id: 'barron_tax_cut_proposal',
-        category: 'political',
+        category: 'congressional',
         likelihood: 0.6,
         headline: 'Barron unveils the Financial Freedom Act: corporate tax cut from 21% to 15%. Haines flags a $400B revenue shortfall. Lassiter on The Sentinel: "Growth pays for itself." Reyes: "Math doesn\'t lie"',
         magnitude: 'moderate',
-        when: (sim, world, congress) => congress.trifecta,
+        when: (sim, world, congress) => congress.trifecta && getPipelineStatus('deregulation_act') === null,
         params: { mu: 0.025, theta: -0.003, b: 0.005, q: 0.002 },
-        effects: (world) => { world.election.barronApproval = Math.min(100, world.election.barronApproval + 2); shiftFaction('federalistSupport', 3); },
+        effects: (world) => { world.election.barronApproval = Math.min(100, world.election.barronApproval + 2); shiftFaction('federalistSupport', 3); advanceBill('deregulation_act', 'introduced'); },
+        followups: [{ id: 'ffa_committee_markup', mtth: 25, weight: 1 }],
+    },
+    {
+        id: 'ffa_committee_markup',
+        category: 'congressional',
+        likelihood: 3,
+        headline: 'Senate Banking Committee begins markup of the Financial Freedom Act. Lassiter chairs a 14-hour session. Haines proposes an amendment capping the repatriation holiday at 3 years. Lassiter kills it in committee.',
+        magnitude: 'moderate',
+        when: (sim, world) => getPipelineStatus('deregulation_act') === 'introduced',
+        params: { mu: 0.01, theta: -0.002 },
+        effects: () => { advanceBill('deregulation_act', 'committee'); },
+        followups: [
+            { id: 'ffa_floor_passes', mtth: 30, weight: 0.6 },
+            { id: 'ffa_floor_fails', mtth: 30, weight: 0.4 },
+            { id: 'ffa_haines_opposition', mtth: 12, weight: 0.5 },
+            { id: 'ffa_reyes_floor_speech', mtth: 15, weight: 0.4 },
+        ],
+    },
+    {
+        id: 'ffa_haines_opposition',
+        category: 'congressional',
+        likelihood: 2,
+        headline: 'Haines breaks with party leadership on the Financial Freedom Act, citing deficit projections. "I will not vote for a bill that adds $400B to the debt without offsets." Barron: "Peggy is confused again."',
+        magnitude: 'minor',
+        when: (sim, world) => getPipelineStatus('deregulation_act') === 'committee',
+        params: { theta: 0.003 },
+        effects: (world) => { world.election.barronApproval = Math.max(0, world.election.barronApproval - 1); },
+    },
+    {
+        id: 'ffa_reyes_floor_speech',
+        category: 'congressional',
+        likelihood: 2,
+        headline: 'Reyes delivers a blistering 40-minute floor speech against the Financial Freedom Act. "This bill is a permission slip for Wall Street to gamble with the economy." The Sentinel\'s Cole calls it "theatrics."',
+        magnitude: 'minor',
+        when: (sim, world) => getPipelineStatus('deregulation_act') === 'committee',
+        params: {},
+        effects: (world) => { shiftFaction('farmerLaborSupport', 1); },
     },
     {
         id: 'clay_opposition_rally',
@@ -3088,14 +3125,41 @@ const CONGRESSIONAL_EVENTS = [
         magnitude: 'moderate',
     },
     {
-        id: 'corporate_tax_reform_passes',
+        id: 'ffa_floor_passes',
         category: 'congressional',
-        likelihood: 0.4,
         headline: 'The Financial Freedom Act passes both chambers: corporate rate cut to 15%, repatriation holiday. Tao celebrates on the House floor. Reyes walks out. MarketWire: "Shareholder returns about to explode"',
+        likelihood: (sim, world, congress) => {
+            let w = congress.trifecta ? 3 : 0.3;
+            w *= (1 + (world.election.lobbyMomentum || 0) * 0.15);
+            return w;
+        },
         magnitude: 'major',
-        when: (sim, world, congress) => congress.trifecta,
+        when: (sim, world) => getPipelineStatus('deregulation_act') === 'committee',
         params: { mu: 0.03, theta: -0.005, b: 0.002, q: 0.004 },
-        effects: (world) => { world.election.barronApproval = Math.min(100, world.election.barronApproval + 3); shiftFaction('federalistSupport', 4); shiftFaction('firmStanding', 2); },
+        effects: (world) => {
+            world.election.barronApproval = Math.min(100, world.election.barronApproval + 3);
+            shiftFaction('federalistSupport', 4);
+            shiftFaction('firmStanding', 2);
+            advanceBill('deregulation_act', 'active');
+        },
+    },
+    {
+        id: 'ffa_floor_fails',
+        category: 'congressional',
+        headline: 'The Financial Freedom Act fails 48-52 as Haines and two other Federalist moderates defect. Lassiter storms out of the chamber. Barron: "We will primary every one of them." Tao vows to bring it back.',
+        likelihood: (sim, world, congress) => {
+            let w = congress.trifecta ? 0.5 : 3;
+            w *= (1 - (world.election.lobbyMomentum || 0) * 0.15);
+            return Math.max(0.1, w);
+        },
+        magnitude: 'major',
+        when: (sim, world) => getPipelineStatus('deregulation_act') === 'committee',
+        params: { mu: -0.02, theta: 0.008 },
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+            shiftFaction('farmerLaborSupport', 3);
+            advanceBill('deregulation_act', 'failed');
+        },
     },
     {
         id: 'capital_gains_tax_scare',
@@ -4119,11 +4183,11 @@ export const OFFLINE_EVENTS = [
         likelihood: 0,
         oneShot: true,
         when: (sim, world, congress, ctx) =>
-            world.fed.hartleyFired && congress.trifecta,
+            world.fed.hartleyFired && congress.trifecta && getPipelineStatus('deregulation_act') === null,
         headline: 'The Financial Freedom Act meets a Federalist trifecta — Lassiter and Tao gut banking oversight in a 48-hour legislative blitz. MarketWire calls it "the most consequential deregulation since 1999."',
         magnitude: 'major',
         params: { theta: -0.02, lambda: 0.5 },
-        effects: (world) => { world.election.barronApproval += 3; shiftFaction('federalistSupport', 4); shiftFaction('regulatoryExposure', -3); },
+        effects: (world) => { world.election.barronApproval += 3; shiftFaction('federalistSupport', 4); shiftFaction('regulatoryExposure', -3); activateRegulation('deregulation_act'); },
     },
     {
         id: 'compound_pnth_war_profits',
