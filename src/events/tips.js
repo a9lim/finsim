@@ -1,0 +1,103 @@
+/* tips.js -- Insider tip outcome events (real and fake). */
+
+export const TIP_EVENTS = [
+    // -- Insider tip outcome events (real) --
+    {
+        id: 'tip_dividend_hike',
+        category: 'pnth_earnings',
+        likelihood: 0,
+        headline: 'PNTH announces surprise dividend hike — payout doubles',
+        params: { mu: 0.03, theta: -0.01 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_fed_pause',
+        category: 'fed',
+        likelihood: 0,
+        headline: 'Fed holds steady in surprise decision — doves prevail',
+        params: { mu: 0.02, theta: -0.005, b: -0.005, sigmaR: -0.002 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_contract_win',
+        category: 'sector',
+        likelihood: 0,
+        headline: 'PNTH wins $2.8B defense contract — shares surge',
+        params: { mu: 0.04, theta: -0.015 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_short_squeeze',
+        category: 'market',
+        likelihood: 0,
+        headline: 'Short squeeze erupts — forced covering drives 8% rally in hours',
+        params: { mu: 0.05, theta: 0.02, lambda: 1.5 },
+        magnitude: 'major',
+    },
+    {
+        id: 'tip_earnings_beat',
+        category: 'pnth_earnings',
+        likelihood: 0,
+        headline: 'PNTH crushes earnings — revenue up 25%, guidance raised',
+        params: { mu: 0.04, theta: -0.01, q: 0.002 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_acquisition_bid',
+        category: 'sector',
+        likelihood: 0,
+        headline: 'Foreign consortium launches $55B bid for PNTH — 30% premium',
+        params: { mu: 0.06, theta: -0.02, xi: 0.03 },
+        magnitude: 'major',
+    },
+
+    // -- Insider tip outcome events (fake — "despite rumors") --
+    {
+        id: 'tip_dividend_flat',
+        category: 'pnth_earnings',
+        likelihood: 0,
+        headline: 'PNTH maintains dividend despite rumors of increase — board prioritizes buybacks',
+        params: { mu: -0.01, theta: 0.005 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'tip_fed_hike',
+        category: 'fed',
+        likelihood: 0,
+        headline: 'Despite rumors of a pause, Fed hikes 25bps — Hartley cites persistent inflation',
+        params: { mu: -0.02, theta: 0.01, b: 0.005, sigmaR: 0.003 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_contract_loss',
+        category: 'sector',
+        likelihood: 0,
+        headline: 'PNTH loses defense bid to rival despite rumors of a win — shares slide',
+        params: { mu: -0.03, theta: 0.01 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_squeeze_fizzle',
+        category: 'market',
+        likelihood: 0,
+        headline: 'Rumored short squeeze fizzles — shorts hold firm, longs trapped',
+        params: { mu: -0.02, theta: 0.015 },
+        magnitude: 'minor',
+    },
+    {
+        id: 'tip_earnings_miss',
+        category: 'pnth_earnings',
+        likelihood: 0,
+        headline: 'Despite whisper-number optimism, PNTH misses estimates — guidance lowered',
+        params: { mu: -0.03, theta: 0.015, q: -0.001 },
+        magnitude: 'moderate',
+    },
+    {
+        id: 'tip_acquisition_denied',
+        category: 'sector',
+        likelihood: 0,
+        headline: 'PNTH denies acquisition rumors — "not in discussions with any party"',
+        params: { mu: -0.02, theta: 0.01, xi: -0.01 },
+        magnitude: 'minor',
+    },
+];
