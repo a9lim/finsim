@@ -901,20 +901,13 @@ function _processPopupQueue() {
         if (choice.playerFlag) {
             playerChoices[choice.playerFlag] = sim.day;
         }
-        if (choice.playerFlag === 'pursued_insider_tip' || choice.playerFlag === 'pursued_pnth_tip') {
-            shiftFaction('regulatoryExposure', 13);
-        } else if (choice.playerFlag === 'pursued_analyst_tip') {
-            shiftFaction('regulatoryExposure', 10);
+        if (choice.cashPenalty) {
+            portfolio.cash -= choice.cashPenalty;
         }
-        if (choice.playerFlag === 'settled_sec') {
-            portfolio.cash -= 2000;
+        if (choice.regulatoryAction === 'settle') {
             settleRegulatory();
-        }
-        if (choice.playerFlag === 'informed_sec') {
+        } else if (choice.regulatoryAction === 'cooperate') {
             cooperateRegulatory();
-        }
-        if (choice.playerFlag === 'fought_sec') {
-            shiftFaction('regulatoryExposure', 13);
         }
         if (choice.followups && eventEngine) {
             for (const fu of choice.followups) {
