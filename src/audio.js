@@ -1,7 +1,8 @@
 /* ===================================================
-   audio.js — Chiptune jazz for Shoals.
-   Synthesized walking bass, swing comping, brushed
-   hi-hat, and angular melody over Am diatonic circle.
+   audio.js — Background jazz loop for Shoals.
+   Walking bass with sub-octave warmth, rich 3-note
+   comping with ghost fills, ride cymbal, cross-stick,
+   and brush sweeps over Am diatonic circle.
    Event stingers and superevent chord stabs on top.
    All Web Audio API — no external audio files.
    Leaf module. No DOM access.
@@ -48,94 +49,66 @@ const CHORDS = [
     'FM7','Hd','E7', 'Am7',      // C  — resolves to Am
 ];
 
-/* Shell voicings: 3rd + 7th */
+/* Three-note rootless voicings with smooth voice leading.
+   Each chord connects to the next by semitone/step motion:
+   Am7→D7: G→Gb only. D7→GM7: C→B, E→D. GM7→CM7: D→E, Gb→G.
+   CM7→FM7: parallel 3rds down. FM7→Hd: C→D, E→F. Hd→E7: A→B only.
+   E7(b9)→Am7: B→C, D→E, F→G (all steps — textbook resolution). */
 const VOICING = {
-    Am7: [N.C4, N.G4],
-    D7:  [N.Gb3, N.C4],
-    GM7: [N.B3, N.Gb4],
-    CM7: [N.E4, N.B4],
-    FM7: [N.A3, N.E4],
-    Hd:  [N.D4, N.A4],      // Bm7b5: b3 + b7
-    E7:  [N.Ab3, N.D4],
+    Am7: [N.C4, N.E4, N.G4],       // 3, 5, 7
+    D7:  [N.C4, N.E4, N.Gb4],      // b7, 9, 3 — type B rootless
+    GM7: [N.B3, N.D4, N.Gb4],      // 3, 5, 7
+    CM7: [N.B3, N.E4, N.G4],       // 7, 3, 5
+    FM7: [N.A3, N.C4, N.E4],       // 3, 5, 7
+    Hd:  [N.A3, N.D4, N.F4],       // Bm7b5: b7, b3, b5
+    E7:  [N.B3, N.D4, N.F4],       // 5, b7, b9 — tension into Am
 };
 
 /* Walking bass: one quarter note per beat, 64 total.
-   Angular lines with wide leaps and chromatic approaches. */
+   Smooth stepwise motion with chromatic approaches on beat 4.
+   Mostly 2nds and 3rds — no wide leaps. Suave, not angular. */
 const BASS = [
     // A (bars 0–3: Am7 → D7 → GM7 → CM7)
-    N.A2, N.C3, N.E3, N.Eb3,     N.D3, N.A2, N.Gb2, N.Ab2,
-    N.G2, N.B2, N.D3, N.B2,      N.C3, N.E3, N.G2, N.E3,
+    N.A2, N.B2, N.C3, N.Db3,     N.D3, N.C3, N.A2, N.Ab2,
+    N.G2, N.A2, N.B2, N.B2,      N.C3, N.B2, N.G2, N.E2,
     // B (bars 4–7: FM7 → Bm7b5 → E7 → E7)
-    N.F2, N.A2, N.C3, N.Bb2,     N.B2, N.D3, N.F3, N.F3,
-    N.E3, N.Ab2, N.B2, N.D3,     N.E2, N.Ab2, N.B2, N.Bb2,
+    N.F2, N.G2, N.A2, N.Bb2,     N.B2, N.A2, N.G2, N.F2,
+    N.E2, N.Gb2, N.Ab2, N.B2,    N.E3, N.D3, N.B2, N.Bb2,
     // A' (bars 8–11: Am7 → D7 → GM7 → CM7)
-    N.A2, N.E3, N.C3, N.Eb3,     N.D3, N.Gb2, N.A2, N.Ab2,
-    N.G2, N.D3, N.B2, N.B2,      N.C3, N.G2, N.E3, N.E3,
+    N.A2, N.C3, N.D3, N.Db3,     N.D3, N.C3, N.A2, N.Ab2,
+    N.G2, N.B2, N.A2, N.B2,      N.C3, N.B2, N.A2, N.E2,
     // C (bars 12–15: FM7 → Bm7b5 → E7 → Am7 → loop)
-    N.F2, N.C3, N.A2, N.Bb2,     N.B2, N.F3, N.D3, N.F3,
-    N.E3, N.B2, N.Ab2, N.Ab2,    N.A2, N.E3, N.C3, N.Ab2,
+    N.F2, N.G2, N.A2, N.Bb2,     N.B2, N.A2, N.G2, N.F2,
+    N.E2, N.Gb2, N.G2, N.Ab2,    N.A2, N.G2, N.F2, N.Ab2,
 ];
 
-/* Comp events: 2 hits per bar, section-start bars get strong downbeat */
+/* Comp events: 2–3 hits per bar with ghost fills for texture.
+   ghost = true → quiet square-wave percussive fill
+   ghost = false/undefined → warm triangle-wave main voicing */
 const COMP = [];
 for (let bar = 0; bar < 16; bar++) {
     const b = bar * 4, ch = CHORDS[bar];
     if (bar % 4 === 0) {
-        // Section start: strong downbeat + and-of-2
-        COMP.push({ beat: b,           ch, dur: 0.5 },
-                   { beat: b + 2 + SW, ch, dur: 0.4 });
+        // Section start: strong downbeat + ghost fill + off-beat
+        COMP.push({ beat: b,           ch, dur: 0.8, vol: 1.0 },
+                   { beat: b + 1 + SW, ch, dur: 0.3, vol: 0.5, ghost: true },
+                   { beat: b + 2 + SW, ch, dur: 0.5, vol: 0.7 });
+    } else if (bar % 4 === 2) {
+        // Mid-section: syncopated with trailing ghost
+        COMP.push({ beat: b + SW,      ch, dur: 0.6, vol: 0.65 },
+                   { beat: b + 2,      ch, dur: 0.5, vol: 0.8 },
+                   { beat: b + 3 + SW, ch, dur: 0.3, vol: 0.4, ghost: true });
     } else if (bar % 2 === 0) {
-        COMP.push({ beat: b + 1,       ch, dur: 0.7 },
-                   { beat: b + 2 + SW, ch, dur: 0.4 });
+        // Even bars: relaxed, two hits
+        COMP.push({ beat: b + 1,       ch, dur: 0.7, vol: 0.7 },
+                   { beat: b + 2 + SW, ch, dur: 0.4, vol: 0.5 });
     } else {
-        COMP.push({ beat: b + SW,      ch, dur: 0.6 },
-                   { beat: b + 3,      ch, dur: 0.6 });
+        // Odd bars: laid back with ghost texture
+        COMP.push({ beat: b + SW,      ch, dur: 0.6, vol: 0.6 },
+                   { beat: b + 2,      ch, dur: 0.3, vol: 0.35, ghost: true },
+                   { beat: b + 3,      ch, dur: 0.6, vol: 0.7 });
     }
 }
-
-/* Melody: 8-bar head (bars 0–7). Nocturne-inspired phrasing —
-   warm stepwise motion in octave 3–4, building through sequences
-   and appoggiaturas to a dramatic octave-leap climax on G5,
-   then settling back into intimate chromatic descent.
-   Bars 8–15 tacet (rhythm section breathes). */
-const MELODY = [
-    // Bar 0 (Am7): nocturne opening — long tones, unhurried
-    { beat: 0,         freq: N.A3,  dur: 2 },
-    { beat: 2 + SW,    freq: N.B3,  dur: 1 - SW },
-    { beat: 3,         freq: N.C4,  dur: 1 },
-    // Bar 1 (D7): ascending sequence continues, tritone color
-    { beat: 4,         freq: N.D4,  dur: 1 },
-    { beat: 5,         freq: N.Gb3, dur: SW },
-    { beat: 5 + SW,    freq: N.A3,  dur: 1 - SW },
-    { beat: 6,         freq: N.D4,  dur: 1.5 },
-    // Bar 2 (GM7): building — stepwise through the 7th
-    { beat: 8,         freq: N.B3,  dur: 1.5 },
-    { beat: 10,        freq: N.D4,  dur: SW },
-    { beat: 10 + SW,   freq: N.E4,  dur: 1 - SW },
-    { beat: 11,        freq: N.Gb4, dur: 1 },
-    // Bar 3 (CM7): climax — dramatic leap, then cascading descent
-    { beat: 12,        freq: N.G4,  dur: 1.5 },
-    { beat: 14,        freq: N.E4,  dur: SW },
-    { beat: 14 + SW,   freq: N.D4,  dur: 1 - SW },
-    { beat: 15,        freq: N.C4,  dur: 1 },
-    // Bar 4 (FM7): second theme — intimate, sustained
-    { beat: 16,        freq: N.A3,  dur: 2 },
-    { beat: 18 + SW,   freq: N.C4,  dur: 1 - SW },
-    { beat: 19,        freq: N.F4,  dur: 1 },
-    // Bar 5 (Bm7b5): chromatic descent into shadow
-    { beat: 20,        freq: N.D4,  dur: 1 },
-    { beat: 21,        freq: N.C4,  dur: SW },
-    { beat: 21 + SW,   freq: N.B3,  dur: 1 + (1 - SW) },
-    // Bar 6 (E7): appoggiatura — C resolves to B, then leaps
-    { beat: 24,        freq: N.C4,  dur: 1 },
-    { beat: 25,        freq: N.B3,  dur: SW },
-    { beat: 25 + SW,   freq: N.Ab3, dur: 1 - SW },
-    { beat: 26,        freq: N.E4,  dur: 1.5 },
-    // Bar 7 (E7): sustained suspense — fading into silence
-    { beat: 28,        freq: N.D4,  dur: 1.5 },
-    { beat: 30,        freq: N.B3,  dur: 2 },
-    // Bars 8–15: tacet — rhythm section only
-];
 
 /* Stinger definitions (one-shot event feedback) */
 const STINGER_DEFS = {
@@ -272,41 +245,93 @@ function _kick(time, vol, dest) {
     osc.stop(time + 0.2);
 }
 
+/** Cross-stick: short bandpass noise burst for woody backbeat. */
+function _crossStick(time, vol, dest) {
+    if (!_noiseBuffer) {
+        const len = _ctx.sampleRate * 2;
+        _noiseBuffer = _ctx.createBuffer(1, len, _ctx.sampleRate);
+        const d = _noiseBuffer.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const src = _ctx.createBufferSource();
+    src.buffer = _noiseBuffer;
+
+    const bp = _ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1200;
+    bp.Q.value = 4;
+
+    const g = _ctx.createGain();
+    g.gain.setValueAtTime(vol, time);
+    g.gain.linearRampToValueAtTime(vol * 0.25, time + 0.012);
+    g.gain.linearRampToValueAtTime(0, time + 0.04);
+
+    src.connect(bp);
+    bp.connect(g);
+    g.connect(dest);
+    src.start(time);
+    src.stop(time + 0.05);
+}
+
 /* =============== JAZZ LOOP =============== */
 
 /** Schedule one full 16-bar loop iteration starting at t0. */
 function _scheduleLoop(t0) {
     const dest = _jazzGain;
 
-    /* Walking bass (triangle, dark filter) */
+    /* Walking bass: triangle at written pitch (audible on all speakers)
+       + sub-octave sine for warmth on full-range systems */
     for (let i = 0; i < 64; i++) {
-        _noteOn('triangle', BASS[i], t0 + i * BEAT, 0.9, 0.16, 280, dest);
+        _noteOn('triangle', BASS[i],       t0 + i * BEAT, 0.9, 0.12, 280, dest);
+        _noteOn('sine',     BASS[i] * 0.5, t0 + i * BEAT, 0.9, 0.22, 220, dest);
     }
 
-    /* Chord comping (square, mid filter) */
+    /* Chord comping: warm triangle mains + quiet square ghost fills */
     for (const c of COMP) {
         const v = VOICING[c.ch];
+        const isGhost = c.ghost;
+        const baseVol = isGhost ? 0.01 : 0.025;
+        const filterHz = isGhost ? 700 : 1100;
+        const type = isGhost ? 'square' : 'triangle';
         for (const freq of v) {
-            _noteOn('square', freq, t0 + c.beat * BEAT, c.dur, 0.04, 900, dest);
+            _noteOn(type, freq, t0 + c.beat * BEAT, c.dur, baseVol * c.vol, filterHz, dest);
         }
     }
 
-    /* Melody (square, brighter filter) — bars 0–7 only */
-    for (const m of MELODY) {
-        _noteOn('square', m.freq, t0 + m.beat * BEAT, m.dur, 0.08, 1800, dest);
-    }
+    /* Drums: unified kit pattern that builds within each 4-bar phrase.
+       phrase 0 = sparse (just kick + hat), 1 = developing (add cross-stick,
+       kick ghost), 2 = full groove, 3 = resolve with brush sweep. */
+    for (let bar = 0; bar < 16; bar++) {
+        const b = bar * 4;
+        const p = bar % 4;  // phrase position: 0 start → 3 resolve
 
-    /* Hi-hat: swung eighth notes, accenting beats 2 & 4 */
-    for (let i = 0; i < 64; i++) {
-        const accent = (i % 4 === 1 || i % 4 === 3);
-        _noise(t0 + i * BEAT, 0.05, accent ? 0.05 : 0.025, 8000, dest);
-        _noise(t0 + (i + SW) * BEAT, 0.035, 0.012, 10000, dest);
-    }
+        /* Kick: always on 1, ghost on 3 enters at phrase 1 and grows */
+        _kick(t0 + b * BEAT, 0.06 + p * 0.005, dest);
+        if (p >= 1) {
+            _kick(t0 + (b + 2) * BEAT, 0.015 + p * 0.005, dest);
+        }
 
-    /* Kick: beat 1 (strong) + beat 3 (ghost) of each bar */
-    for (let i = 0; i < 64; i += 4) {
-        _kick(t0 + i * BEAT, 0.07, dest);
-        _kick(t0 + (i + 2) * BEAT, 0.04, dest);
+        /* Cross-stick: beat 2 enters at phrase 1, beat 4 at phrase 2 */
+        if (p >= 1) {
+            _crossStick(t0 + (b + 1) * BEAT, 0.04 + p * 0.005, dest);
+        }
+        if (p >= 2) {
+            _crossStick(t0 + (b + 3) * BEAT, 0.04, dest);
+        }
+
+        /* Hi-hat: downbeat always; swing ghosts layer in as phrase builds */
+        _noise(t0 + b * BEAT, 0.05, 0.03 + (p === 0 ? 0.01 : 0), 8000, dest);
+        if (p >= 1) {
+            _noise(t0 + (b + 2 + SW) * BEAT, 0.035, 0.012, 10000, dest);
+        }
+        if (p >= 2) {
+            _noise(t0 + (b + SW) * BEAT, 0.03, 0.008, 10000, dest);
+        }
+
+        /* Brush sweep on resolve bar — leads into next phrase */
+        if (p === 3) {
+            _noise(t0 + (b + 3) * BEAT, BEAT * 1.5, 0.015, 3000, dest);
+        }
     }
 }
 
