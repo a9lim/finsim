@@ -68,6 +68,11 @@ export function firmThresholdMult() {
         getTraitEffect('firmThresholdMult', 1);
 }
 
+/** Capital allocation multiplier based on firm standing. Scales position limits. */
+export function capitalMultiplier() {
+    return 0.5 + (factions.firmStanding / 100);
+}
+
 /** Compliance popup cooldown multiplier. High firmStanding = less frequent popups. */
 export function firmCooldownMult() {
     return (0.5 + (factions.firmStanding / 100)) *
