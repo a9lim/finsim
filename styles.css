@@ -98,10 +98,15 @@ main {
     outline: none;
     -webkit-appearance: none;
 }
-.lobby-pill-fed { color: var(--ext-orange); }
-.lobby-pill-fl  { color: var(--ext-lime); }
+.lobby-pill-fed     { color: var(--ext-orange); }
+.lobby-pill-fl      { color: var(--ext-lime); }
+.lobby-pill-pol     { color: var(--ext-yellow); }
+.lobby-pill-media   { color: var(--ext-cyan); }
+.lobby-pill-fed-rel { color: var(--ext-blue); }
+#lobby-actions { display: flex; align-items: center; }
 .lobby-bar .substrate-pill-left  { border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
 .lobby-bar .substrate-pill-right { border-radius: 0 var(--radius-pill) var(--radius-pill) 0; }
+.lobby-bar .substrate-pill-solo  { border-radius: var(--radius-pill); }
 .lobby-bar .substrate-pill:hover:not(:disabled) {
     background: color-mix(in srgb, currentColor 10%, transparent);
 }
