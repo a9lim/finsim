@@ -3172,6 +3172,80 @@ const CONGRESSIONAL_EVENTS = [
         effects: [ { path: 'election.barronApproval', op: 'add', value: -1 }, ],
     },
 
+    // -- Serican Reciprocal Tariff Act lifecycle ------------------------------
+    {
+        id: 'tariff_act_introduced',
+        category: 'congressional',
+        likelihood: 2,
+        headline: 'Lassiter introduces the Serican Reciprocal Tariff Act in the Senate. "If Serica taxes our goods, we tax theirs — dollar for dollar." Bipartisan support from both hawks. Reyes abstains. MarketWire: "This one has legs."',
+        magnitude: 'moderate',
+        when: (sim, world) => world.geopolitical.tradeWarStage >= 1 && getPipelineStatus('trade_war_tariffs') === null,
+        params: { mu: -0.01, theta: 0.005 },
+        effects: () => { advanceBill('trade_war_tariffs', 'introduced'); },
+        followups: [
+            { id: 'tariff_act_committee', mtth: 20, weight: 1 },
+            { id: 'tariff_act_lassiter_pushes', mtth: 10, weight: 0.5 },
+        ],
+    },
+    {
+        id: 'tariff_act_lassiter_pushes',
+        category: 'congressional',
+        likelihood: 2,
+        headline: 'Lassiter brings Serican factory workers to testify before the Foreign Relations Committee. "These are the jobs we lost." The footage dominates The Sentinel for three days. Cole: "His best performance yet."',
+        magnitude: 'minor',
+        when: (sim, world) => getPipelineStatus('trade_war_tariffs') === 'introduced',
+        params: {},
+        effects: (world) => { shiftFaction('federalistSupport', 1); },
+    },
+    {
+        id: 'tariff_act_committee',
+        category: 'congressional',
+        likelihood: 3,
+        headline: 'Senate Foreign Relations Committee advances the Serican Reciprocal Tariff Act 14-8 with bipartisan support. Haines votes yes. "This isn\'t about politics — it\'s about leverage," she tells MarketWire.',
+        magnitude: 'moderate',
+        when: (sim, world) => getPipelineStatus('trade_war_tariffs') === 'introduced',
+        params: { mu: -0.01, theta: 0.005 },
+        effects: () => { advanceBill('trade_war_tariffs', 'committee'); },
+        followups: [
+            { id: 'tariff_act_passes', mtth: 25, weight: 0.7 },
+            { id: 'tariff_act_fails', mtth: 25, weight: 0.3 },
+        ],
+    },
+    {
+        id: 'tariff_act_passes',
+        category: 'congressional',
+        headline: 'The Serican Reciprocal Tariff Act passes 68-32 with bipartisan support. Lassiter and Whitfield both vote yes. Barron signs it in the Rose Garden. Liang Wei recalls Columbia\'s ambassador within the hour.',
+        likelihood: (sim, world) => {
+            let w = world.geopolitical.tradeWarStage >= 2 ? 3 : 1;
+            w *= (1 + (world.election.lobbyMomentum || 0) * 0.1);
+            return w;
+        },
+        magnitude: 'major',
+        when: (sim, world) => getPipelineStatus('trade_war_tariffs') === 'committee',
+        params: { mu: -0.02, theta: 0.01, lambda: 0.5 },
+        effects: (world) => {
+            shiftFaction('federalistSupport', 3);
+            world.geopolitical.sericaRelations = Math.max(-3, world.geopolitical.sericaRelations - 1);
+            advanceBill('trade_war_tariffs', 'active');
+        },
+    },
+    {
+        id: 'tariff_act_fails',
+        category: 'congressional',
+        headline: 'The Serican Reciprocal Tariff Act fails 45-55 as business-wing Federalists break ranks. Lassiter: "Corporate cowards." Barron threatens executive tariffs instead. Markets rally on the news.',
+        likelihood: (sim, world) => {
+            let w = world.geopolitical.tradeWarStage >= 2 ? 0.3 : 2;
+            return Math.max(0.1, w);
+        },
+        magnitude: 'major',
+        when: (sim, world) => getPipelineStatus('trade_war_tariffs') === 'committee',
+        params: { mu: 0.02, theta: -0.005 },
+        effects: (world) => {
+            shiftFaction('farmerLaborSupport', 2);
+            advanceBill('trade_war_tariffs', 'failed');
+        },
+    },
+
     // -- Big Beautiful Bill lifecycle -----------------------------------------
     {
         id: 'big_bill_house_passes',
