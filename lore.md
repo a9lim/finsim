@@ -6,6 +6,11 @@
 
 Alternate-history America. Two major parties: Federalist and Farmer-Labor.
 Presidential system, bicameral Congress (Senate: 100 seats, House: 435 seats).
+Capital: Philadelphia. Presidential island resort: Little St. James.
+
+> **Lore rule:** Geography and institutions mirror the real world (Strait of Hormuz,
+> Nanjing, Philadelphia, White House, Federal Reserve, Wall Street). Polities and
+> people are fictional (Federal States of Columbia, Serica, Farsistan, John Barron).
 
 ---
 
@@ -150,10 +155,10 @@ Presidential system, bicameral Congress (Senate: 100 seats, House: 435 seats).
 ### Nations & Leaders
 
 - **Serica** (≈ China+) — **Premier Liang Wei**. Techno-authoritarian. Patient,
-  strategic, plays decades-long games. Home of Zhaowei Technologies (semiconductor
-  giant). Primary trade rival. Serican negotiators are formidable — they'll accept
-  short-term pain for long-term position. Retaliatory tariffs escalate to
-  semiconductor export bans to Zhaowei entering Columbian markets directly.
+  strategic, plays decades-long games. Capital: Nanjing. Home of Zhaowei Technologies
+  (semiconductor giant). Primary trade rival. Serican negotiators are formidable —
+  they'll accept short-term pain for long-term position. Retaliatory tariffs escalate
+  to semiconductor export bans to Zhaowei entering Columbian markets directly.
 
 - **Khasuria** (≈ Russia+) — **President Yevgeny Volkov**. Expansionist. Energy
   leverage over Europe via gas pipelines. Border provocations in Eastern Europe
@@ -161,7 +166,7 @@ Presidential system, bicameral Congress (Senate: 100 seats, House: 435 seats).
   Accord is a failing ceasefire he respects only when convenient.
 
 - **Farsistan** (≈ Middle East/Gulf) — **Emir Rashid al-Farhan**. Oil cartel
-  leader. Controls the Strait of Farsis (critical oil chokepoint). Sovereign
+  leader. Controls the Strait of Hormuz (critical oil chokepoint). Sovereign
   wealth fund with PNTH acquisition interest. Plays all sides — buys Columbian
   weapons, hosts Khasurian oligarchs, invests in Serican tech. Partial or full
   Strait closure is his ultimate leverage.
@@ -171,9 +176,9 @@ Presidential system, bicameral Congress (Senate: 100 seats, House: 435 seats).
   the Southern Hemisphere Initiative (CIA/PNTH covert ops using Atlas Sentinel).
   Nationalizes mines when threatened, triggering supply chain crises.
 
-- **Meridia** (≈ Israel+) — **PM Ari Navon**. Hawkish. Primary Columbian military
-  ally in the Farsistan theater. Operation Dustwalker is a joint operation.
-  Requests Atlas Aegis support, connecting PNTH directly to geopolitical
+- **Meridia** (≈ Israel+) — **PM Ari Navon**. Hawkish. Demonym: Meridine. Primary
+  Columbian military ally in the Farsistan theater. Operation Dustwalker is a joint
+  operation. Requests Atlas Aegis support, connecting PNTH directly to geopolitical
   consequences. Border incidents with Farsistan can trigger Strait closure.
 
 ### Treaties & Flashpoints
@@ -193,7 +198,7 @@ Presidential system, bicameral Congress (Senate: 100 seats, House: 435 seats).
   Atlas Sentinel used for surveillance. Exposure would be a massive scandal
   connecting the government, PNTH, and regime change operations.
 
-- **Strait of Farsis** — Oil chokepoint. Al-Farhan can threaten, partially close,
+- **Strait of Hormuz** — Oil chokepoint. Al-Farhan can threaten, partially close,
   or fully close it. Each stage independently impacts energy prices, shipping
   costs, and bond rates. Full closure is a global economic event.
 
