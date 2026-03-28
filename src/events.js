@@ -301,35 +301,44 @@ export class EventEngine {
 
     // -- Internal ---------------------------------------------------------
 
+    _scaledParams(params, coupling) {
+        if (!params || coupling === 1.0) return params;
+        const scaled = {};
+        for (const k in params) scaled[k] = params[k] * coupling;
+        return scaled;
+    }
+
+    _logEvent(day, event, params, magnitude) {
+        const entry = { day, headline: event.headline, magnitude: magnitude || event.magnitude || 'moderate', params: params ?? {} };
+        this.eventLog.push(entry);
+        if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
+        return entry;
+    }
+
+    _scheduleFollowups(event, day, depth, chainIdSuffix) {
+        if (!event.followups || depth >= MAX_CHAIN_DEPTH) return;
+        const chainId = event.id || ('chain_' + day + (chainIdSuffix || ''));
+        for (const fu of event.followups) {
+            const delay = this._followupDelay(fu.mtth);
+            this._pendingFollowups.push({
+                event: getEventById(fu.id) || fu,
+                chainId,
+                targetDay: day + Math.max(1, delay),
+                weight: fu.weight ?? 1,
+                depth: depth + 1,
+            });
+        }
+    }
+
     _fireEvent(event, sim, day, depth, netDelta = 0) {
         if (event.popup && event.superevent) {
             const coupling = this._computeCoupling(netDelta, event.params);
-            if (event.params && coupling !== 1.0) {
-                const scaled = {};
-                for (const k in event.params) scaled[k] = event.params[k] * coupling;
-                this.applyDeltas(sim, scaled);
-            } else {
-                this.applyDeltas(sim, event.params);
-            }
+            this.applyDeltas(sim, this._scaledParams(event.params, coupling) || event.params);
             if (typeof event.effects === 'function') event.effects(this.world);
             else if (Array.isArray(event.effects)) applyStructuredEffects(this.world, event.effects);
 
-            this.eventLog.push({ day, headline: event.headline, magnitude: event.magnitude || 'major', params: event.params || {} });
-            if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
-
-            if (event.followups && depth < MAX_CHAIN_DEPTH) {
-                const chainId = event.id || ('chain_' + day);
-                for (const fu of event.followups) {
-                    const delay = this._followupDelay(fu.mtth);
-                    this._pendingFollowups.push({
-                        event: getEventById(fu.id) || fu,
-                        chainId,
-                        targetDay: day + Math.max(1, delay),
-                        weight: fu.weight ?? 1,
-                        depth: depth + 1,
-                    });
-                }
-            }
+            this._logEvent(day, event, event.params || {}, event.magnitude || 'major');
+            this._scheduleFollowups(event, day, depth);
 
             return { queued: true, event: { ...event } };
         }
@@ -345,20 +354,13 @@ export class EventEngine {
                     ) : null,
                 }));
             }
-            this.eventLog.push({ day, headline: event.headline, magnitude: event.magnitude || 'moderate', params: null });
-            if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
+            this._logEvent(day, event, null);
             return { queued: true, event: queuedEvent };
         }
 
         // Non-popup: apply deltas with coupling
         const coupling = this._computeCoupling(netDelta, event.params);
-        if (event.params && coupling !== 1.0) {
-            const scaled = {};
-            for (const k in event.params) scaled[k] = event.params[k] * coupling;
-            this.applyDeltas(sim, scaled);
-        } else {
-            this.applyDeltas(sim, event.params);
-        }
+        this.applyDeltas(sim, this._scaledParams(event.params, coupling) || event.params);
 
         // Apply world state effects
         if (typeof event.effects === 'function') {
@@ -374,30 +376,10 @@ export class EventEngine {
             this._consecutiveMinor = 0;
         }
 
-        const logEntry = {
-            day,
-            headline: event.headline,
-            magnitude: event.magnitude || 'moderate',
-            params: event.params || {},
-            interjection: event.interjection || false,
-        };
-        this.eventLog.push(logEntry);
-        if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
+        const logEntry = this._logEvent(day, event, event.params || {});
+        logEntry.interjection = event.interjection || false;
 
-        // Schedule followups (if any and within depth limit)
-        if (event.followups && depth < MAX_CHAIN_DEPTH) {
-            const chainId = event.id || ('chain_' + day + '_' + Math.random().toString(36).slice(2, 8));
-            for (const fu of event.followups) {
-                const delay = this._followupDelay(fu.mtth);
-                this._pendingFollowups.push({
-                    event: getEventById(fu.id) || fu,
-                    chainId,
-                    targetDay: day + Math.max(1, delay),
-                    weight: fu.weight ?? 1,
-                    depth: depth + 1,
-                });
-            }
-        }
+        this._scheduleFollowups(event, day, depth, '_' + Math.random().toString(36).slice(2, 8));
 
         return logEntry;
     }
@@ -442,57 +424,47 @@ export class EventEngine {
         return fired;
     }
 
+    _eventWeight(ev, sim, congress, boostNonMinor, convIds) {
+        let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
+        if (boostNonMinor && ev.magnitude !== 'minor' && ev.category !== 'neutral') {
+            w *= 2;
+        }
+        // Conviction-aware likelihood adjustments
+        if (convIds.length > 0) {
+            if (convIds.includes('political_operator') && (ev.category === 'congressional' || ev.category === 'filibuster' || ev.category === 'political')) {
+                w *= 1.5;
+            }
+            if (convIds.includes('volatility_addict') && (ev.category === 'pnth' || ev.category === 'pnth_earnings')) {
+                w *= 1.3;
+            }
+            if (convIds.includes('information_edge') && (ev.category === 'investigation' || ev.category === 'media')) {
+                w *= 1.4;
+            }
+            if (convIds.includes('ghost_protocol')) {
+                w *= 0.7;
+            }
+        }
+        return w;
+    }
+
     _weightedPick(events, sim) {
         const congress = congressHelpers(this.world);
         const boredomImmune = getTraitEffect('boredomImmune', false);
         const boostNonMinor = !boredomImmune && this._consecutiveMinor >= BOREDOM_THRESHOLD;
-        const _convIds = getActiveTraitIds();
+        const convIds = getActiveTraitIds();
+
+        const weights = new Array(events.length);
         let totalWeight = 0;
-        for (const ev of events) {
-            let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
-            if (boostNonMinor && ev.magnitude !== 'minor' && ev.category !== 'neutral') {
-                w *= 2;
-            }
-            // Conviction-aware likelihood adjustments
-            if (_convIds.length > 0) {
-                if (_convIds.includes('political_operator') && (ev.category === 'congressional' || ev.category === 'filibuster' || ev.category === 'political')) {
-                    w *= 1.5;
-                }
-                if (_convIds.includes('volatility_addict') && (ev.category === 'pnth' || ev.category === 'pnth_earnings')) {
-                    w *= 1.3;
-                }
-                if (_convIds.includes('information_edge') && (ev.category === 'investigation' || ev.category === 'media')) {
-                    w *= 1.4;
-                }
-                if (_convIds.includes('ghost_protocol')) {
-                    w *= 0.7;
-                }
-            }
+        for (let i = 0; i < events.length; i++) {
+            const w = this._eventWeight(events[i], sim, congress, boostNonMinor, convIds);
+            weights[i] = w;
             totalWeight += w;
         }
+
         let roll = Math.random() * totalWeight;
-        for (const ev of events) {
-            let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
-            if (boostNonMinor && ev.magnitude !== 'minor' && ev.category !== 'neutral') {
-                w *= 2;
-            }
-            // Conviction-aware likelihood adjustments
-            if (_convIds.length > 0) {
-                if (_convIds.includes('political_operator') && (ev.category === 'congressional' || ev.category === 'filibuster' || ev.category === 'political')) {
-                    w *= 1.5;
-                }
-                if (_convIds.includes('volatility_addict') && (ev.category === 'pnth' || ev.category === 'pnth_earnings')) {
-                    w *= 1.3;
-                }
-                if (_convIds.includes('information_edge') && (ev.category === 'investigation' || ev.category === 'media')) {
-                    w *= 1.4;
-                }
-                if (_convIds.includes('ghost_protocol')) {
-                    w *= 0.7;
-                }
-            }
-            roll -= w;
-            if (roll <= 0) return ev;
+        for (let i = 0; i < events.length; i++) {
+            roll -= weights[i];
+            if (roll <= 0) return events[i];
         }
         return events[events.length - 1];
     }

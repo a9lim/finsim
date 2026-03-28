@@ -423,8 +423,6 @@ main {
 }
 
 /* --- Portfolio Positions --- */
-.pos-row {}
-
 .pos-label {
     flex: 1;
     min-width: 0;
@@ -472,8 +470,6 @@ main {
 }
 
 /* --- Order Rows --- */
-.order-row {}
-
 .order-label {
     flex: 1;
     min-width: 0;
@@ -538,7 +534,7 @@ main {
     border: 1px solid var(--border);
     background: var(--bg-elevated);
     color: var(--text);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-size: 0.82rem;
     outline: none;
     transition: border-color 0.15s;
@@ -546,6 +542,10 @@ main {
 
 .sim-input:focus {
     border-color: var(--accent);
+}
+
+.sim-input::placeholder {
+    color: var(--text-muted);
 }
 
 /* --- Time Slider Bar --- */
@@ -1006,25 +1006,6 @@ main {
 }
 
 /* Strategy name input */
-.sim-input {
-    width: 100%;
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-elevated);
-    color: var(--text);
-    font-family: var(--font-body);
-    font-size: 0.82rem;
-    outline: none;
-    transition: border-color 0.15s;
-}
-.sim-input:focus {
-    border-color: var(--accent);
-}
-.sim-input::placeholder {
-    color: var(--text-muted);
-}
-
 /* Saved strategies section in trade tab */
 .saved-strategies-section {
     margin-top: 10px;

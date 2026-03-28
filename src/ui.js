@@ -274,8 +274,6 @@ export function bindEvents($, handlers) {
     }
     $.fullChainLink.addEventListener('click', onFullChainOpen);
 
-    const _hideClass = (el, afterHide) => () => { el.classList.add('hidden'); if (typeof afterHide === 'function') afterHide(); };
-
     const closeChain = () => {
         $.chainOverlay.classList.add('hidden');
         if (_chainTrapCleanup) { _chainTrapCleanup(); _chainTrapCleanup = null; }
@@ -367,45 +365,29 @@ export function bindEvents($, handlers) {
     // Tooltip delegation for [data-tooltip] cells
     if (typeof createSimTooltip === 'function') {
         _tip = createSimTooltip();
-        $.sidebar.addEventListener('mouseover', (e) => {
-            const el = e.target.closest('[data-tooltip]');
-            if (el === _tipTarget) return;
-            if (el) {
-                _tipTarget = el;
-                _tip.show(e.clientX, e.clientY, el.dataset.tooltip);
-            } else if (_tipTarget) {
-                _tipTarget = null;
-                _tip.hide();
-            }
-        });
-        $.sidebar.addEventListener('mouseout', (e) => {
-            if (!_tipTarget) return;
-            const related = e.relatedTarget;
-            if (!related || !_tipTarget.contains(related)) {
-                _tipTarget = null;
-                _tip.hide();
-            }
-        });
-        // Also cover the chain overlay
-        $.chainOverlay.addEventListener('mouseover', (e) => {
-            const el = e.target.closest('[data-tooltip]');
-            if (el === _tipTarget) return;
-            if (el) {
-                _tipTarget = el;
-                _tip.show(e.clientX, e.clientY, el.dataset.tooltip);
-            } else if (_tipTarget) {
-                _tipTarget = null;
-                _tip.hide();
-            }
-        });
-        $.chainOverlay.addEventListener('mouseout', (e) => {
-            if (!_tipTarget) return;
-            const related = e.relatedTarget;
-            if (!related || !_tipTarget.contains(related)) {
-                _tipTarget = null;
-                _tip.hide();
-            }
-        });
+        const _wireTooltipDelegation = (el) => {
+            el.addEventListener('mouseover', (e) => {
+                const target = e.target.closest('[data-tooltip]');
+                if (target === _tipTarget) return;
+                if (target) {
+                    _tipTarget = target;
+                    _tip.show(e.clientX, e.clientY, target.dataset.tooltip);
+                } else if (_tipTarget) {
+                    _tipTarget = null;
+                    _tip.hide();
+                }
+            });
+            el.addEventListener('mouseout', (e) => {
+                if (!_tipTarget) return;
+                const related = e.relatedTarget;
+                if (!related || !_tipTarget.contains(related)) {
+                    _tipTarget = null;
+                    _tip.hide();
+                }
+            });
+        };
+        _wireTooltipDelegation($.sidebar);
+        _wireTooltipDelegation($.chainOverlay);
     }
 }
 
@@ -856,7 +838,7 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
     qtyInput.title = 'Quantity';
     qtyInput.addEventListener('change', () => {
         const newAbsQty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
-        leg.qty = isShort ? -newAbsQty : newAbsQty;
+        leg.qty = (leg.qty < 0) ? -newAbsQty : newAbsQty;
         if (typeof onLegChange === 'function') onLegChange();
     });
 

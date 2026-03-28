@@ -284,40 +284,29 @@ export function deleteStrategy(id) {
  * @param {Array} expiries - [{day, dte}] from ExpiryManager
  * @param {number|null} overrideExpiryDay - if set, use this expiry for legs with dteOffset===null
  */
+function _resolveExpiry(dteOffset, day, expiries, overrideExpiryDay) {
+    if (dteOffset == null) {
+        return overrideExpiryDay || (expiries[0] ? expiries[0].day : day + 63);
+    }
+    const targetDay = day + dteOffset;
+    let best = expiries[0];
+    for (let i = 1; i < expiries.length; i++) {
+        if (Math.abs(expiries[i].day - targetDay) < Math.abs(best.day - targetDay)) best = expiries[i];
+    }
+    return best ? best.day : day + 63;
+}
+
 export function resolveLegs(legs, S, day, expiries, overrideExpiryDay) {
     return legs.map(leg => {
         if (leg.type === 'stock') {
             return { type: leg.type, qty: leg.qty, strike: null, expiryDay: null };
         }
         if (leg.type === 'bond') {
-            let expiryDay = null;
-            if (leg.dteOffset == null) {
-                expiryDay = overrideExpiryDay || (expiries[0] ? expiries[0].day : day + 63);
-            } else if (leg.dteOffset != null) {
-                const targetDay = day + leg.dteOffset;
-                let bestExpiry = expiries[0];
-                for (let i = 1; i < expiries.length; i++) {
-                    if (Math.abs(expiries[i].day - targetDay) < Math.abs(bestExpiry.day - targetDay)) bestExpiry = expiries[i];
-                }
-                expiryDay = bestExpiry ? bestExpiry.day : day + 63;
-            }
-            return { type: leg.type, qty: leg.qty, strike: null, expiryDay };
+            return { type: leg.type, qty: leg.qty, strike: null,
+                expiryDay: _resolveExpiry(leg.dteOffset, day, expiries, overrideExpiryDay) };
         }
         const strike = Math.round((S + leg.strikeOffset) / 5) * 5;
-        let expiryDay;
-        if (leg.dteOffset == null) {
-            // Selectable expiry leg — use override or nearest available
-            expiryDay = overrideExpiryDay || (expiries[0] ? expiries[0].day : day + 63);
-        } else {
-            const targetDay = day + leg.dteOffset;
-            let bestExpiry = expiries[0];
-            for (let i = 1; i < expiries.length; i++) {
-                if (Math.abs(expiries[i].day - targetDay) < Math.abs(bestExpiry.day - targetDay)) {
-                    bestExpiry = expiries[i];
-                }
-            }
-            expiryDay = bestExpiry ? bestExpiry.day : day + 63;
-        }
+        const expiryDay = _resolveExpiry(leg.dteOffset, day, expiries, overrideExpiryDay);
         return { type: leg.type, qty: leg.qty, strike, expiryDay };
     });
 }

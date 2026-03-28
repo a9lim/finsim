@@ -212,34 +212,16 @@ export class Simulation {
             return this._spare;
         }
         const u1 = 1 - Math.random();
-        const u2 = Math.random();
+        const angle = 2 * Math.PI * Math.random();
         const mag = Math.sqrt(-2 * Math.log(u1));
-        this._spare = mag * Math.sin(2 * Math.PI * u2);
+        this._spare = mag * Math.sin(angle);
         this._spareValid = true;
-        return mag * Math.cos(2 * Math.PI * u2);
-    }
-
-    /* -----------------------------------------------
-       _poisson(lam)
-       Inverse-transform Poisson sampler.
-       Suitable for small lambda*dt values.
-    ----------------------------------------------- */
-    _poisson(lam) {
-        if (lam <= 0) return 0;
-        const L = Math.exp(-lam);
-        let k = 0;
-        let p = 1;
-        do {
-            k++;
-            p *= Math.random();
-        } while (p > L);
-        return k - 1;
+        return mag * Math.cos(angle);
     }
 
     /* -----------------------------------------------
        _poissonFast()
-       Like _poisson() but uses the pre-cached L value
-       (_poissonL) computed once per day in beginDay().
+       Uses pre-cached L value (_poissonL) from beginDay().
     ----------------------------------------------- */
     _poissonFast() {
         const L = this._poissonL;
