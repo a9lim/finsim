@@ -420,7 +420,7 @@ function _pageWorld(world, sim, impactHistory, premature) {
             body += _p('The recession arrived with the inevitability of gravity. The human cost \u2014 layoffs, foreclosures, the particular despair of watching savings evaporate \u2014 was felt long after the technical definition was met.');
         }
         if (geo.straitClosed) {
-            body += _p('The Strait of Farsis remained closed. Al-Farhan reshaped Middle Eastern power dynamics for a generation.');
+            body += _p('The Strait of Hormuz remained closed. Al-Farhan reshaped Middle Eastern power dynamics for a generation.');
         }
         if ((geo.tradeWarStage || 0) >= 3) {
             body += _p('The tech decoupling with Serica was complete and permanent.');
@@ -479,9 +479,9 @@ function _pageWorld(world, sim, impactHistory, premature) {
 
     // Strait
     if (geo.straitClosed) {
-        body += _p('The Strait of Farsis remained closed. Al-Farhan extracted concessions that reshaped Middle Eastern power dynamics for a generation.');
+        body += _p('The Strait of Hormuz remained closed. Al-Farhan extracted concessions that reshaped Middle Eastern power dynamics for a generation.');
     } else if ((geo.farsistanEscalation || 0) >= 2) {
-        body += _p('Al-Farhan\'s Strait of Farsis brinkmanship ended in a back-channel deal. Bowman\'s one genuine diplomatic achievement.');
+        body += _p('Al-Farhan\'s Strait of Hormuz brinkmanship ended in a back-channel deal. Bowman\'s one genuine diplomatic achievement.');
     }
 
     // Serica relations

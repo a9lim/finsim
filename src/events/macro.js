@@ -146,7 +146,7 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Oil surges 12% as Operation Dustwalker threatens Strait of Farsis shipping lanes. Al-Farhan warns: "Any further provocation and the Strait closes." Energy stocks rally but consumer discretionary tanks.',
+        headline: 'Oil surges 12% as Operation Dustwalker threatens Strait of Hormuz shipping lanes. Al-Farhan warns: "Any further provocation and the Strait closes." Energy stocks rally but consumer discretionary tanks.',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.004 },
         magnitude: 'moderate',
         portfolioFlavor: (portfolio) => {
@@ -521,7 +521,7 @@ export const MACRO_EVENTS = [
     {
         id: 'farsistan_tanker_inspections',
         category: 'macro',
-        headline: 'Al-Farhan orders "security inspections" of all tankers transiting the Strait of Farsis. Transit times double. Oil creeps up $8/barrel. Priya Sharma: "This is the warning shot."',
+        headline: 'Al-Farhan orders "security inspections" of all tankers transiting the Strait of Hormuz. Transit times double. Oil creeps up $8/barrel. Priya Sharma: "This is the warning shot."',
         likelihood: 2,
         params: { b: 0.008, mu: -0.01 },
         magnitude: 'moderate',
@@ -536,7 +536,7 @@ export const MACRO_EVENTS = [
         id: 'farsistan_partial_closure',
         followupOnly: true,
         category: 'macro',
-        headline: 'Farsistan closes the Strait of Farsis to non-allied shipping. Meridia-flagged tankers turned back. Oil surges past $120. Barron: "We will ensure free navigation." Navon: "We\'re ready."',
+        headline: 'Farsistan closes the Strait of Hormuz to non-allied shipping. Meridia-flagged tankers turned back. Oil surges past $120. Barron: "We will ensure free navigation." Navon: "We\'re ready."',
         likelihood: 0,
         params: { mu: -0.03, b: 0.015, theta: 0.015, sigmaR: 0.004 },
         magnitude: 'major',
@@ -657,7 +657,7 @@ export const MACRO_EVENTS = [
         oneShot: true,
         when: (sim, world, congress, ctx) =>
             world.geopolitical.oilCrisis && world.geopolitical.mideastEscalation >= 3,
-        headline: 'Al-Farhan closes the Strait of Farsis as Meridia border tensions peak. Oil gaps above $140. Barron tweets: "The Emir will learn what Columbia does when you cut our energy supply." Bond vigilantes are already moving.',
+        headline: 'Al-Farhan closes the Strait of Hormuz as Meridia border tensions peak. Oil gaps above $140. Barron tweets: "The Emir will learn what Columbia does when you cut our energy supply." Bond vigilantes are already moving.',
         magnitude: 'major',
         superevent: true,
         params: { mu: -0.06, theta: 0.03, lambda: 2.5, b: 0.02, sigmaR: 0.005 },
@@ -670,7 +670,7 @@ export const MACRO_EVENTS = [
         when: (sim, world, congress, ctx) =>
             world.geopolitical.straitClosed &&
             world.geopolitical.farsistanEscalation >= 3,
-        headline: 'Al-Farhan seals the Strait of Farsis completely. Navon puts Meridia on war footing. Barron authorizes naval escort operations. Oil hits $160. The Sentinel runs a countdown clock: "Days Since the Strait Closed."',
+        headline: 'Al-Farhan seals the Strait of Hormuz completely. Navon puts Meridia on war footing. Barron authorizes naval escort operations. Oil hits $160. The Sentinel runs a countdown clock: "Days Since the Strait Closed."',
         magnitude: 'major',
         superevent: true,
         params: { mu: -0.08, b: 0.03, sigmaR: 0.008, theta: 0.04, lambda: 3.0 },
