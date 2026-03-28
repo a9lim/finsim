@@ -1356,6 +1356,11 @@ function _onDayComplete() {
         }
     }
 
+    // Check if lobbying has been exposed (heavy lobbying while media is watching)
+    if (eventEngine && _lobbyCount >= 3 && factions.mediaTrust < 40 && !eventEngine.world.media.lobbyingExposed) {
+        eventEngine.world.media.lobbyingExposed = true;
+    }
+
     // Update ambient mood based on market regime
     const _ambientVol = Math.sqrt(sim.v);
     if (_ambientVol > 0.35 || sim.lambda > 5) setAmbientMood('crisis');

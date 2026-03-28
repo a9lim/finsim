@@ -431,7 +431,8 @@ export const INVESTIGATION_EVENTS = [
         when: (sim, world, congress, ctx) =>
             !world.investigations.meridianExposed && (
                 (ctx.playerChoices.pursued_insider_tip || ctx.playerChoices.pursued_pnth_tip || ctx.playerChoices.hosted_fundraiser) ||
-                (ctx.factions && ctx.factions.regulatoryExposure > 50)
+                (ctx.factions && ctx.factions.regulatoryExposure > 50) ||
+                world.media.lobbyingExposed
             ),
         effects: (world) => {
             world.investigations.meridianExposed = true;
