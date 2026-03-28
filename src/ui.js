@@ -161,6 +161,11 @@ export function cacheDOMElements($) {
     $.houseDiagram       = document.getElementById('house-diagram');
     $.senateLegend       = document.getElementById('senate-legend');
     $.houseLegend        = document.getElementById('house-legend');
+    $.lobbyBar           = document.getElementById('lobby-bar');
+    $.lobbyActions       = document.getElementById('lobby-actions');
+    $.standingsSection   = document.getElementById('standings-section');
+    $.standingsWorld     = document.getElementById('standings-world');
+    $.standingsFactions  = document.getElementById('standings-factions');
 }
 
 // ---------------------------------------------------------------------------
@@ -231,12 +236,16 @@ export function bindEvents($, handlers) {
 
     // Buy/sell mode toggle button
     const modeBtn = document.getElementById('mode-btn');
+    const modeIconBuy  = document.getElementById('mode-icon-buy');
+    const modeIconSell = document.getElementById('mode-icon-sell');
     if (modeBtn) {
         modeBtn.addEventListener('click', () => {
             sellMode = !sellMode;
             modeBtn.setAttribute('aria-pressed', String(sellMode));
             modeBtn.setAttribute('aria-label', sellMode ? 'Sell mode' : 'Buy mode');
             modeBtn.title = sellMode ? 'Sell mode (X)' : 'Buy mode (X)';
+            modeIconBuy.style.display  = sellMode ? 'none' : '';
+            modeIconSell.style.display = sellMode ? '' : 'none';
             modeBtn.style.color = sellMode ? 'var(--accent)' : '';
         });
     }
@@ -264,8 +273,6 @@ export function bindEvents($, handlers) {
         if (hint) hint.textContent = 'Tap to Trade \u00b7 Long-press for Bid/Ask \u00b7 Pinch to Zoom Chart';
     }
     $.fullChainLink.addEventListener('click', onFullChainOpen);
-
-    const _hideClass = (el, afterHide) => () => { el.classList.add('hidden'); if (typeof afterHide === 'function') afterHide(); };
 
     const closeChain = () => {
         $.chainOverlay.classList.add('hidden');
@@ -358,45 +365,29 @@ export function bindEvents($, handlers) {
     // Tooltip delegation for [data-tooltip] cells
     if (typeof createSimTooltip === 'function') {
         _tip = createSimTooltip();
-        $.sidebar.addEventListener('mouseover', (e) => {
-            const el = e.target.closest('[data-tooltip]');
-            if (el === _tipTarget) return;
-            if (el) {
-                _tipTarget = el;
-                _tip.show(e.clientX, e.clientY, el.dataset.tooltip);
-            } else if (_tipTarget) {
-                _tipTarget = null;
-                _tip.hide();
-            }
-        });
-        $.sidebar.addEventListener('mouseout', (e) => {
-            if (!_tipTarget) return;
-            const related = e.relatedTarget;
-            if (!related || !_tipTarget.contains(related)) {
-                _tipTarget = null;
-                _tip.hide();
-            }
-        });
-        // Also cover the chain overlay
-        $.chainOverlay.addEventListener('mouseover', (e) => {
-            const el = e.target.closest('[data-tooltip]');
-            if (el === _tipTarget) return;
-            if (el) {
-                _tipTarget = el;
-                _tip.show(e.clientX, e.clientY, el.dataset.tooltip);
-            } else if (_tipTarget) {
-                _tipTarget = null;
-                _tip.hide();
-            }
-        });
-        $.chainOverlay.addEventListener('mouseout', (e) => {
-            if (!_tipTarget) return;
-            const related = e.relatedTarget;
-            if (!related || !_tipTarget.contains(related)) {
-                _tipTarget = null;
-                _tip.hide();
-            }
-        });
+        const _wireTooltipDelegation = (el) => {
+            el.addEventListener('mouseover', (e) => {
+                const target = e.target.closest('[data-tooltip]');
+                if (target === _tipTarget) return;
+                if (target) {
+                    _tipTarget = target;
+                    _tip.show(e.clientX, e.clientY, target.dataset.tooltip);
+                } else if (_tipTarget) {
+                    _tipTarget = null;
+                    _tip.hide();
+                }
+            });
+            el.addEventListener('mouseout', (e) => {
+                if (!_tipTarget) return;
+                const related = e.relatedTarget;
+                if (!related || !_tipTarget.contains(related)) {
+                    _tipTarget = null;
+                    _tip.hide();
+                }
+            });
+        };
+        _wireTooltipDelegation($.sidebar);
+        _wireTooltipDelegation($.chainOverlay);
     }
 }
 
@@ -847,7 +838,7 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
     qtyInput.title = 'Quantity';
     qtyInput.addEventListener('change', () => {
         const newAbsQty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
-        leg.qty = isShort ? -newAbsQty : newAbsQty;
+        leg.qty = (leg.qty < 0) ? -newAbsQty : newAbsQty;
         if (typeof onLegChange === 'function') onLegChange();
     });
 
@@ -943,6 +934,69 @@ export function updateDynamicSections($, presetIndex) {
     }
     if ($.congressSection) {
         $.congressSection.classList.toggle('hidden', !isDynamic);
+    }
+    if ($.standingsSection) {
+        $.standingsSection.classList.toggle('hidden', !isDynamic);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Standings panel
+// ---------------------------------------------------------------------------
+
+const _FACTION_IDS = ['firmStanding', 'regulatoryExposure', 'federalistSupport', 'farmerLaborSupport', 'mediaTrust', 'fedRelations'];
+
+export function updateStandings($, world, factions, getFactionDescriptor) {
+    if (!$.standingsWorld || !$.standingsFactions) return;
+    _renderWorldState($.standingsWorld, world);
+    _renderFactionScores($.standingsFactions, factions, getFactionDescriptor);
+}
+
+function _renderWorldState(container, world) {
+    container.textContent = '';
+    const entries = [
+        ['Barron Approval', (world?.election?.barronApproval ?? '?') + '%'],
+        ['Fed Stance', (world?.fed?.hikeCycle) ? 'Hiking' : (world?.fed?.cutCycle) ? 'Cutting' : 'Holding'],
+        ['Fed Credibility', (world?.fed?.credibilityScore ?? '?') + '/10'],
+    ];
+    for (const [label, value] of entries) {
+        const row = document.createElement('div');
+        row.className = 'stat-row';
+        const lbl = document.createElement('span');
+        lbl.className = 'stat-label';
+        lbl.textContent = label;
+        const val = document.createElement('span');
+        val.className = 'stat-value';
+        val.textContent = value;
+        row.appendChild(lbl);
+        row.appendChild(val);
+        container.appendChild(row);
+    }
+}
+
+const _FACTION_LABELS = {
+    firmStanding: 'Firm',
+    regulatoryExposure: 'Regulatory',
+    federalistSupport: 'Federalists',
+    farmerLaborSupport: 'Farmer-Labor',
+    mediaTrust: 'Media',
+    fedRelations: 'Fed Relations',
+};
+
+function _renderFactionScores(container, factions, getFactionDescriptor) {
+    container.textContent = '';
+    for (const id of _FACTION_IDS) {
+        const row = document.createElement('div');
+        row.className = 'stat-row';
+        const lbl = document.createElement('span');
+        lbl.className = 'stat-label';
+        lbl.textContent = _FACTION_LABELS[id] || id;
+        const val = document.createElement('span');
+        val.className = 'stat-value';
+        val.textContent = getFactionDescriptor(id);
+        row.appendChild(lbl);
+        row.appendChild(val);
+        container.appendChild(row);
     }
 }
 
@@ -1088,18 +1142,16 @@ const _popupCategoryMeta = {
     gameover:       { label: 'Game Over',           color: 'var(--ext-red)' },
 };
 
-export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude) {
+export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude, superevent = false) {
     // Category badge + accent color
     const meta = _popupCategoryMeta[category] || _popupCategoryMeta.desk;
     const panel = $.popupOverlay.querySelector('.sim-overlay-panel');
     panel.style.borderTopColor = meta.color;
 
-    // Magnitude-based backdrop
+    // Magnitude-based backdrop (blur only, no darkening)
     if (magnitude === 'major') {
-        $.popupOverlay.style.background = 'rgba(0,0,0,0.55)';
         $.popupOverlay.style.backdropFilter = 'blur(8px) saturate(1.2)';
     } else {
-        $.popupOverlay.style.background = '';
         $.popupOverlay.style.backdropFilter = '';
     }
 
@@ -1115,7 +1167,42 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
     tag.style.borderColor = meta.color;
 
     $.popupHeadline.textContent = headline;
-    $.popupContext.textContent = context;
+    if (superevent) {
+        $.popupOverlay.classList.add('superevent');
+        $.popupContext.textContent = '';
+        $.popupChoices.style.display = 'none';
+        const fullContext = context;
+        let charIdx = 0;
+        const cursor = document.createElement('span');
+        cursor.className = 'typewriter-cursor';
+        $.popupContext.appendChild(cursor);
+        const typeInterval = setInterval(() => {
+            if (charIdx < fullContext.length) {
+                cursor.before(document.createTextNode(fullContext[charIdx]));
+                charIdx++;
+            } else {
+                clearInterval(typeInterval);
+                cursor.remove();
+                // Staggered fade-in for each choice button
+                $.popupChoices.style.display = '';
+                const btns = $.popupChoices.querySelectorAll('.popup-choice-btn');
+                btns.forEach((btn, i) => {
+                    btn.classList.add('choice-animate-in');
+                    btn.style.animationDelay = (i * 150) + 'ms';
+                });
+                const lastBtn = btns[btns.length - 1];
+                if (lastBtn) {
+                    lastBtn.addEventListener('animationend', () => {
+                        const firstBtn = $.popupChoices.querySelector('button');
+                        if (firstBtn) firstBtn.focus();
+                    }, { once: true });
+                }
+            }
+        }, 25);
+    } else {
+        $.popupOverlay.classList.remove('superevent');
+        $.popupContext.textContent = context;
+    }
     $.popupChoices.textContent = '';
     choices.forEach((c, i) => {
         const btn = document.createElement('button');
@@ -1134,6 +1221,7 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
             panel.style.borderTopColor = '';
             $.popupOverlay.style.background = '';
             $.popupOverlay.style.backdropFilter = '';
+            $.popupOverlay.classList.remove('superevent');
             if (_popupTrapCleanup) { _popupTrapCleanup(); _popupTrapCleanup = null; }
             if (_popupPrevFocus && _popupPrevFocus.focus) { _popupPrevFocus.focus(); _popupPrevFocus = null; }
             onChoice(i);

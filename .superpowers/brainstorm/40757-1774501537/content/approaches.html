@@ -1,0 +1,42 @@
+<h2>Three Approaches to Narrative Enrichment</h2>
+<p class="subtitle">Same goal — richer, more specific world — different strategies for getting there</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Lore Layer — Named Characters & Places as Data</h3>
+      <p><strong>Strategy:</strong> Create a structured "lore registry" of named characters, places, products, and treaties. Rewrite existing event headlines to reference these entities contextually. Events pull from the registry based on world state.</p>
+      <p><strong>Example:</strong> Instead of <code>"Trade war tariffs escalate"</code> → <code>"Sen. Roy Lassiter (F-SC) rams Farsistan Reciprocal Tariff Act through Commerce Committee over Minority Leader Okafor's objection; Hang Seng futures drop 3%"</code></p>
+      <p><strong>Scope:</strong> ~40-60 named entities across the 4 pillars. Headline templates with entity substitution. World-state-aware selection.</p>
+      <p><strong>Tradeoff:</strong> Most systematic. Ensures consistency (same senator doesn't appear in contradictory roles). But templated headlines can feel formulaic if not carefully written.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Deep Rewrite — Hand-Craft Every Headline</h3>
+      <p><strong>Strategy:</strong> Manually rewrite every event's headline, context text, and toast to reference specific people, products, and places. Each event is a bespoke piece of micro-fiction. New world-state fields track character arcs.</p>
+      <p><strong>Example:</strong> The same tariff event becomes a hand-written narrative: <code>"Roy Lassiter holds the Senate floor for nine hours reading soybean import statistics. By midnight, the Farsistan Reciprocal Tariff Act passes 52-48. Lassiter's victory lap on The Sentinel draws 14 million viewers."</code></p>
+      <p><strong>Scope:</strong> Touch every existing event. Rewrite ~277 toast headlines + ~30 popup contexts. Add character tracking to world state.</p>
+      <p><strong>Tradeoff:</strong> Highest quality per-event. But massive writing effort, and adding new events later requires matching the voice. Risk of inconsistency across the large pool.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid — Registry + Targeted Rewrites</h3>
+      <p><strong>Strategy:</strong> Build a lightweight lore registry for consistency, then hand-rewrite the ~80-100 most impactful events (all popups, all major/moderate toasts, all compound triggers). Minor/filler events get lighter enrichment via the registry. New event chains for the 4 pillars use the registry from day one.</p>
+      <p><strong>Example:</strong> Major events get the full bespoke treatment. Minor events get enriched headlines like <code>"Lassiter tells The Sentinel he has 'the votes' for the tariff bill"</code> — specific but shorter.</p>
+      <p><strong>Scope:</strong> Lore registry (~40-60 entities). Deep rewrite of ~80-100 key events. Light enrichment of remaining ~180. New chains for products, geopolitics, media.</p>
+      <p><strong>Tradeoff:</strong> Best balance of quality and feasibility. Registry prevents contradictions. Bespoke writing where it matters most. But two tiers of quality could feel uneven if the seam is visible.</p>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 2rem; padding: 1.5rem; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+  <h3 style="margin-top:0">My Recommendation: C (Hybrid)</h3>
+  <p style="margin-bottom:0">A pure registry approach (A) risks feeling procedural. A pure hand-craft approach (B) is a huge amount of writing with consistency risks. The hybrid (C) gives you the registry as a single source of truth for "who is Roy Lassiter and what does he want" while putting the real writing effort into the events the player actually reads carefully — popups, superevents, compound triggers, and the epilogue.</p>
+</div>

@@ -19,6 +19,8 @@ import {
 
 import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
 import { recordStockTrade, recordOptionTrade } from './price-impact.js';
+import { getRegulationEffect } from './regulations.js';
+import { capitalMultiplier } from './faction-standing.js';
 
 let _greekTrees = null;
 import { computePositionValue, unitPrice } from './position-value.js';
@@ -90,6 +92,9 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
     const ba = (type === 'call' || type === 'put')
         ? computeOptionBidAsk(mid, currentPrice, strike, currentVol)
         : computeBidAsk(mid, currentVol);
+    const sMult = getRegulationEffect('spreadMult', 1);
+    ba.ask = mid + (ba.ask - mid) * sMult;
+    ba.bid = mid - (mid - ba.bid) * sMult;
     const spreadFill = side === 'long' ? ba.ask : ba.bid;
 
     const signedQty = side === 'long' ? qty : -qty;
@@ -127,17 +132,28 @@ export function computeOptionBidAsk(mid, currentPrice, strike, currentVol) {
 // Reusable greek trees bundle for delta computation
 let _gt = null;
 
+/**
+ * Compute skew-adjusted sigma for an option position using market globals.
+ * @param {{ expiryDay: number, strike: number }} pos
+ * @returns {{ T: number, sigma: number } | null} null when expired (dte <= 0)
+ */
+function _optionSigma(pos) {
+    const dte = pos.expiryDay - market.day;
+    if (dte <= 0) return null;
+    const T = dte / TRADING_DAYS_PER_YEAR;
+    const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+    const sigma = computeSkewSigma(sigEff, market.S, pos.strike, T, market.rho, market.xi, market.kappa);
+    return { T, sigma };
+}
+
 export function computeNetDelta() {
     let net = 0;
     for (const p of portfolio.positions) {
         if (p.type === 'stock') { net += p.qty; continue; }
         if (p.type === 'bond')  continue;
-        const dte = p.expiryDay - market.day;
-        if (dte <= 0) continue;
-        const T = dte / TRADING_DAYS_PER_YEAR;
-        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
-        const sigma = computeSkewSigma(sigEff, market.S, p.strike, T, market.rho, market.xi, market.kappa);
-        _gt = prepareGreekTrees(T, market.r, sigma, market.q, market.day, _gt);
+        const sv = _optionSigma(p);
+        if (!sv) continue;
+        _gt = prepareGreekTrees(sv.T, market.r, sv.sigma, market.q, market.day, _gt);
         const greeks = computeGreeksWithTrees(market.S, p.strike, p.type === 'put', _gt);
         net += greeks.delta * p.qty;
     }
@@ -149,12 +165,9 @@ export function computeGrossNotional() {
     for (const p of portfolio.positions) {
         if (p.type === 'stock') { gross += Math.abs(p.qty) * market.S; continue; }
         if (p.type === 'bond')  continue;
-        const dte = p.expiryDay - market.day;
-        if (dte <= 0) continue;
-        const T = dte / TRADING_DAYS_PER_YEAR;
-        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
-        const sigma = computeSkewSigma(sigEff, market.S, p.strike, T, market.rho, market.xi, market.kappa);
-        _gt = prepareGreekTrees(T, market.r, sigma, market.q, market.day, _gt);
+        const sv = _optionSigma(p);
+        if (!sv) continue;
+        _gt = prepareGreekTrees(sv.T, market.r, sv.sigma, market.q, market.day, _gt);
         const greeks = computeGreeksWithTrees(market.S, p.strike, p.type === 'put', _gt);
         gross += Math.abs(greeks.delta * p.qty) * market.S;
     }
@@ -182,8 +195,8 @@ function _checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRa
     // equity is roughly unchanged. Compute current equity as the baseline.
     const equity = portfolioValue(currentPrice, currentVol, currentRate, currentDay, q);
 
-    // Initial margin: equity must cover REG_T_MARGIN of the debit
-    return equity >= REG_T_MARGIN * Math.abs(newCash);
+    // Initial margin: equity must cover REG_T_MARGIN of the debit (scaled by capital allocation)
+    return equity >= REG_T_MARGIN * Math.abs(newCash) / capitalMultiplier();
 }
 
 /**
@@ -269,6 +282,7 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
     // Add the proposed short position's MTM to equity
     equity += shortMtm;
 
+    required *= getRegulationEffect('marginMult', 1) / capitalMultiplier();
     return equity >= required;
 }
 
@@ -300,6 +314,11 @@ export function executeMarketOrder(
     currentPrice, currentVol, currentRate, currentDay,
     strike, expiryDay, strategyName, q
 ) {
+    if (side === 'short' && type === 'stock' && getRegulationEffect('shortStockDisabled', false)) {
+        if (typeof showToast !== 'undefined') showToast('Short stock sales currently banned by regulation.', 3000);
+        return null;
+    }
+
     // Convert to signed qty: long = +qty, short = -qty
     const signedQty = side === 'long' ? qty : -qty;
 
@@ -687,26 +706,57 @@ export function exerciseOption(positionId, currentPrice, currentDay, currentVol,
     const absQty = pos.qty;
     let stockPos = null;
 
-    if (pos.type === 'call') {
-        // Must pay strike per share; receive a long stock position
-        // Allowed on margin -- cash can go negative (up to initial margin limit)
-        const cost = pos.strike * absQty;
-        if (currentVol != null && currentRate != null) {
-            if (!_checkInitialMarginDebit(-cost, currentPrice, currentVol, currentRate, currentDay, q)) return null;
+    // Both call and put exercise deliver stock at the strike price.
+    // Call: buy stock (signedDelta = +absQty), pay strike*qty cash.
+    // Put:  sell stock (signedDelta = -absQty), receive strike*qty cash.
+    const signedDelta = pos.type === 'call' ? absQty : -absQty;
+    const cashEffect  = -signedDelta * pos.strike; // call: pay; put: receive
+
+    if (pos.type === 'call' && currentVol != null && currentRate != null) {
+        if (!_checkInitialMarginDebit(cashEffect, currentPrice, currentVol, currentRate, currentDay, q)) return null;
+    }
+    portfolio.cash += cashEffect;
+
+    // Exercise delivers stock — record price impact
+    if (currentVol != null) recordStockTrade(signedDelta, currentVol);
+
+    // Net into existing stock position with same strategy
+    const stratKey = pos.strategyName || null;
+    const existingStock = portfolio.positions.find(p =>
+        p.type === 'stock' && (p.strategyName || null) === stratKey
+    );
+
+    if (existingStock) {
+        const oldQty = existingStock.qty;
+        const newQty = oldQty + signedDelta;
+
+        if (newQty === 0) {
+            // Fully netted — remove the position
+            const removeIdx = portfolio.positions.indexOf(existingStock);
+            if (removeIdx !== -1) portfolio.positions.splice(removeIdx, 1);
+            stockPos = null;
+        } else {
+            // Update entry price only when extending in same direction
+            if (Math.sign(oldQty) === Math.sign(signedDelta)) {
+                existingStock.entryPrice = (existingStock.entryPrice * Math.abs(oldQty) + pos.strike * absQty) / (Math.abs(oldQty) + absQty);
+            } else if (Math.sign(newQty) !== Math.sign(oldQty)) {
+                // Flipped direction — new entry price is the strike
+                existingStock.entryPrice = pos.strike;
+            }
+            existingStock.qty = newQty;
+            existingStock.entryDay = currentDay;
+            stockPos = existingStock;
         }
-        portfolio.cash -= cost;
+    } else {
         stockPos = {
             id:          _nextPositionId++,
             type:        'stock',
-            qty:         absQty,
+            qty:         signedDelta,
             entryPrice:  pos.strike,
             entryDay:    currentDay,
-            strategyName: pos.strategyName || null,
+            strategyName: stratKey,
         };
         portfolio.positions.push(stockPos);
-    } else {
-        // Put: receive strike per share in cash
-        portfolio.cash += pos.strike * absQty;
     }
 
     // Remove the option position
@@ -731,7 +781,8 @@ export function exerciseOption(positionId, currentPrice, currentDay, currentVol,
  */
 export function chargeBorrowInterest(currentPrice, currentVol, currentRate, borrowSpread, currentDay) {
     let totalCharged = 0;
-    const annualRate = Math.max(currentRate, 0) + borrowSpread * currentVol;
+    const regBorrowAdd = getRegulationEffect('borrowSpreadAdd', 0);
+    const annualRate = Math.max(currentRate, 0) + (borrowSpread + regBorrowAdd) * currentVol;
     const dailyRate = annualRate / TRADING_DAYS_PER_YEAR;
 
     // Charge interest on short stock/bond positions
@@ -948,6 +999,7 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
         required += MAINTENANCE_MARGIN * Math.abs(portfolio.cash);
     }
 
+    required *= getRegulationEffect('marginMult', 1) / capitalMultiplier();
     const triggered = required > 0 && equity < required;
     return { triggered, equity, required };
 }
@@ -1015,15 +1067,12 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
 
         if (pos.type !== 'call' && pos.type !== 'put') continue;
 
-        const dte    = pos.expiryDay != null
-            ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
-            : 0;
+        if (market.v <= 0) continue;
+        const sv = _optionSigma(pos);
+        if (!sv) continue;
         const isPut  = pos.type === 'put';
-        if (dte <= 0 || market.v <= 0) continue;
-        const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-        const sig = computeSkewSigma(sigEff, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
         if (!_greekTrees) _greekTrees = allocGreekTrees();
-        prepareGreekTrees(dte, currentRate, sig, q, currentDay, _greekTrees);
+        prepareGreekTrees(sv.T, currentRate, sv.sigma, q, currentDay, _greekTrees);
         const greeks = computeGreeksWithTrees(currentPrice, pos.strike, isPut, _greekTrees);
 
         delta += w * greeks.delta;

@@ -215,7 +215,7 @@ export class LLMEventSource {
                     ', CEO: ' + (w.pnth.ceoIsGottlieb ? 'Gottlieb' : 'successor') +
                     ', CTO: ' + (w.pnth.ctoIsMira ? 'Kassis' : 'vacant'),
                 '- Military contract: ' + w.pnth.militaryContractActive + ', Commercial momentum: ' + w.pnth.commercialMomentum,
-                '- Trade war stage: ' + w.geopolitical.tradeWarStage + ', China relations: ' + w.geopolitical.chinaRelations,
+                '- Trade war stage: ' + w.geopolitical.tradeWarStage + ', Serica relations: ' + w.geopolitical.sericaRelations,
                 '- Mideast escalation: ' + w.geopolitical.mideastEscalation + ', South America: ' + w.geopolitical.southAmericaOps,
                 '- Oil crisis: ' + w.geopolitical.oilCrisis + ', Recession: ' + w.geopolitical.recessionDeclared,
                 '- Fed: credibility ' + w.fed.credibilityScore + '/10, Hartley fired: ' + w.fed.hartleyFired + ', Vane appointed: ' + w.fed.vaneAppointed,

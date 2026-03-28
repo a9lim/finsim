@@ -12,20 +12,22 @@ import {
     NON_FED_COOLDOWN_MIN, NON_FED_COOLDOWN_MAX, FED_MEETING_JITTER,
     BOREDOM_THRESHOLD, TERM_END_DAY,
     PNTH_EARNINGS_INTERVAL, PNTH_EARNINGS_JITTER,
-    ADV, EVENT_COUPLING_CAP,
+    ADV, EVENT_COUPLING_CAP, HISTORY_CAPACITY,
 } from './config.js';
 
 import { createWorldState, congressHelpers, applyStructuredEffects } from './world-state.js';
-import { OFFLINE_EVENTS, PARAM_RANGES, getEventById } from './event-pool.js';
+import { ALL_EVENTS, PARAM_RANGES, getEventById } from './events/index.js';
+import { getTraitEffect, getActiveTraitIds } from './traits.js';
+import { firmCooldownMult } from './faction-standing.js';
 
 // -- Re-export for backwards compat -------------------------------------
-export { PARAM_RANGES } from './event-pool.js';
+export { PARAM_RANGES } from './events/index.js';
 
 const MAX_LOG = MAX_EVENT_LOG;
 const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 
 // -- Pulse-excluded categories (not drawn by Poisson random) ------------
-const _PULSE_CATEGORIES = new Set(['fed', 'pnth_earnings', 'midterm']);
+const _PULSE_CATEGORIES = new Set(['fed', 'pnth_earnings', 'midterm', 'interjection']);
 
 // -- EventEngine --------------------------------------------------------
 export class EventEngine {
@@ -49,17 +51,31 @@ export class EventEngine {
         // Epilogue
         this._epilogueFired = false;
 
-        // Pre-filter pools from OFFLINE_EVENTS
+        // Player context for enriched guard signatures
+        this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [], traitIds: [], portfolio: {} };
+        this._firedOneShot = new Set();
+
+        // Pre-filter pools from ALL_EVENTS (exclude followupOnly events)
         this._pools = {
-            fed:            OFFLINE_EVENTS.filter(e => e.category === 'fed'),
-            pnth_earnings:  OFFLINE_EVENTS.filter(e => e.category === 'pnth_earnings'),
-            random:         OFFLINE_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category)),
+            fed:            ALL_EVENTS.filter(e => e.category === 'fed' && !e.followupOnly),
+            pnth_earnings:  ALL_EVENTS.filter(e => e.category === 'pnth_earnings' && !e.followupOnly),
+            random:         ALL_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category) && !e.followupOnly),
+            filibuster:     ALL_EVENTS.filter(e => e.category === 'filibuster' && !e.followupOnly),
+            media:          ALL_EVENTS.filter(e => e.category === 'media' && !e.followupOnly),
+            interjection:   ALL_EVENTS.filter(e => e.category === 'interjection' && !e.followupOnly),
         };
+
+        // Portfolio-triggered event pool (evaluated daily, not Poisson-drawn)
+        this._triggerPool = ALL_EVENTS.filter(e => typeof e.trigger === 'function');
+        this._triggerCooldowns = {};
 
         // Pulse schedule
         this._pulses = [
             { type: 'recurring', id: 'fomc',           interval: FED_MEETING_INTERVAL,    jitter: FED_MEETING_JITTER,    nextDay: -1, poolKey: 'fed' },
             { type: 'recurring', id: 'pnth_earnings',  interval: PNTH_EARNINGS_INTERVAL,  jitter: PNTH_EARNINGS_JITTER,  nextDay: -1, poolKey: 'pnth_earnings' },
+            { type: 'recurring', id: 'filibuster_check', interval: 7,  jitter: 2, nextDay: -1, poolKey: 'filibuster' },
+            { type: 'recurring', id: 'media_cycle',      interval: 21, jitter: 5, nextDay: -1, poolKey: 'media' },
+            { type: 'recurring', id: 'interjection',     interval: 50, jitter: 15, nextDay: -1, poolKey: 'interjection' },
             { type: 'fixed',     id: 'campaign_season', day: CAMPAIGN_START_DAY, fired: false, handler: '_onCampaignSeason' },
             { type: 'fixed',     id: 'midterm',         day: MIDTERM_DAY,        fired: false, handler: '_onMidterm' },
         ];
@@ -85,6 +101,18 @@ export class EventEngine {
             }
             return { fired, popups };
         };
+
+        // Deterministic pre-pass: fire eligible one-shot events
+        const oneShotCandidates = this._pools.random.filter(ev =>
+            ev.oneShot && !this._firedOneShot.has(ev.id)
+        );
+        if (oneShotCandidates.length > 0) {
+            const eligible = this._filterEligible(oneShotCandidates, sim);
+            if (eligible.length > 0) {
+                this._firedOneShot.add(eligible[0].id);
+                return _partition([this._fireEvent(eligible[0], sim, day, 0, netDelta)]);
+            }
+        }
 
         // 1. Check pulses in array order
         for (const pulse of this._pulses) {
@@ -148,7 +176,10 @@ export class EventEngine {
         if (!params) return;
         for (const [key, delta] of Object.entries(params)) {
             const range = PARAM_RANGES[key];
-            if (!range) continue;
+            if (!range) {
+                console.warn(`[EventEngine] applyDeltas: unknown param "${key}" (no PARAM_RANGES entry)`);
+                continue;
+            }
             sim[key] = Math.min(range.max, Math.max(range.min, sim[key] + delta));
         }
         if (params.rho !== undefined) sim._recomputeRhoDerived();
@@ -171,6 +202,15 @@ export class EventEngine {
         if (w.fed.hartleyFired)                    score -= 6;
         if (w.geopolitical.tradeWarStage === 4)    score += 6;
         if (w.geopolitical.oilCrisis)              score -= 5;
+
+        // New geopolitical/media scoring factors
+        if (w.geopolitical.khasurianCrisis >= 3) score -= 6;
+        if (w.geopolitical.straitClosed) score -= 8;
+        if (w.congress.bigBillStatus === 3) score += 5;
+        if (w.congress.bigBillStatus === 4) score -= 4;
+        if (w.media.pressFreedomIndex <= 3) score -= 3;
+        if (w.media.sentinelRating >= 8) score += 2;
+        if (w.media.tanCredibility >= 8) score -= 3;
 
         // Noise: +-5
         score += (Math.random() - 0.5) * 10;
@@ -208,6 +248,9 @@ export class EventEngine {
         this._randomCooldown = 0;
         this._consecutiveMinor = 0;
         this._epilogueFired = false;
+        this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [], traitIds: [], portfolio: {} };
+        this._firedOneShot.clear();
+        this._triggerCooldowns = {};
 
         // Reset all pulse states
         for (const pulse of this._pulses) {
@@ -219,10 +262,91 @@ export class EventEngine {
         }
     }
 
+    /** Update player context passed to event guards. */
+    setPlayerContext(playerChoices, factions, activeRegIds, traitIds = [], portfolioMetrics = {}) {
+        this._playerCtx = { playerChoices, factions, activeRegIds, traitIds, portfolio: portfolioMetrics };
+    }
+
+    /** Clear fired one-shot tracking (call on reset). */
+    resetOneShot() {
+        this._firedOneShot.clear();
+    }
+
+    /** Return ids of all one-shot events that have fired this game. */
+    getFiredOneShotIds() {
+        return [...this._firedOneShot];
+    }
+
+    /** Evaluate portfolio-triggered events. Returns array of triggered event objects. */
+    evaluateTriggers(sim, day) {
+        const triggered = [];
+        for (const ev of this._triggerPool) {
+            const cd = this._triggerCooldowns[ev.id];
+            const cdMult = ev.tone === 'positive' ? 1 / firmCooldownMult() : firmCooldownMult();
+            if (cd && day - cd < ev.cooldown * cdMult) continue;
+            const liveDay = day - HISTORY_CAPACITY;
+            if (ev.era === 'early' && liveDay > 500) continue;
+            if (ev.era === 'mid'   && (liveDay < 500 || liveDay > 800)) continue;
+            if (ev.era === 'late'  && liveDay < 800) continue;
+            try {
+                if (ev.trigger(sim, this.world, this._playerCtx)) {
+                    this._triggerCooldowns[ev.id] = day;
+                    triggered.push(ev);
+                }
+            } catch (e) { /* guard — portfolio state may be inconsistent mid-reset */ }
+        }
+        return triggered;
+    }
+
+    /** Reset trigger cooldowns (call on game reset). */
+    resetTriggerCooldowns() {
+        this._triggerCooldowns = {};
+    }
+
     // -- Internal ---------------------------------------------------------
 
+    _scaledParams(params, coupling) {
+        if (!params || coupling === 1.0) return params;
+        const scaled = {};
+        for (const k in params) scaled[k] = params[k] * coupling;
+        return scaled;
+    }
+
+    _logEvent(day, event, params, magnitude) {
+        const entry = { day, headline: event.headline, magnitude: magnitude || event.magnitude || 'moderate', params: params ?? {} };
+        this.eventLog.push(entry);
+        if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
+        return entry;
+    }
+
+    _scheduleFollowups(event, day, depth, chainIdSuffix) {
+        if (!event.followups || depth >= MAX_CHAIN_DEPTH) return;
+        const chainId = event.id || ('chain_' + day + (chainIdSuffix || ''));
+        for (const fu of event.followups) {
+            const delay = this._followupDelay(fu.mtth);
+            this._pendingFollowups.push({
+                event: getEventById(fu.id) || fu,
+                chainId,
+                targetDay: day + Math.max(1, delay),
+                weight: fu.weight ?? 1,
+                depth: depth + 1,
+            });
+        }
+    }
+
     _fireEvent(event, sim, day, depth, netDelta = 0) {
-        // If popup event, queue for player choice instead of applying immediately
+        if (event.popup && event.superevent) {
+            const coupling = this._computeCoupling(netDelta, event.params);
+            this.applyDeltas(sim, this._scaledParams(event.params, coupling) || event.params);
+            if (typeof event.effects === 'function') event.effects(this.world);
+            else if (Array.isArray(event.effects)) applyStructuredEffects(this.world, event.effects);
+
+            this._logEvent(day, event, event.params || {}, event.magnitude || 'major');
+            this._scheduleFollowups(event, day, depth);
+
+            return { queued: true, event: { ...event } };
+        }
+
         if (event.popup && event.choices) {
             const coupling = this._computeCoupling(netDelta, event.params);
             const queuedEvent = { ...event };
@@ -234,20 +358,13 @@ export class EventEngine {
                     ) : null,
                 }));
             }
-            this.eventLog.push({ day, headline: event.headline, magnitude: event.magnitude || 'moderate', params: null });
-            if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
+            this._logEvent(day, event, null);
             return { queued: true, event: queuedEvent };
         }
 
         // Non-popup: apply deltas with coupling
         const coupling = this._computeCoupling(netDelta, event.params);
-        if (event.params && coupling !== 1.0) {
-            const scaled = {};
-            for (const k in event.params) scaled[k] = event.params[k] * coupling;
-            this.applyDeltas(sim, scaled);
-        } else {
-            this.applyDeltas(sim, event.params);
-        }
+        this.applyDeltas(sim, this._scaledParams(event.params, coupling) || event.params);
 
         // Apply world state effects
         if (typeof event.effects === 'function') {
@@ -263,29 +380,10 @@ export class EventEngine {
             this._consecutiveMinor = 0;
         }
 
-        const logEntry = {
-            day,
-            headline: event.headline,
-            magnitude: event.magnitude || 'moderate',
-            params: event.params || {},
-        };
-        this.eventLog.push(logEntry);
-        if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
+        const logEntry = this._logEvent(day, event, event.params || {});
+        logEntry.interjection = event.interjection || false;
 
-        // Schedule followups (if any and within depth limit)
-        if (event.followups && depth < MAX_CHAIN_DEPTH) {
-            const chainId = event.id || ('chain_' + day + '_' + Math.random().toString(36).slice(2, 8));
-            for (const fu of event.followups) {
-                const delay = this._followupDelay(fu.mtth);
-                this._pendingFollowups.push({
-                    event: getEventById(fu.id) || fu,
-                    chainId,
-                    targetDay: day + Math.max(1, delay),
-                    weight: fu.weight ?? 1,
-                    depth: depth + 1,
-                });
-            }
-        }
+        this._scheduleFollowups(event, day, depth, '_' + Math.random().toString(36).slice(2, 8));
 
         return logEntry;
     }
@@ -323,32 +421,56 @@ export class EventEngine {
 
             const event = picked.event ?? getEventById(picked.id);
             if (!event) continue;
-            if (event.when && !event.when(sim, this.world, congress)) continue;
+            if (event.when && !event.when(sim, this.world, congress, this._playerCtx)) continue;
+            if (event.oneShot && this._firedOneShot.has(event.id)) continue;
+            if (event.oneShot) this._firedOneShot.add(event.id);
 
             fired.push(this._fireEvent(event, sim, day, picked.depth, netDelta));
         }
         return fired;
     }
 
+    _eventWeight(ev, sim, congress, boostNonMinor, convIds) {
+        let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
+        if (boostNonMinor && ev.magnitude !== 'minor' && ev.category !== 'neutral') {
+            w *= 2;
+        }
+        // Conviction-aware likelihood adjustments
+        if (convIds.length > 0) {
+            if (convIds.includes('political_operator') && (ev.category === 'congressional' || ev.category === 'filibuster' || ev.category === 'political')) {
+                w *= 1.5;
+            }
+            if (convIds.includes('volatility_addict') && (ev.category === 'pnth' || ev.category === 'pnth_earnings')) {
+                w *= 1.3;
+            }
+            if (convIds.includes('information_edge') && (ev.category === 'investigation' || ev.category === 'media')) {
+                w *= 1.4;
+            }
+            if (convIds.includes('ghost_protocol')) {
+                w *= 0.7;
+            }
+        }
+        return w;
+    }
+
     _weightedPick(events, sim) {
         const congress = congressHelpers(this.world);
-        const boostNonMinor = this._consecutiveMinor >= BOREDOM_THRESHOLD;
+        const boredomImmune = getTraitEffect('boredomImmune', false);
+        const boostNonMinor = !boredomImmune && this._consecutiveMinor >= BOREDOM_THRESHOLD;
+        const convIds = getActiveTraitIds();
+
+        const weights = new Array(events.length);
         let totalWeight = 0;
-        for (const ev of events) {
-            let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
-            if (boostNonMinor && ev.magnitude !== 'minor' && ev.category !== 'neutral') {
-                w *= 2;
-            }
+        for (let i = 0; i < events.length; i++) {
+            const w = this._eventWeight(events[i], sim, congress, boostNonMinor, convIds);
+            weights[i] = w;
             totalWeight += w;
         }
+
         let roll = Math.random() * totalWeight;
-        for (const ev of events) {
-            let w = typeof ev.likelihood === 'function' ? ev.likelihood(sim, this.world, congress) : (ev.likelihood || 1);
-            if (boostNonMinor && ev.magnitude !== 'minor' && ev.category !== 'neutral') {
-                w *= 2;
-            }
-            roll -= w;
-            if (roll <= 0) return ev;
+        for (let i = 0; i < events.length; i++) {
+            roll -= weights[i];
+            if (roll <= 0) return events[i];
         }
         return events[events.length - 1];
     }
@@ -362,12 +484,18 @@ export class EventEngine {
                 if (ev.era === 'mid' && (day < 500 || day > 800)) return false;
                 if (ev.era === 'late' && day < 800) return false;
             }
-            return !ev.when || ev.when(sim, this.world, congress);
+            const liveDay = day - HISTORY_CAPACITY;
+            if (ev.minDay != null && liveDay < ev.minDay) return false;
+            if (ev.maxDay != null && liveDay > ev.maxDay) return false;
+            return !ev.when || ev.when(sim, this.world, congress, this._playerCtx);
         });
     }
 
     _drawRandom(sim) {
-        const eligible = this._filterEligible(this._pools.random, sim);
+        const pool = this._pools.random.filter(ev =>
+            !(ev.oneShot && this._firedOneShot.has(ev.id))
+        );
+        const eligible = this._filterEligible(pool, sim);
         if (eligible.length === 0) return null;
         return this._weightedPick(eligible, sim);
     }
@@ -418,8 +546,18 @@ export class EventEngine {
         if (w.geopolitical.recessionDeclared) score -= 15;
         if (w.geopolitical.mideastEscalation >= 2 || w.geopolitical.southAmericaOps >= 2) score -= 8;
 
-        // Noise: +-10
-        score += (Math.random() - 0.5) * 20;
+        // Lobby momentum: each point shifts the score by 3
+        score += (w.election.lobbyMomentum || 0) * 3;
+
+        // Cross-domain signals
+        if (w.investigations.okaforProbeStage >= 2) score -= 5;
+        if (w.fed.hartleyFired) score -= 3;
+        if ((w.pnth.aegisControversy || 0) >= 2) score -= 3;
+        const factions = w.factions || {};
+        score += ((factions.federalistSupport || 30) - (factions.farmerLaborSupport || 30)) * 0.15;
+
+        // Noise: +-5 (reduced from +-10 to preserve player agency)
+        score += (Math.random() - 0.5) * 10;
 
         let result, headline, params, effects;
 
@@ -472,6 +610,9 @@ export class EventEngine {
             params,
             magnitude: 'major',
             effects,
+            popup: true,
+            superevent: true,
+            choices: [{ label: 'Acknowledged', desc: 'The markets have spoken.' }],
         };
 
         w.election.midtermComplete = true;
@@ -486,7 +627,7 @@ export class EventEngine {
         if (!deltas || !deltas.mu || Math.abs(netDelta) < 1) return 1.0;
         const alignment = Math.sign(netDelta) * Math.sign(deltas.mu);
         const magnitude = Math.min(1, Math.abs(netDelta) / (ADV * 0.5));
-        return 1 + alignment * magnitude * EVENT_COUPLING_CAP;
+        return 1 + alignment * magnitude * EVENT_COUPLING_CAP * getTraitEffect('couplingCapMult', 1);
     }
 
     // -- Public followup scheduling ---------------------------------------
