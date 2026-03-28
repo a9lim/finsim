@@ -97,10 +97,11 @@
         <div class="intro-content">
             <span class="intro-overline">Meridian Capital &middot; Derivatives Desk</span>
             <h1 class="intro-title">Shoals<br><span class="intro-subtitle">Trading Simulator</span></h1>
-            <p class="intro-desc">You are a senior derivatives trader at Meridian Capital&rsquo;s
-                most aggressive desk. President Barron has just taken office and the political
-                landscape is volatile. Build positions, manage risk, navigate 4 years of
-                market events&mdash;and try not to get fired.</p>
+            <p class="intro-desc">You&rsquo;ve just been poached from a rival firm to run
+                Meridian Capital&rsquo;s most aggressive derivatives desk. President Barron
+                has just taken office, volatility is spiking, and Meridian wants someone who
+                can trade through the storm. Build positions, manage risk, navigate 4 years
+                of market events&mdash;and try not to get fired.</p>
             <div class="intro-cards">
                 <div class="intro-card">
                     <div class="intro-card-icon">
@@ -179,8 +180,13 @@
                 </svg>
             </button>
             <button id="mode-btn" class="tool-btn" aria-label="Buy mode" aria-pressed="false" title="Buy mode (X)">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <polyline points="4,16 8,10 12,13 16,7 20,11"/>
+                <svg id="mode-icon-buy" width="20" height="18" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="2,14 6,10 10,12 16,4"/>
+                    <polyline points="12,4 16,4 16,8"/>
+                </svg>
+                <svg id="mode-icon-sell" width="20" height="18" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                    <polyline points="2,4 6,8 10,6 16,14"/>
+                    <polyline points="12,14 16,14 16,10"/>
                 </svg>
             </button>
             <div class="tool-sep hide-sm"></div>
@@ -240,6 +246,9 @@
                         <path d="M3 21l7-7"></path>
                     </svg>
                 </button>
+            </div>
+            <div id="lobby-bar" class="lobby-bar glass" style="display:none">
+                <div id="lobby-actions"></div>
             </div>
         </div>
         <div id="time-slider-bar" class="time-slider-bar hidden">
@@ -398,6 +407,10 @@
                             <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-rho">Rho</span><button class="info-trigger" type="button" data-info="rho_greek" aria-label="Info: Rho">?</button></span><span class="stat-value" id="greek-rho">0.00</span></div>
                         </div>
                     </div>
+                        <div id="convictions-section" class="convictions-section hidden">
+                            <div class="group-label">Convictions</div>
+                            <div id="convictions-list" class="convictions-list"></div>
+                        </div>
                 </div>
                 <!-- Strategy Tab -->
                 <div class="tab-panel" id="tab-strategy" role="tabpanel" aria-labelledby="tab-btn-strategy">
@@ -529,7 +542,27 @@
                             </div>
                         </div>
                     </div>
+                    <div id="regulations-section" class="regulations-section">
+                        <div class="group-label">Active Regulations</div>
+                        <div id="regulations-list" class="regulations-list">
+                            <span class="text-muted" style="font-size:0.78rem">None</span>
+                        </div>
+                    </div>
+                    <div id="standings-section" class="stat-group hidden">
+                        <div class="group-label">World State</div>
+                        <div id="standings-world"></div>
+                        <div class="group-label" style="margin-top:8px">Your Standing</div>
+                        <div id="standings-factions"></div>
+                    </div>
                     <div class="stat-group">
+                        <div class="group-label">Settings</div>
+                        <div class="control-group">
+                            <label for="volume-slider">
+                                <span>Volume</span>
+                                <span class="slider-value" id="volume-slider-val">30%</span>
+                            </label>
+                            <input type="range" id="volume-slider" min="0" max="100" step="1" value="30">
+                        </div>
                         <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn">Advanced Parameters <span class="info-trigger" role="button" tabindex="0" data-info="gbm" aria-label="Info: Pricing Models">?</span></button>
                         <div id="advanced-section" class="advanced-section hidden">
                             <div class="ctrl-row">
@@ -649,6 +682,7 @@
       </div>
     </div>
 
+
     <!-- Epilogue Overlay -->
     <div id="epilogue-overlay" class="sim-overlay hidden" role="dialog" aria-label="Epilogue" aria-modal="true">
         <div class="sim-overlay-panel glass epilogue-panel">
@@ -659,6 +693,7 @@
             <div class="epilogue-footer">
                 <div class="epilogue-dots">
                     <span class="epilogue-dot active"></span>
+                    <span class="epilogue-dot"></span>
                     <span class="epilogue-dot"></span>
                     <span class="epilogue-dot"></span>
                     <span class="epilogue-dot"></span>

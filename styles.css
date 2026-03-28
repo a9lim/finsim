@@ -70,6 +70,60 @@ main {
     cursor: grab;
 }
 
+/* --- Lobby Pill Bar --- */
+.lobby-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: var(--radius-pill);
+    z-index: 20;
+}
+.lobby-bar .substrate-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border: none;
+    background: transparent;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: clamp(0.72rem, 1vw, 0.82rem);
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+    white-space: nowrap;
+    outline: none;
+    -webkit-appearance: none;
+}
+.lobby-pill-fed     { color: var(--ext-orange); }
+.lobby-pill-fl      { color: var(--ext-lime); }
+.lobby-pill-pol     { color: var(--ext-yellow); }
+.lobby-pill-media   { color: var(--ext-cyan); }
+.lobby-pill-fed-rel { color: var(--ext-blue); }
+#lobby-actions { display: flex; align-items: center; }
+.lobby-bar .substrate-pill-left  { border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
+.lobby-bar .substrate-pill-right { border-radius: 0 var(--radius-pill) var(--radius-pill) 0; }
+.lobby-bar .substrate-pill-solo  { border-radius: var(--radius-pill); }
+.lobby-bar .substrate-pill:hover:not(:disabled) {
+    background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.lobby-bar .substrate-pill:active:not(:disabled) {
+    transform: scale(0.96);
+}
+.lobby-bar .substrate-pill:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.lobby-bar .substrate-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    flex-shrink: 0;
+}
+
 /* --- Time Slider (below chart in strategy mode) --- */
 .time-slider-row {
     display: flex;
@@ -369,8 +423,6 @@ main {
 }
 
 /* --- Portfolio Positions --- */
-.pos-row {}
-
 .pos-label {
     flex: 1;
     min-width: 0;
@@ -418,8 +470,6 @@ main {
 }
 
 /* --- Order Rows --- */
-.order-row {}
-
 .order-label {
     flex: 1;
     min-width: 0;
@@ -484,7 +534,7 @@ main {
     border: 1px solid var(--border);
     background: var(--bg-elevated);
     color: var(--text);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-size: 0.82rem;
     outline: none;
     transition: border-color 0.15s;
@@ -492,6 +542,10 @@ main {
 
 .sim-input:focus {
     border-color: var(--accent);
+}
+
+.sim-input::placeholder {
+    color: var(--text-muted);
 }
 
 /* --- Time Slider Bar --- */
@@ -645,6 +699,9 @@ main {
     #zoom-controls {
         bottom: 8px;
         left: 10px;
+    }
+    .lobby-bar {
+        bottom: 8px;
     }
 
     #sidebar {
@@ -949,25 +1006,6 @@ main {
 }
 
 /* Strategy name input */
-.sim-input {
-    width: 100%;
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-elevated);
-    color: var(--text);
-    font-family: var(--font-body);
-    font-size: 0.82rem;
-    outline: none;
-    transition: border-color 0.15s;
-}
-.sim-input:focus {
-    border-color: var(--accent);
-}
-.sim-input::placeholder {
-    color: var(--text-muted);
-}
-
 /* Saved strategies section in trade tab */
 .saved-strategies-section {
     margin-top: 10px;
@@ -1025,7 +1063,7 @@ main {
 
 /* -- Popup decision events -- */
 #popup-event-overlay {
-    background: rgba(0, 0, 0, 0.35);
+    background: none;
 }
 .popup-event-body {
     max-width: 520px;
@@ -1090,6 +1128,64 @@ main {
 }
 .popup-choice-desc {
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     line-height: 1.4;
+}
+
+
+/* -- Convictions ------------------------------------------------------------ */
+.convictions-section { margin-top: 12px; }
+.convictions-list { display: flex; flex-direction: column; gap: 4px; }
+.conviction-item {
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    border-left: 2px solid var(--accent);
+    background: var(--bg-hover);
+    border-radius: var(--radius-sm);
+    cursor: help;
+}
+.conviction-name { font-weight: 600; color: var(--text); }
+
+/* -- Superevent presentation ------------------------------------------------ */
+#popup-event-overlay.superevent { background: none; }
+#popup-event-overlay.superevent .popup-event-body { max-width: 600px; border-top-width: 4px; animation: superEventIn 1.5s ease both; }
+#popup-event-overlay.superevent .popup-headline { font-size: 1.5rem; line-height: 1.3; }
+#popup-event-overlay.superevent .popup-context { font-size: 0.9rem; line-height: 1.7; }
+@keyframes superEventIn {
+    0% { opacity: 0; transform: translateY(20px) scale(0.97); }
+    40% { opacity: 0; transform: translateY(20px) scale(0.97); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.typewriter-cursor {
+    display: inline-block; width: 2px; height: 1em;
+    background: var(--text); animation: blink 0.8s step-end infinite;
+    vertical-align: text-bottom; margin-left: 1px;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.popup-choice-btn.choice-animate-in {
+    animation: choiceFadeIn 0.4s ease both;
+}
+@keyframes choiceFadeIn {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* -- Regulations ------------------------------------------------------------ */
+.regulations-section { margin-top: 12px; margin-bottom: 16px; }
+.regulations-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.regulation-badge {
+    font-size: 0.72rem; font-weight: 600;
+    padding: 3px 10px; border-radius: var(--radius-pill);
+    background: var(--bg-elevated); border: 1px solid currentColor;
+    cursor: help; opacity: 0.85;
+}
+
+
+/* -- Interjections ---------------------------------------------------------- */
+.toast.interjection-toast {
+    font-style: italic; color: var(--text-muted);
+    border-color: transparent; background: var(--bg-panel);
+    font-size: 0.8rem; max-width: 360px;
+    border-radius: var(--radius-lg, 12px);
+    padding: 12px 20px; line-height: 1.45;
 }

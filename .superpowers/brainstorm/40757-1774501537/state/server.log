@@ -1,0 +1,6 @@
+{"type":"server-started","port":62663,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:62663","screen_dir":"/Users/a9lim/Work/a9lim.github.io/shoals/.superpowers/brainstorm/40757-1774501537/content","state_dir":"/Users/a9lim/Work/a9lim.github.io/shoals/.superpowers/brainstorm/40757-1774501537/state"}
+{"type":"screen-added","file":"/Users/a9lim/Work/a9lim.github.io/shoals/.superpowers/brainstorm/40757-1774501537/content/approaches.html"}
+{"type":"screen-added","file":"/Users/a9lim/Work/a9lim.github.io/shoals/.superpowers/brainstorm/40757-1774501537/content/lore-bible-cast.html"}
+{"type":"screen-added","file":"/Users/a9lim/Work/a9lim.github.io/shoals/.superpowers/brainstorm/40757-1774501537/content/lore-bible-cast-v2.html"}
+{"type":"screen-added","file":"/Users/a9lim/Work/a9lim.github.io/shoals/.superpowers/brainstorm/40757-1774501537/content/waiting.html"}
+{"type":"server-stopped","reason":"idle timeout"}
