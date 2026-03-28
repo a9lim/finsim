@@ -202,9 +202,41 @@ Principle: `context` functions do the heavy lifting for popups. Toast-only event
 - Verify no circular dependencies were introduced (use the existing domain interaction matrix as baseline)
 - Verify conditional context functions handle missing/null world state gracefully
 
-## Out of Scope
+## Phase 1 Additions: Engine & Balance Fixes
 
-- New event creation (except if a structural gap is found during wiring that cannot be bridged with existing events)
-- `firmCooldownMult` semantic rework (documented as a known design issue but not causing bugs with current event definitions)
-- World-state `factions` duplication cleanup (works correctly via manual sync, fragile but not buggy)
-- Midterm election noise term rebalancing (design choice, not a bug)
+### 1.7 `firmCooldownMult` Semantic Rework
+
+**Problem:** `firmCooldownMult()` blanket-suppresses all 17 triggered desk events when firm standing is high. This incorrectly reduces positive event frequency (headhunter, comeback kid, milestone) alongside negative events (compliance, risk committee).
+
+**Fix:** Add a `tone` field (`'positive'` or `'negative'`) to each triggered event in firm.js. In `evaluateTriggers()` (`events.js:282`), apply the multiplier directionally:
+
+```js
+const mult = ev.tone === 'positive' ? 1 / firmCooldownMult() : firmCooldownMult();
+if (cd && day - cd < ev.cooldown * mult) continue;
+```
+
+High standing → fewer compliance nags, more opportunities. Low standing → more warnings, fewer rewards.
+
+### 1.8 World-State `factions` Duplication Cleanup
+
+**Problem:** `createWorldState()` in world-state.js creates a `factions` object with hardcoded defaults that is immediately overwritten by `eventEngine.world.factions = factions` in main.js. The duplicate is confusing and risks divergence if the sync line is ever missed.
+
+**Fix:** Remove the `factions` field from `createWorldState()` entirely. Add a comment at the sync sites in main.js (`init` at line 589, `loadPreset` at line 1731, `_resetCore` at line 1686) explaining that faction state lives in faction-standing.js and is attached to the world object by reference.
+
+### 1.9 Midterm Election Rebalancing
+
+**Problem:** The noise term `(Math.random() - 0.5) * 20` (±10 points) can single-handedly flip the midterm outcome by one or two tiers, overwhelming player agency (lobbying momentum contributes ±9 at max).
+
+**Fix:**
+1. Reduce noise from ±10 to ±5: `(Math.random() - 0.5) * 10`
+2. Add world-state signal inputs to the scoring formula:
+   - `okaforProbeStage >= 2` → score −5 (scandal drags incumbent)
+   - `hartleyFired` → score −3 (institutional chaos)
+   - `aegisControversy >= 2` → score −3 (military scandal reflects on administration)
+   - `federalistSupport - farmerLaborSupport` → net shift scaled by 0.15 (player lobbying has broader electoral impact beyond `lobbyMomentum`)
+
+This makes the midterm a culmination of the game's events rather than a coin flip.
+
+## New Event Policy
+
+New events are allowed when they serve as **bridge nodes between domains** — minimal followupOnly events with no popup and no params unless mechanically necessary. The `meridianExposed` bridge event (Section 2B) is the primary example. Additional bridge events may be identified during the wiring phase, but the goal remains: rewire existing events first, create new ones only for structural gaps.
