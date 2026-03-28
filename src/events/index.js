@@ -50,7 +50,7 @@ for (const ev of ALL_EVENTS) {
 for (const id of _referencedFollowupIds) {
     const ev = getEventById(id);
     if (!ev) console.warn(`[events] followup references unknown event: '${id}'`);
-    else if (!ev.followupOnly) console.warn(`[events] followup target '${id}' missing followupOnly flag`);
+    else if (!ev.followupOnly && ev.likelihood === 0) console.warn(`[events] followup target '${id}' missing followupOnly flag`);
 }
 for (const ev of ALL_EVENTS) {
     if (ev.followupOnly && !_referencedFollowupIds.has(ev.id)) {
