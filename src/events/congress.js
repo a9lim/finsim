@@ -172,7 +172,11 @@ export const CONGRESS_EVENTS = [
     {
         id: 'barron_tax_cut_proposal',
         category: 'congressional',
-        likelihood: 0.6,
+        likelihood: (sim, world) => {
+            let base = 0.6;
+            if (world.election.midtermResult === 'fed_gain') base *= 2.0;
+            return base;
+        },
         headline: 'Barron unveils the Financial Freedom Act: corporate tax cut from 21% to 15%. Haines flags a $400B revenue shortfall. Lassiter on The Sentinel: "Growth pays for itself." Reyes: "Math doesn\'t lie"',
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.trifecta && getPipelineStatus('deregulation_act') === null,
@@ -811,6 +815,7 @@ export const CONGRESS_EVENTS = [
         likelihood: (sim, world, congress) => {
             let w = congress.trifecta ? 3 : 0.3;
             w *= (1 + (world.election.lobbyMomentum || 0) * 0.15);
+            if (world.election.midtermResult === 'fed_gain') w *= 2.0;
             return w;
         },
         magnitude: 'major',
@@ -1150,7 +1155,10 @@ export const CONGRESS_EVENTS = [
         likelihood: 3,
         params: { mu: 0.02 },
         magnitude: 'moderate',
-        when: (sim, world) => world.congress.bigBillStatus === 0,
+        when: (sim, world) => {
+            if (world.election.midtermResult === 'fed_loss_both') return false;
+            return world.congress.bigBillStatus === 0;
+        },
         effects: (world) => { world.congress.bigBillStatus = 1; shiftFaction('federalistSupport', 2); },
         era: 'early',
     },
@@ -1161,7 +1169,10 @@ export const CONGRESS_EVENTS = [
         likelihood: 3,
         params: { theta: 0.008 },
         magnitude: 'moderate',
-        when: (sim, world) => world.congress.bigBillStatus === 1,
+        when: (sim, world) => {
+            if (world.election.midtermResult === 'fed_loss_both') return false;
+            return world.congress.bigBillStatus === 1;
+        },
         effects: (world) => {
             world.congress.bigBillStatus = 2;
             world.congress.filibusterActive = true;
@@ -1232,7 +1243,10 @@ export const CONGRESS_EVENTS = [
         likelihood: (sim, world) => world.election.barronApproval > 50 && (world.election.lobbyMomentum || 0) > 0 ? 3 : 0.5,
         params: { mu: 0.03, theta: -0.01 },
         magnitude: 'major',
-        when: (sim, world) => world.congress.filibusterActive && world.congress.bigBillStatus === 2,
+        when: (sim, world) => {
+            if (world.election.midtermResult === 'fed_loss_both') return false;
+            return world.congress.filibusterActive && world.congress.bigBillStatus === 2;
+        },
         effects: (world) => {
             world.congress.filibusterActive = false;
             world.congress.bigBillStatus = 3;

@@ -11,7 +11,11 @@ export const INVESTIGATION_EVENTS = [
     {
         id: 'tan_bowman_initial',
         category: 'investigation',
-        likelihood: 0.7,
+        likelihood: (sim, world) => {
+            let base = 0.7;
+            if (world.election.midtermResult === 'fed_gain') base *= 0.5;
+            return base;
+        },
         headline: 'EXCLUSIVE (The Continental): Rachel Tan reveals VP Bowman held $4M in PNTH stock while personally lobbying Pentagon for Atlas contract. White House: "old news"',
         magnitude: 'moderate',
         maxDay: 600,
@@ -105,6 +109,8 @@ export const INVESTIGATION_EVENTS = [
         likelihood: (sim, world) => {
             let base = 0.8;
             if (world.investigations.tanBowmanStory >= 2) base *= 1.5;
+            if (world.election.midtermResult === 'fed_loss_both' ||
+                world.election.midtermResult === 'fed_loss_house') base *= 1.5;
             return base;
         },
         headline: 'Sen. Okafor formally opens Intelligence Committee hearings into PNTH-White House ties; witness list includes current and former PNTH executives',
@@ -119,6 +125,8 @@ export const INVESTIGATION_EVENTS = [
         likelihood: (sim, world) => {
             let base = 1.0;
             if (world.investigations.tanBowmanStory >= 2) base *= 1.5;
+            if (world.election.midtermResult === 'fed_loss_both' ||
+                world.election.midtermResult === 'fed_loss_house') base *= 1.5;
             return base;
         },
         headline: 'Okafor issues subpoenas for Bowman financial records and Dirks-Bowman communications; White House invokes executive privilege. Constitutional showdown looms',
@@ -170,7 +178,11 @@ export const INVESTIGATION_EVENTS = [
     {
         id: 'bowman_indicted',
         category: 'investigation',
-        likelihood: 0.3,
+        likelihood: (sim, world) => {
+            let base = 0.3;
+            if (world.election.midtermResult === 'fed_gain') base *= 0.5;
+            return base;
+        },
         headline: 'Federal grand jury indicts former VP Bowman on 12 counts of insider trading and conspiracy; bail set at $5M. First sitting or former VP indicted in U.S. history',
         params: { mu: -0.05, theta: 0.03, lambda: 1.5, muJ: -0.04 },
         magnitude: 'major',
