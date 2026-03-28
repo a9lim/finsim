@@ -468,7 +468,13 @@ export const PNTH_EVENTS = [
         magnitude: 'major',
         when: (sim, world) => !world.pnth.militaryContractActive && !world.pnth.acquired,
         params: { mu: 0.04, theta: -0.005, lambda: -0.2 },
-        effects: (world) => { world.pnth.militaryContractActive = true; world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1); shiftFaction('firmStanding', 3); },
+        effects: (world) => {
+            world.pnth.militaryContractActive = true;
+            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
+            shiftFaction('firmStanding', 3);
+            // Aegis contract win strengthens Dirks's board position
+            world.pnth.boardDirks = Math.min(10, (world.pnth.boardDirks || 7) + 1);
+        },
     },
     {
         id: 'defense_contract_cancelled',
@@ -695,6 +701,10 @@ export const PNTH_EVENTS = [
         params: { mu: 0.06, theta: -0.01, lambda: -0.3 },
         magnitude: 'major',
         when: (sim, world) => !world.pnth.acquired && world.pnth.ctoIsMira,
+        // Foundry success boosts commercial momentum
+        effects: (world) => {
+            world.pnth.commercialMomentum = Math.min(3, (world.pnth.commercialMomentum || 0) + 1);
+        },
     },
     {
         id: 'pnth_government_ai_czar',
@@ -732,6 +742,8 @@ export const PNTH_EVENTS = [
             world.pnth.aegisControversy = 1;
             shiftFaction('firmStanding', 2);
             shiftFaction('regulatoryExposure', 2);
+            // Aegis deployment milestone strengthens Dirks's board position
+            world.pnth.boardDirks = Math.min(10, (world.pnth.boardDirks || 7) + 1);
         },
         era: 'mid',
         followups: [
@@ -747,7 +759,11 @@ export const PNTH_EVENTS = [
         params: { theta: 0.01, mu: -0.01 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.aegisDeployed,
-        effects: (world) => { world.pnth.aegisControversy = Math.min(3, world.pnth.aegisControversy + 1); },
+        effects: (world) => {
+            world.pnth.aegisControversy = Math.min(3, world.pnth.aegisControversy + 1);
+            // Military controversy makes enterprise clients nervous about the brand
+            world.pnth.commercialMomentum = Math.max(-3, (world.pnth.commercialMomentum || 0) - 1);
+        },
         followups: [
             { id: 'aegis_gottlieb_dissent', mtth: 20, weight: 1 },
         ],
@@ -763,6 +779,8 @@ export const PNTH_EVENTS = [
         when: (sim, world) => world.pnth.aegisControversy >= 2,
         effects: (world) => {
             world.pnth.boardGottlieb = Math.max(0, world.pnth.boardGottlieb - 1);
+            // Military controversy makes enterprise clients nervous about the brand
+            world.pnth.commercialMomentum = Math.max(-3, (world.pnth.commercialMomentum || 0) - 1);
         },
     },
 
@@ -807,7 +825,13 @@ export const PNTH_EVENTS = [
         params: { theta: 0.005 },
         magnitude: 'minor',
         when: (sim, world) => world.pnth.companionScandal >= 1,
-        effects: (world) => { world.pnth.companionScandal = Math.min(3, world.pnth.companionScandal + 1); },
+        effects: (world) => {
+            world.pnth.companionScandal = Math.min(3, world.pnth.companionScandal + 1);
+            // Scandal spillover: congressional scrutiny of one PNTH product spills to others
+            world.pnth.aegisControversy = Math.min(3, (world.pnth.aegisControversy || 0) + 1);
+            // Companion scandal erodes Gottlieb's board standing
+            world.pnth.boardGottlieb = Math.max(0, (world.pnth.boardGottlieb || 3) - 1);
+        },
     },
     {
         id: 'companion_teen_addiction',
@@ -818,7 +842,15 @@ export const PNTH_EVENTS = [
         params: { theta: 0.008 },
         magnitude: 'moderate',
         when: (sim, world) => world.pnth.companionScandal >= 1,
-        effects: (world) => { world.pnth.companionScandal = Math.min(3, world.pnth.companionScandal + 1); shiftFaction('regulatoryExposure', 2); shiftFaction('firmStanding', -2); },
+        effects: (world) => {
+            world.pnth.companionScandal = Math.min(3, world.pnth.companionScandal + 1);
+            shiftFaction('regulatoryExposure', 2);
+            shiftFaction('firmStanding', -2);
+            // Scandal spillover: congressional scrutiny of one PNTH product spills to others
+            world.pnth.aegisControversy = Math.min(3, (world.pnth.aegisControversy || 0) + 1);
+            // Companion scandal erodes Gottlieb's board standing
+            world.pnth.boardGottlieb = Math.max(0, (world.pnth.boardGottlieb || 3) - 1);
+        },
     },
 
     // =====================================================================
@@ -832,7 +864,11 @@ export const PNTH_EVENTS = [
         params: { mu: 0.02 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.foundryLaunched,
-        effects: (world) => { world.pnth.foundryLaunched = true; },
+        effects: (world) => {
+            world.pnth.foundryLaunched = true;
+            // Foundry success boosts commercial momentum
+            world.pnth.commercialMomentum = Math.min(3, (world.pnth.commercialMomentum || 0) + 1);
+        },
         era: 'mid',
         followups: [
             { id: 'foundry_outage', mtth: 90, weight: 1 },
