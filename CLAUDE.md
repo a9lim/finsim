@@ -22,7 +22,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 ## Architecture
 
-**Orchestrator**: `main.js` (~2100 lines) — DOM cache `$`, rAF loop, sub-step streaming, all system wiring.
+**Orchestrator**: `main.js` (~2000 lines) — DOM cache `$`, rAF loop, sub-step streaming, all system wiring. Shared micro-helpers at module top: `_toast()` / `_haptic()` (guarded global access), `_clampRate()` (regulation rate bounds), `_runSubstep()` (full substep pipeline), `_refreshStrategyView()` / `_populateStrategyLegs()` (strategy UI update sequence).
 
 **Module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator. `market.js` is shared mutable state (single-writer main.js via `syncMarket`, multiple readers).
 
@@ -37,7 +37,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 ### Sub-Step Pipeline (playing)
 
 1. `frame()` applies Layer 3 param overlays, calls `sim.beginDay()`
-2. 16 sub-steps per day: `sim.substep()` → rate ceiling/floor clamp → `decayImpactVolumes()` → `syncMarket()` → `rehedgeMM()` → `_onSubstepTick()` (pending orders) → `chart.setLiveCandle()`
+2. 16 sub-steps per day: `_runSubstep()` (substep → rate clamp → impact decay → market sync → MM rehedge → order check) → `chart.setLiveCandle()`
 3. After substep batch: `_onSubstepUI()` (reprice chain sidebar, update portfolio display)
 4. After all 16: `sim.finalizeDay()`, overlays removed. `_onDayComplete()` runs: borrow interest, expiry, dividends, quarterly review, trait eval, event engine, regulation eval, endings check, portfolio popups, Layer 3 shifts, scrutiny, ambient mood, rogue trading check, margin check, lobby pill update, standings update, popup queue drain
 
@@ -92,7 +92,7 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - `sim._partial` pushed by reference — `beginDay()` pushes, `substep()` mutates in-place
 - `portfolio` is a singleton — `resetPortfolio()` mutates in place, never replace the reference
 - `eventEngine` is null in non-Dynamic mode — always guard
-- `_haptics` guard required: `if (typeof _haptics !== 'undefined')`
+- Use `_haptic(pattern)` and `_toast(msg, duration)` — never raw `_haptics.trigger()` or `showToast()` in main.js
 - `computeEffectiveSigma(v, T, kappa, theta, xi)` takes **variance** `v`, not vol. `computeSkewSigma` takes the additional S, K, rho args
 - Dual pricing shares `_V` buffer — `_priceCore` after `_pricePairCore` overwrites call values
 - Chain table rebuilt every call — never cache cell refs; delegation bound once via `_chainClicksBound`
@@ -106,14 +106,14 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - Compliance triggers use directional notional, not raw `qty` sign
 - `q` (dividend) NOT in GBM drift — stock grows at `mu`, not `mu - q`; only discrete quarterly drops
 - Vasicek rate can go negative — tree handles via per-step `pu` clamped to [0,1]
-- Rate ceiling/floor is a permanent `sim.r` mutation (not an overlay). Mean-reversion operates from clamped value
+- Rate ceiling/floor is a permanent `sim.r` mutation (not an overlay) via `_clampRate()`. Mean-reversion operates from clamped value
 - Event deltas are additive and clamped to `PARAM_RANGES` — never set absolute values
 - Superevent params apply at fire time (in `_fireEvent`), not choice time — popup is informational only
 - `minDay`/`maxDay` use live trading days (`day - 252`), different from `era` which uses absolute `day`
 - `getTraitEffect(key, defaultVal)` multiplies all active effects onto defaultVal (boolean: any true wins)
 - `getRegulationEffect(key, defaultVal)` — mult keys: product; add: sum; ceiling: min; floor: max; boolean: any true
 - One-shot events (migrated compound triggers) fire at most once per game — tracked by event id in `EventEngine._firedOneShots` Set
-- `advanceBill(id, 'failed')` and `advanceBill(id, 'repealed')` both remove from pipeline AND _active — they are terminal states, not display states
+- `advanceBill(id, 'failed')` and `advanceBill(id, 'repealed')` remove from `_state` entirely — they are terminal states, not display states
 - `getPipelineStatus(id)` returns null if the regulation was never introduced or was removed — event guards must check for null, not 'inactive'
 - `trigger` (portfolio-triggered, daily eval) vs `when` (world-state eligibility guard) — events with `trigger` are never Poisson-drawn
 - `factionShifts` on choices are additive — conditional bonuses (`when.hasTrait`) add to the base `value`, not replace it
@@ -141,6 +141,15 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - `onChoose` on popup event choices — use declarative `factionShifts` arrays instead
 - `SUPEREVENT_IDS` set in main.js — use `superevent: true` on the event object
 - `resetPopupCooldowns` / `evaluatePortfolioPopups` — use `eventEngine.resetTriggerCooldowns()` and `eventEngine.evaluateTriggers()`
+- Inline `typeof showToast !== 'undefined'` / `typeof _haptics !== 'undefined'` guards in main.js — use `_toast()` and `_haptic()` helpers
+- Inline substep pipeline (substep + rate clamp + decay + sync + rehedge + tick) — use `_runSubstep()`
+- Inline strategy refresh sequences (resetRange + priceExpiry + updateChainDisplay + updateStockBondPrices + updateStrategyBuilder + updateTimeSliderRange) — use `_refreshStrategyView()`
+- `_LOBBY_COLORS` / `_LOBBY_LABELS` as separate objects — merged into `_LOBBY_META`
+- `_active` + `_pipeline` dual maps in regulations.js — unified into single `_state` Map (id → `{ status, remainingDays }`)
+- `_poisson(lam)` method on Simulation — dead code, only `_poissonFast()` is used
+- Duplicate `.sim-input` CSS block — single definition at line ~534, not repeated
+- Empty `.pos-row {}` / `.order-row {}` CSS rules — no-ops, removed
+- `_hideClass` helper in ui.js — dead code, never called
 
 ### Lore Reference
 

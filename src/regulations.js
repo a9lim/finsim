@@ -7,11 +7,9 @@
    Leaf module. No DOM access.
    =================================================== */
 
-const _active = new Map(); // id -> regulation object (status === 'active' only)
-
-// Pipeline: tracks both pending bills and active regulations
-// id -> { status: 'introduced'|'committee'|'floor'|'active'|'failed'|'expired'|'repealed', remainingDays: number|null }
-const _pipeline = new Map();
+// Unified state: id -> { status, remainingDays }
+// Status: 'introduced'|'committee'|'floor'|'active'|'failed'|'expired'|'repealed'
+const _state = new Map();
 
 const REGULATIONS = [
     {
@@ -123,12 +121,11 @@ export function advanceBill(id, status) {
     if (!reg) return;
 
     if (status === 'failed' || status === 'repealed') {
-        _pipeline.delete(id);
-        _active.delete(id);
+        _state.delete(id);
         return;
     }
 
-    const entry = _pipeline.get(id) || { status: null, remainingDays: null };
+    const entry = _state.get(id) || { status: null, remainingDays: null };
     entry.status = status;
 
     if (status === 'active') {
@@ -137,10 +134,9 @@ export function advanceBill(id, status) {
         } else {
             entry.remainingDays = null;
         }
-        _active.set(id, reg);
     }
 
-    _pipeline.set(id, entry);
+    _state.set(id, entry);
 }
 
 /**
@@ -155,16 +151,14 @@ export function activateRegulation(id, customDuration) {
         ? (customDuration ?? reg.duration)
         : null;
 
-    _pipeline.set(id, { status: 'active', remainingDays });
-    _active.set(id, reg);
+    _state.set(id, { status: 'active', remainingDays });
 }
 
 /**
  * Deactivate a regulation directly.
  */
 export function deactivateRegulation(id) {
-    _pipeline.delete(id);
-    _active.delete(id);
+    _state.delete(id);
 }
 
 /**
@@ -173,17 +167,14 @@ export function deactivateRegulation(id) {
  */
 export function tickRegulations() {
     const expired = [];
-    for (const [id, entry] of _pipeline) {
+    for (const [id, entry] of _state) {
         if (entry.status !== 'active' || entry.remainingDays == null) continue;
         entry.remainingDays--;
         if (entry.remainingDays <= 0) {
-            entry.status = 'expired';
-            _active.delete(id);
             expired.push(id);
         }
     }
-    // Clean up expired entries from pipeline
-    for (const id of expired) _pipeline.delete(id);
+    for (const id of expired) _state.delete(id);
     return { expired };
 }
 
@@ -193,7 +184,7 @@ export function tickRegulations() {
  */
 export function getRegulationPipeline() {
     const result = [];
-    for (const [id, entry] of _pipeline) {
+    for (const [id, entry] of _state) {
         const reg = _regById.get(id);
         if (!reg) continue;
         result.push({
@@ -215,13 +206,20 @@ export function getRegulationPipeline() {
  * Get current pipeline status for a regulation (used by event guards).
  */
 export function getPipelineStatus(id) {
-    const entry = _pipeline.get(id);
+    const entry = _state.get(id);
     return entry ? entry.status : null;
 }
 
 /** Get all currently active regulation objects. */
 export function getActiveRegulations() {
-    return [..._active.values()];
+    const result = [];
+    for (const [id, entry] of _state) {
+        if (entry.status === 'active') {
+            const reg = _regById.get(id);
+            if (reg) result.push(reg);
+        }
+    }
+    return result;
 }
 
 /**
@@ -232,7 +230,10 @@ export function getRegulationEffect(effectKey, defaultVal) {
     let result = defaultVal;
     let found = false;
 
-    for (const [, reg] of _active) {
+    for (const [id, entry] of _state) {
+        if (entry.status !== 'active') continue;
+        const reg = _regById.get(id);
+        if (!reg) continue;
         const val = reg.effects[effectKey];
         if (val === undefined) continue;
 
@@ -261,8 +262,7 @@ export function getRegulation(id) {
 }
 
 export function resetRegulations() {
-    _active.clear();
-    _pipeline.clear();
+    _state.clear();
 }
 
 export { REGULATIONS };

@@ -106,26 +106,64 @@ let _savedOverlays = {};
 const _popupQueue = [];
 const playerChoices = {};
 
-const _LOBBY_COLORS = {
-    pac_federalist: 'lobby-pill-fed',
-    pac_farmerlabor: 'lobby-pill-fl',
-    host_fundraiser: 'lobby-pill-pol',
-    broker_deal: 'lobby-pill-pol',
-    leak_to_media: 'lobby-pill-media',
-    counsel_fed: 'lobby-pill-fed-rel',
-};
-const _LOBBY_LABELS = {
-    pac_federalist: '+Fed',
-    pac_farmerlabor: '+F-L',
-    host_fundraiser: 'Host',
-    broker_deal: 'Deal',
-    leak_to_media: 'Leak',
-    counsel_fed: 'Fed',
+const _LOBBY_META = {
+    pac_federalist:  { cls: 'lobby-pill-fed',     label: '+Fed' },
+    pac_farmerlabor: { cls: 'lobby-pill-fl',      label: '+F-L' },
+    host_fundraiser: { cls: 'lobby-pill-pol',     label: 'Host' },
+    broker_deal:     { cls: 'lobby-pill-pol',     label: 'Deal' },
+    leak_to_media:   { cls: 'lobby-pill-media',   label: 'Leak' },
+    counsel_fed:     { cls: 'lobby-pill-fed-rel', label: 'Fed' },
 };
 const impactHistory = [];
 let _lobbyCount = 0;
 const quarterlyReviews = [];
 
+
+// ---------------------------------------------------------------------------
+// Micro-helpers — eliminate repeated typeof guards & duplicated blocks
+// ---------------------------------------------------------------------------
+
+function _toast(msg, duration) {
+    if (typeof showToast !== 'undefined') showToast(msg, duration);
+}
+function _haptic(pattern) {
+    if (typeof _haptics !== 'undefined') _haptics.trigger(pattern);
+}
+function _clampRate() {
+    const ceil = getRegulationEffect('rateCeiling', null);
+    const flr  = getRegulationEffect('rateFloor', null);
+    if (ceil !== null && sim.r > ceil) sim.r = ceil;
+    if (flr  !== null && sim.r < flr)  sim.r = flr;
+}
+/** Run one substep + impact decay + market sync + MM rehedge + order check. */
+function _runSubstep() {
+    sim.substep();
+    _clampRate();
+    decayImpactVolumes();
+    syncMarket(sim);
+    rehedgeMM(portfolio.positions);
+    _onSubstepTick();
+}
+/** Common tail after modifying strategyLegs: reprice, rebuild UI, mark dirty. */
+function _refreshStrategyView() {
+    strategy.resetRange(sim.S, strategyLegs);
+    const spe = _priceExpiry(_strategyExpiryIdx());
+    updateStrategyChainDisplay($, spe, handleAddLeg, _buildStrategyPosMap());
+    updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+    updateStrategyBuilder();
+    updateTimeSliderRange();
+    dirty = true;
+}
+/** Populate strategyLegs from resolved legs array. */
+function _populateStrategyLegs(resolved) {
+    strategyLegs.length = 0;
+    for (const leg of resolved) {
+        strategyLegs.push({
+            type: leg.type, qty: leg.qty, strike: leg.strike,
+            expiryDay: leg.expiryDay, _refS: sim.S, _refDay: sim.day,
+        });
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Rate sparkline helpers
@@ -291,8 +329,8 @@ function init() {
         { key: ',', label: 'Slow down',            group: 'Simulation', action: () => decycleSpeed() },
         { key: '/', label: 'Step forward one day', group: 'Simulation', action: () => step() },
         { key: 'r', label: 'Reset simulation',    group: 'Simulation', action: () => resetSim() },
-        { key: 's', label: 'Toggle sidebar',       group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); } },
-        { key: 't', label: 'Toggle sidebar',       group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); if (typeof _haptics !== 'undefined') _haptics.trigger('light'); } },
+        { key: 's', label: 'Toggle sidebar',       group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); _haptic('light'); } },
+        { key: 't', label: 'Toggle sidebar',       group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); _haptic('light'); } },
         { key: '[', label: 'Previous tab',         group: 'View',       action: () => cycleTab(-1) },
         { key: ']', label: 'Next tab',             group: 'View',       action: () => cycleTab(1) },
         { key: 'Escape', label: 'Close sidebar',   group: 'View',       action: () => { if ($.sidebar.classList.contains('open')) _toolbar.toggleSidebar($.panelToggle, $.sidebar); } },
@@ -452,7 +490,7 @@ function init() {
         const id = e.detail && e.detail.id;
         if (id != null) {
             const ok = closePosition(sim, id, sim.S, market.sigma, sim.r, sim.day, sim.q);
-            if (ok && typeof showToast !== 'undefined') showToast('Position closed.');
+            if (ok) _toast('Position closed.');
             chainDirty = true;
             updateUI();
             dirty = true;
@@ -470,9 +508,7 @@ function init() {
             if (result && qty > 0) {
                 _recordImpact(sim.day, isCall ? 1 : -1, qty, 'Option exercise');
             }
-            if (typeof showToast !== 'undefined') {
-                showToast(result ? 'Option exercised.' : 'Cannot exercise.');
-            }
+            _toast(result ? 'Option exercised.' : 'Cannot exercise.');
             chainDirty = true;
             updateUI();
             dirty = true;
@@ -483,7 +519,7 @@ function init() {
         const id = e.detail && e.detail.id;
         if (id != null) {
             cancelOrder(id);
-            if (typeof showToast !== 'undefined') showToast('Order cancelled.');
+            _toast('Order cancelled.');
             updateUI();
             dirty = true;
         }
@@ -498,7 +534,7 @@ function init() {
             if (closePosition(sim, pos.id, sim.S, market.sigma, sim.r, sim.day, sim.q)) closed++;
         }
         if (closed > 0) {
-            if (typeof showToast !== 'undefined') showToast('Unwound "' + name + '" (' + closed + ' position' + (closed > 1 ? 's' : '') + ').');
+            _toast('Unwound "' + name + '" (' + closed + ' position' + (closed > 1 ? 's' : '') + ').');
             chainDirty = true;
             updateUI();
             dirty = true;
@@ -572,7 +608,7 @@ function init() {
                 if (result.playerFlag) playerChoices[result.playerFlag] = day;
                 else playerChoices['lobbied_' + actionId] = day;
                 _lobbyCount++;
-                showToast('Lobbying: ' + result.action.name + (result.cost > 0 ? ' (-$' + result.cost + 'k)' : ''), 3000);
+                _toast('Lobbying: ' + result.action.name + (result.cost > 0 ? ' (-$' + result.cost + 'k)' : ''), 3000);
                 _updateLobbyPills();
                 dirty = true;
             }
@@ -730,15 +766,7 @@ function frame(now) {
             // Run any pending sub-steps
             let stepped = false;
             while (sim.substepsDone < targetSteps) {
-                sim.substep();
-                const _rateCeil = getRegulationEffect('rateCeiling', null);
-                const _rateFlr = getRegulationEffect('rateFloor', null);
-                if (_rateCeil !== null && sim.r > _rateCeil) sim.r = _rateCeil;
-                if (_rateFlr !== null && sim.r < _rateFlr) sim.r = _rateFlr;
-                decayImpactVolumes();
-                syncMarket(sim);
-                rehedgeMM(portfolio.positions);
-                _onSubstepTick();
+                _runSubstep();
                 chart.setLiveCandle(sim._partial);
                 stepped = true;
             }
@@ -782,10 +810,8 @@ function _onSubstepTick() {
     // Check pending orders at intraday price
     const filledOrders = checkPendingOrders(sim, sim.S, vol, sim.r, sim.day, sim.q);
     for (const pos of filledOrders) {
-        if (typeof showToast !== 'undefined') {
-            const side = pos.qty > 0 ? 'Bought' : 'Sold';
-            showToast(side + ' ' + Math.abs(pos.qty) + 'k ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
-        }
+        const side = pos.qty > 0 ? 'Bought' : 'Sold';
+        _toast(side + ' ' + Math.abs(pos.qty) + 'k ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
         chainDirty = true;
     }
 
@@ -824,7 +850,7 @@ function _updateLobbyPills() {
             $.lobbyActions.appendChild(div);
         }
         const btn = document.createElement('button');
-        const colorCls = _LOBBY_COLORS[action.id] || '';
+        const colorCls = (_LOBBY_META[action.id] || {}).cls || '';
         const isFirst = i === 0;
         const isLast = i === actions.length - 1;
         let radiusCls = '';
@@ -834,7 +860,7 @@ function _updateLobbyPills() {
         btn.className = `substrate-pill lobby-pill ${colorCls} ${radiusCls}`.trim();
         btn.dataset.lobby = action.id;
         btn.disabled = !action.affordable || !action.cooldownReady;
-        const label = _LOBBY_LABELS[action.id] || action.name;
+        const label = (_LOBBY_META[action.id] || {}).label || action.name;
         const cost = action.cost > 0 ? ` $${action.cost}k` : '';
         btn.textContent = label + cost;
         btn.title = action.desc + (action.cooldownReady ? '' : ' (cooldown)');
@@ -907,7 +933,7 @@ function _processPopupQueue() {
             }
         }
         if (choice.resultToast) {
-            showToast(choice.resultToast, 4000);
+            _toast(choice.resultToast, 4000);
         }
         // -- Declarative trade execution --
         if (choice.trades) {
@@ -952,7 +978,7 @@ function _processPopupQueue() {
                             sim.S, vol, sim.r, sim.day,
                             undefined, undefined, undefined, sim.q
                         );
-                        showToast(`Hedge placed: bought ${hedgeQty} shares at market.`, 4000);
+                        _toast(`Hedge placed: bought ${hedgeQty} shares at market.`, 4000);
                     }
                     continue;
                 }
@@ -967,7 +993,7 @@ function _processPopupQueue() {
             }
             if (closed > 0) {
                 const sign = pnlSum >= 0 ? '+' : '';
-                showToast(`Closed ${closed} position${closed > 1 ? 's' : ''}. P&L: ${sign}${fmtDollar(pnlSum)}`, 4000);
+                _toast(`Closed ${closed} position${closed > 1 ? 's' : ''}. P&L: ${sign}${fmtDollar(pnlSum)}`, 4000);
                 chainDirty = true;
                 updateUI();
             }
@@ -984,7 +1010,7 @@ function _processPopupQueue() {
             const tip = pickTip();
             const isReal = Math.random() < TIP_REAL_PROBABILITY;
             const eventId = isReal ? tip.realEvent : tip.fakeEvent;
-            showToast(`"Word is ${tip.hint}."`, 6000);
+            _toast(`"Word is ${tip.hint}."`, 6000);
             eventEngine.scheduleFollowup({ id: eventId, mtth: 14 }, sim.day);
             if (isReal) {
                 shiftFaction('firmStanding', -5);
@@ -1013,7 +1039,7 @@ function _processPopupQueue() {
                 // Re-check margin after partial liquidation
                 const recheck = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
                 if (recheck.triggered) {
-                    showToast('Still below margin. Full liquidation required.', 4000);
+                    _toast('Still below margin. Full liquidation required.', 4000);
                     liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
                     chainDirty = true;
                     updateUI();
@@ -1022,7 +1048,7 @@ function _processPopupQueue() {
                     }
                 }
             }
-            if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
+            _haptic('heavy');
         }
         // Rogue trading / game over actions
         if (event._gameOverAction) {
@@ -1128,7 +1154,7 @@ function _portfolioEquity() {
 
 function _showInterjection(text) {
     const container = document.getElementById('toast-container');
-    showToast(text, 6000);
+    _toast(text, 6000);
     requestAnimationFrame(() => {
         const last = container?.lastElementChild;
         if (last) last.classList.add('interjection-toast');
@@ -1158,9 +1184,9 @@ function _onDayComplete() {
     if (sim.q > 0 && sim.day > 0 && sim.day % QUARTERLY_CYCLE === 0) {
         sim.S *= (1 - sim.q / 4);
         const divNet = processDividends(sim.S, sim.q);
-        if (divNet !== 0 && typeof showToast !== 'undefined') {
+        if (divNet !== 0) {
             const label = divNet > 0 ? 'Dividend received' : 'Dividend charged';
-            showToast(label + ': $' + Math.abs(divNet).toFixed(2));
+            _toast(label + ': $' + Math.abs(divNet).toFixed(2));
         }
     }
 
@@ -1190,14 +1216,14 @@ function _onDayComplete() {
         if (playerChoices.cooperated_sec || playerChoices.silent_sec || playerChoices.accepted_insider_tip) {
             text += ' The SEC inquiry hasn\'t helped perception of the desk.';
         }
-        showToast(text, rating === 'poor' ? 8000 : 5000);
+        _toast(text, rating === 'poor' ? 8000 : 5000);
     }
 
     const { expired, unwound } = processExpiry(sim, sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
     if (unwound.length > 0) {
         const names = [...new Set(unwound.map(p => p.strategyName))];
         for (const name of names) {
-            if (typeof showToast !== 'undefined') showToast('Strategy "' + name + '" expired — unwound all legs.');
+            _toast('Strategy "' + name + '" expired — unwound all legs.');
         }
         chainDirty = true;
     }
@@ -1230,7 +1256,7 @@ function _onDayComplete() {
     const newTraits = evaluateTraits(_traitCtx);
     for (const id of newTraits) {
         const trait = getTrait(id);
-        if (trait) showToast(`${trait.permanent ? 'Conviction unlocked' : 'Reputation earned'}: ${trait.name}`, 4000);
+        if (trait) _toast(`${trait.permanent ? 'Conviction unlocked' : 'Reputation earned'}: ${trait.name}`, 4000);
     }
 
     // Fire dynamic events
@@ -1272,33 +1298,31 @@ function _onDayComplete() {
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
             updateCongressDiagrams($, eventEngine.world);
             updateStandings($, eventEngine.world, factions, getFactionDescriptor);
-            if (typeof showToast !== 'undefined') {
-                for (let i = 0; i < fired.length; i++) {
-                    const ev = fired[i];
-                    let headline = ev.headline;
-                    if (ev.interjection) {
-                        setTimeout(function() { _showInterjection(headline); }, i * 1500);
-                        continue;
-                    }
-                    if (ev.portfolioFlavor) {
-                        const flavor = ev.portfolioFlavor(portfolio);
-                        if (flavor) headline += ' ' + flavor;
-                    }
-                    if (getTraitEffect('eventHintArrows', false) && ev.params) {
-                        const _hintMu = ev.params.mu || 0;
-                        if (_hintMu > 0) headline += ' \u2191';
-                        else if (_hintMu < 0) headline += ' \u2193';
-                    }
-                    const duration = ev.magnitude === 'major' ? 8000
-                        : ev.magnitude === 'moderate' ? 5000 : 3000;
-                    setTimeout(function() { showToast(headline, duration); }, i * 1500);
-                    setTimeout(function() {
-                        const _mu = ev.params?.mu || 0;
-                        if (_mu > 0.02) playStinger('positive');
-                        else if (_mu < -0.02) playStinger('negative');
-                        else playStinger('alert');
-                    }, i * 1500 + 200);
+            for (let i = 0; i < fired.length; i++) {
+                const ev = fired[i];
+                let headline = ev.headline;
+                if (ev.interjection) {
+                    setTimeout(function() { _showInterjection(headline); }, i * 1500);
+                    continue;
                 }
+                if (ev.portfolioFlavor) {
+                    const flavor = ev.portfolioFlavor(portfolio);
+                    if (flavor) headline += ' ' + flavor;
+                }
+                if (getTraitEffect('eventHintArrows', false) && ev.params) {
+                    const _hintMu = ev.params.mu || 0;
+                    if (_hintMu > 0) headline += ' \u2191';
+                    else if (_hintMu < 0) headline += ' \u2193';
+                }
+                const duration = ev.magnitude === 'major' ? 8000
+                    : ev.magnitude === 'moderate' ? 5000 : 3000;
+                setTimeout(function() { _toast(headline, duration); }, i * 1500);
+                setTimeout(function() {
+                    const _mu = ev.params?.mu || 0;
+                    if (_mu > 0.02) playStinger('positive');
+                    else if (_mu < -0.02) playStinger('negative');
+                    else playStinger('alert');
+                }, i * 1500 + 200);
             }
         }
     }
@@ -1313,7 +1337,7 @@ function _onDayComplete() {
         const { expired } = tickRegulations();
         for (const id of expired) {
             const reg = getRegulation(id);
-            if (reg) showToast('Regulation expired: ' + reg.name, 3000);
+            if (reg) _toast('Regulation expired: ' + reg.name, 3000);
         }
     }
 
@@ -1346,7 +1370,7 @@ function _onDayComplete() {
     // Impact toast
     const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
     const toast = selectImpactToast(grossRatio, hasOptions ? 'option' : 'stock', sim.day);
-    if (toast) showToast(toast, 3000);
+    if (toast) _toast(toast, 3000);
 
     if (grossRatio > 0.75) shiftFaction('regulatoryExposure', 1);
 
@@ -1430,33 +1454,13 @@ function _onDayComplete() {
 function tick() {
     if (dayInProgress) {
         // Finish remaining sub-steps instantly
-        while (!sim.dayComplete) {
-            sim.substep();
-            const _rateCeil = getRegulationEffect('rateCeiling', null);
-            const _rateFlr = getRegulationEffect('rateFloor', null);
-            if (_rateCeil !== null && sim.r > _rateCeil) sim.r = _rateCeil;
-            if (_rateFlr !== null && sim.r < _rateFlr) sim.r = _rateFlr;
-            decayImpactVolumes();
-            syncMarket(sim);
-            rehedgeMM(portfolio.positions);
-            _onSubstepTick();
-        }
+        while (!sim.dayComplete) _runSubstep();
         sim.finalizeDay();
         dayInProgress = false;
     } else {
         // Full day: beginDay + substeps + finalizeDay
         sim.beginDay();
-        for (let i = 0; i < INTRADAY_STEPS; i++) {
-            sim.substep();
-            const _rateCeil = getRegulationEffect('rateCeiling', null);
-            const _rateFlr = getRegulationEffect('rateFloor', null);
-            if (_rateCeil !== null && sim.r > _rateCeil) sim.r = _rateCeil;
-            if (_rateFlr !== null && sim.r < _rateFlr) sim.r = _rateFlr;
-            decayImpactVolumes();
-            syncMarket(sim);
-            rehedgeMM(portfolio.positions);
-            _onSubstepTick();
-        }
+        for (let i = 0; i < INTRADAY_STEPS; i++) _runSubstep();
         sim.finalizeDay();
     }
     // Snap the lerp to the final state (no animation for step)
@@ -1619,7 +1623,7 @@ function togglePlay() {
         if (!dayInProgress) lastTickTime -= 2000; // force immediate beginDay
     }
     updatePlayBtn($, playing);
-    if (typeof _haptics !== 'undefined') _haptics.trigger(playing ? 'medium' : 'light');
+    _haptic(playing ? 'medium' : 'light');
 }
 
 function step() {
@@ -1633,15 +1637,7 @@ function step() {
     }
 
     // Advance one substep
-    sim.substep();
-    const _rateCeil = getRegulationEffect('rateCeiling', null);
-    const _rateFlr = getRegulationEffect('rateFloor', null);
-    if (_rateCeil !== null && sim.r > _rateCeil) sim.r = _rateCeil;
-    if (_rateFlr !== null && sim.r < _rateFlr) sim.r = _rateFlr;
-    decayImpactVolumes();
-    syncMarket(sim);
-    rehedgeMM(portfolio.positions);
-    _onSubstepTick();
+    _runSubstep();
     chart.setLiveCandle(sim._partial);
     _onSubstepUI();
 
@@ -1654,7 +1650,7 @@ function step() {
     }
 
     dirty = true;
-    if (typeof _haptics !== 'undefined') _haptics.trigger('light');
+    _haptic('light');
 }
 
 function _syncLerpSpeed() {
@@ -1665,14 +1661,14 @@ function cycleSpeed() {
     speedIndex = (speedIndex + 1) % SPEED_OPTIONS.length;
     updateSpeedBtn($, SPEED_OPTIONS[speedIndex] * 2);
     _syncLerpSpeed();
-    if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
+    _haptic('selection');
 }
 
 function decycleSpeed() {
     speedIndex = (speedIndex - 1 + SPEED_OPTIONS.length) % SPEED_OPTIONS.length;
     updateSpeedBtn($, SPEED_OPTIONS[speedIndex] * 2);
     _syncLerpSpeed();
-    if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
+    _haptic('selection');
 }
 
 function _resetCore(index) {
@@ -1744,7 +1740,7 @@ function loadPreset(index) {
     updateUI();
     _repositionCamera();
     dirty = true;
-    if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
+    _haptic('medium');
 }
 
 function resetSim() {
@@ -1760,7 +1756,7 @@ function resetSim() {
     updateUI();
     _repositionCamera();
     dirty = true;
-    if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
+    _haptic('heavy');
 }
 
 function _isDynamicPreset(index) { return index >= 5; }
@@ -1793,18 +1789,18 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
         const pos = executeMarketOrder(sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q);
         if (pos) {
             const label = side === 'short' ? 'Shorted' : 'Bought';
-            if (typeof showToast !== 'undefined') showToast(label + ' ' + qty + 'k ' + type + ' at $' + pos.fillPrice.toFixed(2));
-            if (typeof _haptics !== 'undefined') _haptics.trigger('success');
+            _toast(label + ' ' + qty + 'k ' + type + ' at $' + pos.fillPrice.toFixed(2));
+            _haptic('success');
             if (type === 'stock') _recordImpact(sim.day, side === 'long' ? 1 : -1, qty, 'Stock trade');
         } else {
-            if (typeof showToast !== 'undefined') showToast('Insufficient margin.');
-            if (typeof _haptics !== 'undefined') _haptics.trigger('error');
+            _toast('Insufficient margin.');
+            _haptic('error');
         }
     } else {
         const triggerPrice = _getTriggerPrice();
         placePendingOrder(type, side, qty, orderType, triggerPrice, strike, expiryDay);
-        if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' order placed for ' + qty + 'k ' + type + '.');
-        if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
+        _toast('Pending ' + orderType + ' order placed for ' + qty + 'k ' + type + '.');
+        _haptic('medium');
     }
     chainDirty = true;
     updateUI();
@@ -1858,16 +1854,16 @@ function handleTradeSubmit(data) {
             sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q
         );
         if (pos) {
-            if (typeof showToast !== 'undefined') showToast('Order filled: ' + type + ' x' + qty + 'k');
-            if (typeof _haptics !== 'undefined') _haptics.trigger('success');
+            _toast('Order filled: ' + type + ' x' + qty + 'k');
+            _haptic('success');
         } else {
-            if (typeof showToast !== 'undefined') showToast('Order failed — insufficient margin.');
-            if (typeof _haptics !== 'undefined') _haptics.trigger('error');
+            _toast('Order failed — insufficient margin.');
+            _haptic('error');
         }
     } else {
         placePendingOrder(type, side, qty, orderType, limitPrice, strike, expiryDay);
-        if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' order placed.');
-        if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
+        _toast('Pending ' + orderType + ' order placed.');
+        _haptic('medium');
     }
 
     chainDirty = true;
@@ -1893,14 +1889,14 @@ function handleLiquidate() {
     chainDirty = true;
     updateUI();
     dirty = true;
-    if (typeof _haptics !== 'undefined') _haptics.trigger('heavy');
+    _haptic('heavy');
 
     if (portfolio.cash < sim.S) {
         _showGameOver('Following the forced liquidation of all positions, your account remains in deficit by '
             + fmtDollar(Math.abs(portfolio.cash))
             + '. Regulators have flagged the account for review.');
     } else {
-        if (typeof showToast !== 'undefined') showToast('All positions liquidated.');
+        _toast('All positions liquidated.');
     }
 }
 
@@ -1937,25 +1933,13 @@ function handleAddLeg(type, side, strike, expiryDay) {
         strategyLegs.push(leg);
     }
 
-    strategy.resetRange(sim.S, strategyLegs);
-    const spe = _priceExpiry(_strategyExpiryIdx());
-    updateStrategyChainDisplay($, spe, handleAddLeg, _buildStrategyPosMap());
-    updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
-    updateStrategyBuilder();
-    updateTimeSliderRange();
-    dirty = true;
-    if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
+    _refreshStrategyView();
+    _haptic('selection');
 }
 
 function handleRemoveLeg(index) {
     strategyLegs.splice(index, 1);
-    strategy.resetRange(sim.S, strategyLegs);
-    const spe = _priceExpiry(_strategyExpiryIdx());
-    updateStrategyChainDisplay($, spe, handleAddLeg, _buildStrategyPosMap());
-    updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
-    updateStrategyBuilder();
-    updateTimeSliderRange();
-    dirty = true;
+    _refreshStrategyView();
 }
 
 function _isSelectableExpiry() {
@@ -1979,24 +1963,22 @@ function handleSaveStrategy() {
     const relLegs = legsToRelative(strategyLegs, sim.S, sim.day, selExpiry);
     const id = saveStrategy(currentStrategyHash, name, relLegs, selExpiry);
     if (id === 'collision') {
-        if (typeof showToast !== 'undefined') showToast('A strategy with that name already exists.');
-        if (typeof _haptics !== 'undefined') _haptics.trigger('error');
+        _toast('A strategy with that name already exists.');
+        _haptic('error');
         return;
     }
     if (id === null) {
-        if (typeof showToast !== 'undefined') showToast('Strategy limit reached (max 50).');
-        if (typeof _haptics !== 'undefined') _haptics.trigger('error');
+        _toast('Strategy limit reached (max 50).');
+        _haptic('error');
         return;
     }
     currentStrategyHash = id;
     isBuiltinLoaded = false;
     _refreshStrategyDropdowns();
     if ($.strategyLoadSelect) $.strategyLoadSelect.value = id;
-    if (typeof showToast !== 'undefined') {
-        const saved = getStrategy(id);
-        showToast('Strategy "' + (saved ? saved.name : '') + '" saved.');
-    }
-    if (typeof _haptics !== 'undefined') _haptics.trigger('success');
+    const saved = getStrategy(id);
+    _toast('Strategy "' + (saved ? saved.name : '') + '" saved.');
+    _haptic('success');
     updateStrategyBuilder();
 }
 
@@ -2035,16 +2017,16 @@ function executeWithRollback(resolvedLegs, strategyName, execMult) {
         portfolio.totalTrades = savedTotalTrades;
         portfolio.positions.length = 0;
         for (const p of savedPositions) portfolio.positions.push(p);
-        if (typeof showToast !== 'undefined') showToast('Strategy failed (leg ' + (results.length + 1) + ' rejected) \u2014 all legs unwound.');
-        if (typeof _haptics !== 'undefined') _haptics.trigger('error');
+        _toast('Strategy failed (leg ' + (results.length + 1) + ' rejected) \u2014 all legs unwound.');
+        _haptic('error');
     } else if (results.length > 0) {
         const netDebit = results.reduce((sum, r) => sum + r._fillCost, 0);
         const mult = execMult || 1;
         const perUnit = Math.abs(netDebit / mult);
         const verb = netDebit > 0 ? 'at' : 'for credit';
         const name = strategyName + 's';
-        if (typeof showToast !== 'undefined') showToast('Executed ' + mult + 'k ' + name + ' ' + verb + ' $' + perUnit.toFixed(2));
-        if (typeof _haptics !== 'undefined') _haptics.trigger('success');
+        _toast('Executed ' + mult + 'k ' + name + ' ' + verb + ' $' + perUnit.toFixed(2));
+        _haptic('success');
     }
     chainDirty = true;
     updateUI();
@@ -2060,31 +2042,15 @@ function handleLoadStrategy(id) {
     const overrideDay = strat.selectableExpiry ? _strategyExpiryDay() : null;
     const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
 
-    strategyLegs.length = 0;
-    for (const leg of resolved) {
-        strategyLegs.push({
-            type: leg.type,
-            qty: leg.qty,
-            strike: leg.strike,
-            expiryDay: leg.expiryDay,
-            _refS: sim.S,
-            _refDay: sim.day,
-        });
-    }
+    _populateStrategyLegs(resolved);
 
     isBuiltinLoaded = !!strat.builtin;
     currentStrategyHash = strat.builtin ? null : id;
     if ($.strategyNameInput) $.strategyNameInput.value = strat.name;
     if ($.selectableExpiryToggle) $.selectableExpiryToggle.checked = !!strat.selectableExpiry;
 
-    strategy.resetRange(sim.S, strategyLegs);
-    const spe = _priceExpiry(_strategyExpiryIdx());
-    updateStrategyChainDisplay($, spe, handleAddLeg, _buildStrategyPosMap());
-    updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
-    updateStrategyBuilder();
-    updateTimeSliderRange();
-    dirty = true;
-    if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
+    _refreshStrategyView();
+    _haptic('selection');
 }
 
 function handleDeleteStrategy() {
@@ -2098,14 +2064,11 @@ function handleDeleteStrategy() {
     isBuiltinLoaded = false;
     strategyLegs.length = 0;
     if ($.strategyNameInput) $.strategyNameInput.value = '';
-    strategy.resetRange(sim.S, strategyLegs);
     _refreshStrategyDropdowns();
     if ($.strategyLoadSelect) $.strategyLoadSelect.value = '';
-    updateStrategyBuilder();
-    updateTimeSliderRange();
-    dirty = true;
-    if (typeof showToast !== 'undefined') showToast('Strategy "' + (strat ? strat.name : '') + '" deleted.');
-    if (typeof _haptics !== 'undefined') _haptics.trigger('light');
+    _refreshStrategyView();
+    _toast('Strategy "' + (strat ? strat.name : '') + '" deleted.');
+    _haptic('light');
 }
 
 function handleTradeExecStrategy() {
@@ -2125,8 +2088,8 @@ function handleTradeExecStrategy() {
     } else {
         const triggerPrice = _getTriggerPrice();
         placePendingOrder(null, null, null, orderType, triggerPrice, null, null, strat.name, scaled, mult);
-        if (typeof showToast !== 'undefined') showToast('Pending ' + orderType + ' for ' + mult + 'k ' + strat.name + 's @ $' + triggerPrice.toFixed(0));
-        if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
+        _toast('Pending ' + orderType + ' for ' + mult + 'k ' + strat.name + 's @ $' + triggerPrice.toFixed(0));
+        _haptic('medium');
         chainDirty = true;
         updateUI();
         dirty = true;
@@ -2154,13 +2117,7 @@ function _reloadSelectableLegs() {
     const expiries = expiryMgr.update(sim.day);
     const overrideDay = _strategyExpiryDay();
     const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
-    strategyLegs.length = 0;
-    for (const leg of resolved) {
-        strategyLegs.push({
-            type: leg.type, qty: leg.qty, strike: leg.strike,
-            expiryDay: leg.expiryDay, _refS: sim.S, _refDay: sim.day,
-        });
-    }
+    _populateStrategyLegs(resolved);
     strategy.resetRange(sim.S, strategyLegs);
     updateStrategyBuilder();
     updateTimeSliderRange();
@@ -2245,7 +2202,7 @@ function _showEpilogue(pages) {
     keepBtn.onclick = () => {
         overlay.classList.add('hidden');
         _cleanupEpilogue();
-        if (typeof showToast !== 'undefined') showToast('Event storyline complete. Market simulation continues.');
+        _toast('Event storyline complete. Market simulation continues.');
     };
 
     overlay.classList.remove('hidden');

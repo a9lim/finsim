@@ -132,17 +132,28 @@ export function computeOptionBidAsk(mid, currentPrice, strike, currentVol) {
 // Reusable greek trees bundle for delta computation
 let _gt = null;
 
+/**
+ * Compute skew-adjusted sigma for an option position using market globals.
+ * @param {{ expiryDay: number, strike: number }} pos
+ * @returns {{ T: number, sigma: number } | null} null when expired (dte <= 0)
+ */
+function _optionSigma(pos) {
+    const dte = pos.expiryDay - market.day;
+    if (dte <= 0) return null;
+    const T = dte / TRADING_DAYS_PER_YEAR;
+    const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
+    const sigma = computeSkewSigma(sigEff, market.S, pos.strike, T, market.rho, market.xi, market.kappa);
+    return { T, sigma };
+}
+
 export function computeNetDelta() {
     let net = 0;
     for (const p of portfolio.positions) {
         if (p.type === 'stock') { net += p.qty; continue; }
         if (p.type === 'bond')  continue;
-        const dte = p.expiryDay - market.day;
-        if (dte <= 0) continue;
-        const T = dte / TRADING_DAYS_PER_YEAR;
-        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
-        const sigma = computeSkewSigma(sigEff, market.S, p.strike, T, market.rho, market.xi, market.kappa);
-        _gt = prepareGreekTrees(T, market.r, sigma, market.q, market.day, _gt);
+        const sv = _optionSigma(p);
+        if (!sv) continue;
+        _gt = prepareGreekTrees(sv.T, market.r, sv.sigma, market.q, market.day, _gt);
         const greeks = computeGreeksWithTrees(market.S, p.strike, p.type === 'put', _gt);
         net += greeks.delta * p.qty;
     }
@@ -154,12 +165,9 @@ export function computeGrossNotional() {
     for (const p of portfolio.positions) {
         if (p.type === 'stock') { gross += Math.abs(p.qty) * market.S; continue; }
         if (p.type === 'bond')  continue;
-        const dte = p.expiryDay - market.day;
-        if (dte <= 0) continue;
-        const T = dte / TRADING_DAYS_PER_YEAR;
-        const sigEff = computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi);
-        const sigma = computeSkewSigma(sigEff, market.S, p.strike, T, market.rho, market.xi, market.kappa);
-        _gt = prepareGreekTrees(T, market.r, sigma, market.q, market.day, _gt);
+        const sv = _optionSigma(p);
+        if (!sv) continue;
+        _gt = prepareGreekTrees(sv.T, market.r, sv.sigma, market.q, market.day, _gt);
         const greeks = computeGreeksWithTrees(market.S, p.strike, p.type === 'put', _gt);
         gross += Math.abs(greeks.delta * p.qty) * market.S;
     }
@@ -1059,15 +1067,12 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
 
         if (pos.type !== 'call' && pos.type !== 'put') continue;
 
-        const dte    = pos.expiryDay != null
-            ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
-            : 0;
+        if (market.v <= 0) continue;
+        const sv = _optionSigma(pos);
+        if (!sv) continue;
         const isPut  = pos.type === 'put';
-        if (dte <= 0 || market.v <= 0) continue;
-        const sigEff = computeEffectiveSigma(market.v, dte, market.kappa, market.theta, market.xi);
-        const sig = computeSkewSigma(sigEff, currentPrice, pos.strike, dte, market.rho, market.xi, market.kappa);
         if (!_greekTrees) _greekTrees = allocGreekTrees();
-        prepareGreekTrees(dte, currentRate, sig, q, currentDay, _greekTrees);
+        prepareGreekTrees(sv.T, currentRate, sv.sigma, q, currentDay, _greekTrees);
         const greeks = computeGreeksWithTrees(currentPrice, pos.strike, isPut, _greekTrees);
 
         delta += w * greeks.delta;
