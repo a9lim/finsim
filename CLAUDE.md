@@ -74,7 +74,7 @@ Impact is an **overlay** on `sim.S` — never mutates it. `getStockImpact(sigma)
 
 ### Popups vs Toasts
 
-Events are unified under `src/events/`. Toast-only events have `headline` + `params` but no `choices`. Popup events have `popup: true` + `choices`. Portfolio-triggered popups have `trigger` + `cooldown` (evaluated daily by `EventEngine.evaluateTriggers`). Superevents have `superevent: true` (full-screen treatment + chord stab). `showToast(message, duration)` — duration is numeric ms, no severity parameter. Long toasts auto-detect multiline and switch from pill to rounded-rect shape.
+Events are unified under `src/events/`. Toast-only events have `headline` + `params` but no `choices`. Popup events have `popup: true` + `choices`. Portfolio-triggered popups have `trigger` + `cooldown` + `tone` (`'positive'` or `'negative'`) evaluated daily by `EventEngine.evaluateTriggers`. Positive-tone events fire more often at high firm standing (inverse cooldown multiplier); negative-tone events fire less often. Superevents have `superevent: true` (full-screen treatment + chord stab). `showToast(message, duration)` — duration is numeric ms, no severity parameter. Long toasts auto-detect multiline and switch from pill to rounded-rect shape.
 
 ### Positions
 
@@ -112,7 +112,7 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - `minDay`/`maxDay` use live trading days (`day - 252`), different from `era` which uses absolute `day`
 - `getTraitEffect(key, defaultVal)` multiplies all active effects onto defaultVal (boolean: any true wins)
 - `getRegulationEffect(key, defaultVal)` — mult keys: product; add: sum; ceiling: min; floor: max; boolean: any true
-- One-shot events (migrated compound triggers) fire at most once per game — tracked by event id in `EventEngine._firedOneShots` Set
+- One-shot events (migrated compound triggers) fire at most once per game — tracked by event id in `EventEngine._firedOneShots` Set. Guard also applies in `_checkFollowups` so one-shots referenced as followups can't fire twice
 - `advanceBill(id, 'failed')` and `advanceBill(id, 'repealed')` remove from `_state` entirely — they are terminal states, not display states
 - `getPipelineStatus(id)` returns null if the regulation was never introduced or was removed — event guards must check for null, not 'inactive'
 - `trigger` (portfolio-triggered, daily eval) vs `when` (world-state eligibility guard) — events with `trigger` are never Poisson-drawn
@@ -150,10 +150,23 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - Duplicate `.sim-input` CSS block — single definition at line ~534, not repeated
 - Empty `.pos-row {}` / `.order-row {}` CSS rules — no-ops, removed
 - `_hideClass` helper in ui.js — dead code, never called
+- `factions` block in `createWorldState()` — removed; faction state lives solely in `faction-standing.js`, attached by reference
+- `Strait of Farsis` / `Beijing` / `Mar-a-Lago` / `Korindian` — use real geography (Strait of Hormuz, Nanjing, Little St. James, Meridine)
+
+### Cross-Domain Event Wiring
+
+Events form an interconnected web, not isolated threads. Key cross-domain connections:
+- **Geopolitical → PNTH**: Khasurian incursion sets `aegisDemandSurge` → Aegis events boost likelihood. Serican compute buildout sets `foundryCompetitionPressure` → Foundry events respond. Strait closure sets `energyCrisis` → Fed emergency followup.
+- **Investigation cross-pollination**: Okafor probe / Tan-Bowman story at stage 2+ trigger `meridian_exposed` bridge event (followupOnly) — but only if player has dirty flags (`pursued_insider_tip`, `hosted_fundraiser`, etc.) or high `regulatoryExposure`. Clean players are unaffected.
+- **Fed ↔ Geopolitical**: `recessionDeclared` / `energyCrisis` boost Fed cut event likelihood. Late-cycle hikes nudge `barronApproval` down.
+- **Election downstream**: Midterm results (`midtermResult`) reshape event likelihood — F-L win boosts investigations, blocks Big Beautiful Bill. Federalist landslide boosts deregulation, penalizes investigations.
+- **PNTH product spillover**: Companion scandal bumps `aegisControversy`, Aegis controversy reduces `commercialMomentum`, product outcomes shift board dynamics.
+- **Lobbying → narrative**: `lobbyingExposed` flag (set when `lobbyCount >= 3` and `mediaTrust < 40`) boosts media/compliance events and feeds into `meridianExposed` conditions.
+- **playerFlags → endings**: ~22 unused playerFlags wired into reputation synthesis in endings.js (compliance stance, trading style, political engagement, information edge).
 
 ### Lore Reference
 
-See `lore.md` for the full world bible. Key cast:
+**Lore rule:** Geography and institutions mirror the real world; polities and people are fictional. See `lore.md` for the full world bible. Key cast:
 
 **Federal States of Columbia**. President John Barron (Federalist) vs Robin Clay (Farmer-Labor). VP Jay Bowman. Fed Chair Hayden Hartley. Player is at Meridian Capital. Term ends live day 1008. Midterm elections at live day 504.
 
@@ -167,7 +180,9 @@ See `lore.md` for the full world bible. Key cast:
 
 ### World State Domains
 
-`congress` (seats + `filibusterActive` + `bigBillStatus` 0–4), `pnth` (board + products: `sentinelLaunched`/`aegisDeployed`/`companionLaunched`/`foundryLaunched` + `companionScandal`/`aegisControversy` 0–3), `geopolitical` (`sericaRelations` ±3, `farsistanEscalation`/`khasurianCrisis` 0–3, `straitClosed`), `fed`, `investigations`, `election`, `media` (`tanCredibility`/`sentinelRating` 0–10, `pressFreedomIndex` 0–10, `leakCount` 0–5).
+`congress` (seats + `filibusterActive` + `bigBillStatus` 0–4), `pnth` (board + products: `sentinelLaunched`/`aegisDeployed`/`companionLaunched`/`foundryLaunched` + `companionScandal`/`aegisControversy` 0–3), `geopolitical` (`sericaRelations` ±3, `farsistanEscalation`/`khasurianCrisis` 0–3, `straitClosed`, `aegisDemandSurge`, `foundryCompetitionPressure`, `energyCrisis`), `fed`, `investigations` (`tanBowmanStory`/`okaforProbeStage`/`impeachmentStage` 0–3, `meridianExposed` bool — set by bridge event when dirty player is caught in investigative crossfire), `election`, `media` (`tanCredibility`/`sentinelRating` 0–10, `pressFreedomIndex` 0–10, `leakCount` 0–5, `lobbyingExposed` bool — set when `lobbyCount >= 3` and `mediaTrust < 40`).
+
+`factions` is NOT in `createWorldState()` — it lives in `faction-standing.js` and is attached by reference via `eventEngine.world.factions = factions` at init/reset/preset-load.
 
 ### Exercise Netting
 
