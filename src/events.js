@@ -176,7 +176,10 @@ export class EventEngine {
         if (!params) return;
         for (const [key, delta] of Object.entries(params)) {
             const range = PARAM_RANGES[key];
-            if (!range) continue;
+            if (!range) {
+                console.warn(`[EventEngine] applyDeltas: unknown param "${key}" (no PARAM_RANGES entry)`);
+                continue;
+            }
             sim[key] = Math.min(range.max, Math.max(range.min, sim[key] + delta));
         }
         if (params.rho !== undefined) sim._recomputeRhoDerived();
@@ -418,6 +421,8 @@ export class EventEngine {
             const event = picked.event ?? getEventById(picked.id);
             if (!event) continue;
             if (event.when && !event.when(sim, this.world, congress, this._playerCtx)) continue;
+            if (event.oneShot && this._firedOneShot.has(event.id)) continue;
+            if (event.oneShot) this._firedOneShot.add(event.id);
 
             fired.push(this._fireEvent(event, sim, day, picked.depth, netDelta));
         }
