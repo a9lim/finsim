@@ -45,7 +45,7 @@ export const INVESTIGATION_EVENTS = [
         when: (sim, world) => world.investigations.tanBowmanStory === 1,
         params: { mu: -0.04, theta: 0.02, lambda: 0.6, muJ: -0.02 },
         effects: (world) => { world.investigations.tanBowmanStory = 2; world.election.barronApproval = Math.max(0, world.election.barronApproval - 5); shiftFaction('mediaTrust', 3); shiftFaction('regulatoryExposure', 5); },
-        followups: [ { id: 'doj_bowman_referral', mtth: 30, weight: 0.5 }, { id: 'tan_bombshell_recording', mtth: 40, weight: 0.4 }, ],
+        followups: [ { id: 'doj_bowman_referral', mtth: 30, weight: 0.5 }, { id: 'tan_bombshell_recording', mtth: 40, weight: 0.4 }, { id: 'meridian_exposed', mtth: 25, weight: 0.5 }, ],
     },
     {
         id: 'tan_bombshell_recording',
@@ -58,7 +58,7 @@ export const INVESTIGATION_EVENTS = [
         when: (sim, world) => world.investigations.tanBowmanStory >= 2,
         params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
         effects: (world) => { world.investigations.tanBowmanStory = 3; world.election.barronApproval = Math.max(0, world.election.barronApproval - 8); world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1); world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1); shiftFaction('mediaTrust', 3); shiftFaction('regulatoryExposure', 8); },
-        followups: [{ id: 'bowman_resigns', mtth: 20, weight: 0.5 }],
+        followups: [{ id: 'bowman_resigns', mtth: 20, weight: 0.5 }, { id: 'meridian_exposed', mtth: 25, weight: 0.5 }],
     },
     {
         id: 'tan_nsa_initial',
@@ -102,7 +102,11 @@ export const INVESTIGATION_EVENTS = [
     {
         id: 'okafor_hearings_opened',
         category: 'investigation',
-        likelihood: 0.8,
+        likelihood: (sim, world) => {
+            let base = 0.8;
+            if (world.investigations.tanBowmanStory >= 2) base *= 1.5;
+            return base;
+        },
         headline: 'Sen. Okafor formally opens Intelligence Committee hearings into PNTH-White House ties; witness list includes current and former PNTH executives',
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.okaforProbeStage === 0 && world.pnth.senateProbeLaunched,
@@ -112,13 +116,18 @@ export const INVESTIGATION_EVENTS = [
     {
         id: 'okafor_subpoenas',
         category: 'investigation',
-        likelihood: 1.0,
+        likelihood: (sim, world) => {
+            let base = 1.0;
+            if (world.investigations.tanBowmanStory >= 2) base *= 1.5;
+            return base;
+        },
         headline: 'Okafor issues subpoenas for Bowman financial records and Dirks-Bowman communications; White House invokes executive privilege. Constitutional showdown looms',
         magnitude: 'moderate',
         minDay: 250,
         when: (sim, world) => world.investigations.okaforProbeStage >= 1,
         params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         effects: (world) => { world.investigations.okaforProbeStage = 2; shiftFaction('regulatoryExposure', 5); shiftFaction('farmerLaborSupport', 2); },
+        followups: [{ id: 'meridian_exposed', mtth: 20, weight: 0.6 }],
     },
     {
         id: 'okafor_criminal_referral',
@@ -130,6 +139,7 @@ export const INVESTIGATION_EVENTS = [
         when: (sim, world) => world.investigations.okaforProbeStage >= 2,
         params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
         effects: (world) => { world.investigations.okaforProbeStage = 3; world.election.barronApproval = Math.max(0, world.election.barronApproval - 3); shiftFaction('regulatoryExposure', 10); shiftFaction('farmerLaborSupport', 3); },
+        followups: [{ id: 'meridian_exposed', mtth: 20, weight: 0.6 }],
     },
 
     // =====================================================================
@@ -395,6 +405,31 @@ export const INVESTIGATION_EVENTS = [
             },
         ],
     },
+    // =====================================================================
+    //  INVESTIGATION CROSS-POLLINATION BRIDGE
+    // =====================================================================
+    {
+        id: 'meridian_exposed',
+        followupOnly: true,
+        category: 'investigation',
+        headline: 'SEC compliance review flags Meridian Capital\'s derivatives desk in connection with ongoing federal probe. Your name appears in the filing.',
+        likelihood: 0,
+        magnitude: 'moderate',
+        params: { theta: 0.005 },
+        when: (sim, world, congress, ctx) =>
+            !world.investigations.meridianExposed && (
+                (ctx.playerChoices.pursued_insider_tip || ctx.playerChoices.pursued_pnth_tip || ctx.playerChoices.hosted_fundraiser) ||
+                (ctx.factions && ctx.factions.regulatoryExposure > 50)
+            ),
+        effects: (world) => {
+            world.investigations.meridianExposed = true;
+        },
+        factionShifts: [
+            { faction: 'regulatoryExposure', value: 10 },
+            { faction: 'firmStanding', value: -5 },
+        ],
+    },
+
     {
         id: 'scrutiny_enforcement',
         trigger: (sim, world, portfolio) => getRegLevel() >= 4,

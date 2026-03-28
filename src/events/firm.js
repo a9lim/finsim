@@ -318,7 +318,8 @@ export const FIRM_EVENTS = [
         trigger: (sim, world) => {
             const eq = equity();
             if (eq <= 0) return false;
-            const thresh = 0.30 * firmThresholdMult() * (hasTrait('under_scrutiny') ? 0.7 : 1);
+            const exposedMult = world?.investigations?.meridianExposed ? 0.7 : 1.0;
+            const thresh = 0.30 * firmThresholdMult() * (hasTrait('under_scrutiny') ? 0.7 : 1) * exposedMult;
             return shortDirectionalNotional() / eq > thresh && anyInvestigationActive(world);
         },
         cooldown: 200,
@@ -731,9 +732,10 @@ export const FIRM_EVENTS = [
 
     {
         id: 'desk_risk_committee',
-        trigger: () => {
+        trigger: (sim, world) => {
+            const exposedMult = world?.investigations?.meridianExposed ? 0.9 : 1.0;
             const eq = equity();
-            return eq < INITIAL_CAPITAL * (1 - ROGUE_TRADING_THRESHOLD * 0.8);
+            return eq < INITIAL_CAPITAL * (1 - ROGUE_TRADING_THRESHOLD * 0.8 * exposedMult);
         },
         cooldown: 250,
         tone: 'negative',
@@ -887,11 +889,12 @@ export const FIRM_EVENTS = [
 
     {
         id: 'desk_unusual_activity',
-        trigger: () => {
+        trigger: (sim, world) => {
             if (portfolio.peakValue <= INITIAL_CAPITAL) return false;
+            const exposedMult = world?.investigations?.meridianExposed ? 0.7 : 1.0;
             const eq = equity();
             const dailySwing = Math.abs(eq - portfolio.peakValue) / portfolio.peakValue;
-            return dailySwing > 0.08;
+            return dailySwing > 0.08 * exposedMult;
         },
         cooldown: 120,
         tone: 'negative',
