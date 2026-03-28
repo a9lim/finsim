@@ -11,7 +11,7 @@ export const MACRO_EVENTS = [
         id: 'tariffs_announced',
         category: 'macro',
         likelihood: 0.5,
-        headline: 'Barron signs executive order imposing 25% tariffs on $200B of imports; "America will no longer be ripped off," he declares at signing ceremony',
+        headline: 'Barron signs executive order imposing 25% tariffs on $200B of imports; "Columbia will no longer be ripped off," he declares at signing ceremony',
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 0,
         params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
@@ -488,8 +488,8 @@ export const MACRO_EVENTS = [
         when: (sim, world) => world.geopolitical.khasurianCrisis === 1,
         effects: (world) => { world.geopolitical.khasurianCrisis = 2; },
         followups: [
-            { id: 'khasuria_incursion', mtth: 45, weight: 2 },
-            { id: 'khasuria_backs_down', mtth: 45, weight: 1 },
+            { id: 'khasuria_incursion', mtth: 45, weight: 0.67 },
+            { id: 'khasuria_backs_down', mtth: 45, weight: 0.33 },
         ],
     },
     {
