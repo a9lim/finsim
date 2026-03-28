@@ -10,7 +10,11 @@ export const MEDIA_EVENTS = [
         id: 'tan_bowman_offshore',
         category: 'media',
         headline: 'Rachel Tan publishes Part 1 of her Bowman investigation: offshore accounts in the Farsistani banking system. The Continental\'s servers crash from traffic. Cole calls it "a hit piece."',
-        likelihood: 3,
+        likelihood: (sim, world) => {
+            let base = 3;
+            if (world.media.lobbyingExposed) base *= 1.5;
+            return base;
+        },
         params: { theta: 0.01 },
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.tanBowmanStory >= 1 && world.media.tanCredibility >= 4,
@@ -97,7 +101,11 @@ export const MEDIA_EVENTS = [
         id: 'tan_pnth_military',
         category: 'media',
         headline: 'Tan\'s Continental series on PNTH military contracts wins the Harriman Prize for investigative journalism. Dirks releases a statement calling it "irresponsible." Subscriptions spike. PNTH dips 2%.',
-        likelihood: 2,
+        likelihood: (sim, world) => {
+            let base = 2;
+            if (world.media.lobbyingExposed) base *= 1.5;
+            return base;
+        },
         params: { mu: -0.01, theta: 0.005 },
         magnitude: 'minor',
         when: (sim, world) => world.media.tanCredibility >= 7 && world.pnth.aegisDeployed,
