@@ -282,7 +282,8 @@ export class EventEngine {
         const triggered = [];
         for (const ev of this._triggerPool) {
             const cd = this._triggerCooldowns[ev.id];
-            if (cd && day - cd < ev.cooldown * firmCooldownMult()) continue;
+            const cdMult = ev.tone === 'positive' ? 1 / firmCooldownMult() : firmCooldownMult();
+            if (cd && day - cd < ev.cooldown * cdMult) continue;
             const liveDay = day - HISTORY_CAPACITY;
             if (ev.era === 'early' && liveDay > 500) continue;
             if (ev.era === 'mid'   && (liveDay < 500 || liveDay > 800)) continue;

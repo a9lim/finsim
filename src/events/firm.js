@@ -321,6 +321,7 @@ export const FIRM_EVENTS = [
             return shortDirectionalNotional() / eq > thresh && anyInvestigationActive(world);
         },
         cooldown: 200,
+        tone: 'negative',
         popup: true,
         headline: 'Meridian compliance flags short book — Okafor\'s committee is watching',
         context: (sim, world) => {
@@ -377,6 +378,7 @@ export const FIRM_EVENTS = [
                 (world.geopolitical.tradeWarStage >= 2 || world.geopolitical.recessionDeclared);
         },
         cooldown: 250,
+        tone: 'negative',
         popup: true,
         headline: 'Meridian CRO: "Do you know something we don\'t?"',
         context: (sim, world) => {
@@ -429,6 +431,7 @@ export const FIRM_EVENTS = [
             return notional / totalOpt > 0.50 && notional / eq > 0.10 * firmThresholdMult();
         },
         cooldown: 180,
+        tone: 'negative',
         popup: true,
         headline: 'Market maker complains about single-strike concentration',
         context: () => {
@@ -469,6 +472,7 @@ export const FIRM_EVENTS = [
             return (gross / eq) > 4 * (hasTrait('under_scrutiny') ? 0.7 : 1);
         },
         cooldown: 120,
+        tone: 'negative',
         popup: true,
         headline: 'Risk desk intervention: leverage ratio exceeds 4x',
         context: (sim) => {
@@ -518,6 +522,7 @@ export const FIRM_EVENTS = [
             return absStock > ADV * IMPACT_THRESHOLD_100;
         },
         cooldown: 200,
+        tone: 'positive',
         popup: true,
         headline: 'Your name is on the tape',
         context: () => {
@@ -566,6 +571,7 @@ export const FIRM_EVENTS = [
             return Math.abs(nuu) * market.S / eq > 0.10 * firmThresholdMult();
         },
         cooldown: 120,
+        tone: 'negative',
         popup: true,
         headline: 'Risk desk flags unlimited upside exposure',
         context: (sim) => {
@@ -616,6 +622,7 @@ export const FIRM_EVENTS = [
             return bondNotional() / eq > 0.20 * firmThresholdMult() && !world.fed.hartleyFired;
         },
         cooldown: 180,
+        tone: 'negative',
         era: 'early',
         popup: true,
         headline: 'Compliance flags bond position ahead of Hartley\'s FOMC meeting',
@@ -658,6 +665,7 @@ export const FIRM_EVENTS = [
             return pnthNotional / eq > 0.15 * firmThresholdMult() && daysToEarnings <= 10;
         },
         cooldown: 150,
+        tone: 'negative',
         popup: true,
         headline: 'Sellside salesman mentions "interesting flow" ahead of Malhotra\'s earnings call',
         context: () => {
@@ -688,6 +696,7 @@ export const FIRM_EVENTS = [
             return netDelta < -15 && sim.S > 115;
         },
         cooldown: 200,
+        tone: 'negative',
         popup: true,
         headline: 'The Meridian Brief: "One trader swimming against the tide"',
         context: (sim) => {
@@ -726,6 +735,7 @@ export const FIRM_EVENTS = [
             return eq < INITIAL_CAPITAL * (1 - ROGUE_TRADING_THRESHOLD * 0.8);
         },
         cooldown: 250,
+        tone: 'negative',
         popup: true,
         headline: 'Emergency risk committee meeting',
         context: () => {
@@ -777,6 +787,7 @@ export const FIRM_EVENTS = [
             return world.geopolitical.recessionDeclared && equity() > INITIAL_CAPITAL * 1.2;
         },
         cooldown: 300,
+        tone: 'positive',
         popup: true,
         headline: 'MarketWire: "Meridian Capital profits surge amid recession"',
         context: (sim, world) => {
@@ -829,6 +840,7 @@ export const FIRM_EVENTS = [
             return eq < INITIAL_CAPITAL * 0.85;
         },
         cooldown: 200,
+        tone: 'negative',
         era: 'early',
         popup: true,
         headline: 'Your MD wants a word',
@@ -881,6 +893,7 @@ export const FIRM_EVENTS = [
             return dailySwing > 0.08;
         },
         cooldown: 120,
+        tone: 'negative',
         popup: true,
         headline: 'Meridian compliance flags unusual P&L volatility',
         context: () => {
@@ -922,6 +935,7 @@ export const FIRM_EVENTS = [
             return quarters >= 3 && (eq > INITIAL_CAPITAL * 1.3 || hasTrait('meridian_star'));
         },
         cooldown: 300,
+        tone: 'positive',
         era: 'mid',
         popup: true,
         headline: 'A headhunter wants to poach you from Meridian',
@@ -967,6 +981,7 @@ export const FIRM_EVENTS = [
             return portfolio.maxDrawdown > 0.20 && eq >= INITIAL_CAPITAL * 0.98;
         },
         cooldown: 300,
+        tone: 'positive',
         popup: true,
         headline: 'The comeback kid',
         context: () => {
@@ -1003,6 +1018,7 @@ export const FIRM_EVENTS = [
         id: 'desk_first_milestone',
         trigger: () => equity() > INITIAL_CAPITAL * 1.15,
         cooldown: 600,  // basically once
+        tone: 'positive',
         era: 'early',
         popup: true,
         headline: 'The Meridian Brief mentions you by name',
@@ -1037,6 +1053,7 @@ export const FIRM_EVENTS = [
             return bondNotional() / eq > 0.10 * firmThresholdMult() && world.fed.hikeCycle;
         },
         cooldown: 200,
+        tone: 'negative',
         era: 'mid',
         popup: true,
         headline: 'Compliance requires documentation during Hartley\'s hiking cycle',
