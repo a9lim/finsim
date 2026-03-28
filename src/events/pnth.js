@@ -670,7 +670,7 @@ export const PNTH_EVENTS = [
         id: 'pnth_international_expansion',
         category: 'pnth',
         likelihood: 0.8,
-        headline: 'PNTH announces major Atlas Sentinel expansion into European and Asian markets. $2.4B in new international contracts. Malhotra: "Geographic diversification reduces our dependence on Aegis revenue." Dirks signs a separate Aegis MOU with the Korindian military.',
+        headline: 'PNTH announces major Atlas Sentinel expansion into European and Asian markets. $2.4B in new international contracts. Malhotra: "Geographic diversification reduces our dependence on Aegis revenue." Dirks signs a separate Aegis MOU with the Meridine military.',
         params: { mu: 0.04, theta: -0.01, lambda: -0.2 },
         magnitude: 'moderate',
         when: (sim, world) => !world.pnth.acquired,

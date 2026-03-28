@@ -107,7 +107,7 @@ export const MARKET_EVENTS = [
         id: 'zhaowei_beijing_summit',
         category: 'sector',
         likelihood: 1.5,
-        headline: 'Zhaowei CEO Liang Wei keynotes Beijing AI Summit; announces state-backed $50B compute buildout. Dirks calls it "a Sputnik moment for Columbian AI." The Meridian Brief: "Foundry just got a competitor with a sovereign balance sheet."',
+        headline: 'Zhaowei CEO Liang Wei keynotes Nanjing AI Summit; announces state-backed $50B compute buildout. Dirks calls it "a Sputnik moment for Columbian AI." The Meridian Brief: "Foundry just got a competitor with a sovereign balance sheet."',
         params: { mu: -0.005, theta: 0.003 },
         magnitude: 'minor',
         when: (sim, world) => world.geopolitical.sericaRelations <= 0,

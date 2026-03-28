@@ -161,7 +161,7 @@ See `lore.md` for the full world bible. Key cast:
 
 **PNTH**: Chairwoman Andrea Dirks vs CEO Eugene Gottlieb. CTO Mira Kassis, CFO Raj Malhotra, board kingmaker David Zhen. Products: Atlas Sentinel (enterprise), Atlas Aegis (military), Atlas Companion (consumer), Atlas Foundry (infrastructure), Covenant AI (Gottlieb's rival).
 
-**Geopolitics**: Serica (Premier Liang Wei), Khasuria (President Volkov), Farsistan (Emir al-Farhan, Strait of Farsis), Boliviara (President Madero), Meridia (PM Navon).
+**Geopolitics**: Serica (Premier Liang Wei), Khasuria (President Volkov), Farsistan (Emir al-Farhan, Strait of Hormuz), Boliviara (President Madero), Meridia (PM Navon).
 
 **Media**: The Continental (Rachel Tan, Tom Driscoll), The Sentinel (Marcus Cole), MarketWire (Priya Sharma), The Meridian Brief (internal).
 

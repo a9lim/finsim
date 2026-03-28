@@ -74,7 +74,7 @@ const REGULATIONS = [
     },
     {
         id: 'oil_emergency',
-        name: 'Strait of Farsis Emergency Margins',
+        name: 'Strait of Hormuz Emergency Margins',
         description: 'As Emir al-Farhan tightens the oil chokepoint, clearinghouses raise margin requirements across energy-linked instruments.',
         color: 'var(--ext-brown)',
         type: 'executive',
