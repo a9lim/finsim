@@ -548,8 +548,15 @@ export class EventEngine {
         // Lobby momentum: each point shifts the score by 3
         score += (w.election.lobbyMomentum || 0) * 3;
 
-        // Noise: +-10
-        score += (Math.random() - 0.5) * 20;
+        // Cross-domain signals
+        if (w.investigations.okaforProbeStage >= 2) score -= 5;
+        if (w.fed.hartleyFired) score -= 3;
+        if ((w.pnth.aegisControversy || 0) >= 2) score -= 3;
+        const factions = w.factions || {};
+        score += ((factions.federalistSupport || 30) - (factions.farmerLaborSupport || 30)) * 0.15;
+
+        // Noise: +-5 (reduced from +-10 to preserve player agency)
+        score += (Math.random() - 0.5) * 10;
 
         let result, headline, params, effects;
 
