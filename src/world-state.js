@@ -48,7 +48,10 @@ export function createWorldState() {
             sericaRelations:     0,
             farsistanEscalation: 0,
             khasurianCrisis:     0,
-            straitClosed:        false,
+            straitClosed:              false,
+            aegisDemandSurge:          false,
+            foundryCompetitionPressure: false,
+            energyCrisis:               false,
         },
         fed: {
             hikeCycle:        false,
@@ -63,6 +66,7 @@ export function createWorldState() {
             tanNsaStory:      0,
             okaforProbeStage: 0,
             impeachmentStage: 0,
+            meridianExposed:  false,
         },
         election: {
             midtermComplete:  false,
@@ -78,14 +82,7 @@ export function createWorldState() {
             sentinelRating:    5,
             pressFreedomIndex: 7,
             leakCount:         0,
-        },
-        factions: {
-            firmStanding:        65,
-            regulatoryExposure:  10,
-            federalistSupport:   30,
-            farmerLaborSupport:  30,
-            mediaTrust:          40,
-            fedRelations:        40,
+            lobbyingExposed:   false,
         },
     };
 }

@@ -586,6 +586,7 @@ function init() {
         } else {
             eventEngine = new EventEngine('offline');
         }
+        // Faction state lives in faction-standing.js; attach by reference so events can read it
         eventEngine.world.factions = factions;
     }
     updateDynamicSections($, DEFAULT_PRESET);
@@ -1683,6 +1684,7 @@ function _resetCore(index) {
     if (eventEngine) eventEngine.resetTriggerCooldowns();
     resetUsedTips();
     resetFactions();
+    // Re-attach faction reference after reset (faction-standing.js is the source of truth)
     if (eventEngine) eventEngine.world.factions = factions;
     resetTraits();
     resetRegulations();
@@ -1728,6 +1730,7 @@ function loadPreset(index) {
         } else {
             eventEngine = new EventEngine('offline');
         }
+        // Attach faction reference (faction-standing.js is the source of truth)
         eventEngine.world.factions = factions;
     } else {
         eventEngine = null;
