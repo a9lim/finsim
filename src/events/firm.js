@@ -635,7 +635,11 @@ export const FIRM_EVENTS = [
                 : tone === 'pointed' ? 'We need to talk again — '
                 : tone === 'final_warning' ? 'This is being escalated to HR — '
                 : '';
-            return prefix + `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure with Chair Hartley's FOMC meeting imminent. Priya Sharma's MarketWire preview is already moving bonds. The surveillance team has flagged the timing — they want documentation of your decision-making process, what public information you used, and whether you've had any contact with Fed officials or their staff. Standard protocol, but the paperwork is a headache.`;
+            let body = `You have $${(bondNot / 1000).toFixed(1)}k in bond exposure with Chair Hartley's FOMC meeting imminent. Priya Sharma's MarketWire preview is already moving bonds. The surveillance team has flagged the timing — they want documentation of your decision-making process, what public information you used, and whether you've had any contact with Fed officials or their staff. Standard protocol, but the paperwork is a headache.`;
+            if (world?.geopolitical?.energyCrisis) {
+                body += ' The energy crisis adds a new dimension — Hartley is caught between inflation from oil prices and recession from tightening.';
+            }
+            return prefix + body;
         },
         choices: [
             {
@@ -670,8 +674,12 @@ export const FIRM_EVENTS = [
         tone: 'negative',
         popup: true,
         headline: 'Sellside salesman mentions "interesting flow" ahead of Malhotra\'s earnings call',
-        context: () => {
-            return 'A salesman from a bulge bracket calls your line. "Listen, I can\'t say much, but there\'s been unusual activity in the PNTH options chain ahead of Malhotra\'s earnings call. Smart money is positioning before the print — someone on the sellside thinks Raj is going to guide higher. I think you\'d want to know." He trails off, waiting for you to bite.';
+        context: (sim, world) => {
+            let text = 'A salesman from a bulge bracket calls your line. "Listen, I can\'t say much, but there\'s been unusual activity in the PNTH options chain ahead of Malhotra\'s earnings call. Smart money is positioning before the print — someone on the sellside thinks Raj is going to guide higher. I think you\'d want to know." He trails off, waiting for you to bite.';
+            if (world?.geopolitical?.khasurianCrisis >= 2) {
+                text += ' The Khasurian border crisis has made Aegis a national security priority overnight.';
+            }
+            return text;
         },
         choices: [
             {
@@ -701,9 +709,13 @@ export const FIRM_EVENTS = [
         tone: 'negative',
         popup: true,
         headline: 'The Meridian Brief: "One trader swimming against the tide"',
-        context: (sim) => {
+        context: (sim, world) => {
             const netDelta = computeNetDelta();
-            return `PNTH is at $${sim.S.toFixed(0)} — well above where you started shorting — and your delta is ${netDelta.toFixed(0)}. Every tick higher costs you. The PM next to you on the Meridian floor just booked his best quarter ever going long. Your MarketWire chat is full of unsolicited advice. The desk head walks past without making eye contact. You're either early or wrong, and right now the P&L doesn't distinguish between the two.`;
+            let text = `PNTH is at $${sim.S.toFixed(0)} — well above where you started shorting — and your delta is ${netDelta.toFixed(0)}. Every tick higher costs you. The PM next to you on the Meridian floor just booked his best quarter ever going long. Your MarketWire chat is full of unsolicited advice. The desk head walks past without making eye contact. You're either early or wrong, and right now the P&L doesn't distinguish between the two.`;
+            if (world?.geopolitical?.foundryCompetitionPressure) {
+                text += ' Zhaowei\'s sovereign-backed compute buildout looms over every Foundry projection.';
+            }
+            return text;
         },
         choices: [
             {

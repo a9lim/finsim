@@ -322,7 +322,13 @@ export const INVESTIGATION_EVENTS = [
         era: 'mid',
         popup: true,
         headline: 'Rachel Tan is asking questions about Meridian\'s derivatives desk',
-        context: 'Rachel Tan at The Continental has been asking questions about unusual trading patterns from the Meridian derivatives desk. Your name came up. When Tan starts digging, stories follow — and her stories have a way of reaching Okafor\'s committee. The compliance department wants to know how you\u2019d like to handle it.',
+        context: (sim, world) => {
+            let text = 'Rachel Tan at The Continental has been asking questions about unusual trading patterns from the Meridian derivatives desk. Your name came up. When Tan starts digging, stories follow — and her stories have a way of reaching Okafor\'s committee. The compliance department wants to know how you\u2019d like to handle it.';
+            if (world?.investigations?.meridianExposed) {
+                text += ' Your desk\u2019s name is in the filing. This is no longer someone else\u2019s problem.';
+            }
+            return text;
+        },
         choices: [
             {
                 label: 'No comment',
@@ -352,7 +358,13 @@ export const INVESTIGATION_EVENTS = [
         era: 'mid',
         popup: true,
         headline: 'SEC Information Request',
-        context: 'A formal letter from the SEC\u2019s Division of Enforcement has arrived at Meridian\u2019s legal department. They\u2019re requesting trading records, communications, and position histories for your desk. This is not a routine examination.',
+        context: (sim, world) => {
+            let text = 'A formal letter from the SEC\u2019s Division of Enforcement has arrived at Meridian\u2019s legal department. They\u2019re requesting trading records, communications, and position histories for your desk. This is not a routine examination.';
+            if (world?.investigations?.meridianExposed) {
+                text += ' Your desk\u2019s name is in the filing. This is no longer someone else\u2019s problem.';
+            }
+            return text;
+        },
         choices: [
             {
                 label: 'Full cooperation',
