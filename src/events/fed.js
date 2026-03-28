@@ -46,7 +46,7 @@ export const FED_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => sim.b < 0.15 && !world.fed.hartleyFired && !world.fed.hikeCycle,
         params: { mu: -0.015, theta: 0.005, sigmaR: 0.001 },
-        effects: (world) => { world.fed.hikeCycle = true; world.fed.cutCycle = false; shiftFaction('fedRelations', -1); },
+        effects: (world) => { world.fed.hikeCycle = true; world.fed.cutCycle = false; world.election.barronApproval = Math.max(0, world.election.barronApproval - 1); shiftFaction('fedRelations', -1); },
         followups: [{ id: 'fed_25bps_hike', mtth: 32, weight: 0.7 }],
     },
     {
@@ -58,6 +58,9 @@ export const FED_EVENTS = [
         params: { mu: -0.02, theta: 0.008, b: 0.0075, sigmaR: 0.001, lambda: 0.2 },
         magnitude: 'moderate',
         when: (sim, world) => sim.b < 0.15 && !world.fed.hartleyFired,
+        effects: (world) => {
+            world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
+        },
         followups: [
             { id: 'fed_second_hike', mtth: 32, weight: 0.5 },
             { id: 'fed_housing_pause', mtth: 45, weight: 0.3 },
@@ -99,11 +102,16 @@ export const FED_EVENTS = [
     {
         id: 'fed_signals_cut',
         category: 'fed',
-        likelihood: 0.8,
+        likelihood: (sim, world) => {
+            let base = 0.8;
+            if (world.geopolitical?.recessionDeclared) base *= 2.0;
+            if (world.geopolitical?.energyCrisis) base *= 1.5;
+            return base;
+        },
         headline: 'Hartley pivots dovish: "Downside risks have increased materially"; markets price 80% chance of cut at next meeting. Sharma on MarketWire: "The doves are circling. A cut is coming."',
         params: { mu: 0.02, theta: -0.005, sigmaR: 0.002 },
         magnitude: 'moderate',
-        when: (sim, world) => sim.b > -0.03 && !world.fed.hartleyFired && !world.fed.cutCycle,
+        when: (sim, world) => sim.b > -0.03 && !world.fed.hartleyFired && (!world.fed.cutCycle || world.geopolitical?.recessionDeclared),
         effects: (world) => { world.fed.cutCycle = true; world.fed.hikeCycle = false; shiftFaction('fedRelations', 1); },
         followups: [
             { id: 'fed_50bps_emergency_cut', mtth: 20, weight: 0.5 },
@@ -113,7 +121,12 @@ export const FED_EVENTS = [
         id: 'fed_50bps_emergency_cut',
         followupOnly: true,
         category: 'fed',
-        likelihood: 0.6,
+        likelihood: (sim, world) => {
+            let base = 0.6;
+            if (world.geopolitical?.recessionDeclared) base *= 2.0;
+            if (world.geopolitical?.energyCrisis) base *= 1.5;
+            return base;
+        },
         headline: 'Fed slashes rates 50bps in emergency inter-meeting action; Hartley: "Extraordinary circumstances demand decisive response." Sharma breaks the news 90 seconds before the official release. MarketWire crashes from traffic.',
         magnitude: 'major',
         when: (sim, world) => sim.b > -0.03,
@@ -125,7 +138,12 @@ export const FED_EVENTS = [
     {
         id: 'fed_qe_restart',
         category: 'fed',
-        likelihood: 0.3,
+        likelihood: (sim, world) => {
+            let base = 0.3;
+            if (world.geopolitical?.recessionDeclared) base *= 2.0;
+            if (world.geopolitical?.energyCrisis) base *= 1.5;
+            return base;
+        },
         headline: 'Fed announces open-ended QE: $120B/month in Treasury and MBS purchases; "whatever it takes" language deployed. Sharma\'s MarketWire column: "Hartley just fired every bullet she has left." The Sentinel: "Money printer go brrr."',
         magnitude: 'major',
         minDay: 300,
