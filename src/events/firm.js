@@ -107,6 +107,7 @@ export const FIRM_EVENTS = [
         headline: 'Zhaowei CEO Liang Wei showcases new chip architecture at Nanjing AI Forum; Sharma: "The Zhaowei gap is narrowing. Kassis knows it."',
         params: { mu: -0.002 },
         magnitude: 'minor',
+        effects: (world) => { world.geopolitical.foundryCompetitionPressure = true; },
     },
     {
         id: 'markets_drift_sideways_1',

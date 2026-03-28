@@ -463,7 +463,7 @@ export const PNTH_EVENTS = [
     {
         id: 'defense_contract_won',
         category: 'pnth',
-        likelihood: 1.0,
+        likelihood: (sim, world) => world.geopolitical.aegisDemandSurge ? 2.0 : 1.0,
         headline: 'Dirks announces Atlas Aegis at a closed Pentagon briefing. $3.2B Department of War contract for battlefield integration -- largest defense AI award in history. Gottlieb learns about it from MarketWire. Malhotra\'s stock buyback begins the same afternoon.',
         magnitude: 'major',
         when: (sim, world) => !world.pnth.militaryContractActive && !world.pnth.acquired,
@@ -566,7 +566,7 @@ export const PNTH_EVENTS = [
     {
         id: 'pnth_hyperscaler_deal',
         category: 'pnth',
-        likelihood: 1.2,
+        likelihood: (sim, world) => world.geopolitical.foundryCompetitionPressure ? 2.0 : 1.2,
         headline: 'PNTH signs multi-year Atlas Foundry inference partnership with a top-3 cloud provider. Guaranteed $1.8B minimum commitment. Malhotra: "Foundry is the commercial pivot Sentinel never was." Gottlieb calls it "renting out the family silver."',
         params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
         magnitude: 'moderate',
@@ -669,7 +669,7 @@ export const PNTH_EVENTS = [
     {
         id: 'pnth_international_expansion',
         category: 'pnth',
-        likelihood: 0.8,
+        likelihood: (sim, world) => world.geopolitical.aegisDemandSurge ? 2.0 : 0.8,
         headline: 'PNTH announces major Atlas Sentinel expansion into European and Asian markets. $2.4B in new international contracts. Malhotra: "Geographic diversification reduces our dependence on Aegis revenue." Dirks signs a separate Aegis MOU with the Meridine military.',
         params: { mu: 0.04, theta: -0.01, lambda: -0.2 },
         magnitude: 'moderate',
@@ -690,7 +690,7 @@ export const PNTH_EVENTS = [
     {
         id: 'pnth_custom_chip_announcement',
         category: 'pnth',
-        likelihood: 0.6,
+        likelihood: (sim, world) => world.geopolitical.foundryCompetitionPressure ? 1.5 : 0.6,
         headline: 'Kassis unveils a custom AI accelerator chip for Atlas Foundry: 3x performance per watt vs. GPU incumbents. "We\'re done renting compute." Dirks sees it as an Aegis edge. Malhotra sees it as a Foundry margin play. Both are right.',
         params: { mu: 0.06, theta: -0.01, lambda: -0.3 },
         magnitude: 'major',
@@ -723,7 +723,7 @@ export const PNTH_EVENTS = [
         id: 'aegis_deployment_announced',
         category: 'pnth',
         headline: 'Dirks confirms Atlas Aegis deployment in the Farsistan theater at a Senate Armed Services hearing. Gottlieb is conspicuously absent from the witness table. PNTH surges 6% in after-hours.',
-        likelihood: 3,
+        likelihood: (sim, world) => world.geopolitical.aegisDemandSurge ? 5.0 : 3,
         params: { mu: 0.03, theta: 0.01 },
         magnitude: 'major',
         when: (sim, world) => !world.pnth.aegisDeployed && world.pnth.militaryContractActive,

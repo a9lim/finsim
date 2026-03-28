@@ -149,6 +149,7 @@ export const MACRO_EVENTS = [
         headline: 'Oil surges 12% as Operation Dustwalker threatens Strait of Hormuz shipping lanes. Al-Farhan warns: "Any further provocation and the Strait closes." Energy stocks rally but consumer discretionary tanks.',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.004 },
         magnitude: 'moderate',
+        effects: (world) => { world.geopolitical.energyCrisis = true; },
         portfolioFlavor: (portfolio) => {
             const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
             const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
@@ -501,7 +502,10 @@ export const MACRO_EVENTS = [
         params: { mu: -0.04, theta: 0.03, lambda: 2.0, b: 0.015 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.khasurianCrisis === 2,
-        effects: (world) => { world.geopolitical.khasurianCrisis = 3; shiftFaction('fedRelations', -2); },
+        effects: (world) => { world.geopolitical.khasurianCrisis = 3; world.geopolitical.aegisDemandSurge = true; shiftFaction('fedRelations', -2); },
+        followups: [
+            { id: 'pnth_international_expansion', mtth: 15, weight: 0.5 },
+        ],
     },
     {
         id: 'khasuria_backs_down',
@@ -560,9 +564,13 @@ export const MACRO_EVENTS = [
             world.geopolitical.farsistanEscalation = 3;
             world.geopolitical.straitClosed = true;
             world.geopolitical.oilCrisis = true;
+            world.geopolitical.energyCrisis = true;
             shiftFaction('fedRelations', -3);
             activateRegulation('oil_emergency');
         },
+        followups: [
+            { id: 'fed_50bps_emergency_cut', mtth: 5, weight: 0.8 },
+        ],
     },
     {
         id: 'farsistan_negotiation',

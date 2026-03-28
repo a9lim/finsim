@@ -111,6 +111,7 @@ export const MARKET_EVENTS = [
         params: { mu: -0.005, theta: 0.003 },
         magnitude: 'minor',
         when: (sim, world) => world.geopolitical.sericaRelations <= 0,
+        effects: (world) => { world.geopolitical.foundryCompetitionPressure = true; },
     },
     {
         id: 'ai_safety_framework',
