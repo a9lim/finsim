@@ -954,43 +954,49 @@ export function updateStandings($, world, factions, getFactionDescriptor) {
 
 function _renderWorldState(container, world) {
     container.textContent = '';
-    const h4 = document.createElement('h4');
-    h4.textContent = 'World State';
-    container.appendChild(h4);
     const entries = [
         ['Barron Approval', (world?.election?.barronApproval ?? '?') + '%'],
-        ['Congress', 'Senate ' + (world?.congress?.senate?.federalist ?? '?') + 'F / ' + (world?.congress?.senate?.farmerLabor ?? '?') + 'FL'],
-        ['Big Beautiful Bill', 'Stage ' + (world?.congress?.bigBillStatus ?? 0) + '/4' + ((world?.congress?.filibusterActive) ? ' \u2014 Filibuster active' : '')],
-        ['PNTH Board', 'Dirks ' + (world?.pnth?.boardDirks ?? '?') + ' / Gottlieb ' + (10 - (world?.pnth?.boardDirks ?? 5))],
-        ['Trade War', 'Stage ' + (world?.geopolitical?.tradeWarStage ?? 0) + '/4'],
-        ['Fed', ((world?.fed?.hikeCycle) ? 'Hike' : (world?.fed?.cutCycle) ? 'Cut' : 'Hold') + ', Cred ' + (world?.fed?.credibilityScore ?? '?') + '/10'],
+        ['Fed Stance', (world?.fed?.hikeCycle) ? 'Hiking' : (world?.fed?.cutCycle) ? 'Cutting' : 'Holding'],
+        ['Fed Credibility', (world?.fed?.credibilityScore ?? '?') + '/10'],
     ];
     for (const [label, value] of entries) {
-        const p = document.createElement('p');
-        const b = document.createElement('strong');
-        b.textContent = label + ': ';
-        p.appendChild(b);
-        p.appendChild(document.createTextNode(value));
-        container.appendChild(p);
+        const row = document.createElement('div');
+        row.className = 'stat-row';
+        const lbl = document.createElement('span');
+        lbl.className = 'stat-label';
+        lbl.textContent = label;
+        const val = document.createElement('span');
+        val.className = 'stat-value';
+        val.textContent = value;
+        row.appendChild(lbl);
+        row.appendChild(val);
+        container.appendChild(row);
     }
 }
 
+const _FACTION_LABELS = {
+    firmStanding: 'Firm',
+    regulatoryExposure: 'Regulatory',
+    federalistSupport: 'Federalists',
+    farmerLaborSupport: 'Farmer-Labor',
+    mediaTrust: 'Media',
+    fedRelations: 'Fed Relations',
+};
+
 function _renderFactionScores(container, factions, getFactionDescriptor) {
     container.textContent = '';
-    const h4 = document.createElement('h4');
-    h4.textContent = 'Your Standing';
-    container.appendChild(h4);
     for (const id of _FACTION_IDS) {
-        const p = document.createElement('p');
-        const label = id.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
-        const b = document.createElement('strong');
-        b.textContent = label + ': ';
-        p.appendChild(b);
-        p.appendChild(document.createTextNode((factions[id] ?? 0) + '/100 \u2014 '));
-        const em = document.createElement('em');
-        em.textContent = getFactionDescriptor(id);
-        p.appendChild(em);
-        container.appendChild(p);
+        const row = document.createElement('div');
+        row.className = 'stat-row';
+        const lbl = document.createElement('span');
+        lbl.className = 'stat-label';
+        lbl.textContent = _FACTION_LABELS[id] || id;
+        const val = document.createElement('span');
+        val.className = 'stat-value';
+        val.textContent = getFactionDescriptor(id);
+        row.appendChild(lbl);
+        row.appendChild(val);
+        container.appendChild(row);
     }
 }
 
