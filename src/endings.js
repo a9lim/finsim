@@ -693,6 +693,34 @@ function _pageLegacy(endingId, sim, portfolio, eventLog, playerChoices, impactHi
             body += _p(`On day ${dayLabel}, a burst of institutional ${direction} pressure preceded what came next. The compliance logs would show a single desk, a single trader, and a position size that made the back office call upstairs.`);
         }
 
+        // -- Player choice echoes -------------------------------------------------
+
+        // Compliance stance
+        if (playerChoices.cooperated_with_compliance || playerChoices.filed_fomc_docs) {
+            body += _p('Your compliance record was immaculate \u2014 every filing on time, every flag addressed. It was the kind of paper trail that made lawyers smile and regulators nod.');
+        } else if (playerChoices.lawyered_up || playerChoices.lawyered_up_unusual || playerChoices.stonewalled_sec) {
+            body += _p('You lawyered up every time compliance knocked. The firm\u2019s general counsel had your outside attorney on speed dial. Whether this was prudence or paranoia depended on who you asked.');
+        }
+
+        // Trading style
+        if (playerChoices.doubled_down_short || playerChoices.comeback_aggressive || playerChoices.owned_tape_presence) {
+            body += _p('You traded with the kind of conviction that made other desks nervous. When the market moved against you, you didn\u2019t flinch \u2014 you added.');
+        } else if (playerChoices.comeback_disciplined || playerChoices.covered_losing_short || playerChoices.comeback_cautious) {
+            body += _p('You learned when to hold and when to fold. The market tested you and you adapted. Not glamorous. Effective.');
+        }
+
+        // Political engagement
+        if (playerChoices.attended_political_dinner || playerChoices.attended_fundraiser) {
+            body += _p('Your name appeared on donor lists and fundraiser RSVPs. The line between trading and politicking had blurred \u2014 whether intentionally or not was a question only you could answer.');
+        }
+
+        // Information edge
+        if (playerChoices.pursued_insider_tip || playerChoices.pursued_pnth_tip) {
+            body += _p('There were conversations that, in retrospect, you probably shouldn\u2019t have had. Tips received, tips acted upon. The compliance logs told one story; the P&L told another.');
+        } else if (playerChoices.declined_analyst_color) {
+            body += _p('When the sellside called with color, you hung up. When the tips came, you deleted them. Your edge was in the math, not the whisper network.');
+        }
+
         body += `<div class="epilogue-rating">${rating}</div>`;
     }
 
@@ -852,6 +880,10 @@ function _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, p
     if (flags.includes('desk_used_channel'))    scores.insider += 2;
     if (flags.includes('stonewalled_sec')) scores.insider += 2;
     if (flags.includes('invoked_fifth')) scores.insider += 1;
+    if (flags.includes('pursued_insider_tip'))  scores.insider += 2;
+    if (flags.includes('pursued_pnth_tip'))     scores.insider += 2;
+    if (flags.includes('lawyered_up'))          scores.insider += 1;
+    if (flags.includes('lawyered_up_unusual'))  scores.insider += 1;
 
     // Principled
     if (flags.includes('reported_insider_tip'))  scores.principled += 3;
@@ -862,10 +894,20 @@ function _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, p
     if (flags.includes('cooperated_sec_letter')) scores.principled += 1;
     if (flags.includes('testified_fully')) scores.principled += 2;
     if (flags.includes('informed_sec')) scores.principled += 3;
+    if (flags.includes('cooperated_with_compliance')) scores.principled += 2;
+    if (flags.includes('filed_fomc_docs'))       scores.principled += 1;
+    if (flags.includes('declined_analyst_color')) scores.principled += 2;
+    if (flags.includes('declined_insider_tip'))  scores.principled += 1;
+    if (flags.includes('reported_lobbyist'))     scores.principled += 2;
 
     // Speculator
     if (impactHistory.length >= 10) scores.speculator += 3;
     else if (impactHistory.length >= 5) scores.speculator += 2;
+    if (flags.includes('doubled_down_short'))    scores.speculator += 2;
+    if (flags.includes('comeback_aggressive'))   scores.speculator += 2;
+    if (flags.includes('owned_tape_presence'))   scores.speculator += 1;
+    if (flags.includes('defied_unlimited_risk')) scores.speculator += 1;
+    if (flags.includes('showed_conviction_early')) scores.speculator += 1;
 
     // Survivor
     if (quarterlyReviews.length > 0) {
@@ -874,6 +916,12 @@ function _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, p
         );
         if (allSmall && quarterlyReviews.every(r => r.pnl >= 0)) scores.survivor += 3;
     }
+    if (flags.includes('comeback_disciplined'))  scores.survivor += 2;
+    if (flags.includes('comeback_cautious'))     scores.survivor += 2;
+    if (flags.includes('covered_losing_short'))  scores.survivor += 1;
+    if (flags.includes('deleveraged_fully'))     scores.survivor += 1;
+    if (flags.includes('closed_bond_book'))      scores.survivor += 1;
+    if (flags.includes('wound_down_gracefully')) scores.survivor += 1;
 
     // Kingmaker
     if (flags.includes('donated_barron') || flags.includes('donated_fl')) scores.kingmaker += 2;
@@ -881,6 +929,9 @@ function _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, p
     if (flags.includes('gave_interview'))    scores.kingmaker += 1;
     if (flags.includes('desk_attended_fundraiser')) scores.kingmaker += 2;
     if (flags.includes('lobbied_federalist') || flags.includes('lobbied_farmerlabor')) scores.kingmaker += 2;
+    if (flags.includes('attended_political_dinner')) scores.kingmaker += 2;
+    if (flags.includes('attended_fundraiser'))    scores.kingmaker += 2;
+    if (flags.includes('sent_check_no_dinner'))  scores.kingmaker += 1;
 
     // Ghost
     if (flags.length <= 2) scores.ghost += 4;
