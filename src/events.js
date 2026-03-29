@@ -279,8 +279,10 @@ export class EventEngine {
 
     /** Evaluate portfolio-triggered events. Returns array of triggered event objects. */
     evaluateTriggers(sim, day) {
+        const MAX_TRIGGERS_PER_DAY = 3;
         const triggered = [];
         for (const ev of this._triggerPool) {
+            if (triggered.length >= MAX_TRIGGERS_PER_DAY) break;
             const cd = this._triggerCooldowns[ev.id];
             const cdMult = ev.tone === 'positive' ? 1 / firmCooldownMult() : firmCooldownMult();
             if (cd && day - cd < ev.cooldown * cdMult) continue;
