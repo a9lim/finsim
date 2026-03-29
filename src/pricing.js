@@ -77,7 +77,7 @@ const _N = BINOMIAL_STEPS;
  */
 export function computeEffectiveSigma(v, T, kappa, theta, xi) {
     const kT = kappa * T;
-    if (kT < 1e-6) return Math.sqrt(Math.max(v, 0));
+    if (kT < 1e-6) return Math.sqrt(Math.max(v, 1e-8));
     const expNkT = Math.exp(-kT);
     const meanVar = theta + (v - theta) * (1 - expNkT) / kT;
     if (meanVar < 1e-8) return Math.sqrt(Math.max(meanVar, 0));
@@ -114,13 +114,14 @@ export function computeEffectiveSigma(v, T, kappa, theta, xi) {
  * @returns {number} Skew-adjusted volatility for this strike
  */
 export function computeSkewSigma(sigmaEff, S, K, T, rho, xi, kappa) {
+    const sig = Math.max(sigmaEff, 0.02); // guard against division by near-zero vol
     const x = Math.log(K / S);
     const kT = kappa * T;
     const dampen = kT < 1e-6 ? 1 : (1 - Math.exp(-kT)) / kT;
-    const skewCoeff = rho * xi / (2 * sigmaEff) * dampen;
+    const skewCoeff = rho * xi / (2 * sig) * dampen;
     // Second-order smile curvature: ξ²/(12σ²) makes both wings curve up.
     // Same dampen factor (approximation — exact Heston decays differently).
-    const curvCoeff = xi * xi / (12 * sigmaEff * sigmaEff) * dampen;
+    const curvCoeff = xi * xi / (12 * sig * sig) * dampen;
     const adj = sigmaEff * (1 + skewCoeff * x + curvCoeff * x * x);
     return adj > 0.01 ? adj : 0.01;
 }
@@ -204,7 +205,7 @@ function _fillTree(tree, T, r, sigma, q, currentDay) {
         for (; nextDiv <= currentDay + dteDays; nextDiv += QUARTERLY_CYCLE) {
             const dayOffset = nextDiv - currentDay;
             const step = Math.round(dayOffset / dteDays * n);
-            if (step >= 1 && step <= n) {
+            if (step >= 0 && step <= n) {
                 hasDivs = true;
                 // Fill divAdj[stepCursor..step-1] with current adj
                 while (stepCursor < step) divAdj[stepCursor++] = adj;
