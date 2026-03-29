@@ -7,7 +7,9 @@
    ===================================================== */
 
 import { fmtDte, fmtNum } from './format-helpers.js';
-import { modeledOI } from './price-impact.js';
+import { modeledOI, modeledStockADV, modeledBondADV } from './price-impact.js';
+import { market } from './market.js';
+import { computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 
 // ---------------------------------------------------------------------------
 // Internal chain table builders (DOM methods -- no text interpolation)
@@ -27,7 +29,7 @@ function _wrapPrice(td, text, posMap, type, strike, expiryDay) {
     if (qty) td.classList.add(qty > 0 ? 'pos-long' : 'pos-short');
 }
 
-function buildChainRow(row, expiry, isAtm, compact, posMap, spot) {
+function buildChainRow(row, expiry, isAtm, compact, posMap, spot, sigmaEff) {
     const tr = document.createElement('tr');
     tr.className = 'chain-row' + (isAtm ? ' atm-row' : '');
 
@@ -64,8 +66,12 @@ function buildChainRow(row, expiry, isAtm, compact, posMap, spot) {
         tr.appendChild(putTd);
     } else {
         const logSK = spot > 0 ? Math.log(spot / row.strike) : 0;
-        const callOI = modeledOI('call', logSK, expiry.dte).toFixed(2) + 'k';
-        const putOI  = modeledOI('put',  logSK, expiry.dte).toFixed(2) + 'k';
+        const T = expiry.dte / 252;
+        const skewSigma = sigmaEff > 0
+            ? computeSkewSigma(sigmaEff, spot, row.strike, T, market.rho, market.xi, market.kappa)
+            : 0;
+        const callOI = modeledOI('call', logSK, expiry.dte, skewSigma).toFixed(2) + 'k';
+        const putOI  = modeledOI('put',  logSK, expiry.dte, skewSigma).toFixed(2) + 'k';
         const cellDefs = [
             { text: row.call.bid.toFixed(2) + ' / ' + row.call.ask.toFixed(2), cls: 'call-cell', type: 'call' },
             { text: callOI, cls: 'chain-greek', type: null },
@@ -111,10 +117,16 @@ export function buildChainTable(expiry, compact, posMap, spot) {
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
+    // Compute effective ATM vol once per expiry for OI display
+    const T = expiry.dte / 252;
+    const sigmaEff = !compact && T > 0
+        ? computeEffectiveSigma(market.v, T, market.kappa, market.theta, market.xi)
+        : 0;
+
     const tbody = document.createElement('tbody');
     const midStrike = expiry.options[Math.floor(expiry.options.length / 2)]?.strike;
     for (const row of expiry.options) {
-        tbody.appendChild(buildChainRow(row, expiry, row.strike === midStrike, compact, posMap, spot));
+        tbody.appendChild(buildChainRow(row, expiry, row.strike === midStrike, compact, posMap, spot, sigmaEff));
     }
     table.appendChild(tbody);
     return table;
@@ -294,12 +306,13 @@ export function renderChainInto(container, pricedExpiry, onClick, posMap) {
 // Exported: build stock/bond price table (used by chain overlay)
 // ---------------------------------------------------------------------------
 
-export function buildStockBondTable(stockBA, bondBA, onChainCellClick, posMap) {
+export function buildStockBondTable(stockBA, bondBA, onChainCellClick, posMap, showADV) {
     const table = document.createElement('table');
     table.className = 'chain-tbl overlay-stock-bond';
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
-    for (const h of ['Stock', 'Bond']) {
+    const headers = showADV ? ['Stock', 'Stock ADV', 'Bond ADV', 'Bond'] : ['Stock', 'Bond'];
+    for (const h of headers) {
         const th = document.createElement('th');
         th.className = 'chain-th';
         th.textContent = h;
@@ -319,6 +332,19 @@ export function buildStockBondTable(stockBA, bondBA, onChainCellClick, posMap) {
     stockTd.setAttribute('tabindex', '0');
     stockTd.setAttribute('role', 'button');
     bindCellTrade(stockTd, 'stock', onChainCellClick);
+    tr.appendChild(stockTd);
+
+    if (showADV) {
+        const stockAdvTd = document.createElement('td');
+        stockAdvTd.className = 'chain-cell chain-greek';
+        stockAdvTd.textContent = modeledStockADV(market.sigma).toFixed(1) + 'k';
+        tr.appendChild(stockAdvTd);
+
+        const bondAdvTd = document.createElement('td');
+        bondAdvTd.className = 'chain-cell chain-greek';
+        bondAdvTd.textContent = modeledBondADV(market.sigmaR).toFixed(1) + 'k';
+        tr.appendChild(bondAdvTd);
+    }
 
     const bondTd = document.createElement('td');
     bondTd.className = 'chain-cell bond-overlay-cell';
@@ -328,9 +354,8 @@ export function buildStockBondTable(stockBA, bondBA, onChainCellClick, posMap) {
     bondTd.setAttribute('tabindex', '0');
     bondTd.setAttribute('role', 'button');
     bindCellTrade(bondTd, 'bond', onChainCellClick);
-
-    tr.appendChild(stockTd);
     tr.appendChild(bondTd);
+
     tbody.appendChild(tr);
     table.appendChild(tbody);
     return table;

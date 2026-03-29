@@ -12,7 +12,7 @@ import { renderChainInto, rebuildExpiryDropdown, buildStockBondTable, buildChain
 import { vasicekBondPrice } from './pricing.js';
 import { BOND_FACE_VALUE, STRIKE_INTERVAL, STRIKE_RANGE } from './config.js';
 import { market } from './market.js';
-import { getStockImpact } from './price-impact.js';
+import { getStockImpact, getBondImpact } from './price-impact.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
 // ---------------------------------------------------------------------------
@@ -481,7 +481,8 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
             ? vasicekBondPrice(BOND_FACE_VALUE, rate, tradeExp.dte / 252, market.a, market.b, market.sigmaR)
             : BOND_FACE_VALUE * Math.exp(-rate * tradeExp.dte / 252)
         : null;
-    const tradeBond = tradeBondMid != null ? tradeBondMid.toFixed(2) : dash;
+    const tradeBondDisplay = tradeBondMid != null ? tradeBondMid + getBondImpact(market.sigmaR) : null;
+    const tradeBond = tradeBondDisplay != null ? tradeBondDisplay.toFixed(2) : dash;
 
     if ($.stockPriceCell) _applyPill($.stockPriceCell, stockTxt, posMap && posMap['stock'], stockTip);
     if ($.bondPriceCell) {
@@ -501,7 +502,8 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
             ? vasicekBondPrice(BOND_FACE_VALUE, rate, stratExp.dte / 252, market.a, market.b, market.sigmaR)
             : BOND_FACE_VALUE * Math.exp(-rate * stratExp.dte / 252)
         : null;
-    const stratBond = stratBondMid != null ? stratBondMid.toFixed(2) : dash;
+    const stratBondDisplay = stratBondMid != null ? stratBondMid + getBondImpact(market.sigmaR) : null;
+    const stratBond = stratBondDisplay != null ? stratBondDisplay.toFixed(2) : dash;
 
     const sMap = stratPosMap || posMap;
     if ($.strategyStockCell) _applyPill($.strategyStockCell, stockTxt, sMap && sMap['stock'], stockTip);
@@ -577,7 +579,7 @@ export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posM
 
         // Stock / Bond price table
         $.chainOverlayTable.appendChild(
-            buildStockBondTable(_sba, _bba, $._onChainCellClick, _pm)
+            buildStockBondTable(_sba, _bba, $._onChainCellClick, _pm, true)
         );
 
         const expiry = priceExpiry(selectedExpiry);

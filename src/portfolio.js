@@ -18,7 +18,7 @@ import {
 } from './config.js';
 
 import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
-import { recordStockTrade, recordOptionTrade } from './price-impact.js';
+import { recordStockTrade, recordBondTrade, recordOptionTrade } from './price-impact.js';
 import { getRegulationEffect } from './regulations.js';
 import { capitalMultiplier } from './faction-standing.js';
 
@@ -100,7 +100,8 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
     const signedQty = side === 'long' ? qty : -qty;
 
     if (type === 'bond') {
-        return spreadFill;
+        const fillCost = recordBondTrade(signedQty, currentVol);
+        return Math.max(0.01, spreadFill + fillCost);
     } else if (type === 'stock') {
         const fillCost = recordStockTrade(signedQty, currentVol);
         return Math.max(0.01, spreadFill + fillCost);

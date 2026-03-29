@@ -8,7 +8,7 @@
 
 import { allocTree, prepareTree, priceWithTree, vasicekBondPrice, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
-import { getStockImpact, getOptionImpact } from './price-impact.js';
+import { getStockImpact, getBondImpact, getOptionImpact } from './price-impact.js';
 import { market } from './market.js';
 
 let _tree = null;
@@ -32,10 +32,12 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
         : 0;
     switch (type) {
         case 'stock': return S + getStockImpact(vol);
-        case 'bond':
-            return market.a >= 1e-8
+        case 'bond': {
+            const bondMid = market.a >= 1e-8
                 ? vasicekBondPrice(BOND_FACE_VALUE, rate, dte, market.a, market.b, market.sigmaR)
                 : BOND_FACE_VALUE * Math.exp(-rate * dte);
+            return bondMid + getBondImpact(market.sigmaR);
+        }
         case 'call':
         case 'put': {
             if (dte <= 0 || vol <= 0) return Math.max(0, type === 'call' ? S - strike : strike - S);

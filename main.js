@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ADV, ROGUE_TRADING_THRESHOLD } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ROGUE_TRADING_THRESHOLD } from './src/config.js';
 import { fmtDollar } from './src/format-helpers.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
@@ -40,7 +40,7 @@ import { REFERENCE } from './src/reference.js';
 import { syncMarket, market } from './src/market.js';
 import {
     resetImpactState, decayImpactVolumes,
-    getStockImpact, rehedgeMM,
+    getStockImpact, getBondImpact, modeledStockADV, rehedgeMM,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
     selectImpactToast,
@@ -1398,7 +1398,7 @@ function _onDayComplete() {
 
     // Layer 3: update param shifts based on gross exposure
     const grossNotional = computeGrossNotional();
-    const grossRatio = grossNotional / (market.S * ADV);
+    const grossRatio = grossNotional / (market.S * modeledStockADV(market.sigma));
     updateParamShifts(grossRatio);
     decayParamShifts();
 
@@ -1876,7 +1876,7 @@ function openFullChain() {
     const vol = market.sigma;
     const displaySpot = sim.S + getStockImpact(market.sigma);
     const bondDte = _getTradeExpiryDay() - sim.day;
-    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
+    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252) + getBondImpact(market.sigmaR);
     const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
     const bondBA = computeBidAsk(bondMid, displaySpot, vol);
     showChainOverlay($, chainSkeleton, _priceExpiryGreeks, stockBA, bondBA, _buildPosMap(), displaySpot);
@@ -1914,7 +1914,7 @@ function _refreshChainOverlayIfOpen() {
     const vol = market.sigma;
     const displaySpot = sim.S + getStockImpact(market.sigma);
     const bondDte = _getTradeExpiryDay() - sim.day;
-    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252);
+    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252) + getBondImpact(market.sigmaR);
     const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
     const bondBA = computeBidAsk(bondMid, displaySpot, vol);
     $._refreshChainOverlay(stockBA, bondBA, _buildPosMap(), displaySpot);

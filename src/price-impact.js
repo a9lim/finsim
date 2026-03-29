@@ -1,6 +1,6 @@
 import {
-    ADV, IMPACT_COEFF, OPT_IMPACT_COEFF,
-    OI_ATM_BASE, OI_MONEYNESS_DECAY,
+    ADV, BOND_ADV, IMPACT_COEFF, BOND_IMPACT_COEFF, OPT_IMPACT_COEFF,
+    OI_ATM_BASE, OI_MONEYNESS_DECAY, OI_SIGMA_BASE, BOND_SIGMA_BASE,
     VOLUME_HALF_LIFE, INTRADAY_STEPS,
     PARAM_SHIFT_HALF_LIFE,
     IMPACT_TOAST_COOLDOWN,
@@ -27,6 +27,8 @@ let _lastToastDay = -Infinity;
 /* ── Decaying cumulative volume ── */
 let _cumStockBuy  = 0;
 let _cumStockSell = 0;
+let _cumBondBuy   = 0;
+let _cumBondSell  = 0;
 // Per-strike: key = `${type}_${strike}_${expiryDay}`, value = { buy, sell }
 const _cumOption = new Map();
 
@@ -42,6 +44,7 @@ export function resetImpactState() {
     for (const k in _playerParamShifts) _playerParamShifts[k] = 0;
     _lastToastDay = -Infinity;
     _cumStockBuy = _cumStockSell = 0;
+    _cumBondBuy = _cumBondSell = 0;
     _cumOption.clear();
     _mmCurrentHedge = 0;
 }
@@ -55,6 +58,10 @@ export function decayImpactVolumes() {
     _cumStockSell *= _volDecayFactor;
     if (_cumStockBuy  < 1e-6) _cumStockBuy  = 0;
     if (_cumStockSell < 1e-6) _cumStockSell = 0;
+    _cumBondBuy  *= _volDecayFactor;
+    _cumBondSell *= _volDecayFactor;
+    if (_cumBondBuy  < 1e-6) _cumBondBuy  = 0;
+    if (_cumBondSell < 1e-6) _cumBondSell = 0;
     for (const [key, cum] of _cumOption) {
         cum.buy  *= _volDecayFactor;
         cum.sell *= _volDecayFactor;
@@ -70,8 +77,9 @@ export function decayImpactVolumes() {
  * @returns {number} Signed price shift to add to sim.S for display/valuation
  */
 export function getStockImpact(sigma) {
-    const buyImpact  = IMPACT_COEFF * sigma * Math.sqrt(_cumStockBuy  / ADV);
-    const sellImpact = IMPACT_COEFF * sigma * Math.sqrt(_cumStockSell / ADV);
+    const adv = modeledStockADV(sigma);
+    const buyImpact  = IMPACT_COEFF * sigma * Math.sqrt(_cumStockBuy  / adv);
+    const sellImpact = IMPACT_COEFF * sigma * Math.sqrt(_cumStockSell / adv);
     return buyImpact - sellImpact;
 }
 
@@ -85,9 +93,54 @@ export function getStockImpact(sigma) {
 export function recordStockTrade(qty, sigma) {
     const absQty = Math.abs(qty);
     const sign   = qty > 0 ? 1 : -1;
+    const adv    = modeledStockADV(sigma);
     const cumRef = qty > 0 ? _cumStockBuy : _cumStockSell;
-    const cost   = IMPACT_COEFF * sigma * (Math.sqrt((cumRef + absQty) / ADV) - Math.sqrt(cumRef / ADV)) * sign;
+    const cost   = IMPACT_COEFF * sigma * (Math.sqrt((cumRef + absQty) / adv) - Math.sqrt(cumRef / adv)) * sign;
     if (qty > 0) _cumStockBuy += absQty; else _cumStockSell += absQty;
+    return cost;
+}
+
+/**
+ * Vol-scaled stock ADV. Higher equity vol deepens the liquidity pool.
+ */
+export function modeledStockADV(sigma) {
+    return sigma > 0 ? ADV * Math.sqrt(sigma / OI_SIGMA_BASE) : ADV;
+}
+
+/* ── Bond impact overlay (analogous to stock, keyed off rate vol sigmaR) ── */
+
+/**
+ * Vol-scaled bond ADV. Higher rate vol deepens the bond liquidity pool.
+ */
+export function modeledBondADV(sigmaR) {
+    return sigmaR > 0 ? BOND_ADV * Math.sqrt(sigmaR / BOND_SIGMA_BASE) : BOND_ADV;
+}
+
+/**
+ * Get the current bond price impact overlay.
+ * @param {number} sigmaR  Current Vasicek rate vol
+ * @returns {number} Signed price shift to add to bond price for display/valuation
+ */
+export function getBondImpact(sigmaR) {
+    const adv = modeledBondADV(sigmaR);
+    const buyImpact  = BOND_IMPACT_COEFF * sigmaR * Math.sqrt(_cumBondBuy  / adv);
+    const sellImpact = BOND_IMPACT_COEFF * sigmaR * Math.sqrt(_cumBondSell / adv);
+    return buyImpact - sellImpact;
+}
+
+/**
+ * Record a bond trade: updates cumulative volume and returns fill cost.
+ * @param {number} qty     Signed quantity (positive=buy, negative=sell)
+ * @param {number} sigmaR  Current Vasicek rate vol
+ * @returns {number} Signed fill cost adjustment
+ */
+export function recordBondTrade(qty, sigmaR) {
+    const absQty = Math.abs(qty);
+    const sign   = qty > 0 ? 1 : -1;
+    const adv    = modeledBondADV(sigmaR);
+    const cumRef = qty > 0 ? _cumBondBuy : _cumBondSell;
+    const cost   = BOND_IMPACT_COEFF * sigmaR * (Math.sqrt((cumRef + absQty) / adv) - Math.sqrt(cumRef / adv)) * sign;
+    if (qty > 0) _cumBondBuy += absQty; else _cumBondSell += absQty;
     return cost;
 }
 
@@ -95,17 +148,20 @@ export function recordStockTrade(qty, sigma) {
 
 /**
  * Compute modeled open interest for an option.
+ * Higher vol deepens the liquidity pool (more hedging/speculative activity).
  */
-export function modeledOI(type, logSK, dte) {
+export function modeledOI(type, logSK, dte, sigma) {
     const absM = Math.abs(logSK);
     const isITM = (type === 'call' && logSK > 0) || (type === 'put' && logSK < 0);
     const decay = isITM
         ? Math.exp(-OI_MONEYNESS_DECAY * 2.5 * absM * absM)
         : Math.exp(-OI_MONEYNESS_DECAY * absM * absM);
     const putSkew = (type === 'put' && !isITM) ? 1.5 : 1.0;
+    const volScale = sigma > 0 ? Math.sqrt(sigma / OI_SIGMA_BASE) : 1;
     return Math.max(1,
         OI_ATM_BASE * decay * putSkew
         * Math.sqrt(63 / Math.max(1, dte))
+        * volScale
     );
 }
 
@@ -123,7 +179,7 @@ export function getOptionImpact(type, strike, expiryDay, sigma, logSK, dte) {
     const key = `${type}_${strike}_${expiryDay}`;
     const cum = _cumOption.get(key);
     if (!cum) return 0;
-    const oi = modeledOI(type, logSK, dte);
+    const oi = modeledOI(type, logSK, dte, sigma);
     const buyImpact  = OPT_IMPACT_COEFF * sigma * Math.sqrt(cum.buy  / oi);
     const sellImpact = OPT_IMPACT_COEFF * sigma * Math.sqrt(cum.sell / oi);
     return buyImpact - sellImpact;
@@ -136,7 +192,7 @@ export function getOptionImpact(type, strike, expiryDay, sigma, logSK, dte) {
 export function recordOptionTrade(type, qty, sigma, logSK, dte, strike, expiryDay) {
     const absQty = Math.abs(qty);
     const sign   = qty > 0 ? 1 : -1;
-    const oi     = modeledOI(type, logSK, dte);
+    const oi     = modeledOI(type, logSK, dte, sigma);
     const key    = `${type}_${strike}_${expiryDay}`;
     let cum = _cumOption.get(key);
     if (!cum) { cum = { buy: 0, sell: 0 }; _cumOption.set(key, cum); }
