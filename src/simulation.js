@@ -110,8 +110,8 @@ export class Simulation {
         // 2. Heston stochastic volatility (Milstein scheme with Ito correction)
         const vPrev = Math.max(this.v, 0);
         const sqrtV = Math.sqrt(vPrev);
-        this.v = this.v
-            + this.kappa * (this.theta - this.v) * dt
+        this.v = vPrev
+            + this.kappa * (this.theta - vPrev) * dt
             + this.xi * sqrtV * this._sqrtDt * z2
             + 0.25 * this.xi * this.xi * (z2 * z2 - 1) * dt;
         this.v = Math.max(this.v, 0);
@@ -133,6 +133,7 @@ export class Simulation {
         this.r = this.r
             + this.a * (this.b - this.r) * dt
             + this.sigmaR * this._sqrtDt * z3;
+        this.r = Math.max(this.r, -0.02); // floor at -2% to prevent extreme negative rates
 
         // Update partial bar in-place
         const p = this._partial;
@@ -187,9 +188,15 @@ export class Simulation {
     ----------------------------------------------- */
     prepopulate() {
         const count = HISTORY_CAPACITY;
-        // Negate drift so the reversed path trends in the correct direction
+        // Negate drift so the reversed path trends in the correct direction.
+        // Disable jumps during prepopulate — Merton compensation (-lambda*k)
+        // is not sign-symmetric with mu, so reverse drift + jumps produces
+        // statistically incorrect history.
         this.mu = -this.mu;
+        const savedLambda = this.lambda;
+        this.lambda = 0;
         for (let i = 0; i < count; i++) this.tick();
+        this.lambda = savedLambda;
         this.mu = -this.mu;
 
         // Collect bars in chronological order, then reverse
