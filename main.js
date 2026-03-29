@@ -599,6 +599,7 @@ function init() {
     // Wire lobby pill buttons
     if ($.lobbyBar) {
         $.lobbyBar.addEventListener('click', (e) => {
+            if (!eventEngine) return;
             const btn = e.target.closest('.lobby-pill');
             if (!btn || btn.disabled) return;
             const actionId = btn.dataset.lobby;
@@ -670,6 +671,7 @@ function init() {
             const isStrategy = activeTab === 'strategy';
             if (isStrategy !== strategyMode) {
                 strategyMode = isStrategy;
+                mouseX = -1; mouseY = -1;
                 toggleStrategyView($, strategyMode);
                 if (strategyMode) {
                     strategy.resize();
@@ -779,10 +781,10 @@ function frame(now) {
             // All sub-steps done — finalize the day
             if (sim.dayComplete) {
                 sim.finalizeDay();
-                removeParamOverlays(sim, _savedOverlays);
                 dayInProgress = false;
                 syncMarket(sim);
                 _onDayComplete();
+                removeParamOverlays(sim, _savedOverlays);
             }
         }
     }
@@ -1705,7 +1707,7 @@ function _resetCore(index) {
     _initPortfolioHistory();
     chart.dayOrigin = sim.day;
     dayInProgress = false;
-    chart._lerp.day = -1;
+    Object.assign(chart._lerp, { day: -1, close: 0, high: 0, low: 0, _from: 0, _targetClose: 0, _targetHigh: 0, _targetLow: 0, _t: 1 });
     expiryMgr.init(sim.day);
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     chainDirty = true;
