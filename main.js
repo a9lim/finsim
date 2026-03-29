@@ -61,7 +61,7 @@ import {
 } from './src/faction-standing.js';
 import {
     evaluateTraits, getActiveTraits, getTrait,
-    getTraitEffect, resetTraits, getActiveTraitIds,
+    getTraitEffect, resetTraits, getActiveTraitIds, hasTrait,
 } from './src/traits.js';
 import {
     tickRegulations, getActiveRegulations, getRegulation,
