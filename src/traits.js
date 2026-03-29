@@ -246,7 +246,7 @@ export function evaluateTraits(ctx) {
                     _active.add(trait.id);
                     newlyActive.push(trait.id);
                 }
-            } catch { /* skip */ }
+            } catch (e) { console.warn('Trait condition error:', trait.id, e); }
         } else if (trait.loseForever) {
             if (_quietMoneyLost) { _active.delete(trait.id); continue; }
             try {
@@ -256,7 +256,7 @@ export function evaluateTraits(ctx) {
                     _active.delete(trait.id);
                     _quietMoneyLost = true;
                 }
-            } catch { /* skip */ }
+            } catch (e) { console.warn('Trait condition error:', trait.id, e); }
         } else {
             try {
                 if (trait.condition(ctx)) {
@@ -265,7 +265,7 @@ export function evaluateTraits(ctx) {
                 } else {
                     _active.delete(trait.id);
                 }
-            } catch { /* skip */ }
+            } catch (e) { console.warn('Trait condition error:', trait.id, e); }
         }
     }
     return newlyActive;
