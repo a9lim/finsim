@@ -611,6 +611,8 @@ export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, c
                     } else { legFailed = true; break; }
                 }
                 if (legFailed) {
+                    // NOTE: price impact from executed legs is NOT reversed on rollback.
+                    // This is a known limitation — impact records are append-only.
                     portfolio.cash = savedCash;
                     portfolio.closedBorrowCost = savedClosedBorrowCost;
                     portfolio.marginDebitCost = savedMarginDebitCost;
@@ -899,8 +901,8 @@ export function processExpiry(sim, expiryDay, currentPrice, currentDay, currentV
                 portfolio.cash += BOND_FACE_VALUE * Math.abs(pos.qty);
             } else {
                 const returnedMargin = pos._reservedMargin ?? _marginForShort(
-                    pos.type, Math.abs(pos.qty), pos.entryPrice, 0, 0,
-                    0, currentDay, pos.strike, pos.expiryDay
+                    pos.type, Math.abs(pos.qty), pos.entryPrice, currentPrice, currentVol,
+                    currentRate, currentDay, pos.strike, pos.expiryDay
                 );
                 portfolio.cash += returnedMargin - BOND_FACE_VALUE * Math.abs(pos.qty);
             }
