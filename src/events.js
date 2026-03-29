@@ -15,7 +15,7 @@ import {
     ADV, EVENT_COUPLING_CAP, HISTORY_CAPACITY,
 } from './config.js';
 
-import { createWorldState, congressHelpers, applyStructuredEffects } from './world-state.js';
+import { createWorldState, congressHelpers, applyStructuredEffects, validateCongress, validatePnthBoard } from './world-state.js';
 import { ALL_EVENTS, PARAM_RANGES, getEventById } from './events/index.js';
 import { getTraitEffect, getActiveTraitIds } from './traits.js';
 import { firmCooldownMult } from './faction-standing.js';
@@ -342,6 +342,8 @@ export class EventEngine {
             this.applyDeltas(sim, this._scaledParams(event.params, coupling) || event.params);
             if (typeof event.effects === 'function') event.effects(this.world);
             else if (Array.isArray(event.effects)) applyStructuredEffects(this.world, event.effects);
+            validateCongress(this.world);
+            validatePnthBoard(this.world);
 
             this._logEvent(day, event, event.params || {}, event.magnitude || 'major');
             this._scheduleFollowups(event, day, depth);
@@ -374,6 +376,8 @@ export class EventEngine {
         } else if (Array.isArray(event.effects)) {
             applyStructuredEffects(this.world, event.effects);
         }
+        validateCongress(this.world);
+        validatePnthBoard(this.world);
 
         // Track consecutive minor/neutral for boredom boost
         if (event.magnitude === 'minor' || event.category === 'neutral') {
