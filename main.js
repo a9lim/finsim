@@ -315,13 +315,6 @@ function init() {
     _toolbar.initSidebar($.panelToggle, $.sidebar, $.closePanel);
 
     // 8. Init keyboard shortcuts
-    function cycleTab(dir) {
-        var btns = document.querySelectorAll('.tab-btn');
-        var idx = 0;
-        btns.forEach(function(b, i) { if (b.classList.contains('active')) idx = i; });
-        var next = (idx + dir + btns.length) % btns.length;
-        btns[next].click();
-    }
 
     var _shortcuts = [
         { key: ' ',  label: 'Play / Pause',      group: 'Simulation', action: () => togglePlay() },
@@ -881,7 +874,7 @@ function _updateLobbyPills() {
         const action = actions[i];
         if (i > 0) {
             const div = document.createElement('span');
-            div.className = 'substrate-divider';
+            div.className = 'substrate-divider divider';
             $.lobbyActions.appendChild(div);
         }
         const btn = document.createElement('button');
@@ -889,10 +882,10 @@ function _updateLobbyPills() {
         const isFirst = i === 0;
         const isLast = i === actions.length - 1;
         let radiusCls = '';
-        if (isFirst && isLast) radiusCls = 'substrate-pill-solo';
-        else if (isFirst) radiusCls = 'substrate-pill-left';
-        else if (isLast) radiusCls = 'substrate-pill-right';
-        btn.className = `substrate-pill lobby-pill ${colorCls} ${radiusCls}`.trim();
+        if (isFirst && isLast) radiusCls = 'pill-btn-solo';
+        else if (isFirst) radiusCls = 'pill-btn-left';
+        else if (isLast) radiusCls = 'pill-btn-right';
+        btn.className = `pill-btn lobby-pill ${colorCls} ${radiusCls}`.trim();
         btn.dataset.lobby = action.id;
         btn.disabled = !action.affordable || !action.cooldownReady;
         const label = (_LOBBY_META[action.id] || {}).label || action.name;
