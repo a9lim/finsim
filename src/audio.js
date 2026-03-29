@@ -604,6 +604,7 @@ function _jazzSchedule() {
         _scheduleLoop(_jazzNext);
         _jazzNext += LOOP_DUR;
     }
+    clearTimeout(_jazzTimer);
     _jazzTimer = setTimeout(_jazzSchedule, 2000);
 }
 
@@ -768,6 +769,8 @@ export function stopMusic(fadeMs = 1000) {
         for (const node of nodes) {
             try { node.osc.stop(); } catch {}
             try { node.osc.disconnect(); } catch {}
+            try { node.filter.disconnect(); } catch {}
+            try { node.gain.disconnect(); } catch {}
         }
     }, fadeMs + 200);
     _musicNodes = [];
