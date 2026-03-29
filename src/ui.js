@@ -613,11 +613,13 @@ export function toggleStrategyView($, active) {
         $.chartCanvas.classList.add('hidden');
         $.strategyCanvas.classList.remove('hidden');
         if ($.zoomControls) $.zoomControls.classList.add('hidden');
+        if ($.lobbyBar) $.lobbyBar.classList.add('hidden');
     } else {
         $.chartCanvas.classList.remove('hidden');
         $.strategyCanvas.classList.add('hidden');
         $.timeSliderBar.classList.add('hidden');
         if ($.zoomControls) $.zoomControls.classList.remove('hidden');
+        if ($.lobbyBar) $.lobbyBar.classList.remove('hidden');
     }
     if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
 }
