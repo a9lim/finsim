@@ -295,7 +295,6 @@ main {
 
 .chain-expiry-tab.active {
     color: var(--accent);
-    border-color: var(--accent);
     background: var(--accent-subtle);
 }
 
