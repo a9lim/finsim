@@ -116,6 +116,14 @@ const _regById = new Map(REGULATIONS.map(r => [r.id, r]));
  * Advance a bill through the legislative pipeline.
  * Called by event effects to move bills between stages.
  */
+const LEGAL_TRANSITIONS = {
+    null:         ['introduced', 'active'], // null = not yet in pipeline; active for executive orders
+    'introduced': ['committee', 'failed'],
+    'committee':  ['floor', 'failed'],
+    'floor':      ['active', 'failed'],
+    'active':     ['repealed'],
+};
+
 export function advanceBill(id, status) {
     const reg = _regById.get(id);
     if (!reg) return;
@@ -126,6 +134,11 @@ export function advanceBill(id, status) {
     }
 
     const entry = _state.get(id) || { status: null, remainingDays: null };
+
+    // Validate transition (skip for executive orders which go straight to active)
+    const allowed = LEGAL_TRANSITIONS[entry.status];
+    if (allowed && !allowed.includes(status)) return;
+
     entry.status = status;
 
     if (status === 'active') {
