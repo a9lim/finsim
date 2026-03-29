@@ -1189,3 +1189,11 @@ main {
     border-radius: var(--radius-lg, 12px);
     padding: 12px 20px; line-height: 1.45;
 }
+
+/* -- Reduced Motion ---------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    @keyframes superEventIn { from, to { opacity: 1; transform: none; } }
+    @keyframes blink { from, to { opacity: 1; } }
+    @keyframes choiceFadeIn { from, to { opacity: 1; transform: none; } }
+    .typewriter-cursor { animation: none; }
+}
