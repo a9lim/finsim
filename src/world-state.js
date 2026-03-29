@@ -101,6 +101,30 @@ export function congressHelpers(world) {
     };
 }
 
+/** Clamp congress seats to valid ranges and enforce conservation. */
+export function validateCongress(world) {
+    const { senate, house } = world.congress;
+    senate.federalist = Math.max(0, Math.min(100, Math.round(senate.federalist)));
+    senate.farmerLabor = 100 - senate.federalist;
+    house.federalist = Math.max(0, Math.min(435, Math.round(house.federalist)));
+    house.farmerLabor = 435 - house.federalist;
+}
+
+/** Clamp PNTH board seats so total does not exceed 12. */
+export function validatePnthBoard(world) {
+    world.pnth.boardDirks = Math.max(0, Math.min(12, Math.round(world.pnth.boardDirks)));
+    world.pnth.boardGottlieb = Math.max(0, Math.min(12, Math.round(world.pnth.boardGottlieb)));
+    const total = world.pnth.boardDirks + world.pnth.boardGottlieb;
+    if (total > 12) {
+        const excess = total - 12;
+        if (world.pnth.boardDirks >= world.pnth.boardGottlieb) {
+            world.pnth.boardDirks -= excess;
+        } else {
+            world.pnth.boardGottlieb -= excess;
+        }
+    }
+}
+
 // -- LLM effect validation ranges (whitelist) ----------------------------
 // Numeric: { min, max, type: 'number' }
 // Boolean: { type: 'boolean' }
