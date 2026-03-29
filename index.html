@@ -24,7 +24,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Noto+Sans+Mono:wght@300;400;500;600;700&family=Noto+Serif:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Fira+Code:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" as="style" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous"></noscript>
@@ -88,7 +88,7 @@
     </script>
 </head>
 
-<body>
+<body class="sim-body">
     <a href="#chart-canvas" class="skip-link">Skip to chart</a>
 
     <!-- Intro Screen -->
@@ -225,14 +225,14 @@
             <canvas id="chart-canvas"></canvas>
             <canvas id="strategy-canvas" class="hidden"></canvas>
             <div id="zoom-controls" class="sim-controls glass">
-                <button class="tool-btn zoom-ctrl-btn" id="zoom-in-btn" aria-label="Zoom in">
+                <button class="tool-btn zoom-ctrl-btn icon-tight" id="zoom-in-btn" aria-label="Zoom in">
                     <svg width="16" height="16" viewBox="0 0 24 24">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
                 </button>
                 <span id="zoom-level" class="zoom-level">100%</span>
-                <button class="tool-btn zoom-ctrl-btn" id="zoom-out-btn" aria-label="Zoom out">
+                <button class="tool-btn zoom-ctrl-btn icon-tight" id="zoom-out-btn" aria-label="Zoom out">
                     <svg width="16" height="16" viewBox="0 0 24 24">
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
@@ -247,9 +247,6 @@
                     </svg>
                 </button>
             </div>
-            <div id="lobby-bar" class="lobby-bar glass" style="display:none">
-                <div id="lobby-actions"></div>
-            </div>
         </div>
         <div id="time-slider-bar" class="time-slider-bar hidden">
             <label class="time-slider-row">
@@ -261,11 +258,15 @@
     </main>
 
     <!-- Sidebar Panel -->
+    <div id="lobby-bar" class="sim-bar glass" style="display:none">
+        <div id="lobby-actions"></div>
+    </div>
+
     <aside id="sidebar" class="sim-panel glass" role="complementary" aria-label="Trading panel">
         <div class="sheet-handle"></div>
         <div class="stats-header">
             <h2 class="stats-title">Trading</h2>
-            <button id="close-panel" class="tool-btn" aria-label="Close panel">
+            <button id="close-panel" class="tool-btn icon-tight" aria-label="Close panel">
                 <svg width="16" height="16" viewBox="0 0 24 24">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -356,7 +357,7 @@
                             </span>
                             <span class="stat-value" id="portfolio-value">$10,000</span>
                         </div>
-                        <canvas class="rate-sparkline" id="portfolio-sparkline" width="280" height="40"></canvas>
+                        <canvas class="sparkline rate-sparkline" id="portfolio-sparkline" width="280" height="40"></canvas>
                         <div class="stat-row">
                             <span class="stat-label-wrap" id="margin-label-wrap">
                                 <span class="stat-label">Margin Status</span>
@@ -493,7 +494,7 @@
                             </span>
                             <span class="stat-value" id="rate-display">0.00%</span>
                         </div>
-                        <canvas class="rate-sparkline" id="rate-sparkline" width="280" height="40"></canvas>
+                        <canvas class="sparkline rate-sparkline" id="rate-sparkline" width="280" height="40"></canvas>
                     </div>
                     <div id="llm-settings-section" class="stat-group hidden">
                         <div class="group-label">LLM Settings <button class="info-trigger" type="button" data-info="llm" aria-label="Info: LLM Integration">?</button></div>

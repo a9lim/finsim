@@ -5,15 +5,6 @@
    shared-base.css.
    =================================================== */
 
-/* --- Base --- */
-body {
-    overflow: hidden;
-    font-size: 14px;
-    line-height: 1.5;
-    height: 100vh;
-    height: 100dvh;
-}
-
 /* --- P&L Colour Classes --- */
 .pnl-up   { color: var(--up); }
 .pnl-down { color: var(--down); }
@@ -71,32 +62,13 @@ main {
 }
 
 /* --- Lobby Pill Bar --- */
-.lobby-bar {
-    position: absolute;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    padding: 4px 8px;
-    border-radius: var(--radius-pill);
-    z-index: 20;
-}
-.lobby-bar .substrate-pill {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.35rem 0.7rem;
-    border: none;
-    background: transparent;
-    font-family: var(--font-body);
-    font-weight: 600;
-    font-size: clamp(0.72rem, 1vw, 0.82rem);
-    cursor: pointer;
-    transition: color 0.2s, background 0.2s;
-    white-space: nowrap;
-    outline: none;
-    -webkit-appearance: none;
+/* Base positioning from .sim-bar in shared-base.css.
+   Lobby bar manages its own visibility via display:none/block from JS,
+   so override the entrance animation and opacity — it doesn't need them. */
+#lobby-bar {
+    opacity: 1;
+    pointer-events: auto;
+    animation: none;
 }
 .lobby-pill-fed     { color: var(--ext-orange); }
 .lobby-pill-fl      { color: var(--ext-lime); }
@@ -104,25 +76,6 @@ main {
 .lobby-pill-media   { color: var(--ext-cyan); }
 .lobby-pill-fed-rel { color: var(--ext-blue); }
 #lobby-actions { display: flex; align-items: center; }
-.lobby-bar .substrate-pill-left  { border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
-.lobby-bar .substrate-pill-right { border-radius: 0 var(--radius-pill) var(--radius-pill) 0; }
-.lobby-bar .substrate-pill-solo  { border-radius: var(--radius-pill); }
-.lobby-bar .substrate-pill:hover:not(:disabled) {
-    background: color-mix(in srgb, currentColor 10%, transparent);
-}
-.lobby-bar .substrate-pill:active:not(:disabled) {
-    transform: scale(0.96);
-}
-.lobby-bar .substrate-pill:disabled {
-    opacity: 0.35;
-    cursor: default;
-}
-.lobby-bar .substrate-divider {
-    width: 1px;
-    height: 20px;
-    background: var(--border);
-    flex-shrink: 0;
-}
 
 /* --- Time Slider (below chart in strategy mode) --- */
 .time-slider-row {
@@ -155,11 +108,7 @@ main {
     border-color: transparent;
 }
 
-#zoom-in-btn svg,
-#zoom-out-btn svg,
-#close-panel svg {
-    stroke-width: 2.5;
-}
+/* stroke-width for zoom/close icons now via shared .icon-tight */
 
 /* Speed button and play/pause states now in shared-base.css */
 
@@ -526,22 +475,9 @@ main {
     min-width: 90px;
 }
 
-/* --- Capital Input --- */
+/* --- Capital Input (overrides shared .sim-input padding) --- */
 .sim-input {
-    width: 100%;
     padding: 6px 10px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--bg-elevated);
-    color: var(--text);
-    font-family: var(--font-body);
-    font-size: 0.82rem;
-    outline: none;
-    transition: border-color 0.15s;
-}
-
-.sim-input:focus {
-    border-color: var(--accent);
 }
 
 .sim-input::placeholder {
@@ -700,25 +636,10 @@ main {
         bottom: 8px;
         left: 10px;
     }
-    .lobby-bar {
-        bottom: 8px;
-    }
-
+    /* Bottom-sheet base now in shared .sim-panel; keep overrides */
     #sidebar {
-        top: auto;
-        right: 0;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        max-height: 55vh;
-        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-        transform: translateY(100%);
         transition: transform 0.35s var(--ease-out);
         z-index: 110;
-    }
-
-    #sidebar.open {
-        transform: translateY(0);
     }
 
     .tab-panel {
@@ -754,14 +675,9 @@ main {
 
 /* Extra small: handled by shared-base.css (hide .sim-brand, tight gap) */
 
-/* -- Rate sparkline -- */
+/* -- Rate sparkline (extends shared .sparkline) -- */
 .rate-sparkline {
-    display: block;
-    width: 100%;
-    height: 40px;
-    margin-top: 4px;
-    border-radius: 4px;
-    background: transparent;
+    --sparkline-h: 40px;
 }
 
 /* -- Dynamic regime: LLM settings & event log -- */

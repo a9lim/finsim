@@ -17,20 +17,13 @@ _PALETTE.theta = _PALETTE.extended.cyan;
 _PALETTE.vega  = _PALETTE.extended.purple;
 _PALETTE.rho   = _PALETTE.extended.slate;
 
-Object.freeze(_PALETTE.extended);
-Object.freeze(_PALETTE.light);
-Object.freeze(_PALETTE.dark);
-Object.freeze(_FONT);
-Object.freeze(_PALETTE);
+_freezeTokens();
 
 // --- CSS Variable Injection ---
-(function injectProjectVars() {
+(function() {
   const P = _PALETTE, L = P.light, D = P.dark;
-
-  const style = document.createElement('style');
-  style.id = 'project-vars';
-  style.textContent = `:root {
-  --up: ${P.up};
+  _injectProjectVars(
+    `  --up: ${P.up};
   --down: ${P.down};
   --call: ${P.call};
   --put: ${P.put};
@@ -41,19 +34,15 @@ Object.freeze(_PALETTE);
   --theta: ${P.theta};
   --vega: ${P.vega};
   --rho: ${P.rho};
-
   --chart-grid: ${_r(L.text, 0.06)};
   --chart-crosshair: ${_r(L.text, 0.25)};
   --chart-axis: ${L.textSecondary};
   --chain-hover: ${_r(L.text, 0.04)};
-  --dialog-bg: ${L.panelSolid};
-}
-[data-theme="dark"] {
-  --chart-grid: ${_r(D.text, 0.06)};
+  --dialog-bg: ${L.panelSolid};`,
+    `  --chart-grid: ${_r(D.text, 0.06)};
   --chart-crosshair: ${_r(D.text, 0.25)};
   --chart-axis: ${D.textSecondary};
   --chain-hover: ${_r(D.text, 0.06)};
-  --dialog-bg: ${D.panelSolid};
-}`;
-  document.head.appendChild(style);
+  --dialog-bg: ${D.panelSolid};`
+  );
 })();
