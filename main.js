@@ -1358,6 +1358,8 @@ function _onDayComplete() {
         }
     }
 
+    // lobbyingExposed is set directly here (not via event system) because it's
+    // a meta-flag derived from player behavior + faction state, not a narrative beat.
     // Check if lobbying has been exposed (heavy lobbying while media is watching)
     if (eventEngine && _lobbyCount >= 3 && factions.mediaTrust < 40 && !eventEngine.world.media.lobbyingExposed) {
         eventEngine.world.media.lobbyingExposed = true;

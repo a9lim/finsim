@@ -235,7 +235,7 @@ export class ChartRenderer {
 
         // Camera zoom = pixels per world unit (1 world unit = 1 day).
         // Candle body is BODY_RATIO of the slot width.
-        const zoom = cam ? cam.zoom : this.SLOT_PX;
+        const zoom = (cam && isFinite(cam.zoom) && cam.zoom > 0) ? cam.zoom : this.SLOT_PX;
         const candleWidthRaw = Math.max(2, Math.min(40, zoom * this.BODY_RATIO));
 
         // Map between screen X and day index.

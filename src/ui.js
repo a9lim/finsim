@@ -74,7 +74,6 @@ export function cacheDOMElements($) {
     $.portfolioValue    = document.getElementById('portfolio-value');
     $.portfolioSparkCanvas = document.getElementById('portfolio-sparkline');
     $.portfolioSparkCtx    = $.portfolioSparkCanvas ? $.portfolioSparkCanvas.getContext('2d') : null;
-    $.totalPnl          = document.getElementById('total-pnl');
     $.marginStatus      = document.getElementById('margin-status');
     $.borrowCostDisplay = document.getElementById('borrow-cost');
     $.dividendDisplay   = document.getElementById('dividend-income');
@@ -891,7 +890,6 @@ export function wireInfoTips() {
         margin:       { title: 'Margin Status', body: 'Your margin health. OK = well-collateralised. Low = approaching maintenance threshold. MARGIN CALL = equity below required level.' },
         cash:         { title: 'Cash', body: 'Available cash. Changes with trades, dividends, borrow costs, and exercises. Can go negative (buying on margin).' },
         portfolioValue: { title: 'Portfolio Value', body: 'Total equity: cash plus mark-to-market value of all open positions at mid-price.' },
-        totalPnl:     { title: 'Total P&L', body: 'Portfolio value minus initial capital ($10,000). Includes realised/unrealised P&L, dividends, borrow costs, and spread costs.' },
         borrowCost:   { title: 'Borrow Cost', body: 'Cumulative interest on short positions and margin debit. Charged daily using the borrow spread formula.' },
         dividends:    { title: 'Dividends', body: 'Net cumulative dividends. Long stock receives cash quarterly; short stock pays. Amount = $S \\times q/4$ per share.' },
         // --- Greeks ---

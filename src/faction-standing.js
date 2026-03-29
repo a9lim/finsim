@@ -45,7 +45,7 @@ export function resetFactions() {
 /** Shift a faction score by delta, applying conviction multipliers for regulatory exposure. */
 export function shiftFaction(id, delta) {
     if (id === 'regulatoryExposure') {
-        if (factions.settled && delta > 0) return; // settlement blocks increases
+        if (factions.settled) return; // settlement freezes exposure entirely
         delta *= getTraitEffect('regExposureMult', 1);
     }
     factions[id] = Math.max(0, Math.min(100, factions[id] + delta));
