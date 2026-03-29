@@ -51,7 +51,7 @@ import {
 } from './src/strategy-store.js';
 import { applyStructuredEffects, congressHelpers } from './src/world-state.js';
 import { pickTip, resetUsedTips } from './src/events/tips.js';
-import { getEventById } from './src/events/index.js';
+import { getEventById, ALL_EVENTS } from './src/events/index.js';
 import {
     factions, resetFactions, getFaction,
     onQuarterlyReview, applyComplianceChoice,
@@ -714,7 +714,39 @@ function init() {
         }
     }
 
-    // 19. Start animation loop
+    // 19. Debug console API — use window._debug in the browser console
+    window._debug = {
+        sim, portfolio, market, factions,
+        get eventEngine() { return eventEngine; },
+        get world() { return eventEngine?.world; },
+        popupQueue: _popupQueue,
+        /** Fire any event by id. Toast events apply immediately; popup events queue. */
+        fireEvent(id) {
+            const ev = getEventById(id);
+            if (!ev) { console.error(`No event with id "${id}"`); return; }
+            if (!eventEngine) { console.error('eventEngine is null (not in Dynamic mode)'); return; }
+            const result = eventEngine._fireEvent(ev, sim, sim.day, 0, 0);
+            if (result.queued) { _popupQueue.push(result.event); _processPopupQueue(); }
+            else { updateEventLog($, eventEngine.eventLog, chart.dayOrigin); updateCongressDiagrams($, eventEngine.world); updateStandings($, eventEngine.world, factions, getFactionDescriptor); }
+            console.log('Fired:', ev.id, result);
+            return result;
+        },
+        /** Show an arbitrary popup (no event engine needed). */
+        popup(headline, context, choices) {
+            _popupQueue.push({ headline, context, choices: choices || [{ label: 'OK', desc: 'Dismiss' }], popup: true });
+            _processPopupQueue();
+        },
+        /** Show a toast message. */
+        toast(msg, ms) { _toast(msg, ms || 3000); },
+        /** List all event ids, optionally filtered by substring. */
+        listEvents(filter) {
+            const list = ALL_EVENTS.map(e => ({ id: e.id, category: e.category, magnitude: e.magnitude, popup: !!e.popup, superevent: !!e.superevent }));
+            if (filter) return list.filter(e => e.id.includes(filter) || (e.category && e.category.includes(filter)));
+            return list;
+        },
+    };
+
+    // 20. Start animation loop
     requestAnimationFrame(frame);
 }
 
