@@ -449,6 +449,9 @@ export function executeMarketOrder(
                 type, Math.abs(newQty), fill, currentPrice, currentVol,
                 currentRate, currentDay, strike, expiryDay
             );
+        } else if (oldQty < 0 && newQty > 0) {
+            // C3: position flipped from short to long — clear stale margin
+            delete existing._reservedMargin;
         }
         return existing;
     }
@@ -745,6 +748,15 @@ export function exerciseOption(positionId, currentPrice, currentDay, currentVol,
             }
             existingStock.qty = newQty;
             existingStock.entryDay = currentDay;
+            // Fix C3/H1: update margin when exercise changes short exposure
+            if (newQty < 0 && currentVol != null && currentRate != null) {
+                existingStock._reservedMargin = _marginForShort(
+                    'stock', Math.abs(newQty), pos.strike, currentPrice, currentVol,
+                    currentRate, currentDay
+                );
+            } else if (newQty > 0) {
+                delete existingStock._reservedMargin;
+            }
             stockPos = existingStock;
         }
     } else {
@@ -757,6 +769,13 @@ export function exerciseOption(positionId, currentPrice, currentDay, currentVol,
             strategyName: stratKey,
         };
         portfolio.positions.push(stockPos);
+        // Fix C2: set margin on newly created short stock from put exercise
+        if (signedDelta < 0 && currentVol != null && currentRate != null) {
+            stockPos._reservedMargin = _marginForShort(
+                'stock', Math.abs(signedDelta), pos.strike, currentPrice, currentVol,
+                currentRate, currentDay
+            );
+        }
     }
 
     // Remove the option position
