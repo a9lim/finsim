@@ -253,7 +253,7 @@ function _fillTree(tree, T, r, sigma, q, currentDay) {
         // Flat rate — fill arrays with constant values
         const drift = useDiscrete ? r : (r - q);
         const disc = Math.exp(-r * dt);
-        const pu = (Math.exp(drift * dt) - d) / uMinusD;
+        const pu = Math.max(0, Math.min(1, (Math.exp(drift * dt) - d) / uMinusD));
         const puDisc = pu * disc;
         const pdDisc = (1 - pu) * disc;
         puDiscArr.fill(puDisc, 0, n);
