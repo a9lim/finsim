@@ -116,8 +116,7 @@ export function cacheDOMElements($) {
     $.popupHeadline  = document.getElementById('popup-event-headline');
     $.popupContext   = document.getElementById('popup-event-context');
     $.popupChoices   = document.getElementById('popup-event-choices');
-    $.introScreen = document.getElementById('intro-screen');
-    $.introStart  = document.getElementById('intro-start');
+
     $.strategyLegsList = document.getElementById('strategy-legs-list');
     $.strategySummary  = document.getElementById('strategy-summary');
     $.stratGreekDelta  = document.getElementById('strat-greek-delta');
