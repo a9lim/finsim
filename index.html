@@ -37,7 +37,7 @@
     <script src="colors.js"></script>
     <script src="/shared-toolbar.js"></script>
     <script src="/shared-forms.js"></script>
-    <script src="/shared-intro.js"></script>
+
     <script src="/shared-touch.js"></script>
     <script src="/shared-info.js"></script>
     <script src="/shared-shortcuts.js"></script>
@@ -88,67 +88,8 @@
     </script>
 </head>
 
-<body class="sim-body">
+<body class="sim-body app-ready">
     <a href="#chart-canvas" class="skip-link">Skip to chart</a>
-
-    <!-- Intro Screen -->
-    <div id="intro-screen">
-        <div class="intro-bg"></div>
-        <div class="intro-content">
-            <span class="intro-overline">Meridian Capital &middot; Derivatives Desk</span>
-            <h1 class="intro-title">Shoals<br><span class="intro-subtitle">Trading Simulator</span></h1>
-            <p class="intro-desc">You&rsquo;ve just been poached from a rival firm to run
-                Meridian Capital&rsquo;s most aggressive derivatives desk. President Barron
-                has just taken office, volatility is spiking, and Meridian wants someone who
-                can trade through the storm. Build positions, manage risk, navigate 4 years
-                of market events&mdash;and try not to get fired.</p>
-            <div class="intro-cards">
-                <div class="intro-card">
-                    <div class="intro-card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M2 17l4-4 4 4 4-8 4 4 4-6"/>
-                            <line x1="2" y1="21" x2="22" y2="21"/>
-                        </svg>
-                    </div>
-                    <div class="intro-card-text">
-                        <strong>Stocks, Bonds &amp; Options</strong>
-                        <span>Market, limit, and stop orders with Reg-T margin.</span>
-                    </div>
-                </div>
-                <div class="intro-card">
-                    <div class="intro-card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-                            <polyline points="2 17 12 22 22 17"/>
-                            <polyline points="2 12 12 17 22 12"/>
-                        </svg>
-                    </div>
-                    <div class="intro-card-text">
-                        <strong>Multi-Leg Strategies</strong>
-                        <span>Build spreads, straddles, and condors with live payoff curves.</span>
-                    </div>
-                </div>
-                <div class="intro-card">
-                    <div class="intro-card-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                            <line x1="16" y1="13" x2="8" y2="13"/>
-                            <line x1="16" y1="17" x2="8" y2="17"/>
-                        </svg>
-                    </div>
-                    <div class="intro-card-text">
-                        <strong>277 Market Events</strong>
-                        <span>Fed policy, geopolitics, corporate drama, and compliance crises.</span>
-                    </div>
-                </div>
-            </div>
-            <button id="intro-start">Start Trading</button>
-        </div>
-    </div>
 
     <!-- Floating Toolbar -->
     <header id="toolbar" class="sim-toolbar glass" role="toolbar" aria-label="Trading tools">
@@ -725,17 +666,6 @@
         </div>
     </div>
 
-    <!-- Inline intro dismiss: lightweight fallback in case ES6 module is slow -->
-    <script>
-        (function() {
-            var btn = document.getElementById('intro-start');
-            if (btn) btn.addEventListener('click', function() {
-                var intro = document.getElementById('intro-screen');
-                if (intro) intro.classList.add('hidden');
-                document.body.classList.add('app-ready');
-            });
-        })();
-    </script>
     <script src="/shared-tabs.js"></script>
     <script type="module" src="main.js"></script>
 </body>

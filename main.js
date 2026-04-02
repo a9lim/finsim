@@ -534,11 +534,15 @@ function init() {
         }
     });
 
-    // 11. Wire intro screen
-    _intro.init($.introScreen, $.introStart, () => {
+    // 11. Init audio on first user interaction (Web Audio API requires gesture)
+    function _initAudioOnce() {
         initAudio();
         setAmbientMood('calm');
-    });
+        document.removeEventListener('click', _initAudioOnce);
+        document.removeEventListener('keydown', _initAudioOnce);
+    }
+    document.addEventListener('click', _initAudioOnce, { once: true });
+    document.addEventListener('keydown', _initAudioOnce, { once: true });
 
     // 12. Wire info tips for slider labels
     wireInfoTips();

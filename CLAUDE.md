@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Part of the **a9l.im** portfolio. See root `CLAUDE.md` for the shared design system, head loading order, CSS conventions, and shared code policy. Sibling projects: `geon`, `cyano`, `gerry`.
+Part of the **a9l.im** portfolio. See root `CLAUDE.md` for the shared design system, head loading order, CSS conventions, and shared code policy. Sibling projects: `geon`, `cyano`, `gerry`, `scripture`.
 
 ## Rules
 
@@ -97,7 +97,7 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - Dual pricing shares `_V` buffer — `_priceCore` after `_pricePairCore` overwrites call values
 - Chain table rebuilt every call — never cache cell refs; delegation bound once via `_chainClicksBound`
 - Trade dialog confirm button cloned on each open to avoid stacking listeners
-- `initAudio()` must be called from a user gesture handler (in `_intro.init`'s `onDismiss` callback)
+- `initAudio()` must be called from a user gesture handler (deferred to first click/keydown via one-shot listeners in `main.js`)
 - `scheduleFollowup` must use `{ event, chainId, targetDay, weight, depth }` — NOT `{ id, fireDay }`
 
 ### Semantic Traps
