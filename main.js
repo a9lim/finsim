@@ -218,13 +218,13 @@ function _buildStrategyPosMap() {
 /** Get the selected trade-tab expiry index, clamped to skeleton bounds. */
 function _tradeExpiryIdx() {
     const raw = parseInt($.tradeExpiry?.value, 10);
-    return Math.min(Math.max((isNaN(raw) ? chainSkeleton.length - 1 : raw), 0), chainSkeleton.length - 1);
+    return clamp(isNaN(raw) ? chainSkeleton.length - 1 : raw, 0, chainSkeleton.length - 1);
 }
 
 /** Get the selected strategy-tab expiry index, clamped to skeleton bounds. */
 function _strategyExpiryIdx() {
     const raw = parseInt($.strategyExpiry?.value, 10);
-    return Math.min(Math.max((isNaN(raw) ? chainSkeleton.length - 1 : raw), 0), chainSkeleton.length - 1);
+    return clamp(isNaN(raw) ? chainSkeleton.length - 1 : raw, 0, chainSkeleton.length - 1);
 }
 
 /** Price one skeleton expiry on demand (price-only, no greeks). */
