@@ -105,7 +105,7 @@
         <div class="toolbar-actions sim-toolbar-actions">
             <button id="play-btn" class="tool-btn" aria-label="Play/Pause simulation" title="Play">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
             </button>
@@ -114,24 +114,24 @@
             </button>
             <button id="step-btn" class="tool-btn" aria-label="Step forward one day" title="Step">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
                     <polygon points="5 4 15 12 5 20 5 4"></polygon>
                     <line x1="19" y1="5" x2="19" y2="19"></line>
                 </svg>
             </button>
             <button id="reset-btn" class="tool-btn" aria-label="Reset simulation" title="Reset">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path>
+                    stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3.7 7.3"></path><path d="M3 3v5h5"></path>
                 </svg>
             </button>
             <button id="mode-btn" class="tool-btn" aria-label="Buy mode" aria-pressed="false" title="Buy mode (X)">
-                <svg id="mode-icon-buy" width="20" height="18" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="2,14 6,10 10,12 16,4"/>
+                <svg id="mode-icon-buy" width="20" height="18" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
+                    <polyline points="2,14 6,10 10,12 15.4,4.8"/>
                     <polyline points="12,4 16,4 16,8"/>
                 </svg>
-                <svg id="mode-icon-sell" width="20" height="18" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-                    <polyline points="2,4 6,8 10,6 16,14"/>
+                <svg id="mode-icon-sell" width="20" height="18" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" style="display:none">
+                    <polyline points="2,4 6,8 10,6 15.4,13.2"/>
                     <polyline points="12,14 16,14 16,10"/>
                 </svg>
             </button>
@@ -153,12 +153,12 @@
                 </svg>
             </button>
             <button id="about-btn" class="tool-btn" aria-label="About" title="About">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
                     <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
             </button>
             <button id="panel-toggle" class="tool-btn" aria-label="Toggle sidebar panel" aria-expanded="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
                     <line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
@@ -188,8 +188,8 @@
                     <svg width="16" height="16" viewBox="0 0 24 24">
                         <path d="M15 3h6v6"></path>
                         <path d="M9 21H3v-6"></path>
-                        <path d="M21 3l-7 7"></path>
-                        <path d="M3 21l7-7"></path>
+                        <path d="M20.3 3.7l-6.3 6.3"></path>
+                        <path d="M3.7 20.3l6.3-6.3"></path>
                     </svg>
                 </button>
             </div>
@@ -455,7 +455,7 @@
                             <div class="key-input-wrap">
                                 <input type="password" id="llm-api-key" class="sim-input" placeholder="sk-ant-...">
                                 <button type="button" id="llm-key-toggle" class="tool-btn key-toggle" aria-label="Toggle key visibility">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                         <circle cx="12" cy="12" r="3"></circle>
                                     </svg>
