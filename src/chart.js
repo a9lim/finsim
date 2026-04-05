@@ -217,7 +217,7 @@ export class ChartRenderer {
 
         if (!history || history.length === 0 || history.size === 0) {
             ctx.fillStyle = textMuted;
-            ctx.font      = `13px var(--font-body, sans-serif)`;
+            ctx.font      = `13px ${_FONT.body}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('Awaiting market data\u2026', W / 2, H / 2);
@@ -473,7 +473,7 @@ export class ChartRenderer {
 
             const strikeDash = [6, 3];
             ctx.lineWidth   = 1;
-            ctx.font        = `11px var(--font-mono, monospace)`;
+            ctx.font        = `11px ${_FONT.mono}`;
             ctx.textBaseline = 'bottom';
 
             // Collect colors per strike: track whether green/rose appear
@@ -518,7 +518,7 @@ export class ChartRenderer {
 
         // ── 8. Y-axis labels ──────────────────────────────────────
         ctx.save();
-        ctx.font        = `11px var(--font-mono, monospace)`;
+        ctx.font        = `11px ${_FONT.mono}`;
         ctx.fillStyle   = textSec;
         ctx.textAlign   = 'right';
         ctx.textBaseline = 'middle';
@@ -535,7 +535,7 @@ export class ChartRenderer {
         // ── 8b. Y-axis rotated label "Price ($)" ────────────────
         ctx.save();
         ctx.fillStyle    = textMuted;
-        ctx.font         = `11px var(--font-body, sans-serif)`;
+        ctx.font         = `11px ${_FONT.mono}`;
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
         ctx.translate(10, plotY + plotH / 2);
@@ -545,7 +545,7 @@ export class ChartRenderer {
 
         // ── 9. X-axis labels ──────────────────────────────────────
         ctx.save();
-        ctx.font        = `11px var(--font-mono, monospace)`;
+        ctx.font        = `11px ${_FONT.mono}`;
         ctx.fillStyle   = textMuted;
         ctx.textAlign   = 'center';
         ctx.textBaseline = 'top';
@@ -604,7 +604,7 @@ export class ChartRenderer {
             ctx.fillStyle = palette.accent;
             ctx.fillRect(priceLabelX, priceLabelY, priceLabelW, priceLabelH);
             ctx.fillStyle = palette.light.canvas;
-            ctx.font        = `11px var(--font-mono, monospace)`;
+            ctx.font        = `11px ${_FONT.mono}`;
             ctx.textAlign   = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(
@@ -622,7 +622,7 @@ export class ChartRenderer {
             if (hoverDay >= hMinDay && hoverDay <= hMaxDay) {
                 const dayText = fmtRelDay(hoverDay, this.dayOrigin);
 
-                ctx.font        = `11px var(--font-mono, monospace)`;
+                ctx.font        = `11px ${_FONT.mono}`;
                 const dayLabelW = ctx.measureText(dayText).width + 10;
                 const dayLabelH = 18;
                 const dayLabelX = Math.round(mouseX) - dayLabelW / 2;

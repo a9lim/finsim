@@ -769,6 +769,7 @@ main {
     display: flex;
     align-items: center;
     gap: 4px;
+    font-family: var(--font-mono);
     font-size: 0.68rem;
     color: var(--text-secondary);
 }

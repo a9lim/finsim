@@ -709,7 +709,7 @@ export class StrategyRenderer {
         ctx.setLineDash([]);
         ctx.globalAlpha  = 1;
         ctx.fillStyle    = accentColor;
-        ctx.font         = '11px var(--font-mono, monospace)';
+        ctx.font         = `11px ${_FONT.mono}`;
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'top';
         ctx.fillText(_fmt$(spot), x, plotY + plotH + 4);
@@ -790,7 +790,7 @@ export class StrategyRenderer {
             ctx.fill();
             // Label
             ctx.fillStyle    = accentColor;
-            ctx.font         = '11px var(--font-mono, monospace)';
+            ctx.font         = `11px ${_FONT.mono}`;
             ctx.textAlign    = 'center';
             ctx.textBaseline = 'top';
             ctx.fillText(_fmt$(bx), px, y0 + 7);
@@ -824,7 +824,7 @@ export class StrategyRenderer {
     _drawYAxis(ctx, plotX, plotY, plotH, yLo, yHi, pnlToPixel, themeClrs) {
         ctx.save();
         ctx.fillStyle    = themeClrs.textSecondary;
-        ctx.font         = '11px var(--font-mono, monospace)';
+        ctx.font         = `11px ${_FONT.mono}`;
         ctx.textAlign    = 'right';
         ctx.textBaseline = 'middle';
 
@@ -842,7 +842,7 @@ export class StrategyRenderer {
         ctx.rotate(-Math.PI / 2);
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font         = '11px var(--font-body, sans-serif)';
+        ctx.font         = `11px ${_FONT.mono}`;
         ctx.fillStyle    = themeClrs.textMuted;
         ctx.fillText('P&L', 0, 0);
         ctx.restore();
@@ -854,7 +854,7 @@ export class StrategyRenderer {
         const baseY = plotY + plotH;
         ctx.save();
         ctx.fillStyle    = themeClrs.textSecondary;
-        ctx.font         = '11px var(--font-mono, monospace)';
+        ctx.font         = `11px ${_FONT.mono}`;
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'top';
 
@@ -868,7 +868,7 @@ export class StrategyRenderer {
 
         // Axis label
         ctx.textBaseline = 'bottom';
-        ctx.font         = '11px var(--font-body, sans-serif)';
+        ctx.font         = `11px ${_FONT.mono}`;
         ctx.fillStyle    = themeClrs.textMuted;
         ctx.fillText('Stock Price', plotX + plotW / 2, baseY + 42);
         ctx.restore();
@@ -906,7 +906,7 @@ export class StrategyRenderer {
         ctx.fill();
         ctx.stroke();
 
-        ctx.font         = '11px var(--font-body, sans-serif)';
+        ctx.font         = `11px ${_FONT.body}`;
         ctx.textBaseline = 'middle';
 
         // Reset legend hit areas

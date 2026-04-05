@@ -1110,16 +1110,16 @@ export function updateCongressDiagrams($, world) {
     const h = world.congress.house;
 
     const senateSegs = [
-        { label: 'Farmer-Labor', count: s.farmerLabor, color: c.farmerLabor },
-        { label: 'Federalist', count: s.federalist, color: c.federalist },
+        { label: 'F-L', count: s.farmerLabor, color: c.farmerLabor },
+        { label: 'Fed', count: s.federalist, color: c.federalist },
     ];
     const senateTotal = s.federalist + s.farmerLabor;
     _drawParliament($.senateDiagram, senateSegs, senateTotal);
     _updateLegend($.senateLegend, senateSegs, 51);
 
     const houseSegs = [
-        { label: 'Farmer-Labor', count: h.farmerLabor, color: c.farmerLabor },
-        { label: 'Federalist', count: h.federalist, color: c.federalist },
+        { label: 'F-L', count: h.farmerLabor, color: c.farmerLabor },
+        { label: 'Fed', count: h.federalist, color: c.federalist },
     ];
     const houseTotal = h.federalist + h.farmerLabor;
     _drawParliament($.houseDiagram, houseSegs, houseTotal);
