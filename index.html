@@ -4,17 +4,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Shoals | a9l.im</title>
+    <title>Shoals — a9l.im</title>
     <meta name="description"
-        content="Learn options trading with a realistic market simulator. Shoals models stock prices with geometric Brownian motion, Merton jumps, and Heston stochastic volatility, prices American options via CRR binomial trees, and includes a multi-leg strategy builder, portfolio margin system, and narrative-driven market events.">
+        content="Learn options trading through simulation. Price American options with stochastic volatility, build multi-leg strategies, and stress-test portfolios against 400+ narrative market events — all in the browser.">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
     <meta property="og:title" content="Shoals — Interactive Options Trading Simulator">
-    <meta property="og:description" content="Learn options trading in a realistic simulator with stochastic volatility, binomial tree pricing, a strategy builder, and narrative market events.">
+    <meta property="og:description" content="Learn options trading through simulation. An interactive options pricing simulator with stochastic volatility and 400+ market scenarios.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://a9l.im/shoals">
     <meta property="og:site_name" content="a9l.im">
     <meta name="twitter:card" content="summary_large_image">
     <meta property="og:image" content="https://a9l.im/shoals/og-image.webp">
     <meta name="twitter:image" content="https://a9l.im/shoals/og-image.webp">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type" content="image/webp">
     <meta name="twitter:site" content="@a9_lim">
     <meta name="twitter:creator" content="@a9_lim">
     <meta name="author" content="a9lim">
@@ -56,17 +60,22 @@
       "name": "Shoals",
       "url": "https://a9l.im/shoals",
       "description": "Interactive options trading simulator modeling stock prices with geometric Brownian motion, Merton jump diffusion, and Heston stochastic volatility. Prices American options via 128-step CRR binomial trees with term-structure volatility and moneyness skew. Includes a 25-strike options chain, multi-leg strategy builder with payoff diagrams and Greek overlays, portfolio margin system, Vasicek interest rate model, and a narrative event engine with 88 curated market scenarios.",
+      "speakable": {
+        "@type": "SpeakableSpecification",
+        "cssSelector": ["meta[name='description']"]
+      },
       "applicationCategory": "EducationalApplication",
       "educationalUse": "Interactive simulation for learning options pricing, portfolio management, derivatives trading, and quantitative finance",
       "learningResourceType": "Simulation",
       "educationalLevel": "Undergraduate",
       "about": [
-        {"@type": "Thing", "name": "Options trading"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q187125", "name": "Option"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q182060", "name": "Stochastic process"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q188451", "name": "Financial market"},
         {"@type": "Thing", "name": "Black-Scholes model"},
         {"@type": "Thing", "name": "Stochastic volatility"},
         {"@type": "Thing", "name": "Binomial options pricing"},
-        {"@type": "Thing", "name": "Portfolio management"},
-        {"@type": "Thing", "name": "Quantitative finance"}
+        {"@type": "Thing", "name": "Portfolio management"}
       ],
       "keywords": "options trading simulator, binomial tree pricing, Heston model, stochastic volatility, Greeks, strategy builder, quantitative finance, educational",
       "operatingSystem": "Any (Web Browser)",
