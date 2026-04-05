@@ -22,7 +22,7 @@ An interactive options trading simulator that runs entirely in the browser. You 
 
 ## Market Modes
 
-Five static presets (Calm Bull, Sideways, Volatile, Crisis, Rate Hike) and two dynamic modes. Dynamic mode runs a narrative event engine with ~280 curated scenarios across economics, politics, and corporate drama. An optional LLM mode connects to the Anthropic API for AI-generated events with full universe lore.
+Five static presets (Calm Bull, Sideways, Volatile, Crisis, Rate Hike) and two dynamic modes. Dynamic mode runs a narrative event engine with over 400 curated scenarios across economics, politics, and corporate drama. An optional LLM mode connects to the Anthropic API for AI-generated events with full universe lore.
 
 ## Running Locally
 
