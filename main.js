@@ -244,7 +244,7 @@ function _priceExpiryGreeks(idx) {
 // ---------------------------------------------------------------------------
 
 cacheDOMElements($);
-$.volumeSlider = document.getElementById('volume-slider');
+$.settingsBtn = document.getElementById('settings-btn');
 $.convictionsSection = document.getElementById('convictions-section');
 $.convictionsList = document.getElementById('convictions-list');
 $.regulationsList = document.getElementById('regulations-list');
@@ -698,17 +698,47 @@ function init() {
         });
     });
 
-    // Audio volume control
-    if ($.volumeSlider) {
-        const volVal = document.getElementById('volume-slider-val');
-        $.volumeSlider.value = Math.round(getVolume() * 100);
+    // Settings dropdown (volume)
+    if ($.settingsBtn) {
+        const dd = document.createElement('div');
+        dd.className = 'settings-dropdown glass';
+        dd.hidden = true;
+        const row = document.createElement('div');
+        row.className = 'display-row';
+        const lbl = document.createElement('label');
+        lbl.className = 'display-label';
+        lbl.textContent = 'Volume';
+        const sl = document.createElement('input');
+        sl.type = 'range'; sl.className = 'sim-slider';
+        sl.min = '0'; sl.max = '100'; sl.step = '1';
+        sl.value = String(Math.round(getVolume() * 100));
+        const slVal = document.createElement('span');
+        slVal.className = 'display-val';
+        slVal.textContent = Math.round(getVolume() * 100) + '%';
+        row.append(lbl, sl, slVal);
+        dd.appendChild(row);
+        document.body.appendChild(dd);
         if (typeof _forms !== 'undefined') {
-            _forms.bindSlider($.volumeSlider, volVal, (v) => {
-                setVolume(v / 100);
-            }, (v) => Math.round(v) + '%');
+            _forms.bindSlider(sl, slVal, (v) => setVolume(v / 100), (v) => Math.round(v) + '%');
         } else {
-            $.volumeSlider.addEventListener('input', () => setVolume($.volumeSlider.value / 100));
+            sl.addEventListener('input', () => { setVolume(sl.value / 100); slVal.textContent = Math.round(sl.value) + '%'; });
         }
+        $.settingsBtn.addEventListener('click', () => {
+            dd.hidden = !dd.hidden;
+            if (!dd.hidden) {
+                const rect = $.settingsBtn.getBoundingClientRect();
+                dd.style.top = `${rect.bottom + 4}px`;
+                dd.style.right = `${window.innerWidth - rect.right}px`;
+            }
+        });
+        document.addEventListener('click', (e) => {
+            if (dd.hidden) return;
+            if (e.target.closest('.settings-dropdown') || e.target.closest('#settings-btn')) return;
+            dd.hidden = true;
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !dd.hidden) dd.hidden = true;
+        });
     }
 
     // 19. Debug console API — use window._debug in the browser console
