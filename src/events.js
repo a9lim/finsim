@@ -18,7 +18,8 @@ import {
 import { createWorldState, congressHelpers, applyStructuredEffects, validateCongress, validatePnthBoard } from './world-state.js';
 import { ALL_EVENTS, PARAM_RANGES, getEventById } from './events/index.js';
 import { getTraitEffect, getActiveTraitIds } from './traits.js';
-import { firmCooldownMult } from './faction-standing.js';
+import { firmCooldownMult, shiftFaction } from './faction-standing.js';
+import { getRegulationPipeline } from './regulations.js';
 
 // -- Re-export for backwards compat -------------------------------------
 export { PARAM_RANGES } from './events/index.js';
@@ -263,8 +264,8 @@ export class EventEngine {
     }
 
     /** Update player context passed to event guards. */
-    setPlayerContext(playerChoices, factions, activeRegIds, traitIds = [], portfolioMetrics = {}) {
-        this._playerCtx = { playerChoices, factions, activeRegIds, traitIds, portfolio: portfolioMetrics };
+    setPlayerContext(playerChoices, factions, activeRegIds, traitIds = [], portfolioMetrics = {}, lobbyCount = 0, lastLobbyDay = 0) {
+        this._playerCtx = { playerChoices, factions, activeRegIds, traitIds, portfolio: portfolioMetrics, lobbyCount, lastLobbyDay };
     }
 
     /** Clear fired one-shot tracking (call on reset). */
@@ -316,6 +317,7 @@ export class EventEngine {
 
     _logEvent(day, event, params, magnitude) {
         const entry = { day, headline: event.headline, magnitude: magnitude || event.magnitude || 'moderate', params: params ?? {} };
+        if (event.category) entry.category = event.category;
         this.eventLog.push(entry);
         if (this.eventLog.length > MAX_LOG) this.eventLog.shift();
         return entry;
@@ -378,6 +380,13 @@ export class EventEngine {
         }
         validateCongress(this.world);
         validatePnthBoard(this.world);
+
+        // Apply top-level faction shifts
+        if (Array.isArray(event.factionShifts)) {
+            for (const fs of event.factionShifts) {
+                shiftFaction(fs.faction, fs.value);
+            }
+        }
 
         // Track consecutive minor/neutral for boredom boost
         if (event.magnitude === 'minor' || event.category === 'neutral') {
@@ -519,7 +528,15 @@ export class EventEngine {
         this._prefetching = true;
         try {
             const events = await this._llm.generateBatch(
-                sim, this.eventLog, this._pendingFollowups, this.world
+                sim, this.eventLog, this._pendingFollowups, this.world,
+                {
+                    factions: this._playerCtx.factions,
+                    traitIds: this._playerCtx.traitIds,
+                    regulations: getRegulationPipeline(),
+                    playerChoices: this._playerCtx.playerChoices,
+                    lobbyCount: this._playerCtx.lobbyCount || 0,
+                    lastLobbyDay: this._playerCtx.lastLobbyDay || 0,
+                }
             );
             if (Array.isArray(events)) {
                 for (const ev of events) {

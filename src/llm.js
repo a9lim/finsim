@@ -20,9 +20,67 @@ for (const [k, r] of Object.entries(PARAM_RANGES)) {
     };
 }
 
+/* Reusable sub-schemas */
+const FACTION_SHIFT_SCHEMA = {
+    type: 'object',
+    properties: {
+        faction: {
+            type: 'string',
+            enum: ['firmStanding', 'regulatoryExposure', 'federalistSupport', 'farmerLaborSupport', 'mediaTrust', 'fedRelations'],
+        },
+        value: { type: 'number', description: 'Additive delta (positive = increase).' },
+    },
+    required: ['faction', 'value'],
+    additionalProperties: false,
+};
+
+const EFFECT_SCHEMA = {
+    type: 'object',
+    properties: {
+        path:  { type: 'string', description: 'Dot-notation path into world state, e.g. "pnth.boardDirks", "election.barronApproval", "fed.credibilityScore".' },
+        op:    { type: 'string', enum: ['set', 'add'] },
+        value: { type: 'number' },
+    },
+    required: ['path', 'op', 'value'],
+    additionalProperties: false,
+};
+
+const FOLLOWUP_SCHEMA = {
+    type: 'object',
+    properties: {
+        id:        { type: 'string', description: 'Short snake_case identifier.' },
+        headline:  { type: 'string', description: '1-2 sentence followup headline.' },
+        params:    { type: 'object', description: 'Parameter deltas.', properties: PARAM_PROPERTIES, additionalProperties: false },
+        magnitude: { type: 'string', enum: ['minor', 'moderate', 'major'] },
+        category:  { type: 'string', enum: ['pnth', 'macro', 'sector', 'neutral', 'political', 'investigation', 'congressional', 'filibuster', 'media', 'desk', 'compound'] },
+        mtth:      { type: 'number', description: 'Mean trading days until followup fires (10-30).' },
+        weight:    { type: 'number', description: 'Probability 0-1 the followup fires (0.3-0.9).' },
+        effects:   { type: 'array', items: EFFECT_SCHEMA, description: 'World state mutations on followup.' },
+        factionShifts: { type: 'array', items: FACTION_SHIFT_SCHEMA, description: 'Faction standing changes on followup.' },
+    },
+    required: ['id', 'headline', 'params', 'magnitude', 'mtth', 'weight'],
+    additionalProperties: false,
+};
+
+const CHOICE_SCHEMA = {
+    type: 'object',
+    properties: {
+        label:      { type: 'string', description: 'Short button label (2-5 words).' },
+        desc:       { type: 'string', description: '1-2 sentence description of the choice and its consequences.' },
+        deltas:     { type: 'object', description: 'Parameter deltas applied when this choice is selected.', properties: PARAM_PROPERTIES, additionalProperties: false },
+        effects:    { type: 'array', items: EFFECT_SCHEMA, description: 'World state mutations on this choice.' },
+        factionShifts: { type: 'array', items: FACTION_SHIFT_SCHEMA, description: 'Faction standing changes on this choice.' },
+        playerFlag: { type: 'string', description: 'Snake_case flag set on the player when chosen (feeds into traits/endings).' },
+        resultToast: { type: 'string', description: 'Toast message shown after choosing (1-2 sentences).' },
+        followups:  { type: 'array', items: FOLLOWUP_SCHEMA, description: 'Choice-specific followup chain.' },
+    },
+    required: ['label', 'desc'],
+    additionalProperties: false,
+};
+
 const TOOL_DEF = {
     name: 'emit_events',
-    description: 'Emit 3-5 narrative market events that shift simulation parameters and optionally mutate world state for Palanthropic (PNTH).',
+    description: 'Emit 3-5 narrative market events with parameter deltas, world state effects, faction shifts, and optional popup choices.',
     input_schema: {
         type: 'object',
         properties: {
@@ -31,13 +89,21 @@ const TOOL_DEF = {
                 items: {
                     type: 'object',
                     properties: {
+                        id: {
+                            type: 'string',
+                            description: 'Unique snake_case event id (e.g. "llm_tan_leak_probe").',
+                        },
                         headline: {
                             type: 'string',
-                            description: '1-2 sentence news headline.',
+                            description: '1-2 sentence news headline. Reference named characters and publications.',
+                        },
+                        category: {
+                            type: 'string',
+                            enum: ['pnth', 'macro', 'sector', 'neutral', 'political', 'investigation', 'congressional', 'filibuster', 'media', 'desk', 'compound'],
                         },
                         params: {
                             type: 'object',
-                            description: 'Parameter name to additive delta value. Minor events: 1-2 params with small deltas. Major events: 3-5 params with large deltas.',
+                            description: 'Parameter name to additive delta. Minor: 1-2 params, small deltas. Major: 3-5 params, large deltas.',
                             properties: PARAM_PROPERTIES,
                             additionalProperties: false,
                         },
@@ -45,44 +111,38 @@ const TOOL_DEF = {
                             type: 'string',
                             enum: ['minor', 'moderate', 'major'],
                         },
+                        popup: {
+                            type: 'boolean',
+                            description: 'True for decision popups with choices (about 1 in 4 events). False or omit for toast-only.',
+                        },
+                        superevent: {
+                            type: 'boolean',
+                            description: 'True for dramatic turning-point events (at most 1 per batch). Gets full-screen treatment.',
+                        },
+                        choices: {
+                            type: 'array',
+                            description: 'Required when popup is true. 2-3 choices for the player.',
+                            items: CHOICE_SCHEMA,
+                            minItems: 2,
+                            maxItems: 3,
+                        },
+                        factionShifts: {
+                            type: 'array',
+                            items: FACTION_SHIFT_SCHEMA,
+                            description: 'Top-level faction shifts applied when the event fires (before any choice). Use for toast-only events.',
+                        },
                         followups: {
                             type: 'array',
-                            description: 'Optional chain events.',
-                            items: {
-                                type: 'object',
-                                properties: {
-                                    id: { type: 'string', description: 'Short snake_case identifier.' },
-                                    headline: { type: 'string', description: '1-2 sentence followup news headline.' },
-                                    params: {
-                                        type: 'object',
-                                        description: 'Parameter deltas for the followup event.',
-                                        properties: PARAM_PROPERTIES,
-                                        additionalProperties: false,
-                                    },
-                                    magnitude: { type: 'string', enum: ['minor', 'moderate', 'major'] },
-                                    mtth: { type: 'number', description: 'Mean trading days until followup fires.' },
-                                    weight: { type: 'number', description: 'Probability (0-1) the followup fires.' },
-                                },
-                                required: ['id', 'headline', 'params', 'magnitude', 'mtth', 'weight'],
-                                additionalProperties: false,
-                            },
+                            description: 'Top-level followup chain (for toast-only events).',
+                            items: FOLLOWUP_SCHEMA,
                         },
                         effects: {
                             type: 'array',
-                            description: 'Optional world state mutations. Each entry is a path + operation.',
-                            items: {
-                                type: 'object',
-                                properties: {
-                                    path:  { type: 'string', description: 'Dot-notation path into world state, e.g. "pnth.boardDirks", "election.barronApproval", "fed.credibilityScore"' },
-                                    op:    { type: 'string', enum: ['set', 'add'] },
-                                    value: { type: 'number' },
-                                },
-                                required: ['path', 'op', 'value'],
-                                additionalProperties: false,
-                            },
+                            description: 'Top-level world state mutations applied when the event fires.',
+                            items: EFFECT_SCHEMA,
                         },
                     },
-                    required: ['headline', 'params', 'magnitude'],
+                    required: ['headline', 'category', 'params', 'magnitude'],
                     additionalProperties: false,
                 },
                 minItems: 3,
@@ -94,67 +154,112 @@ const TOOL_DEF = {
     },
 };
 
-const SYSTEM_PROMPT = `You are a financial event generator for "Shoals", an options trading simulator. Use the emit_events tool to return your events.
+const SYSTEM_PROMPT = `You are a narrative event generator for "Shoals", an options trading simulator set in an alternate-history Federal States of Columbia. The player is a senior derivatives trader at Meridian Capital, trading stock and options in Palanthropic (ticker: PNTH) across a 4-year presidential term (~1008 trading days). Use the emit_events tool to return your events.
 
 ## Universe
 
-The player trades stock and options in Palanthropic (ticker: PNTH), an up-and-coming AI giant with deep government ties. The simulation spans a presidential term.
+Geography is real (Wall Street, Strait of Hormuz, Nanjing). Polities and people are fictional.
 
 ### The Administration
+- **President John Barron** (Federalist) — Populist strongman. Military hawk, tariff enthusiast, Fed-basher. Launches airstrikes in the Middle East and "stabilization operations" in South America using PNTH AI targeting systems. Pressures Fed Chair to cut rates.
+- **VP Jay Bowman** — Former defense lobbyist. Andrea Dirks's college roommate. Lobbied Pentagon on PNTH's behalf. His corruption is an open secret driven by Rachel Tan's reporting.
+- **Former President Robin Clay** (Farmer-Labor) — Establishment centrist, face of the opposition.
 
-- **President John Barron** (Federalist Party) — Populist strongman. Won upset against Robin Clay. Military hawk, tariff enthusiast, Fed-basher. Renamed the Department of Defense to "Department of War." Launches airstrikes in the Middle East and "stabilization operations" in South America using PNTH AI targeting systems. Erratic social media presence. Pressures Fed Chair to cut rates.
-- **Vice President Jay Bowman** — Former defense industry lobbyist. The connection between the White House and PNTH. Andrea Dirks's college roommate. Lobbied Pentagon on PNTH's behalf before taking office. Smooth operator in public, increasingly exposed in private. His corruption is an open secret slowly becoming an open scandal, driven by journalist Rachel Tan's reporting.
-- **Former President Robin Clay** (Farmer-Labor Party) — Establishment centrist. Lost the election but remains the face of the opposition. Writes memoirs, gives speeches, occasionally re-enters the political fray.
+### Congress
+Two parties: Federalist and Farmer-Labor. Key members:
+- **Sen. Roy Lassiter** (F-SC) — trade hawk
+- **Sen. Peggy Haines** (F-WY) — deficit hawk, swing vote
+- **Rep. Vincent Tao** (F-TX) — Majority Leader
+- **Rep. Diane Whittaker** (F-OH) — moderate
+- **Sen. James Whitfield** (F-L, MA) — filibuster master
+- **Rep. Carmen Reyes** (F-L, CA) — firebrand
+- **Sen. Patricia Okafor** (F-L, IL) — Senate Intelligence Chair, investigations, potential presidential candidate
+- **Rep. David Oduya** (F-L, MI) — labor wing, anti-trade
+
+Key legislation: Big Beautiful Bill (omnibus, bigBillStatus 0-4), Serican Reciprocal Tariff Act, Financial Freedom Act, Digital Markets Accountability Act.
 
 ### The Fed
-
-- **Chair Hayden Hartley** — Technocratic, principled, stubborn. Genuinely believes in Fed independence. Barron's attacks on her are personal and public. She doesn't crack, but the institution around her might. Can be fired by Barron if he has a trifecta and her credibility is low.
-- **Governor Marcus Vane** — Hartley's hawkish rival on the FOMC. Dissents frequently. Barron quietly backs him as a potential replacement. Creates internal Fed drama.
+- **Chair Hayden Hartley** — Technocratic, principled. Barron's attacks are personal. Can be fired with a trifecta + low credibility.
+- **Governor Marcus Vane** — Hawkish rival, Barron's preferred replacement.
 
 ### Palanthropic (PNTH)
+- **Chairwoman Andrea Dirks** — Political operative. VP Bowman's college roommate. Defense/intelligence monopoly vision. Controls board (initially 7-3).
+- **CEO Eugene Gottlieb** — Idealistic founder watching his tech get weaponized.
+- **CTO Mira Kassis** — Brilliant engineer, politically naive. Can become whistleblower, Dirks ally, or leave.
+- **CFO Raj Malhotra** — Numbers man, quiet loyalty to whoever's winning.
+- **David Zhen** — Board kingmaker. His vote tips proxy fights.
+Products: Atlas Sentinel (enterprise), Atlas Aegis (military), Atlas Companion (consumer), Atlas Foundry (infrastructure). Gottlieb may start rival Covenant AI.
 
-- **Chairwoman Andrea Dirks** — Political operative in a CEO's clothing. VP Bowman's college roommate. Sees PNTH's future as a defense/intelligence monopoly. Charismatic, ruthless, controls the board (initially 7-3 in her favor).
-- **CEO Eugene Gottlieb** — Idealistic founder who built the technology and watches it get weaponized. Ethical objections are genuine but he's also protecting his legacy. Frequently clashes with Dirks over military AI deployments.
-- **CTO Mira Kassis** — Hired from a major AI lab. Brilliant engineer, politically naive. Caught between Dirks and Gottlieb. Her technical decisions become plot points. Can become whistleblower, Dirks ally, or leave to start a competitor.
-- **The Board** — 10 seats. Initially 7 Dirks / 3 Gottlieb. Composition shifts via activist investors, resignations, proxy fights.
+### Geopolitics
+- **Serica** (Premier Liang Wei, Zhaowei Technologies) — PNTH's rival. Trade war and tech decoupling.
+- **Khasuria** (President Volkov) — Military incursion sets aegisDemandSurge.
+- **Farsistan** (Emir al-Farhan) — Strait of Hormuz closure triggers energyCrisis.
+- **Boliviara** (President Madero) — South American instability.
+- **Meridia** (PM Navon) — Regional flashpoint.
 
-### External Players
+### Media
+- **The Continental** (Rachel Tan, Tom Driscoll) — Paper of record. Tan drives investigation arcs.
+- **The Sentinel** (Marcus Cole) — Conservative outlet.
+- **MarketWire** (Priya Sharma) — Financial wire service.
+- **The Meridian Brief** — Meridian Capital internal newsletter.
 
-- **Senator Patricia Okafor** — Chair of Senate Intelligence Committee. Anti-PNTH, anti-Barron platform. Investigations are real but politically motivated. Potential presidential candidate.
-- **Liang Wei** — CEO of Zhaowei Technologies, PNTH's main international rival. State-backed Chinese AI giant. Trade war and tech decoupling run through this competition.
-- **Rachel Tan** — Investigative journalist at The Continental (paper of record). Breaks the Bowman lobbying story, NSA data-sharing story, and eventually something bigger. Her reporting drives investigation arcs.
+## World State (7 domains)
 
-## World State
+### congress
+Senate/House seat counts (Federalist vs Farmer-Labor). Trifecta = Senate >= 50 + House >= 218.
+- filibusterActive (bool), bigBillStatus (0-4: not introduced, introduced, committee, floor, passed/failed)
 
-The simulation tracks persistent state that your events can mutate via the "effects" array:
+### pnth
+- boardDirks / boardGottlieb (max 12 total), ceoIsGottlieb, ctoIsMira (bool)
+- militaryContractActive, commercialMomentum (-2 to +2), ethicsBoardIntact
+- activistStakeRevealed, dojSuitFiled, senateProbeLaunched, whistleblowerFiled, acquired, gottliebStartedRival (bool)
+- sentinelLaunched, aegisDeployed, companionLaunched, foundryLaunched (bool)
+- companionScandal (0-3), aegisControversy (0-3)
 
-- **Congress** — Senate and House seat counts for Federalist and Farmer-Labor parties. A Federalist trifecta (Senate >= 50 + House >= 218) enables legislation and potentially firing the Fed Chair.
-- **PNTH** — Board composition (Dirks vs Gottlieb seats), CEO/CTO status, military contract active, commercial momentum (-2 to +2), ethics board intact, activist stake revealed, DOJ suit, Senate probe, whistleblower, acquisition, Gottlieb rival startup.
-- **Geopolitical** — Trade war stage (0=peace, 1=tariffs, 2=retaliation, 3=decoupling, 4=deal), Mideast escalation (0-3), South America ops (0-3), sanctions, oil crisis, recession, China relations (-3 cold war to +3 detente).
-- **Fed** — Hike/cut cycle active, QE active, Hartley fired, Vane appointed, credibility score (0-10).
-- **Investigations** — Tan's Bowman story stage (0-3), Tan's NSA story stage (0-3), Okafor probe stage (0-3), impeachment stage (0-3).
-- **Election** — Midterm complete/result, Barron approval (0-100), primary season, Okafor running.
+### geopolitical
+- tradeWarStage (0=peace, 1=tariffs, 2=retaliation, 3=decoupling, 4=deal)
+- sericaRelations (-3 cold war to +3 detente)
+- mideastEscalation, southAmericaOps, farsistanEscalation, khasurianCrisis (0-3)
+- sanctionsActive, oilCrisis, recessionDeclared, straitClosed, aegisDemandSurge, foundryCompetitionPressure, energyCrisis (bool)
 
-## Effects Guidance
+### fed
+- hikeCycle, cutCycle, qeActive, hartleyFired, vaneAppointed (bool)
+- credibilityScore (0-10)
 
-You can suggest world state mutations via the "effects" array on each event:
-- Valid paths use dot-notation into the world state (e.g., "pnth.boardDirks", "election.barronApproval", "fed.credibilityScore").
-- Use "op": "add" for incremental changes (e.g., add -1 to boardDirks), "op": "set" for absolute values.
-- Only numeric and boolean fields can be mutated. For booleans, use set with value 1 (true) or 0 (false).
-- String fields like "midtermResult" cannot be set via effects.
-- Keep effects small and proportional to the event magnitude. A minor event should move 1-2 world state fields slightly; a major event can shift 2-4 fields significantly.
-- Effects are validated and clamped to valid ranges server-side; invalid paths are silently dropped.
+### investigations
+- tanBowmanStory, tanNsaStory, okaforProbeStage, impeachmentStage (0-3)
+- meridianExposed (bool) — set when dirty player is caught in investigative crossfire
+
+### election
+- midtermComplete (bool), barronApproval (0-100), lobbyMomentum (-3 to +3)
+- primarySeason, okaforRunning (bool)
+
+### media
+- tanCredibility, sentinelRating, pressFreedomIndex (0-10)
+- leakCount (0-5), lobbyingExposed (bool)
+
+## Faction Standing System
+
+Six factions (0-100): firmStanding, regulatoryExposure, federalistSupport, farmerLaborSupport, mediaTrust, fedRelations. Use factionShifts on events/choices to move these. Shifts reflect the moral weight of the decision.
 
 ## Event Design Rules
 
-- Build a coherent narrative that continues from recent events and pending followups.
-- Reference current market conditions (price level, volatility, rates) AND world state when relevant.
-- Parameter deltas should be realistic: minor events touch 1-2 params with small deltas, major events touch 3-5 params with large deltas.
-- Mix PNTH-specific events with macro, political, geopolitical, sector, investigation, and neutral events.
-- Include neutral/flavor events (quiet trading days, mixed data, no-news days) to avoid constant directional drift.
-- Followup chains should create multi-step narratives (e.g., ethics dispute -> board meeting -> resignation threat -> resolution).
-- Category should be one of: "pnth", "macro", "sector", "neutral", "political", "investigation", "compound". Do NOT generate "fed" or "pnth_earnings" category events — those are pulse-scheduled separately.
-- Use world state effects to advance narrative arcs (investigations progressing, board composition shifting, geopolitical escalation ladders).`;
+- Build coherent narrative continuing from recent events and pending followups.
+- Reference named characters and publications in headlines (e.g., "Tan publishes in The Continental", not "journalist publishes article").
+- Reference current market conditions (price, vol, rates) and world state.
+- Parameter deltas: minor = 1-2 params with small deltas; moderate = 2-3; major = 3-5 with large deltas.
+- Mix categories: pnth, macro, sector, neutral, political, investigation, congressional, filibuster, media, desk, compound.
+- Do NOT generate category "fed", "pnth_earnings", "midterm", or "interjection" — those are pulse-scheduled separately.
+- Include neutral/flavor events to avoid constant directional drift.
+- About 1 in 4 events should be popups with 2-3 choices. Popup events must have choices array.
+- Superevents: at most 1 per batch, reserved for dramatic turning points (full-screen treatment + chord stab).
+- Followup chains for multi-step narratives: mtth 10-30 days, weight 0.3-0.9.
+- Player flags are snake_case and feed into traits and endings (e.g., "pursued_insider_tip", "cooperated_with_compliance").
+- Era awareness: early game (day 0-350) = establishment; mid game (350-700) = escalation; late game (700-1008) = resolution/consequences.
+- Effects are validated and clamped server-side; invalid paths silently dropped.
+- Use "op": "add" for incremental changes, "op": "set" for absolute values. For booleans use set with 1 or 0.
+- Keep effects proportional: minor events move 1-2 fields slightly, major events shift 2-4 fields significantly.
+- Cross-domain connections matter: geopolitical crises affect PNTH military demand, investigations affect media trust, election results reshape legislative likelihood.`;
 
 export class LLMEventSource {
     constructor() {
@@ -176,12 +281,13 @@ export class LLMEventSource {
         return this.apiKey.length > 0;
     }
 
-    async generateBatch(sim, eventLog, pendingFollowups, world) {
+    async generateBatch(sim, eventLog, pendingFollowups, world, extras = {}) {
         if (!this.isConfigured()) throw new Error('API key not configured');
 
         const vol = Math.sqrt(Math.max(sim.v, 0));
+        const era = sim.day < 350 ? 'early' : sim.day < 700 ? 'mid' : 'late';
         const stateLines = [
-            'Current simulation state (day ' + sim.day + '):',
+            'Current simulation state (day ' + sim.day + ', era: ' + era + '):',
             '- Stock price: $' + sim.S.toFixed(2),
             '- Volatility: ' + (vol * 100).toFixed(1) + '% (annualized)',
             '- Risk-free rate: ' + (sim.r * 100).toFixed(2) + '%',
@@ -196,38 +302,119 @@ export class LLMEventSource {
         ];
 
         const recentEvents = eventLog.length > 0
-            ? eventLog.slice(-10).map(e => 'Day ' + e.day + ': [' + e.magnitude + '] ' + e.headline).join('\n')
+            ? eventLog.slice(-10).map(e =>
+                'Day ' + e.day + ': [' + e.magnitude + (e.category ? '/' + e.category : '') + '] ' + e.headline
+            ).join('\n')
             : '(none yet)';
 
         const pendingLines = pendingFollowups.length > 0
             ? pendingFollowups.map(f => '"' + (f.event?.id || f.chainId || 'unknown') + '" scheduled for day ' + f.targetDay).join('\n')
             : '(none)';
 
-        // Serialize world state for the LLM
+        // Serialize all 7 world state domains
         const worldLines = [];
         if (world) {
             const w = world;
             const cg = w.congress;
+            const trifecta = cg.senate.federalist >= 50 && cg.house.federalist >= 218;
             worldLines.push(
                 'World state:',
-                '- Congress: Senate ' + cg.senate.federalist + 'F/' + cg.senate.farmerLabor + 'FL, House ' + cg.house.federalist + 'F/' + cg.house.farmerLabor + 'FL',
-                '- PNTH board: ' + w.pnth.boardDirks + ' Dirks / ' + w.pnth.boardGottlieb + ' Gottlieb' +
-                    ', CEO: ' + (w.pnth.ceoIsGottlieb ? 'Gottlieb' : 'successor') +
-                    ', CTO: ' + (w.pnth.ctoIsMira ? 'Kassis' : 'vacant'),
-                '- Military contract: ' + w.pnth.militaryContractActive + ', Commercial momentum: ' + w.pnth.commercialMomentum,
-                '- Trade war stage: ' + w.geopolitical.tradeWarStage + ', Serica relations: ' + w.geopolitical.sericaRelations,
-                '- Mideast escalation: ' + w.geopolitical.mideastEscalation + ', South America: ' + w.geopolitical.southAmericaOps,
-                '- Oil crisis: ' + w.geopolitical.oilCrisis + ', Recession: ' + w.geopolitical.recessionDeclared,
-                '- Fed: credibility ' + w.fed.credibilityScore + '/10, Hartley fired: ' + w.fed.hartleyFired + ', Vane appointed: ' + w.fed.vaneAppointed,
-                '- Investigations: Tan story stage ' + w.investigations.tanBowmanStory + ', Okafor probe ' + w.investigations.okaforProbeStage + ', Impeachment ' + w.investigations.impeachmentStage,
-                '- Barron approval: ' + w.election.barronApproval + ', Midterm: ' + (w.election.midtermComplete ? w.election.midtermResult : 'pending'),
+                '',
+                '[Congress]',
+                '- Senate: ' + cg.senate.federalist + 'F / ' + cg.senate.farmerLabor + 'FL',
+                '- House: ' + cg.house.federalist + 'F / ' + cg.house.farmerLabor + 'FL',
+                '- Trifecta: ' + trifecta,
+                '- filibusterActive: ' + (cg.filibusterActive || false),
+                '- bigBillStatus: ' + (cg.bigBillStatus || 0),
+                '',
+                '[PNTH]',
+                '- Board: ' + w.pnth.boardDirks + ' Dirks / ' + w.pnth.boardGottlieb + ' Gottlieb',
+                '- CEO: ' + (w.pnth.ceoIsGottlieb ? 'Gottlieb' : 'successor') + ', CTO: ' + (w.pnth.ctoIsMira ? 'Kassis' : 'vacant'),
+                '- militaryContractActive: ' + w.pnth.militaryContractActive + ', commercialMomentum: ' + w.pnth.commercialMomentum,
+                '- ethicsBoardIntact: ' + w.pnth.ethicsBoardIntact + ', activistStakeRevealed: ' + w.pnth.activistStakeRevealed,
+                '- dojSuitFiled: ' + w.pnth.dojSuitFiled + ', senateProbeLaunched: ' + w.pnth.senateProbeLaunched,
+                '- whistleblowerFiled: ' + w.pnth.whistleblowerFiled + ', acquired: ' + w.pnth.acquired + ', gottliebStartedRival: ' + w.pnth.gottliebStartedRival,
+                '- Products: sentinel=' + w.pnth.sentinelLaunched + ', aegis=' + w.pnth.aegisDeployed + ', companion=' + w.pnth.companionLaunched + ', foundry=' + w.pnth.foundryLaunched,
+                '- companionScandal: ' + w.pnth.companionScandal + ', aegisControversy: ' + w.pnth.aegisControversy,
+                '',
+                '[Geopolitical]',
+                '- tradeWarStage: ' + w.geopolitical.tradeWarStage + ', sericaRelations: ' + w.geopolitical.sericaRelations,
+                '- mideastEscalation: ' + w.geopolitical.mideastEscalation + ', southAmericaOps: ' + w.geopolitical.southAmericaOps,
+                '- farsistanEscalation: ' + (w.geopolitical.farsistanEscalation || 0) + ', khasurianCrisis: ' + (w.geopolitical.khasurianCrisis || 0),
+                '- sanctionsActive: ' + w.geopolitical.sanctionsActive + ', oilCrisis: ' + w.geopolitical.oilCrisis + ', recessionDeclared: ' + w.geopolitical.recessionDeclared,
+                '- straitClosed: ' + (w.geopolitical.straitClosed || false) + ', aegisDemandSurge: ' + (w.geopolitical.aegisDemandSurge || false),
+                '- foundryCompetitionPressure: ' + (w.geopolitical.foundryCompetitionPressure || false) + ', energyCrisis: ' + (w.geopolitical.energyCrisis || false),
+                '',
+                '[Fed]',
+                '- hikeCycle: ' + w.fed.hikeCycle + ', cutCycle: ' + w.fed.cutCycle + ', qeActive: ' + w.fed.qeActive,
+                '- hartleyFired: ' + w.fed.hartleyFired + ', vaneAppointed: ' + w.fed.vaneAppointed + ', credibilityScore: ' + w.fed.credibilityScore + '/10',
+                '',
+                '[Investigations]',
+                '- tanBowmanStory: ' + w.investigations.tanBowmanStory + ', tanNsaStory: ' + (w.investigations.tanNsaStory || 0),
+                '- okaforProbeStage: ' + w.investigations.okaforProbeStage + ', impeachmentStage: ' + w.investigations.impeachmentStage,
+                '- meridianExposed: ' + (w.investigations.meridianExposed || false),
+                '',
+                '[Election]',
+                '- barronApproval: ' + w.election.barronApproval + ', midtermComplete: ' + (w.election.midtermComplete || false),
+                '- lobbyMomentum: ' + (w.election.lobbyMomentum || 0),
+                '- primarySeason: ' + (w.election.primarySeason || false) + ', okaforRunning: ' + (w.election.okaforRunning || false),
+                '',
+                '[Media]',
+                '- tanCredibility: ' + (w.media.tanCredibility || 5) + ', sentinelRating: ' + (w.media.sentinelRating || 5),
+                '- pressFreedomIndex: ' + (w.media.pressFreedomIndex || 7) + ', leakCount: ' + (w.media.leakCount || 0),
+                '- lobbyingExposed: ' + (w.media.lobbyingExposed || false),
             );
         }
+
+        // Faction standing
+        const factionLines = [];
+        if (extras.factions) {
+            const f = extras.factions;
+            factionLines.push(
+                '',
+                'Faction standing:',
+                '- firmStanding: ' + (f.firmStanding || 0),
+                '- regulatoryExposure: ' + (f.regulatoryExposure || 0),
+                '- federalistSupport: ' + (f.federalistSupport || 0),
+                '- farmerLaborSupport: ' + (f.farmerLaborSupport || 0),
+                '- mediaTrust: ' + (f.mediaTrust || 0),
+                '- fedRelations: ' + (f.fedRelations || 0),
+            );
+        }
+
+        // Active traits
+        const traitLine = (extras.traitIds && extras.traitIds.length > 0)
+            ? '\n\nActive player traits: ' + extras.traitIds.join(', ')
+            : '';
+
+        // Regulation pipeline
+        const regLines = [];
+        if (extras.regulations && extras.regulations.length > 0) {
+            regLines.push('', 'Active/pending regulations:');
+            for (const r of extras.regulations) {
+                regLines.push('- ' + r.id + ' [' + r.status + ']' + (r.remainingDays != null ? ', ' + r.remainingDays + ' days remaining' : '') + (r.name ? ' — ' + r.name : ''));
+            }
+        }
+
+        // Player choices (flags)
+        const flagLine = (extras.playerChoices && Object.keys(extras.playerChoices).length > 0)
+            ? '\n\nPlayer flags: ' + Object.entries(extras.playerChoices).filter(([k, v]) => v && !k.startsWith('_')).map(([k, v]) => k + ' (day ' + v + ')').join(', ')
+            : '';
+
+        // Lobby state
+        const lobbyLine = (extras.lobbyCount > 0)
+            ? '\n\nLobby actions taken: ' + extras.lobbyCount + ', last lobby day: ' + (extras.lastLobbyDay || 0)
+            : '';
 
         const userMsg = stateLines.join('\n') +
             '\n\nRecent events:\n' + recentEvents +
             '\n\nPending followup events:\n' + pendingLines +
             (worldLines.length > 0 ? '\n\n' + worldLines.join('\n') : '') +
+            (factionLines.length > 0 ? factionLines.join('\n') : '') +
+            traitLine +
+            (regLines.length > 0 ? regLines.join('\n') : '') +
+            flagLine +
+            lobbyLine +
             '\n\nGenerate 3-5 new events that continue this narrative.';
 
         const resp = await fetch(API_URL, {
@@ -240,7 +427,7 @@ export class LLMEventSource {
             },
             body: JSON.stringify({
                 model: this.model,
-                max_tokens: 1024,
+                max_tokens: 4096,
                 system: SYSTEM_PROMPT,
                 tools: [TOOL_DEF],
                 tool_choice: { type: 'tool', name: 'emit_events' },
@@ -261,9 +448,15 @@ export class LLMEventSource {
         if (!Array.isArray(events) || events.length === 0) throw new Error('Empty events array');
 
         return events.map(ev => ({
+            id: ev.id,
             headline: ev.headline,
+            category: ev.category,
             params: ev.params,
             magnitude: ev.magnitude,
+            popup: ev.popup || false,
+            superevent: ev.superevent || false,
+            choices: ev.popup && Array.isArray(ev.choices) ? ev.choices : undefined,
+            factionShifts: Array.isArray(ev.factionShifts) ? ev.factionShifts : undefined,
             followups: Array.isArray(ev.followups) ? ev.followups : undefined,
             effects: Array.isArray(ev.effects) ? ev.effects : undefined,
         }));

@@ -140,3 +140,5 @@ export function executeLobbyAction(actionId, day, world) {
 export function resetLobbying() {
     _lastLobbyDay = -Infinity;
 }
+
+export function getLastLobbyDay() { return _lastLobbyDay; }

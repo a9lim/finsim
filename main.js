@@ -69,7 +69,7 @@ import {
 } from './src/regulations.js';
 import { TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
-import { getAvailableActions, executeLobbyAction, resetLobbying } from './src/lobbying.js';
+import { getAvailableActions, executeLobbyAction, resetLobbying, getLastLobbyDay } from './src/lobbying.js';
 
 
 // ---------------------------------------------------------------------------
@@ -1309,7 +1309,9 @@ function _onDayComplete() {
                 cash: portfolio.cash,
                 strongQuarters: quarterlyReviews.filter(r => r.rating === 'strong').length,
                 impactTradeCount: impactHistory.length,
-            }
+            },
+            _lobbyCount,
+            getLastLobbyDay()
         );
         const netDelta = computeNetDelta();
         const { fired, popups } = eventEngine.maybeFire(sim, sim.day, netDelta);
