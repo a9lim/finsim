@@ -21,3 +21,15 @@ A narrative event engine with over 400 curated scenarios introduces market shock
 ## Educational Use
 
 Designed for quantitative finance education. Students learn options pricing theory by building positions and observing how Greeks respond to changes in the underlying price, volatility, time decay, and interest rates. The event engine connects abstract models to real-world market behavior.
+
+## Narrative Event Engine
+
+Over 400 curated market scenarios organized into six categories: earnings, monetary policy, geopolitical, sector rotation, technical signals, and black swan events. Each event modifies drift, volatility, and jump intensity parameters with configurable magnitude and decay. Events can chain — a rate hike may trigger a sector rotation, which triggers a technical breakout. Superevents receive full-screen treatment with chord stabs from the synthesized audio engine. A Poisson scheduler controls event arrival with trait-aware likelihood weighting based on player decisions.
+
+## Faction System
+
+Three market factions — momentum traders, value investors, and market makers — respond differently to events and shift the demand curve. Faction behavior is parameterized by sensitivity to price changes, mean reversion speed, and inventory limits.
+
+## Price Impact
+
+The Almgren-Chriss model simulates temporary and permanent price impact from large trades. Temporary impact decays exponentially; permanent impact shifts the equilibrium price based on order flow. Impact is computed as an overlay on the simulated price — it never mutates the underlying stochastic process, preserving model consistency.
