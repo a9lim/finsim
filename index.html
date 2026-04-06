@@ -28,6 +28,7 @@
     <link rel="icon" href="/favicon.ico">
     <meta name="theme-color" content="#C8553D">
     <link rel="canonical" href="https://a9l.im/shoals">
+    <link rel="alternate" hreflang="en" href="https://a9l.im/shoals">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="manifest" href="/manifest.json">
@@ -79,11 +80,13 @@
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q893816", "name": "Binomial options pricing"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1515168", "name": "Portfolio management"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q846706", "name": "Implied volatility"},
-        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1163609", "name": "Delta hedging"}
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1163609", "name": "Delta hedging"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1156843", "name": "Greeks (finance)"}
       ],
       "keywords": "options trading simulator, binomial tree pricing, Heston model, stochastic volatility, Greeks, strategy builder, quantitative finance, educational",
       "operatingSystem": "Any (Web Browser)",
       "browserRequirements": "Modern browser with Canvas support",
+      "sameAs": "https://github.com/a9lim/a9lim.github.io",
       "codeRepository": "https://github.com/a9lim/a9lim.github.io",
       "license": "https://www.gnu.org/licenses/agpl-3.0.html",
       "interactivityType": "active",
@@ -93,6 +96,10 @@
         "Stochastic volatility and the Heston model",
         "Multi-leg options strategy construction and payoff analysis",
         "Portfolio risk management under simulated market stress"
+      ],
+      "educationalAlignment": [
+        {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "targetName": "AP Microeconomics"},
+        {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "targetName": "CFA Level 1: Derivatives"}
       ],
       "datePublished": "2026-03-17",
       "dateModified": "2026-04-05",
@@ -110,6 +117,11 @@
         "name": "a9l.im",
         "url": "https://a9l.im"
       },
+      "isBasedOn": [
+        {"@type": "ScholarlyArticle", "name": "The Pricing of Options and Corporate Liabilities", "author": "F. Black, M. Scholes", "datePublished": "1973", "sameAs": "https://doi.org/10.1086/260062"},
+        {"@type": "ScholarlyArticle", "name": "A Closed-Form Solution for Options with Stochastic Volatility", "author": "S. L. Heston", "datePublished": "1993", "sameAs": "https://doi.org/10.1093/rfs/6.2.327"},
+        {"@type": "ScholarlyArticle", "name": "Option pricing: A simplified approach", "author": "J. C. Cox, S. A. Ross, M. Rubinstein", "datePublished": "1979", "sameAs": "https://doi.org/10.1016/0304-405X(79)90015-1"}
+      ],
       "offers": {
         "@type": "Offer",
         "price": "0",
@@ -193,6 +205,20 @@
     <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://a9l.im"},{"@type":"ListItem","position":2,"name":"Shoals","item":"https://a9l.im/shoals"}]}
     </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "How to price options with Shoals",
+      "step": [
+        {"@type": "HowToStep", "position": 1, "name": "Select underlying parameters", "text": "Set the initial stock price, volatility, risk-free rate, and dividend yield to define the underlying asset dynamics."},
+        {"@type": "HowToStep", "position": 2, "name": "Configure a pricing model", "text": "Choose between geometric Brownian motion, Heston stochastic volatility, or Merton jump diffusion to drive the price process."},
+        {"@type": "HowToStep", "position": 3, "name": "Build a strategy", "text": "Use the multi-leg strategy builder to construct spreads, straddles, condors, or custom option combinations with real-time payoff diagrams."},
+        {"@type": "HowToStep", "position": 4, "name": "Trigger a market event", "text": "Introduce earnings surprises, Fed rate decisions, or black swan events from the narrative event engine to see how positions respond."},
+        {"@type": "HowToStep", "position": 5, "name": "Analyze the Greeks", "text": "Study how delta, gamma, theta, vega, and rho change across the options chain as the underlying moves."}
+      ]
+    }
+    </script>
 </head>
 
 <body class="sim-body app-ready">
@@ -224,8 +250,8 @@
     <!-- Main Content -->
     <main>
         <div id="chart-container">
-            <canvas id="chart-canvas"></canvas>
-            <canvas id="strategy-canvas" class="hidden"></canvas>
+            <canvas id="chart-canvas" aria-label="Stock price chart"></canvas>
+            <canvas id="strategy-canvas" class="hidden" aria-label="Options strategy payoff diagram"></canvas>
             <div id="zoom-controls" class="sim-controls glass">
                 <button class="tool-btn zoom-ctrl-btn icon-tight" id="zoom-in-btn" aria-label="Zoom in" data-icon="plus" data-icon-size="16"></button>
                 <span id="zoom-level" class="zoom-level">100%</span>
@@ -702,6 +728,14 @@
     <h3>Narrative Framework</h3>
     <p>The simulation is set at Meridian Capital during the Barron administration. Over 400 narrative market events are not random: they follow storylines with followup chains, political consequences, and faction dynamics. The game tracks twelve character traits and six faction standings that shape which events occur and how they resolve, culminating in one of six ending types with a five-page adaptive epilogue.</p>
     <p><em>See also: <a href="/geon">Geon</a> for physics simulation, <a href="/gerry">Gerry</a> for electoral redistricting.</em></p>
+<h3>Learning Outcomes</h3>
+<p>After using Shoals, students should be able to: derive the Black-Scholes price for a European call and put; explain why American options require numerical methods like the binomial tree; describe how stochastic volatility (Heston model) produces volatility smiles that geometric Brownian motion cannot; compute and interpret delta, gamma, theta, vega, and rho for single options and multi-leg strategies; and analyze how market events propagate through the Greeks to affect portfolio value.</p>
+<h3>Prerequisites</h3>
+<p>Basic probability and statistics (expected value, standard deviation, normal distribution). Familiarity with compound interest and present value. No prior knowledge of options or derivatives is required.</p>
+<h3>Volatility Surface</h3>
+<p>The implied volatility surface in Shoals plots IV across strike prices and expirations. Under GBM, the surface is flat — IV equals realized volatility everywhere. Under Heston, the surface develops a characteristic skew (lower strikes have higher IV) and term structure (short-dated options show more curvature). The event engine creates temporary surface dislocations that mean-revert over time, mimicking real market behavior around earnings and macro announcements.</p>
+<h3>References</h3>
+<p>F. Black and M. Scholes, <a href="https://doi.org/10.1086/260062" target="_blank" rel="noopener">"The Pricing of Options and Corporate Liabilities"</a> (1973). S. L. Heston, <a href="https://doi.org/10.1093/rfs/6.2.327" target="_blank" rel="noopener">"A Closed-Form Solution for Options with Stochastic Volatility"</a> (1993). J. C. Cox, S. A. Ross, and M. Rubinstein, <a href="https://doi.org/10.1016/0304-405X(79)90015-1" target="_blank" rel="noopener">"Option pricing: A simplified approach"</a> (1979).</p>
       </article>
     </details>
 </body>
