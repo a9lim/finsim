@@ -30,6 +30,10 @@ Over 400 curated market scenarios organized into six categories: earnings, monet
 
 Three market factions — momentum traders, value investors, and market makers — respond differently to events and shift the demand curve. Faction behavior is parameterized by sensitivity to price changes, mean reversion speed, and inventory limits.
 
+## Accessibility
+
+Shoals supports keyboard navigation for all controls and dialogs, high-contrast mode via the theme toggle, and ARIA labels on interactive elements. Chart data is accessible through the numerical sidebar displays. All popup dialogs are focus-trapped. No flashing content or motion hazards.
+
 ## Price Impact
 
 The Almgren-Chriss model simulates temporary and permanent price impact from large trades. Temporary impact decays exponentially; permanent impact shifts the equilibrium price based on order flow. Impact is computed as an overlay on the simulated price — it never mutates the underlying stochastic process, preserving model consistency.

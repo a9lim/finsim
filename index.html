@@ -32,8 +32,11 @@
     <link rel="alternate" hreflang="en" href="https://a9l.im/shoals">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Shoals">
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="/fonts/fonts.css">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" as="style" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous"></noscript>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
@@ -59,7 +62,7 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": ["WebApplication", "LearningResource"],
+      "@type": ["WebApplication", "LearningResource", "Game"],
       "name": "Shoals",
       "url": "https://a9l.im/shoals",
       "description": "Interactive options trading simulator modeling stock prices with geometric Brownian motion, Merton jump diffusion, and Heston stochastic volatility. Prices American options via 128-step CRR binomial trees with term-structure volatility and moneyness skew. Includes a 25-strike options chain, multi-leg strategy builder with payoff diagrams and Greek overlays, portfolio margin system, Vasicek interest rate model, and a narrative event engine with over 400 narrative market events.",
@@ -102,7 +105,8 @@
       ],
       "educationalAlignment": [
         {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "targetName": "AP Microeconomics", "targetUrl": "https://apcentral.collegeboard.org/courses/ap-microeconomics"},
-        {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "targetName": "CFA Level 1: Derivatives", "targetUrl": "https://www.cfainstitute.org/programs/cfa/exam/level-i"}
+        {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "targetName": "CFA Level 1: Derivatives", "targetUrl": "https://www.cfainstitute.org/programs/cfa/exam/level-i"},
+        {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "educationalFramework": "GARP Financial Risk Manager", "targetName": "FRM Part I: Valuation and Risk Models", "targetUrl": "https://www.garp.org/frm"}
       ],
       "datePublished": "2026-03-17",
       "dateModified": "2026-04-05",
@@ -743,6 +747,8 @@
     <p>Shoals uses the Almgren-Chriss model to simulate price impact from large trades. Buying or selling significant quantities moves the stock price against the trader, with impact decaying over time. This creates realistic market microstructure effects and forces traders to consider execution strategy, not just option selection.</p>
     <h3>Narrative Framework</h3>
     <p>The simulation is set at Meridian Capital during the Barron administration. Over 400 narrative market events are not random: they follow storylines with followup chains, political consequences, and faction dynamics. The game tracks twelve character traits and six faction standings that shape which events occur and how they resolve, culminating in one of six ending types with a five-page adaptive epilogue.</p>
+    <h3>Accessibility</h3>
+    <p>Shoals supports keyboard navigation for all controls and dialogs, high-contrast mode via the theme toggle, and ARIA labels on interactive elements. Chart data is accessible through the numerical sidebar displays. All popup dialogs are focus-trapped. No flashing content or motion simulation hazards.</p>
     <p><em>See also: <a href="/geon">Geon</a> for particle physics, <a href="/cyano">Cyano</a> for cellular metabolism, <a href="/gerry">Gerry</a> for electoral fairness.</em></p>
 <h3>Learning Outcomes</h3>
 <p>After using Shoals, students should be able to: derive the Black-Scholes price for a European call and put; explain why American options require numerical methods like the binomial tree; describe how stochastic volatility (Heston model) produces volatility smiles that geometric Brownian motion cannot; compute and interpret delta, gamma, theta, vega, and rho for single options and multi-leg strategies; and analyze how market events propagate through the Greeks to affect portfolio value.</p>
