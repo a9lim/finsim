@@ -546,7 +546,7 @@ export class StrategyRenderer {
         // --- Draw Greek overlays ---
         for (const gKey of activeGreeks) {
             const gd  = greekData[gKey];
-            const col = clrs[gKey] || '#888';
+            const col = clrs[gKey] || themeClrs.textMuted;
             this._drawLine(ctx, xs, gd.vals, gd.toPixel, xToPixel, col, 0.5, 1.5);
         }
 
