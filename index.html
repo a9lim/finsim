@@ -22,6 +22,7 @@
     <meta property="og:image:alt" content="Shoals options trading simulator">
     <meta name="twitter:site" content="@a9_lim">
     <meta name="twitter:creator" content="@a9_lim">
+    <meta property="og:locale" content="en_US">
     <meta name="twitter:title" content="Shoals — Interactive Options Trading Simulator">
     <meta name="twitter:description" content="Learn options trading through simulation with stochastic volatility, multi-leg strategies, and 400+ narrative market events.">
     <meta name="author" content="a9lim">
@@ -81,7 +82,9 @@
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1515168", "name": "Portfolio management"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q846706", "name": "Implied volatility"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1163609", "name": "Delta hedging"},
-        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1156843", "name": "Greeks (finance)"}
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1156843", "name": "Greeks (finance)"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1247937", "name": "Risk management"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q184098", "name": "Financial derivative"}
       ],
       "keywords": "options trading simulator, binomial tree pricing, Heston model, stochastic volatility, Greeks, strategy builder, quantitative finance, educational",
       "operatingSystem": "Any (Web Browser)",
@@ -120,7 +123,9 @@
       "isBasedOn": [
         {"@type": "ScholarlyArticle", "name": "The Pricing of Options and Corporate Liabilities", "author": "F. Black, M. Scholes", "datePublished": "1973", "sameAs": "https://doi.org/10.1086/260062"},
         {"@type": "ScholarlyArticle", "name": "A Closed-Form Solution for Options with Stochastic Volatility", "author": "S. L. Heston", "datePublished": "1993", "sameAs": "https://doi.org/10.1093/rfs/6.2.327"},
-        {"@type": "ScholarlyArticle", "name": "Option pricing: A simplified approach", "author": "J. C. Cox, S. A. Ross, M. Rubinstein", "datePublished": "1979", "sameAs": "https://doi.org/10.1016/0304-405X(79)90015-1"}
+        {"@type": "ScholarlyArticle", "name": "Option pricing: A simplified approach", "author": "J. C. Cox, S. A. Ross, M. Rubinstein", "datePublished": "1979", "sameAs": "https://doi.org/10.1016/0304-405X(79)90015-1"},
+        {"@type": "ScholarlyArticle", "name": "Optimal Execution of Portfolio Transactions", "author": "Almgren & Chriss", "datePublished": "2000", "url": "https://doi.org/10.1057/palgrave.jam.2240010"},
+        {"@type": "ScholarlyArticle", "name": "An Equilibrium Characterization of the Term Structure", "author": "Vasicek", "datePublished": "1977", "url": "https://doi.org/10.1016/0304-405X(77)90016-2"}
       ],
       "offers": {
         "@type": "Offer",
@@ -130,7 +135,14 @@
       "timeRequired": "PT30M",
       "accessibilityFeature": ["highContrastDisplay", "readingOrder", "structuralNavigation"],
       "accessibilityHazard": ["flashing", "motionSimulation"],
-      "relatedLink": ["https://a9l.im/geon", "https://a9l.im/cyano", "https://a9l.im/gerry"]
+      "relatedLink": ["https://a9l.im/geon", "https://a9l.im/cyano", "https://a9l.im/gerry"],
+      "gameItem": [
+        {"@type":"Thing","name":"Character Traits","description":"12 personality traits that shape narrative branching"},
+        {"@type":"Thing","name":"Market Factions","description":"6 competing factions with parameterized trading behavior"},
+        {"@type":"Thing","name":"Narrative Endings","description":"6 distinct ending types with adaptive 5-page epilogue"}
+      ],
+      "numberOfPlayers": {"@type":"QuantitativeValue","value":1},
+      "genre": ["financial simulation","narrative game","educational"]
     }
     </script>
     <script type="application/ld+json">
@@ -714,6 +726,7 @@
     </div>
 
     <script src="/shared-tabs.js"></script>
+    <link rel="modulepreload" href="main.js">
     <script type="module" src="main.js"></script>
     <details class="edu-content">
       <summary>About this simulation</summary>
@@ -730,7 +743,7 @@
     <p>Shoals uses the Almgren-Chriss model to simulate price impact from large trades. Buying or selling significant quantities moves the stock price against the trader, with impact decaying over time. This creates realistic market microstructure effects and forces traders to consider execution strategy, not just option selection.</p>
     <h3>Narrative Framework</h3>
     <p>The simulation is set at Meridian Capital during the Barron administration. Over 400 narrative market events are not random: they follow storylines with followup chains, political consequences, and faction dynamics. The game tracks twelve character traits and six faction standings that shape which events occur and how they resolve, culminating in one of six ending types with a five-page adaptive epilogue.</p>
-    <p><em>See also: <a href="/geon">Geon</a> for physics simulation, <a href="/gerry">Gerry</a> for electoral redistricting.</em></p>
+    <p><em>See also: <a href="/geon">Geon</a> for particle physics, <a href="/cyano">Cyano</a> for cellular metabolism, <a href="/gerry">Gerry</a> for electoral fairness.</em></p>
 <h3>Learning Outcomes</h3>
 <p>After using Shoals, students should be able to: derive the Black-Scholes price for a European call and put; explain why American options require numerical methods like the binomial tree; describe how stochastic volatility (Heston model) produces volatility smiles that geometric Brownian motion cannot; compute and interpret delta, gamma, theta, vega, and rho for single options and multi-leg strategies; and analyze how market events propagate through the Greeks to affect portfolio value.</p>
 <h3>Prerequisites</h3>
