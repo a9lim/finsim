@@ -98,8 +98,8 @@
         "Portfolio risk management under simulated market stress"
       ],
       "educationalAlignment": [
-        {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "targetName": "AP Microeconomics"},
-        {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "targetName": "CFA Level 1: Derivatives"}
+        {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "targetName": "AP Microeconomics", "targetUrl": "https://apcentral.collegeboard.org/courses/ap-microeconomics"},
+        {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "targetName": "CFA Level 1: Derivatives", "targetUrl": "https://www.cfainstitute.org/programs/cfa/exam/level-i"}
       ],
       "datePublished": "2026-03-17",
       "dateModified": "2026-04-05",
@@ -127,7 +127,10 @@
         "price": "0",
         "priceCurrency": "USD"
       },
-      "timeRequired": "PT30M"
+      "timeRequired": "PT30M",
+      "accessibilityFeature": ["highContrastDisplay", "readingOrder", "structuralNavigation"],
+      "accessibilityHazard": ["flashing", "motionSimulation"],
+      "relatedLink": ["https://a9l.im/geon", "https://a9l.im/cyano", "https://a9l.im/gerry"]
     }
     </script>
     <script type="application/ld+json">
@@ -250,8 +253,8 @@
     <!-- Main Content -->
     <main>
         <div id="chart-container">
-            <canvas id="chart-canvas" aria-label="Stock price chart"></canvas>
-            <canvas id="strategy-canvas" class="hidden" aria-label="Options strategy payoff diagram"></canvas>
+            <canvas id="chart-canvas" aria-label="Interactive stock price chart with geometric Brownian motion and stochastic volatility"></canvas>
+            <canvas id="strategy-canvas" class="hidden" aria-label="Options strategy payoff and Greek sensitivity diagram"></canvas>
             <div id="zoom-controls" class="sim-controls glass">
                 <button class="tool-btn zoom-ctrl-btn icon-tight" id="zoom-in-btn" aria-label="Zoom in" data-icon="plus" data-icon-size="16"></button>
                 <span id="zoom-level" class="zoom-level">100%</span>
