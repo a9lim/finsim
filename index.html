@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shoals — a9l.im</title>
     <meta name="description"
         content="Learn options trading through simulation. Price American options with stochastic volatility, build multi-leg strategies, and stress-test portfolios against 400+ narrative market events — all in the browser.">
@@ -19,6 +19,7 @@
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:type" content="image/webp">
+    <meta property="og:image:alt" content="Shoals options trading simulator">
     <meta name="twitter:site" content="@a9_lim">
     <meta name="twitter:creator" content="@a9_lim">
     <meta name="author" content="a9lim">
@@ -33,27 +34,27 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
     <script src="/shared-tokens.js"></script>
-    <script src="/shared-utils.js"></script>
-    <script src="/shared-haptics.js"></script>
-    <script src="/shared-camera.js"></script>
-    <script src="colors.js"></script>
-    <script src="/shared-icons.js"></script>
-    <script src="/shared-toolbar.js"></script>
-    <script src="/shared-forms.js"></script>
+    <script defer src="/shared-utils.js"></script>
+    <script defer src="/shared-haptics.js"></script>
+    <script defer src="/shared-camera.js"></script>
+    <script defer src="colors.js"></script>
+    <script defer src="/shared-icons.js"></script>
+    <script defer src="/shared-toolbar.js"></script>
+    <script defer src="/shared-forms.js"></script>
 
-    <script src="/shared-touch.js"></script>
-    <script src="/shared-info.js"></script>
-    <script src="/shared-shortcuts.js"></script>
-    <script src="/shared-about.js"></script>
-    <script src="/shared-sparkline.js"></script>
-    <script src="/shared-tooltip.js"></script>
+    <script defer src="/shared-touch.js"></script>
+    <script defer src="/shared-info.js"></script>
+    <script defer src="/shared-shortcuts.js"></script>
+    <script defer src="/shared-about.js"></script>
+    <script defer src="/shared-sparkline.js"></script>
+    <script defer src="/shared-tooltip.js"></script>
     <link rel="stylesheet" href="/shared-base.css">
     <link rel="stylesheet" href="styles.css">
 
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
+      "@type": ["WebApplication", "LearningResource"],
       "name": "Shoals",
       "url": "https://a9l.im/shoals",
       "description": "Interactive options trading simulator modeling stock prices with geometric Brownian motion, Merton jump diffusion, and Heston stochastic volatility. Prices American options via 128-step CRR binomial trees with term-structure volatility and moneyness skew. Includes a 25-strike options chain, multi-leg strategy builder with payoff diagrams and Greek overlays, portfolio margin system, Vasicek interest rate model, and a narrative event engine with 88 curated market scenarios.",
@@ -69,14 +70,26 @@
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q187125", "name": "Option"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q182060", "name": "Stochastic process"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q188451", "name": "Financial market"},
-        {"@type": "Thing", "name": "Black-Scholes model"},
-        {"@type": "Thing", "name": "Stochastic volatility"},
-        {"@type": "Thing", "name": "Binomial options pricing"},
-        {"@type": "Thing", "name": "Portfolio management"}
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q216648", "name": "Black-Scholes model"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q7618411", "name": "Stochastic volatility"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q893816", "name": "Binomial options pricing"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1515168", "name": "Portfolio management"}
       ],
       "keywords": "options trading simulator, binomial tree pricing, Heston model, stochastic volatility, Greeks, strategy builder, quantitative finance, educational",
       "operatingSystem": "Any (Web Browser)",
       "browserRequirements": "Modern browser with Canvas support",
+      "codeRepository": "https://github.com/a9lim/a9lim.github.io",
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+      "interactivityType": "active",
+      "teaches": [
+        "Black-Scholes and binomial tree options pricing models",
+        "Option Greeks: delta, gamma, theta, vega, and rho",
+        "Stochastic volatility and the Heston model",
+        "Multi-leg options strategy construction and payoff analysis",
+        "Portfolio risk management under simulated market stress"
+      ],
+      "datePublished": "2026-03-17",
+      "dateModified": "2026-04-05",
       "author": {
         "@type": "Person",
         "name": "a9lim",
@@ -97,6 +110,81 @@
         "priceCurrency": "USD"
       }
     }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How does Shoals price options?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Shoals uses a 128-step Cox-Ross-Rubinstein (CRR) binomial tree with Broadie-Detemple smoothing for American option pricing. The tree incorporates term-structure volatility, moneyness skew, and discrete dividend adjustments. Stock prices follow geometric Brownian motion with optional Merton jump diffusion and Heston stochastic volatility."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What are the option Greeks?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The Greeks measure an option's sensitivity to different factors. Delta measures price sensitivity to the underlying stock. Gamma measures the rate of change of delta. Theta measures time decay. Vega measures sensitivity to volatility changes. Rho measures sensitivity to interest rate changes. Shoals displays all five Greeks in real time across a 25-strike options chain."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the Heston stochastic volatility model?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The Heston model treats volatility as a random process that mean-reverts over time, rather than being constant as in Black-Scholes. This produces realistic volatility clustering (periods of high and low volatility) and a non-flat implied volatility surface. Shoals implements Heston with configurable mean reversion speed, long-run variance, and volatility of volatility."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What market events does Shoals simulate?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The narrative event engine includes over 400 curated scenarios: earnings surprises, Federal Reserve rate decisions, geopolitical events, sector rotations, and black swan events. Each event modifies the underlying price process parameters (drift, volatility, jump intensity) to produce realistic market dynamics and test portfolio resilience."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I build a multi-leg options strategy in Shoals?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Click the options chain to add individual legs, then switch to the Strategy tab to see the combined payoff diagram, Greek overlays, max profit/loss, and break-even prices. Shoals supports any combination of calls and puts at different strikes and expirations."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Shoals collect any personal data?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Shoals runs entirely in your browser with no server-side processing, no cookies, and no analytics tracking. All simulation state stays on your device."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Shoals free and open source?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Shoals is licensed under AGPL-3.0 and the source code is available on GitHub. It is free to use for educational and personal purposes."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Shoals work on mobile devices?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Shoals is fully responsive with a mobile-optimized layout. The options chain, strategy builder, and market events all adapt to smaller screens."
+          }
+        }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://a9l.im"},{"@type":"ListItem","position":2,"name":"Shoals"}]}
     </script>
 </head>
 
@@ -590,6 +678,19 @@
 
     <script src="/shared-tabs.js"></script>
     <script type="module" src="main.js"></script>
+    <details class="edu-content">
+      <summary>About this simulation</summary>
+      <article>
+        <h2>What is Shoals?</h2>
+        <p>Shoals is an options trading simulator that models derivatives pricing under realistic market conditions. Stock prices evolve with stochastic volatility and jump diffusion while a narrative event engine introduces market shocks, connecting abstract pricing theory to real-world dynamics.</p>
+        <h3>Pricing Models</h3>
+        <p>The underlying stock follows geometric Brownian motion with optional Merton jump diffusion (sudden large moves) and Heston stochastic volatility (time-varying vol that mean-reverts). Interest rates follow a Vasicek process. American options are priced on a 128-step CRR binomial tree with term-structure volatility and moneyness skew adjustments.</p>
+        <h3>Strategy Builder</h3>
+        <p>The multi-leg strategy builder supports spreads, straddles, strangles, condors, butterflies, and custom combinations. Each strategy displays a payoff diagram, Greek overlays showing how sensitivity changes across strikes, maximum profit and loss, and break-even points. A margin system tracks portfolio-level exposure and buying power.</p>
+        <h3>Market Events</h3>
+        <p>Over 400 narrative scenarios &mdash; earnings surprises, central bank decisions, geopolitical crises, and sector rotations &mdash; modify the price process in real time. Events change drift, volatility, and jump intensity, forcing traders to adapt strategies to evolving conditions rather than static assumptions.</p>
+      </article>
+    </details>
 </body>
 
 </html>
