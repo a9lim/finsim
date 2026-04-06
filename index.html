@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shoals — a9l.im</title>
+    <title>Shoals — Interactive Options Trading Simulator | a9l.im</title>
     <meta name="description"
         content="Learn options trading through simulation. Price American options with stochastic volatility, build multi-leg strategies, and stress-test portfolios against 400+ narrative market events — all in the browser.">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
@@ -22,6 +22,8 @@
     <meta property="og:image:alt" content="Shoals options trading simulator">
     <meta name="twitter:site" content="@a9_lim">
     <meta name="twitter:creator" content="@a9_lim">
+    <meta name="twitter:title" content="Shoals — Interactive Options Trading Simulator">
+    <meta name="twitter:description" content="Learn options trading through simulation with stochastic volatility, multi-leg strategies, and 400+ narrative market events.">
     <meta name="author" content="a9lim">
     <link rel="icon" href="/favicon.ico">
     <meta name="theme-color" content="#C8553D">
@@ -58,7 +60,7 @@
       "@type": ["WebApplication", "LearningResource"],
       "name": "Shoals",
       "url": "https://a9l.im/shoals",
-      "description": "Interactive options trading simulator modeling stock prices with geometric Brownian motion, Merton jump diffusion, and Heston stochastic volatility. Prices American options via 128-step CRR binomial trees with term-structure volatility and moneyness skew. Includes a 25-strike options chain, multi-leg strategy builder with payoff diagrams and Greek overlays, portfolio margin system, Vasicek interest rate model, and a narrative event engine with 88 curated market scenarios.",
+      "description": "Interactive options trading simulator modeling stock prices with geometric Brownian motion, Merton jump diffusion, and Heston stochastic volatility. Prices American options via 128-step CRR binomial trees with term-structure volatility and moneyness skew. Includes a 25-strike options chain, multi-leg strategy builder with payoff diagrams and Greek overlays, portfolio margin system, Vasicek interest rate model, and a narrative event engine with over 400 narrative market events.",
       "speakable": {
         "@type": "SpeakableSpecification",
         "cssSelector": ["meta[name='description']"]
@@ -67,6 +69,7 @@
       "educationalUse": "Interactive simulation for learning options pricing, portfolio management, derivatives trading, and quantitative finance",
       "learningResourceType": "Simulation",
       "educationalLevel": "Undergraduate",
+      "inLanguage": "en",
       "about": [
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q187125", "name": "Option"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q182060", "name": "Stochastic process"},
@@ -74,7 +77,9 @@
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q216648", "name": "Black-Scholes model"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q7618411", "name": "Stochastic volatility"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q893816", "name": "Binomial options pricing"},
-        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1515168", "name": "Portfolio management"}
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1515168", "name": "Portfolio management"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q846706", "name": "Implied volatility"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1163609", "name": "Delta hedging"}
       ],
       "keywords": "options trading simulator, binomial tree pricing, Heston model, stochastic volatility, Greeks, strategy builder, quantitative finance, educational",
       "operatingSystem": "Any (Web Browser)",
@@ -109,7 +114,8 @@
         "@type": "Offer",
         "price": "0",
         "priceCurrency": "USD"
-      }
+      },
+      "timeRequired": "PT30M"
     }
     </script>
     <script type="application/ld+json">
@@ -175,21 +181,22 @@
         },
         {
           "@type": "Question",
-          "name": "Does Shoals work on mobile devices?",
+          "name": "What is implied volatility?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. Shoals is fully responsive with a mobile-optimized layout. The options chain, strategy builder, and market events all adapt to smaller screens."
+            "text": "Implied volatility is the market's forecast of a likely movement in an asset's price, derived by reverse-engineering the Black-Scholes model from observed option prices. In Shoals, the vol surface adjusts implied volatility by moneyness and time to expiration, creating a realistic volatility smile. Options far from the money or near expiration trade at different implied vols than at-the-money options."
           }
         }
       ]
     }
     </script>
     <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://a9l.im"},{"@type":"ListItem","position":2,"name":"Shoals"}]}
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://a9l.im"},{"@type":"ListItem","position":2,"name":"Shoals","item":"https://a9l.im/shoals"}]}
     </script>
 </head>
 
 <body class="sim-body app-ready">
+    <a href="#sidebar" class="skip-link">Skip to controls</a>
     <a href="#chart-canvas" class="skip-link">Skip to chart</a>
 
     <!-- Floating Toolbar -->
@@ -690,6 +697,11 @@
         <p>The multi-leg strategy builder supports spreads, straddles, strangles, condors, butterflies, and custom combinations. Each strategy displays a payoff diagram, Greek overlays showing how sensitivity changes across strikes, maximum profit and loss, and break-even points. A margin system tracks portfolio-level exposure and buying power.</p>
         <h3>Market Events</h3>
         <p>Over 400 narrative scenarios &mdash; earnings surprises, central bank decisions, geopolitical crises, and sector rotations &mdash; modify the price process in real time. Events change drift, volatility, and jump intensity, forcing traders to adapt strategies to evolving conditions rather than static assumptions.</p>
+    <h3>Price Impact</h3>
+    <p>Shoals uses the Almgren-Chriss model to simulate price impact from large trades. Buying or selling significant quantities moves the stock price against the trader, with impact decaying over time. This creates realistic market microstructure effects and forces traders to consider execution strategy, not just option selection.</p>
+    <h3>Narrative Framework</h3>
+    <p>The simulation is set at Meridian Capital during the Barron administration. Over 400 narrative market events are not random: they follow storylines with followup chains, political consequences, and faction dynamics. The game tracks twelve character traits and six faction standings that shape which events occur and how they resolve, culminating in one of six ending types with a five-page adaptive epilogue.</p>
+    <p><em>See also: <a href="/geon">Geon</a> for physics simulation, <a href="/gerry">Gerry</a> for electoral redistricting.</em></p>
       </article>
     </details>
 </body>
