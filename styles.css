@@ -16,14 +16,6 @@
 .greek-label-vega,  #greek-vega,  #strat-greek-vega  { color: var(--vega); }
 .greek-label-rho,   #greek-rho,   #strat-greek-rho   { color: var(--rho); }
 
-/* --- Panel Hints --- */
-.panel-hint {
-    color: var(--text-muted);
-    font-size: var(--font-base);
-    padding: 0.5rem 0.65rem;
-    margin: 0;
-}
-
 /* --- Chart Layout --- */
 main {
     position: fixed;
@@ -210,10 +202,12 @@ main {
 
 .chain-cell[role="button"] {
     cursor: pointer;
+    transition: background 0.2s var(--ease-out), transform 0.2s var(--ease-out);
 }
 
 .chain-cell[role="button"]:hover {
     background: var(--chain-hover);
+    transform: translateX(2px);
 }
 
 .call-cell {
@@ -233,8 +227,12 @@ main {
     color: var(--accent);
 }
 
-.atm-row {
-    background: var(--accent-subtle);
+.atm-row .chain-cell:first-child {
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.atm-row .chain-cell:last-child {
+    box-shadow: inset -3px 0 0 var(--accent);
 }
 
 .chain-greek {
@@ -524,13 +522,6 @@ main {
     flex: 1;
 }
 
-/* --- Trade Hint --- */
-.trade-hint {
-    padding: 2px 0 0;
-    font-size: var(--font-sm);
-    text-align: center;
-}
-
 /* --- Strategy Builder --- */
 .strategy-legs-list {
     margin-top: 6px;
@@ -611,11 +602,6 @@ main {
     border-radius: 50%;
     flex-shrink: 0;
     margin-left: 2px;
-}
-
-/* --- Tab Panels --- */
-.tab-panels {
-    font-variant-numeric: tabular-nums;
 }
 
 /* ===================================
