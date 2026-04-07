@@ -1100,7 +1100,7 @@ main {
     padding: 1rem;
     border-radius: var(--radius);
     background: var(--bg-panel);
-    backdrop-filter: blur(20px) saturate(1.5);
+    backdrop-filter: blur(8px);
 }
 
 .settings-dropdown .display-row {
