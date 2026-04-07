@@ -1018,7 +1018,7 @@ main {
 }
 .popup-choice-btn:hover {
     background: var(--bg-hover);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-hover);
     transform: translateX(4px);
 }
 .popup-choice-btn:active {
