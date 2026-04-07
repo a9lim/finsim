@@ -19,7 +19,7 @@
 /* --- Panel Hints --- */
 .panel-hint {
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: var(--font-base);
     padding: 0.5rem 0.65rem;
     margin: 0;
 }
@@ -83,7 +83,7 @@ main {
     align-items: center;
     gap: 12px;
     width: 100%;
-    font-size: 0.75rem;
+    font-size: var(--font-base);
     color: var(--text-secondary);
     cursor: pointer;
 }
@@ -94,7 +94,7 @@ main {
     min-width: 56px;
     text-align: right;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: var(--font-base);
 }
 
 /* --- Zoom Controls --- */
@@ -124,7 +124,7 @@ main {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.78rem;
+    font-size: var(--font-base);
     color: var(--text);
     font-weight: 400;
 }
@@ -138,7 +138,7 @@ main {
 
 .trade-btn {
     flex: 1;
-    font-size: 0.72rem;
+    font-size: var(--font-sm);
     padding: 6px 4px;
     text-align: center;
 }
@@ -186,7 +186,7 @@ main {
 /* --- Chain Table --- */
 .chain-table {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: var(--font-sm);
     font-variant-numeric: tabular-nums;
     overflow-x: auto;
 }
@@ -197,7 +197,7 @@ main {
 }
 
 .chain-th {
-    font-size: 0.78rem;
+    font-size: var(--font-base);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -211,7 +211,7 @@ main {
     text-align: center;
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    font-size: 0.82rem;
+    font-size: var(--font-base);
     transition: background 0.12s;
 }
 
@@ -246,7 +246,7 @@ main {
 
 .chain-greek {
     color: var(--text-muted);
-    font-size: 0.66rem;
+    font-size: var(--font-sm);
 }
 
 #stock-bond-table,
@@ -289,7 +289,7 @@ main {
 }
 
 .chain-expiry-tab {
-    font-size: 0.68rem;
+    font-size: var(--font-sm);
     padding: 4px 10px;
 }
 
@@ -301,14 +301,14 @@ main {
 .chain-placeholder {
     color: var(--text-muted);
     font-family: var(--font-sans);
-    font-size: 0.78rem;
+    font-size: var(--font-base);
     padding: 12px 0;
 }
 
 .chain-expand-btn {
     width: 100%;
     margin-top: 8px;
-    font-size: 0.72rem;
+    font-size: var(--font-sm);
 }
 
 /* --- Chain Overlay --- */
@@ -362,7 +362,7 @@ main {
     border: none;
     background: var(--bg-hover);
     margin-bottom: 3px;
-    font-size: 0.75rem;
+    font-size: var(--font-base);
     transition: background 0.12s;
 }
 .data-row:hover {
@@ -412,7 +412,7 @@ main {
     height: 24px;
     min-width: 24px;
     padding: 0;
-    font-size: 0.65rem;
+    font-size: var(--font-sm);
     line-height: 1;
 }
 
@@ -427,7 +427,7 @@ main {
 }
 .order-detail {
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: var(--font-sm);
     color: var(--text-muted);
     margin-top: 2px;
     line-height: 1.3;
@@ -457,7 +457,7 @@ main {
 /* --- Advanced Section --- */
 .advanced-toggle-btn {
     width: 100%;
-    font-size: 0.78rem;
+    font-size: var(--font-base);
 }
 
 .advanced-section {
@@ -469,7 +469,7 @@ main {
 }
 
 .advanced-section .stat-label {
-    font-size: 0.72rem;
+    font-size: var(--font-sm);
     min-width: 90px;
 }
 
@@ -522,7 +522,7 @@ main {
     align-items: center;
     gap: 10px;
     font-family: var(--font-sans);
-    font-size: 0.78rem;
+    font-size: var(--font-base);
     color: var(--text-secondary);
     white-space: nowrap;
 }
@@ -534,7 +534,7 @@ main {
 /* --- Trade Hint --- */
 .trade-hint {
     padding: 2px 0 0;
-    font-size: 0.68rem;
+    font-size: var(--font-sm);
     text-align: center;
 }
 
@@ -552,7 +552,7 @@ main {
     border: none;
     background: var(--bg-hover);
     margin-bottom: 3px;
-    font-size: 0.75rem;
+    font-size: var(--font-base);
     transition: background 0.12s;
 }
 
@@ -581,7 +581,7 @@ main {
 .leg-qty-input {
     width: 40px;
     padding: 1px 4px;
-    font-size: 0.72rem;
+    font-size: var(--font-sm);
     font-family: var(--font-mono);
     text-align: center;
     border: none;
@@ -612,7 +612,7 @@ main {
     width: 18px;
     height: 18px;
     min-width: 18px;
-    font-size: 0.6rem;
+    font-size: var(--font-sm);
     line-height: 1;
     padding: 0;
     border-radius: 50%;
@@ -689,7 +689,7 @@ main {
     flex: 1;
     min-width: 0;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: var(--font-base);
 }
 .key-toggle {
     width: 28px;
@@ -709,12 +709,12 @@ main {
     gap: 6px;
     align-items: baseline;
     padding: 3px 0;
-    font-size: 0.72rem;
+    font-size: var(--font-sm);
     line-height: 1.3;
 }
 .event-log-day {
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: var(--font-sm);
     color: var(--text-muted);
     flex-shrink: 0;
     min-width: 32px;
@@ -727,7 +727,7 @@ main {
 }
 .event-log-empty {
     color: var(--text-muted);
-    font-size: 0.72rem;
+    font-size: var(--font-sm);
     font-style: italic;
     padding: 4px 0;
 }
@@ -745,7 +745,7 @@ main {
 }
 .congress-chamber-label {
     font-family: var(--font-sans);
-    font-size: 0.68rem;
+    font-size: var(--font-sm);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.12em;
@@ -770,7 +770,7 @@ main {
     align-items: center;
     gap: 4px;
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: var(--font-sm);
     color: var(--text-secondary);
 }
 .congress-legend-dot {
@@ -802,13 +802,13 @@ main {
     max-height: 60vh;
     overflow-y: auto;
     line-height: 1.6;
-    font-size: 0.92rem;
-    transition: opacity 200ms ease;
+    font-size: var(--font-lg);
+    transition: opacity 200ms var(--ease-out);
 }
 
 .epilogue-body h3 {
     font-family: var(--font-sans);
-    font-size: 0.72rem;
+    font-size: var(--font-sm);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.12em;
@@ -843,7 +843,7 @@ main {
     height: 8px;
     border-radius: 50%;
     background: var(--text-muted);
-    transition: background 200ms ease;
+    transition: background 200ms var(--ease-out);
 }
 
 .epilogue-dot.active {
@@ -867,13 +867,13 @@ main {
 
 .epilogue-highlights li {
     padding: 6px 0;
-    font-size: 0.85rem;
+    font-size: var(--font-lg);
     line-height: 1.4;
 }
 
 .epilogue-day {
     font-family: var(--font-mono);
-    font-size: 0.78rem;
+    font-size: var(--font-base);
     color: var(--text-muted);
     margin-right: 8px;
 }
@@ -883,13 +883,13 @@ main {
     grid-template-columns: 60px 1fr;
     gap: 12px;
     padding: 8px 0;
-    font-size: 0.82rem;
+    font-size: var(--font-base);
     line-height: 1.5;
     align-items: start;
 }
 .epilogue-timeline-day {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: var(--font-base);
     color: var(--text-muted);
     white-space: nowrap;
     padding-top: 2px;
@@ -928,7 +928,7 @@ main {
     border-radius: var(--radius);
     padding: 5px 8px;
     margin-bottom: 3px;
-    font-size: 0.75rem;
+    font-size: var(--font-base);
     transition: background 0.12s;
 }
 .strategy-group:hover {
@@ -960,7 +960,7 @@ main {
 }
 .strategy-group-detail {
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: var(--font-sm);
     color: var(--text-muted);
     margin-top: 2px;
     line-height: 1.3;
@@ -977,7 +977,7 @@ main {
 .popup-tag {
     display: inline-block;
     font-family: var(--font-mono);
-    font-size: 0.65rem;
+    font-size: var(--font-sm);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -1030,7 +1030,7 @@ main {
     font-size: 0.9rem;
 }
 .popup-choice-desc {
-    font-size: 0.8rem;
+    font-size: var(--font-base);
     color: var(--text-secondary);
     line-height: 1.4;
 }
@@ -1041,7 +1041,7 @@ main {
 .convictions-list { display: flex; flex-direction: column; gap: 4px; }
 .conviction-item {
     padding: 6px 10px;
-    font-size: 0.78rem;
+    font-size: var(--font-base);
     background: var(--bg-hover);
     border-radius: var(--radius);
     cursor: help;
@@ -1050,7 +1050,7 @@ main {
 
 /* -- Superevent presentation ------------------------------------------------ */
 #popup-event-overlay.superevent { background: none; }
-#popup-event-overlay.superevent .popup-event-body { max-width: 600px; animation: superEventIn 1.5s ease both; }
+#popup-event-overlay.superevent .popup-event-body { max-width: 600px; animation: superEventIn 1.5s var(--ease-out) both; }
 #popup-event-overlay.superevent .popup-headline { font-size: 1.5rem; line-height: 1.3; }
 #popup-event-overlay.superevent .popup-context { font-size: 0.9rem; line-height: 1.7; }
 @keyframes superEventIn {
@@ -1065,7 +1065,7 @@ main {
 }
 @keyframes blink { 50% { opacity: 0; } }
 .popup-choice-btn.choice-animate-in {
-    animation: choiceFadeIn 0.4s ease both;
+    animation: choiceFadeIn 0.4s var(--ease-out) both;
 }
 @keyframes choiceFadeIn {
     0% { opacity: 0; transform: translateY(10px); }
@@ -1076,7 +1076,7 @@ main {
 .regulations-section { margin-top: 12px; margin-bottom: 16px; }
 .regulations-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .regulation-badge {
-    font-size: 0.72rem; font-weight: 600;
+    font-size: var(--font-sm); font-weight: 600;
     padding: 3px 10px; border-radius: var(--radius);
     background: var(--bg-elevated); border: none;
     cursor: help; opacity: 0.85;
@@ -1087,7 +1087,7 @@ main {
 .toast.interjection-toast {
     font-style: italic; color: var(--text-muted);
     background: var(--bg-panel);
-    font-size: 0.8rem; max-width: 360px;
+    font-size: var(--font-base); max-width: 360px;
     border-radius: var(--radius);
     padding: 12px 20px; line-height: 1.45;
 }
@@ -1111,7 +1111,7 @@ main {
 
 .settings-dropdown .display-label {
     font-family: var(--font-sans);
-    font-size: 0.75rem;
+    font-size: var(--font-base);
     color: var(--text-muted);
     min-width: 52px;
     flex-shrink: 0;
@@ -1119,7 +1119,7 @@ main {
 
 .settings-dropdown .display-val {
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: var(--font-sm);
     color: var(--text-secondary);
     min-width: 2.5em;
     text-align: right;
