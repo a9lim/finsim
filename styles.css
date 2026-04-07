@@ -112,13 +112,6 @@ main {
 
 /* Speed button and play/pause states now in shared-base.css */
 
-/* --- Stat group spacing (matches geon) --- */
-.stat-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
 /* --- Control group labels: flex to right-align slider-value --- */
 .control-group > label {
     display: flex;
@@ -639,14 +632,6 @@ main {
     #sidebar {
         transition: transform 0.35s var(--ease-out);
         z-index: 110;
-    }
-
-    .tab-panel {
-        padding: 8px;
-    }
-
-    .stat-group {
-        padding: 0;
     }
 
     #time-slider-bar {
