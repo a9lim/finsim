@@ -217,7 +217,7 @@ export class ChartRenderer {
 
         if (!history || history.length === 0 || history.size === 0) {
             ctx.fillStyle = textMuted;
-            ctx.font      = `13px ${_FONT.body}`;
+            ctx.font      = `13px ${_FONT.sans}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('Awaiting market data\u2026', W / 2, H / 2);

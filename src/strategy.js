@@ -906,7 +906,7 @@ export class StrategyRenderer {
         ctx.fill();
         ctx.stroke();
 
-        ctx.font         = `11px ${_FONT.body}`;
+        ctx.font         = `11px ${_FONT.sans}`;
         ctx.textBaseline = 'middle';
 
         // Reset legend hit areas
