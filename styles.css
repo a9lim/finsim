@@ -150,7 +150,7 @@ main {
 
 .trade-btn.up:hover {
     background: var(--call);
-    color: var(--bg-panel);
+    color: var(--text-on-accent);
 }
 
 .trade-btn.down {
@@ -160,7 +160,7 @@ main {
 
 .trade-btn.down:hover {
     background: var(--put);
-    color: var(--bg-panel);
+    color: var(--text-on-accent);
 }
 
 .trade-btn.stock {
@@ -170,7 +170,7 @@ main {
 
 .trade-btn.stock:hover {
     background: var(--stock);
-    color: var(--bg-panel);
+    color: var(--text-on-accent);
 }
 
 .trade-btn.bond {
@@ -180,7 +180,7 @@ main {
 
 .trade-btn.bond:hover {
     background: var(--bond);
-    color: var(--bg-panel);
+    color: var(--text-on-accent);
 }
 
 /* --- Chain Table --- */
@@ -348,7 +348,7 @@ main {
 
 .trade-confirm:hover {
     background: var(--accent);
-    color: var(--bg-panel);
+    color: var(--text-on-accent);
 }
 
 /* --- Greeks Display --- */
