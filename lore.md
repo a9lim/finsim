@@ -139,8 +139,8 @@ Capital: Philadelphia. Presidential island resort: Little St. James.
   Late-breaking scandal: data-sharing agreement with Farsistani sovereign wealth
   fund (who invested in PNTH) allowed intelligence access to user conversations.
 
-- **Atlas Foundry** — AI model training infrastructure. Sold to other companies.
-  Quiet revenue but critical supply chain role — if Foundry goes down, half of
+- **Atlas Crucible** — AI model training infrastructure. Sold to other companies.
+  Quiet revenue but critical supply chain role — if Crucible goes down, half of
   the tech industry's AI products stop training. Becomes leverage in Serica trade
   negotiations when Zhaowei wants access. Outage events reveal dependency.
 
@@ -204,7 +204,7 @@ Capital: Philadelphia. Presidential island resort: Little St. James.
 
 - **Zhaowei Semiconductor Accord** — Chip trade framework with Serica. On/off
   based on trade war stage. Affects PNTH's ability to source hardware for
-  Atlas Foundry. Zhaowei wants Foundry access in return.
+  Atlas Crucible. Zhaowei wants Crucible access in return.
 
 ---
 

@@ -107,7 +107,7 @@ export const FIRM_EVENTS = [
         headline: 'Zhaowei CEO Liang Wei showcases new chip architecture at Nanjing AI Forum; Sharma: "The Zhaowei gap is narrowing. Kassis knows it."',
         params: { mu: -0.002 },
         magnitude: 'minor',
-        effects: (world) => { world.geopolitical.foundryCompetitionPressure = true; },
+        effects: (world) => { world.geopolitical.crucibleCompetitionPressure = true; },
     },
     {
         id: 'markets_drift_sideways_1',
@@ -712,8 +712,8 @@ export const FIRM_EVENTS = [
         context: (sim, world) => {
             const netDelta = computeNetDelta();
             let text = `PNTH is at $${sim.S.toFixed(0)} — well above where you started shorting — and your delta is ${netDelta.toFixed(0)}. Every tick higher costs you. The PM next to you on the Meridian floor just booked his best quarter ever going long. Your MarketWire chat is full of unsolicited advice. The desk head walks past without making eye contact. You're either early or wrong, and right now the P&L doesn't distinguish between the two.`;
-            if (world?.geopolitical?.foundryCompetitionPressure) {
-                text += ' Zhaowei\'s sovereign-backed compute buildout looms over every Foundry projection.';
+            if (world?.geopolitical?.crucibleCompetitionPressure) {
+                text += ' Zhaowei\'s sovereign-backed compute buildout looms over every Crucible projection.';
             }
             return text;
         },
