@@ -150,7 +150,7 @@ export function recordBondTrade(qty, sigmaR) {
     return cost;
 }
 
-/* ── VXPNT futures impact overlay (keyed off xi / vol-of-vol) ── */
+/* ── VX futures impact overlay (keyed off xi / vol-of-vol) ── */
 
 function modeledVixADV(xi) {
     return xi > 0 ? VIX_ADV * Math.sqrt(xi / VIX_SIGMA_BASE) : VIX_ADV;

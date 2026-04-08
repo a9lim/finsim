@@ -56,7 +56,7 @@ export function posTypeLabel(type, sideOrQty) {
     switch (type) {
         case 'stock':     return prefix + ':STK';
         case 'bond':      return prefix + ':BND';
-        case 'vixfuture': return prefix + ':VXPNT';
+        case 'vixfuture': return prefix + ':VX';
         case 'call':      return prefix + ':CALL';
         case 'put':       return prefix + ':PUT';
         default:      return type.toUpperCase();
