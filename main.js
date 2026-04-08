@@ -100,7 +100,7 @@ let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
-let vixHistory = null;    // sparkline ring buffer for VXPNT
+let vixHistory = null;    // sparkline ring buffer for VX
 let portfolioHistory = null; // sparkline ring buffer for portfolio value
 let _savedOverlays = {};
 
@@ -1759,6 +1759,7 @@ function _resetCore(index) {
     _refreshStrategyDropdowns();
     sliderPct = 100;
     strategy.resetRange(sim.S, strategyLegs);
+    updateStrategyBuilder();
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateDynamicSections($, index);

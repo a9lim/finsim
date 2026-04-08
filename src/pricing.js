@@ -96,7 +96,7 @@ export function computeEffectiveSigma(v, T, kappa, theta, xi) {
 }
 
 /**
- * VXPNT spot: 30-day equity volatility index for PNTH.
+ * VX spot: 30-day equity volatility index for PNTH.
  * In the Heston model this is the expected integrated vol over 30 trading days.
  */
 export function computeVIXSpot(v, kappa, theta, xi) {
@@ -104,7 +104,7 @@ export function computeVIXSpot(v, kappa, theta, xi) {
 }
 
 /**
- * VXPNT futures fair value: expected VXPNT at expiry time T.
+ * VX futures fair value: expected VX at expiry time T.
  * Uses forward variance E[v_T] = θ + (v-θ)e^{-κT}, then computes
  * the 30-day forward integrated vol from that point.
  * Natural contango when v < θ, backwardation when v > θ.
