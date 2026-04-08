@@ -11,11 +11,11 @@ _PALETTE.call  = _PALETTE.extended.green;
 _PALETTE.put   = _PALETTE.extended.rose;
 _PALETTE.stock = _PALETTE.extended.orange;
 _PALETTE.bond  = _PALETTE.extended.blue;
-_PALETTE.delta = _PALETTE.extended.blue;
-_PALETTE.gamma = _PALETTE.extended.orange;
-_PALETTE.theta = _PALETTE.extended.cyan;
+_PALETTE.delta = _PALETTE.extended.orange;
+_PALETTE.gamma = _PALETTE.extended.green;
+_PALETTE.theta = _PALETTE.extended.rose;
 _PALETTE.vega  = _PALETTE.extended.purple;
-_PALETTE.rho   = _PALETTE.extended.slate;
+_PALETTE.rho   = _PALETTE.extended.blue;
 _PALETTE.vix   = _PALETTE.extended.purple;
 
 _freezeTokens();

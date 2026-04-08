@@ -439,7 +439,7 @@ export function updateRateDisplay($, rate, rateHistory) {
     if ($.rateSparkCtx && rateHistory && rateHistory.count >= 2
         && typeof drawSparkline !== 'undefined') {
         const c = $.rateSparkCanvas;
-        const color = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#000000';
+        const color = getComputedStyle(document.documentElement).getPropertyValue('--rho').trim() || '#000000';
         drawSparkline($.rateSparkCtx, rateHistory, c.width, c.height, color, color + '44');
     }
 }
