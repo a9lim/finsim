@@ -1,6 +1,6 @@
 import {
-    ADV, BOND_ADV, IMPACT_COEFF, BOND_IMPACT_COEFF, OPT_IMPACT_COEFF,
-    OI_ATM_BASE, OI_MONEYNESS_DECAY, OI_SIGMA_BASE, BOND_SIGMA_BASE,
+    ADV, BOND_ADV, VIX_ADV, IMPACT_COEFF, BOND_IMPACT_COEFF, VIX_IMPACT_COEFF, OPT_IMPACT_COEFF,
+    OI_ATM_BASE, OI_MONEYNESS_DECAY, OI_SIGMA_BASE, BOND_SIGMA_BASE, VIX_SIGMA_BASE,
     VOLUME_HALF_LIFE, INTRADAY_STEPS,
     PARAM_SHIFT_HALF_LIFE,
     IMPACT_TOAST_COOLDOWN,
@@ -29,6 +29,8 @@ let _cumStockBuy  = 0;
 let _cumStockSell = 0;
 let _cumBondBuy   = 0;
 let _cumBondSell  = 0;
+let _cumVixBuy    = 0;
+let _cumVixSell   = 0;
 // Per-strike: key = `${type}_${strike}_${expiryDay}`, value = { buy, sell }
 const _cumOption = new Map();
 
@@ -45,6 +47,7 @@ export function resetImpactState() {
     _lastToastDay = -Infinity;
     _cumStockBuy = _cumStockSell = 0;
     _cumBondBuy = _cumBondSell = 0;
+    _cumVixBuy = _cumVixSell = 0;
     _cumOption.clear();
     _mmCurrentHedge = 0;
 }
@@ -62,6 +65,10 @@ export function decayImpactVolumes() {
     _cumBondSell *= _volDecayFactor;
     if (_cumBondBuy  < 1e-6) _cumBondBuy  = 0;
     if (_cumBondSell < 1e-6) _cumBondSell = 0;
+    _cumVixBuy  *= _volDecayFactor;
+    _cumVixSell *= _volDecayFactor;
+    if (_cumVixBuy  < 1e-6) _cumVixBuy  = 0;
+    if (_cumVixSell < 1e-6) _cumVixSell = 0;
     for (const [key, cum] of _cumOption) {
         cum.buy  *= _volDecayFactor;
         cum.sell *= _volDecayFactor;
@@ -141,6 +148,29 @@ export function recordBondTrade(qty, sigmaR) {
     const cumRef = qty > 0 ? _cumBondBuy : _cumBondSell;
     const cost   = BOND_IMPACT_COEFF * sigmaR * (Math.sqrt((cumRef + absQty) / adv) - Math.sqrt(cumRef / adv)) * sign;
     if (qty > 0) _cumBondBuy += absQty; else _cumBondSell += absQty;
+    return cost;
+}
+
+/* ── VXPNT futures impact overlay (keyed off xi / vol-of-vol) ── */
+
+export function modeledVixADV(xi) {
+    return xi > 0 ? VIX_ADV * Math.sqrt(xi / VIX_SIGMA_BASE) : VIX_ADV;
+}
+
+export function getVixImpact(xi) {
+    const adv = modeledVixADV(xi);
+    const buyImpact  = VIX_IMPACT_COEFF * xi * Math.sqrt(_cumVixBuy  / adv);
+    const sellImpact = VIX_IMPACT_COEFF * xi * Math.sqrt(_cumVixSell / adv);
+    return buyImpact - sellImpact;
+}
+
+export function recordVixTrade(qty, xi) {
+    const absQty = Math.abs(qty);
+    const sign   = qty > 0 ? 1 : -1;
+    const adv    = modeledVixADV(xi);
+    const cumRef = qty > 0 ? _cumVixBuy : _cumVixSell;
+    const cost   = VIX_IMPACT_COEFF * xi * (Math.sqrt((cumRef + absQty) / adv) - Math.sqrt(cumRef / adv)) * sign;
+    if (qty > 0) _cumVixBuy += absQty; else _cumVixSell += absQty;
     return cost;
 }
 

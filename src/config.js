@@ -21,6 +21,7 @@ export const EXPIRY_COUNT = 8;      // number of active expiry dates
 // -- Portfolio & margin --
 export const INITIAL_CAPITAL = 10000;
 export const MAINTENANCE_MARGIN = 0.25;
+export const VIX_MAINTENANCE_MARGIN = 0.30; // higher for VXPNT futures (vol-of-vol risk)
 export const REG_T_MARGIN = 0.50;
 export const SHORT_OPTION_MARGIN_PCT = 0.20;
 
@@ -39,6 +40,9 @@ export const OI_ATM_BASE            = 50;      // ATM open interest baseline (di
 export const OI_MONEYNESS_DECAY     = 4.0;     // OI decay with moneyness
 export const OI_SIGMA_BASE          = 0.245;   // baseline vol for OI/ADV scaling (sqrt of calm-bull theta)
 export const BOND_SIGMA_BASE        = 0.005;   // baseline sigmaR for bond ADV scaling (calm-bull sigmaR)
+export const VIX_ADV                = 100;     // VXPNT futures average daily volume baseline (displayed as "100k")
+export const VIX_IMPACT_COEFF       = 0.15;    // VXPNT futures impact coefficient (less liquid than stock/bond)
+export const VIX_SIGMA_BASE         = 0.40;    // baseline xi for VXPNT ADV scaling (calm-bull xi)
 export const VOLUME_HALF_LIFE       = 1;       // days for cumulative volume decay (applied per substep)
 export const PARAM_SHIFT_HALF_LIFE  = 5;       // days for Layer 3 param decay
 export const IMPACT_TOAST_COOLDOWN  = 10;      // days between impact toasts

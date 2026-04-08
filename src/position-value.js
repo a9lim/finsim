@@ -6,9 +6,9 @@
    values. Used by portfolio.js and portfolio-renderer.js.
    ===================================================== */
 
-import { allocTree, prepareTree, priceWithTree, vasicekBondPrice, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
+import { allocTree, prepareTree, priceWithTree, vasicekBondPrice, computeEffectiveSigma, computeSkewSigma, computeVIXFuturePrice } from './pricing.js';
 import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
-import { getStockImpact, getBondImpact, getOptionImpact } from './price-impact.js';
+import { getStockImpact, getBondImpact, getVixImpact, getOptionImpact } from './price-impact.js';
 import { market } from './market.js';
 
 let _tree = null;
@@ -16,7 +16,7 @@ let _tree = null;
 /**
  * Compute the fair (mid) unit price for a single unit of an instrument.
  *
- * @param {string} type       - 'stock'|'bond'|'call'|'put'
+ * @param {string} type       - 'stock'|'bond'|'vixfuture'|'call'|'put'
  * @param {number} S          - Current spot price
  * @param {number} vol        - Current implied volatility (annualized)
  * @param {number} rate       - Current risk-free rate
@@ -37,6 +37,10 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
                 ? vasicekBondPrice(BOND_FACE_VALUE, rate, dte, market.a, market.b, market.sigmaR)
                 : BOND_FACE_VALUE * Math.exp(-rate * dte);
             return bondMid + getBondImpact(market.sigmaR);
+        }
+        case 'vixfuture': {
+            const futPrice = computeVIXFuturePrice(market.v, market.kappa, market.theta, market.xi, dte);
+            return futPrice + getVixImpact(market.xi);
         }
         case 'call':
         case 'put': {

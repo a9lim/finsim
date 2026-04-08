@@ -343,10 +343,12 @@
                             <thead><tr>
                                 <th class="chain-th">Stock</th>
                                 <th class="chain-th">Bond</th>
+                                <th class="chain-th">VXPNT</th>
                             </tr></thead>
                             <tbody><tr>
                                 <td class="chain-cell" id="stock-price-cell" role="button" tabindex="0">—</td>
                                 <td class="chain-cell" id="bond-price-cell" role="button" tabindex="0">—</td>
+                                <td class="chain-cell" id="vix-price-cell" role="button" tabindex="0">—</td>
                             </tr></tbody>
                         </table>
                         <div id="chain-table" class="chain-table">
@@ -457,10 +459,12 @@
                             <thead><tr>
                                 <th class="chain-th">Stock</th>
                                 <th class="chain-th">Bond</th>
+                                <th class="chain-th">VXPNT</th>
                             </tr></thead>
                             <tbody><tr>
                                 <td class="chain-cell" id="strategy-stock-cell" role="button" tabindex="0">&mdash;</td>
                                 <td class="chain-cell" id="strategy-bond-cell" role="button" tabindex="0">&mdash;</td>
+                                <td class="chain-cell" id="strategy-vix-cell" role="button" tabindex="0">&mdash;</td>
                             </tr></tbody>
                         </table>
                         <div id="strategy-chain-table" class="chain-table">
@@ -521,6 +525,14 @@
                             <span class="stat-value" id="rate-display">0.00%</span>
                         </div>
                         <canvas class="sparkline rate-sparkline" id="rate-sparkline" width="280" height="40"></canvas>
+                        <div class="stat-row">
+                            <span class="stat-label-wrap">
+                                <span class="stat-label">VXPNT</span>
+                                <button class="info-trigger" type="button" data-info="vix" aria-label="Info: VXPNT">?</button>
+                            </span>
+                            <span class="stat-value" id="vix-display">0.00</span>
+                        </div>
+                        <canvas class="sparkline rate-sparkline" id="vix-sparkline" width="280" height="40"></canvas>
                     </div>
                     <div id="llm-settings-section" class="stat-group hidden">
                         <div class="group-label">LLM Settings <button class="info-trigger" type="button" data-info="llm" aria-label="Info: LLM Integration">?</button></div>

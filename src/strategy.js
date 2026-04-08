@@ -8,7 +8,7 @@
  * Exports: StrategyRenderer
  */
 
-import { allocTree, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
+import { allocTree, prepareTree, priceWithTree, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekDuration } from './pricing.js';
 import { unitPrice } from './position-value.js';
 import {
     TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE,
@@ -170,6 +170,10 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
                 info.bondCurVal = unitPrice('bond', entryS, vol, rate, evalDay ?? 0, null,
                     entryDay != null ? entryDay + Math.round(T * TRADING_DAYS_PER_YEAR) : null, q);
                 break;
+            case 'vixfuture':
+                info.vixCurVal = unitPrice('vixfuture', entryS, vol, rate, evalDay ?? 0, null,
+                    entryDay != null ? entryDay + Math.round(T * TRADING_DAYS_PER_YEAR) : null, q);
+                break;
         }
         return info;
     });
@@ -185,6 +189,8 @@ function _legPnlFast(info, S) {
             return (S - info.entryS) * info.mult;
         case 'bond':
             return (info.bondCurVal - info.entryVal) * info.mult;
+        case 'vixfuture':
+            return (info.vixCurVal - info.entryVal) * info.mult;
         default:
             return 0;
     }
@@ -225,6 +231,20 @@ function _legGreeksFast(info, S) {
                 bTheta = info.rate * info.bondCurVal / TRADING_DAYS_PER_YEAR * info.mult;
             }
             return { delta: 0, gamma: 0, theta: bTheta, vega: 0, rho: bRho };
+        }
+        case 'vixfuture': {
+            const kappa = market.kappa;
+            const Delta = 30 / 252;
+            const kD = kappa * Delta;
+            const MR = kD < 1e-6 ? 1 : (1 - Math.exp(-kD)) / kD;
+            const expKT = Math.exp(-kappa * info.T);
+            const sigma = Math.sqrt(Math.max(market.v, 1e-8));
+            const vixFut = info.vixCurVal > 0.01 ? info.vixCurVal : 1;
+            // Vega: ∂VIXfut/∂σ = 10000 × MR × e^{-κT} × σ / VIXfut
+            const vegaPerUnit = MR * expKT * 10000 * sigma / vixFut;
+            // Theta: contango/backwardation decay per trading day
+            const thetaPerUnit = 5000 * kappa * (market.v - market.theta) * expKT * MR / (vixFut * TRADING_DAYS_PER_YEAR);
+            return { delta: 0, gamma: 0, theta: thetaPerUnit * info.mult, vega: vegaPerUnit * info.mult, rho: 0 };
         }
         default:
             return { delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 };

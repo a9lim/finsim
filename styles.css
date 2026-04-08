@@ -259,6 +259,12 @@ main {
     color: var(--bond);
 }
 
+#vix-price-cell,
+#strategy-vix-cell,
+.vix-overlay-cell {
+    color: var(--vix);
+}
+
 /* --- Position indicators on chain cells --- */
 .pos-long {
     font-weight: 700;

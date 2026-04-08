@@ -21,7 +21,7 @@ import { StrategyRenderer } from './src/strategy.js';
 import {
     cacheDOMElements, bindEvents, updateChainDisplay,
     rebuildTradeDropdown, rebuildStrategyDropdown,
-    updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateStockBondPrices,
+    updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateVixDisplay, updateStockBondPrices,
     syncSettingsUI, toggleStrategyView, showChainOverlay,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
@@ -37,10 +37,11 @@ import { checkEndings, generateEnding } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
+import { computeVIXSpot, computeVIXFuturePrice } from './src/pricing.js';
 import { syncMarket, market } from './src/market.js';
 import {
     resetImpactState, decayImpactVolumes,
-    getStockImpact, getBondImpact, modeledStockADV, rehedgeMM,
+    getStockImpact, getBondImpact, getVixImpact, modeledStockADV, rehedgeMM,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
     selectImpactToast,
@@ -100,6 +101,7 @@ let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
+let vixHistory = null;    // sparkline ring buffer for VXPNT
 let portfolioHistory = null; // sparkline ring buffer for portfolio value
 let _savedOverlays = {};
 
@@ -129,6 +131,10 @@ function _toast(msg, duration) {
 function _haptic(pattern) {
     if (typeof _haptics !== 'undefined') _haptics.trigger(pattern);
 }
+function _syncAll() {
+    syncMarket(sim);
+    market.vix = computeVIXSpot(sim.v, sim.kappa, sim.theta, sim.xi);
+}
 function _clampRate() {
     const ceil = getRegulationEffect('rateCeiling', null);
     const flr  = getRegulationEffect('rateFloor', null);
@@ -140,7 +146,7 @@ function _runSubstep() {
     sim.substep();
     _clampRate();
     decayImpactVolumes();
-    syncMarket(sim);
+    _syncAll();
     rehedgeMM(portfolio.positions);
     _onSubstepTick();
 }
@@ -175,6 +181,15 @@ function _initRateHistory() {
     for (let d = h.minDay; d <= h.maxDay; d++) {
         const bar = h.get(d);
         if (bar) pushSparkSample(rateHistory, bar.r);
+    }
+}
+
+function _initVixHistory() {
+    vixHistory = createSparkHistory(HISTORY_CAPACITY);
+    const h = sim.history;
+    for (let d = h.minDay; d <= h.maxDay; d++) {
+        const bar = h.get(d);
+        if (bar) pushSparkSample(vixHistory, computeVIXSpot(bar.v, sim.kappa, sim.theta, sim.xi));
     }
 }
 
@@ -384,6 +399,8 @@ function init() {
         onShortStock:     () => handleShortStock(),
         onBuyBond:        () => handleBuyBond(),
         onShortBond:      () => handleShortBond(),
+        onBuyVix:         () => handleBuyVix(),
+        onShortVix:       () => handleShortVix(),
         onChainCellClick: (info) => handleChainCellClick(info),
         onExpiryChange:   (idx) => {
             const pe = _priceExpiry(idx);
@@ -560,8 +577,9 @@ function init() {
 
     // 13. Pre-populate full history buffer (prices scaled so final close = $100)
     sim.prepopulate();
-    syncMarket(sim);
+    _syncAll();
     _initRateHistory();
+    _initVixHistory();
     _initPortfolioHistory();
     chart.dayOrigin = sim.day;
 
@@ -809,7 +827,7 @@ function frame(now) {
             if (sim.dayComplete) {
                 sim.finalizeDay();
                 dayInProgress = false;
-                syncMarket(sim);
+                _syncAll();
                 _onDayComplete();
                 removeParamOverlays(sim, _savedOverlays);
             }
@@ -1203,8 +1221,9 @@ function _recordImpact(day, direction, magnitude, context) {
 function _onDayComplete() {
     const vol = market.sigma;
 
-    // Record rate for sparkline
+    // Record rate + VIX for sparklines
     if (rateHistory) pushSparkSample(rateHistory, sim.r);
+    if (vixHistory) pushSparkSample(vixHistory, market.vix);
 
     chargeBorrowInterest(sim.S, vol, sim.r, sim.borrowSpread, sim.day);
 
@@ -1317,7 +1336,7 @@ function _onDayComplete() {
         const hasSupereventPopups = popups.some(ev => ev.superevent);
         if (hasSupereventPopups) {
             sim.recomputeK();
-            syncMarket(sim);
+            _syncAll();
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
             updateCongressDiagrams($, eventEngine.world);
@@ -1325,7 +1344,7 @@ function _onDayComplete() {
         }
         if (fired.length > 0) {
             sim.recomputeK();
-            syncMarket(sim);
+            _syncAll();
             syncSettingsUI($, _simSettingsObj());
             updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
             updateCongressDiagrams($, eventEngine.world);
@@ -1542,6 +1561,7 @@ function updateUI(precomputedMargin) {
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q, portfolioHistory);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     updateRateDisplay($, sim.r, rateHistory);
+    updateVixDisplay($, market.vix, vixHistory);
     refreshTooltip();
     if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
         _updateTradeCreditDebit();
@@ -1575,6 +1595,7 @@ function updateSubstepUI(marginInfo) {
         updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     }
     updateRateDisplay($, sim.r, rateHistory);
+    updateVixDisplay($, market.vix, vixHistory);
 
     if (strategyMode && strategyLegs.length > 0) {
         updateStrategyBuilder();
@@ -1684,7 +1705,7 @@ function step() {
     if (sim.dayComplete) {
         sim.finalizeDay();
         dayInProgress = false;
-        syncMarket(sim);
+        _syncAll();
         _onDayComplete();
     }
 
@@ -1733,8 +1754,9 @@ function _resetCore(index) {
     resetPortfolio();
     resetImpactState();
     sim.prepopulate();
-    syncMarket(sim);
+    _syncAll();
     _initRateHistory();
+    _initVixHistory();
     _initPortfolioHistory();
     chart.dayOrigin = sim.day;
     dayInProgress = false;
@@ -1806,7 +1828,7 @@ function _isLLMPreset(index) { return index >= 6; }
 function syncSliderToSim(param, value) {
     sim[param] = value;
     if (param === 'rho') sim._recomputeRhoDerived();
-    syncMarket(sim);
+    _syncAll();
     dirty = true;
 }
 
@@ -1870,8 +1892,16 @@ function handleShortBond() {
     _executeOrPlace('bond', 'short', _getTradeQty(), null, _getTradeExpiryDay());
 }
 
+function handleBuyVix() {
+    _executeOrPlace('vixfuture', 'long', _getTradeQty(), null, _getTradeExpiryDay());
+}
+
+function handleShortVix() {
+    _executeOrPlace('vixfuture', 'short', _getTradeQty(), null, _getTradeExpiryDay());
+}
+
 function handleChainCellClick(info) {
-    const expiryDay = info.expiryDay ?? (info.type === 'bond' ? _getTradeExpiryDay() : undefined);
+    const expiryDay = info.expiryDay ?? ((info.type === 'bond' || info.type === 'vixfuture') ? _getTradeExpiryDay() : undefined);
     _executeOrPlace(info.type, info.side, _getTradeQty(), info.strike ?? undefined, expiryDay);
 }
 
@@ -1881,9 +1911,12 @@ function openFullChain() {
     const displaySpot = sim.S + getStockImpact(market.sigma);
     const bondDte = _getTradeExpiryDay() - sim.day;
     const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252) + getBondImpact(market.sigmaR);
+    const vixDte = bondDte;
+    const vixMid = computeVIXFuturePrice(market.v, market.kappa, market.theta, market.xi, vixDte / 252) + getVixImpact(market.xi);
     const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
     const bondBA = computeBidAsk(bondMid, displaySpot, vol);
-    showChainOverlay($, chainSkeleton, _priceExpiryGreeks, stockBA, bondBA, _buildPosMap(), displaySpot);
+    const vixBA = computeBidAsk(vixMid, vixMid, market.xi);
+    showChainOverlay($, chainSkeleton, _priceExpiryGreeks, stockBA, bondBA, vixBA, _buildPosMap(), displaySpot);
 }
 
 function handleTradeSubmit(data) {
@@ -1919,9 +1952,11 @@ function _refreshChainOverlayIfOpen() {
     const displaySpot = sim.S + getStockImpact(market.sigma);
     const bondDte = _getTradeExpiryDay() - sim.day;
     const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252) + getBondImpact(market.sigmaR);
+    const vixMid = computeVIXFuturePrice(market.v, market.kappa, market.theta, market.xi, bondDte / 252) + getVixImpact(market.xi);
     const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
     const bondBA = computeBidAsk(bondMid, displaySpot, vol);
-    $._refreshChainOverlay(stockBA, bondBA, _buildPosMap(), displaySpot);
+    const vixBA = computeBidAsk(vixMid, vixMid, market.xi);
+    $._refreshChainOverlay(stockBA, bondBA, vixBA, _buildPosMap(), displaySpot);
 }
 
 function handleLiquidate() {
@@ -1953,7 +1988,7 @@ function handleAddLeg(type, side, strike, expiryDay) {
     if (strike == null && (type === 'call' || type === 'put')) {
         strike = Math.round(sim.S / 5) * 5;
     }
-    if (expiryDay == null && (type === 'call' || type === 'put' || type === 'bond')) {
+    if (expiryDay == null && (type === 'call' || type === 'put' || type === 'bond' || type === 'vixfuture')) {
         const idx = parseInt($.strategyExpiry?.value, 10);
         const expiry = chainSkeleton.length > 0 ? chainSkeleton[isNaN(idx) ? chainSkeleton.length - 1 : Math.min(idx, chainSkeleton.length - 1)] : null;
         expiryDay = expiry ? expiry.day : sim.day + 21;
