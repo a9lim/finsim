@@ -188,7 +188,7 @@ Key legislation: Big Beautiful Bill (omnibus, bigBillStatus 0-4), Serican Recipr
 - **CTO Mira Kassis** — Brilliant engineer, politically naive. Can become whistleblower, Dirks ally, or leave.
 - **CFO Raj Malhotra** — Numbers man, quiet loyalty to whoever's winning.
 - **David Zhen** — Board kingmaker. His vote tips proxy fights.
-Products: Atlas Sentinel (enterprise), Atlas Aegis (military), Atlas Companion (consumer), Atlas Foundry (infrastructure). Gottlieb may start rival Covenant AI.
+Products: Atlas Sentinel (enterprise), Atlas Aegis (military), Atlas Companion (consumer), Atlas Crucible (infrastructure). Gottlieb may start rival Covenant AI.
 
 ### Geopolitics
 - **Serica** (Premier Liang Wei, Zhaowei Technologies) — PNTH's rival. Trade war and tech decoupling.
@@ -213,14 +213,14 @@ Senate/House seat counts (Federalist vs Farmer-Labor). Trifecta = Senate >= 50 +
 - boardDirks / boardGottlieb (max 12 total), ceoIsGottlieb, ctoIsMira (bool)
 - militaryContractActive, commercialMomentum (-2 to +2), ethicsBoardIntact
 - activistStakeRevealed, dojSuitFiled, senateProbeLaunched, whistleblowerFiled, acquired, gottliebStartedRival (bool)
-- sentinelLaunched, aegisDeployed, companionLaunched, foundryLaunched (bool)
+- sentinelLaunched, aegisDeployed, companionLaunched, crucibleLaunched (bool)
 - companionScandal (0-3), aegisControversy (0-3)
 
 ### geopolitical
 - tradeWarStage (0=peace, 1=tariffs, 2=retaliation, 3=decoupling, 4=deal)
 - sericaRelations (-3 cold war to +3 detente)
 - mideastEscalation, southAmericaOps, farsistanEscalation, khasurianCrisis (0-3)
-- sanctionsActive, oilCrisis, recessionDeclared, straitClosed, aegisDemandSurge, foundryCompetitionPressure, energyCrisis (bool)
+- sanctionsActive, oilCrisis, recessionDeclared, straitClosed, aegisDemandSurge, crucibleCompetitionPressure, energyCrisis (bool)
 
 ### fed
 - hikeCycle, cutCycle, qeActive, hartleyFired, vaneAppointed (bool)
@@ -334,7 +334,7 @@ export class LLMEventSource {
                 '- ethicsBoardIntact: ' + w.pnth.ethicsBoardIntact + ', activistStakeRevealed: ' + w.pnth.activistStakeRevealed,
                 '- dojSuitFiled: ' + w.pnth.dojSuitFiled + ', senateProbeLaunched: ' + w.pnth.senateProbeLaunched,
                 '- whistleblowerFiled: ' + w.pnth.whistleblowerFiled + ', acquired: ' + w.pnth.acquired + ', gottliebStartedRival: ' + w.pnth.gottliebStartedRival,
-                '- Products: sentinel=' + w.pnth.sentinelLaunched + ', aegis=' + w.pnth.aegisDeployed + ', companion=' + w.pnth.companionLaunched + ', foundry=' + w.pnth.foundryLaunched,
+                '- Products: sentinel=' + w.pnth.sentinelLaunched + ', aegis=' + w.pnth.aegisDeployed + ', companion=' + w.pnth.companionLaunched + ', crucible=' + w.pnth.crucibleLaunched,
                 '- companionScandal: ' + w.pnth.companionScandal + ', aegisControversy: ' + w.pnth.aegisControversy,
                 '',
                 '[Geopolitical]',
@@ -343,7 +343,7 @@ export class LLMEventSource {
                 '- farsistanEscalation: ' + (w.geopolitical.farsistanEscalation || 0) + ', khasurianCrisis: ' + (w.geopolitical.khasurianCrisis || 0),
                 '- sanctionsActive: ' + w.geopolitical.sanctionsActive + ', oilCrisis: ' + w.geopolitical.oilCrisis + ', recessionDeclared: ' + w.geopolitical.recessionDeclared,
                 '- straitClosed: ' + (w.geopolitical.straitClosed || false) + ', aegisDemandSurge: ' + (w.geopolitical.aegisDemandSurge || false),
-                '- foundryCompetitionPressure: ' + (w.geopolitical.foundryCompetitionPressure || false) + ', energyCrisis: ' + (w.geopolitical.energyCrisis || false),
+                '- crucibleCompetitionPressure: ' + (w.geopolitical.crucibleCompetitionPressure || false) + ', energyCrisis: ' + (w.geopolitical.energyCrisis || false),
                 '',
                 '[Fed]',
                 '- hikeCycle: ' + w.fed.hikeCycle + ', cutCycle: ' + w.fed.cutCycle + ', qeActive: ' + w.fed.qeActive,

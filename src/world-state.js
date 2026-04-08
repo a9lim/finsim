@@ -34,7 +34,7 @@ export function createWorldState() {
             sentinelLaunched:        true,
             aegisDeployed:           false,
             companionLaunched:       false,
-            foundryLaunched:         false,
+            crucibleLaunched:         false,
             companionScandal:        0,
             aegisControversy:        0,
         },
@@ -50,7 +50,7 @@ export function createWorldState() {
             khasurianCrisis:     0,
             straitClosed:              false,
             aegisDemandSurge:          false,
-            foundryCompetitionPressure: false,
+            crucibleCompetitionPressure: false,
             energyCrisis:               false,
         },
         fed: {
@@ -158,7 +158,7 @@ export const WORLD_STATE_RANGES = {
     'pnth.sentinelLaunched':            { type: 'boolean' },
     'pnth.aegisDeployed':               { type: 'boolean' },
     'pnth.companionLaunched':           { type: 'boolean' },
-    'pnth.foundryLaunched':             { type: 'boolean' },
+    'pnth.crucibleLaunched':             { type: 'boolean' },
     'pnth.companionScandal':            { min: 0,   max: 3,   type: 'number' },
     'pnth.aegisControversy':            { min: 0,   max: 3,   type: 'number' },
     // geopolitical

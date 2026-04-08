@@ -161,7 +161,7 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 ### Cross-Domain Event Wiring
 
 Events form an interconnected web, not isolated threads. Key cross-domain connections:
-- **Geopolitical → PNTH**: Khasurian incursion sets `aegisDemandSurge` → Aegis events boost likelihood. Serican compute buildout sets `foundryCompetitionPressure` → Foundry events respond. Strait closure sets `energyCrisis` → Fed emergency followup.
+- **Geopolitical → PNTH**: Khasurian incursion sets `aegisDemandSurge` → Aegis events boost likelihood. Serican compute buildout sets `crucibleCompetitionPressure` → Crucible events respond. Strait closure sets `energyCrisis` → Fed emergency followup.
 - **Investigation cross-pollination**: Okafor probe / Tan-Bowman story at stage 2+ trigger `meridian_exposed` bridge event (followupOnly) — but only if player has dirty flags (`pursued_insider_tip`, `hosted_fundraiser`, etc.) or high `regulatoryExposure`. Clean players are unaffected.
 - **Fed ↔ Geopolitical**: `recessionDeclared` / `energyCrisis` boost Fed cut event likelihood. Late-cycle hikes nudge `barronApproval` down.
 - **Election downstream**: Midterm results (`midtermResult`) reshape event likelihood — F-L win boosts investigations, blocks Big Beautiful Bill. Federalist landslide boosts deregulation, penalizes investigations.
@@ -177,7 +177,7 @@ Events form an interconnected web, not isolated threads. Key cross-domain connec
 
 **Congress**: Sen. Roy Lassiter (F-SC, trade hawk), Sen. Peggy Haines (F-WY, deficit hawk/swing vote), Rep. Vincent Tao (F-TX, Majority Leader), Rep. Diane Whittaker (F-OH, moderate), Sen. James Whitfield (F-L, MA, filibuster master), Rep. Carmen Reyes (F-L, CA, firebrand), Sen. Patricia Okafor (F-L, IL, investigations). Key bills: Big Beautiful Bill (omnibus), Serican Reciprocal Tariff Act, Financial Freedom Act, Digital Markets Accountability Act.
 
-**PNTH**: Chairwoman Andrea Dirks vs CEO Eugene Gottlieb. CTO Mira Kassis, CFO Raj Malhotra, board kingmaker David Zhen. Products: Atlas Sentinel (enterprise), Atlas Aegis (military), Atlas Companion (consumer), Atlas Foundry (infrastructure), Covenant AI (Gottlieb's rival).
+**PNTH**: Chairwoman Andrea Dirks vs CEO Eugene Gottlieb. CTO Mira Kassis, CFO Raj Malhotra, board kingmaker David Zhen. Products: Atlas Sentinel (enterprise), Atlas Aegis (military), Atlas Companion (consumer), Atlas Crucible (infrastructure), Covenant AI (Gottlieb's rival).
 
 **Geopolitics**: Serica (Premier Liang Wei), Khasuria (President Volkov), Farsistan (Emir al-Farhan, Strait of Hormuz), Boliviara (President Madero), Meridia (PM Navon).
 
@@ -185,7 +185,7 @@ Events form an interconnected web, not isolated threads. Key cross-domain connec
 
 ### World State Domains
 
-`congress` (seats + `filibusterActive` + `bigBillStatus` 0–4), `pnth` (board + products: `sentinelLaunched`/`aegisDeployed`/`companionLaunched`/`foundryLaunched` + `companionScandal`/`aegisControversy` 0–3), `geopolitical` (`sericaRelations` ±3, `farsistanEscalation`/`khasurianCrisis` 0–3, `straitClosed`, `aegisDemandSurge`, `foundryCompetitionPressure`, `energyCrisis`), `fed`, `investigations` (`tanBowmanStory`/`okaforProbeStage`/`impeachmentStage` 0–3, `meridianExposed` bool — set by bridge event when dirty player is caught in investigative crossfire), `election`, `media` (`tanCredibility`/`sentinelRating` 0–10, `pressFreedomIndex` 0–10, `leakCount` 0–5, `lobbyingExposed` bool — set when `lobbyCount >= 3` and `mediaTrust < 40`).
+`congress` (seats + `filibusterActive` + `bigBillStatus` 0–4), `pnth` (board + products: `sentinelLaunched`/`aegisDeployed`/`companionLaunched`/`crucibleLaunched` + `companionScandal`/`aegisControversy` 0–3), `geopolitical` (`sericaRelations` ±3, `farsistanEscalation`/`khasurianCrisis` 0–3, `straitClosed`, `aegisDemandSurge`, `crucibleCompetitionPressure`, `energyCrisis`), `fed`, `investigations` (`tanBowmanStory`/`okaforProbeStage`/`impeachmentStage` 0–3, `meridianExposed` bool — set by bridge event when dirty player is caught in investigative crossfire), `election`, `media` (`tanCredibility`/`sentinelRating` 0–10, `pressFreedomIndex` 0–10, `leakCount` 0–5, `lobbyingExposed` bool — set when `lobbyCount >= 3` and `mediaTrust < 40`).
 
 `factions` is NOT in `createWorldState()` — it lives in `faction-standing.js` and is attached by reference via `eventEngine.world.factions = factions` at init/reset/preset-load.
 
