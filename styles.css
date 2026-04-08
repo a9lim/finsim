@@ -179,6 +179,7 @@ main {
 .chain-tbl {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 
 .chain-th {
@@ -235,11 +236,6 @@ main {
     box-shadow: inset -3px 0 0 var(--accent);
 }
 
-.chain-greek {
-    color: var(--text-muted);
-    font-size: var(--font-sm);
-}
-
 #stock-bond-table,
 #strategy-stock-bond-table {
     font-family: var(--font-mono);
@@ -248,20 +244,17 @@ main {
 }
 
 #stock-price-cell,
-#strategy-stock-cell,
-.stock-overlay-cell {
+#strategy-stock-cell {
     color: var(--stock);
 }
 
 #bond-price-cell,
-#strategy-bond-cell,
-.bond-overlay-cell {
+#strategy-bond-cell {
     color: var(--bond);
 }
 
 #vix-price-cell,
-#strategy-vix-cell,
-.vix-overlay-cell {
+#strategy-vix-cell {
     color: var(--vix);
 }
 
@@ -274,49 +267,11 @@ main {
     font-style: italic;
 }
 
-.overlay-stock-bond {
-    margin-bottom: 10px;
-}
-
-.chain-expiry-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-bottom: 8px;
-}
-
-.chain-expiry-tab {
-    font-size: var(--font-sm);
-    padding: 4px 10px;
-}
-
-.chain-expiry-tab.active {
-    color: var(--accent);
-    background: var(--accent-subtle);
-}
-
 .chain-placeholder {
     color: var(--text-muted);
     font-family: var(--font-sans);
     font-size: var(--font-base);
     padding: 12px 0;
-}
-
-.chain-expand-btn {
-    width: 100%;
-    margin-top: 8px;
-    font-size: var(--font-sm);
-}
-
-/* --- Chain Overlay --- */
-.chain-overlay-content {
-    max-width: 560px;
-    padding: 1.25rem;
-}
-
-.full-chain {
-    max-height: 60vh;
-    overflow-y: auto;
 }
 
 /* --- Trade Dialog --- */
@@ -361,9 +316,6 @@ main {
     margin-bottom: 3px;
     font-size: var(--font-base);
     transition: background 0.12s;
-}
-.data-row:hover {
-    background: var(--bg-hover);
 }
 
 /* --- Portfolio Positions --- */
@@ -546,10 +498,6 @@ main {
     transition: background 0.12s;
 }
 
-.leg-row:hover {
-    background: var(--bg-hover);
-}
-
 /* --- Leg Row Layout --- */
 .leg-row .pos-actions {
     display: flex;
@@ -636,10 +584,6 @@ main {
         margin: 16px;
     }
 
-    .chain-overlay-content {
-        max-width: none;
-        margin: 8px;
-    }
 }
 
 /* Small phones */
@@ -832,29 +776,6 @@ main {
     gap: 8px;
 }
 
-.epilogue-scorecard .stat-group {
-    margin-bottom: 16px;
-}
-
-.epilogue-highlights {
-    list-style: none;
-    padding: 0;
-    margin: 8px 0;
-}
-
-.epilogue-highlights li {
-    padding: 6px 0;
-    font-size: var(--font-lg);
-    line-height: 1.4;
-}
-
-.epilogue-day {
-    font-family: var(--font-mono);
-    font-size: var(--font-base);
-    color: var(--text-muted);
-    margin-right: 8px;
-}
-
 .epilogue-timeline-row {
     display: grid;
     grid-template-columns: 60px 1fr;
@@ -907,9 +828,6 @@ main {
     margin-bottom: 3px;
     font-size: var(--font-base);
     transition: background 0.12s;
-}
-.strategy-group:hover {
-    background: var(--bg-hover);
 }
 .strategy-group-header {
     display: flex;

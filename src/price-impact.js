@@ -5,11 +5,10 @@ import {
     PARAM_SHIFT_HALF_LIFE,
     IMPACT_TOAST_COOLDOWN,
     IMPACT_THRESHOLD_25, IMPACT_THRESHOLD_50,
-    IMPACT_THRESHOLD_75, IMPACT_THRESHOLD_100,
+    IMPACT_THRESHOLD_75,
     MAX_PLAYER_MU_SHIFT, MAX_PLAYER_THETA_SHIFT,
     MAX_PLAYER_XI_SHIFT, MAX_PLAYER_KAPPA_SHIFT,
     MAX_PLAYER_SIGMAR_SHIFT,
-    EVENT_COUPLING_CAP,
     TRADING_DAYS_PER_YEAR,
 } from './config.js';
 import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
@@ -119,7 +118,7 @@ export function modeledStockADV(sigma) {
 /**
  * Vol-scaled bond ADV. Higher rate vol deepens the bond liquidity pool.
  */
-export function modeledBondADV(sigmaR) {
+function modeledBondADV(sigmaR) {
     return sigmaR > 0 ? BOND_ADV * Math.sqrt(sigmaR / BOND_SIGMA_BASE) : BOND_ADV;
 }
 
@@ -153,7 +152,7 @@ export function recordBondTrade(qty, sigmaR) {
 
 /* ── VXPNT futures impact overlay (keyed off xi / vol-of-vol) ── */
 
-export function modeledVixADV(xi) {
+function modeledVixADV(xi) {
     return xi > 0 ? VIX_ADV * Math.sqrt(xi / VIX_SIGMA_BASE) : VIX_ADV;
 }
 
@@ -180,7 +179,7 @@ export function recordVixTrade(qty, xi) {
  * Compute modeled open interest for an option.
  * Higher vol deepens the liquidity pool (more hedging/speculative activity).
  */
-export function modeledOI(type, logSK, dte, sigma) {
+function modeledOI(type, logSK, dte, sigma) {
     const absM = Math.abs(logSK);
     const isITM = (type === 'call' && logSK > 0) || (type === 'put' && logSK < 0);
     const decay = isITM
@@ -318,15 +317,6 @@ export function removeParamOverlays(sim, saved) {
     for (const k in saved) sim[k] = saved[k];
 }
 
-/* ── Layer 2: Event coupling ── */
-
-export function computeEventCoupling(netDelta, deltas) {
-    if (!deltas || !deltas.mu || Math.abs(netDelta) < 1) return 1.0;
-    const alignment = Math.sign(netDelta) * Math.sign(deltas.mu);
-    const magnitude = Math.min(1, Math.abs(netDelta) / (ADV * 0.5));
-    return 1 + alignment * magnitude * EVENT_COUPLING_CAP;
-}
-
 /* ── Impact toasts ── */
 
 const _stockToastsMedium = [
@@ -371,4 +361,3 @@ export function selectImpactToast(grossRatio, instrument, day) {
 }
 
 /* ── Accessors ── */
-export function getPlayerParamShifts() { return { ..._playerParamShifts }; }

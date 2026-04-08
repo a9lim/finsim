@@ -278,4 +278,3 @@ export function resetRegulations() {
     _state.clear();
 }
 
-export { REGULATIONS };

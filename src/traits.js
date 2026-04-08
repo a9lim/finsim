@@ -292,4 +292,3 @@ export function getActiveTraitIds() { return [..._active]; }
 export function getActiveTraits() { return TRAITS.filter(t => _active.has(t.id)); }
 export function getTrait(id) { return TRAITS.find(t => t.id === id) || null; }
 export function resetTraits() { _active.clear(); _quietMoneyLost = false; }
-export { TRAITS };

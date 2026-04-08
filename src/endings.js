@@ -8,7 +8,7 @@
 import { computePositionValue } from './position-value.js';
 import { INITIAL_CAPITAL, HISTORY_CAPACITY, TERM_END_DAY } from './config.js';
 import { getFactionState, getFaction } from './faction-standing.js';
-import { getActiveTraitIds, getActiveTraits, getTrait } from './traits.js';
+import { getActiveTraitIds, getTrait } from './traits.js';
 
 // -- HTML helpers -------------------------------------------------------------
 
@@ -180,13 +180,13 @@ function _pageElection(world, playerChoices, premature, endingId) {
     const fed = world?.fed || {};
 
     // Midterm recap
-    if (mid === 'fed_wave') {
+    if (mid === 'fed_gain') {
         body += _p('The midterm elections two years prior had been a triumph for the Federalist Party. Barron\'s coalition held firm, expanding their margins in both chambers and silencing early talk of a lame-duck presidency. Pundits declared the era of Barron politics firmly entrenched.');
-    } else if (mid === 'fl_wave') {
+    } else if (mid === 'fed_loss_both') {
         body += _p('The midterm elections had been devastating for Barron. The Farmer-Labor wave swept through suburban districts that had once been Federalist strongholds, flipping the House and narrowing the Senate margin to a knife\'s edge. For the first time, the word "impeachment" was spoken aloud in the Capitol corridors.');
-    } else if (mid === 'split') {
+    } else if (mid === 'fed_loss_house') {
         body += _p('The midterms had produced a Congress as divided as the country itself. The Federalists clung to the Senate while Farmer-Labor claimed a narrow House majority. Gridlock became the governing philosophy, and every piece of legislation required horse-trading that left both sides exhausted.');
-    } else if (mid === 'status_quo') {
+    } else if (mid === 'fed_hold') {
         body += _p('The midterms had changed little, preserving the status quo in Washington. Neither party could claim a mandate, and governing lurched forward on inertia and executive orders.');
     }
 

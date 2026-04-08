@@ -311,16 +311,6 @@ export function resolveLegs(legs, S, day, expiries, overrideExpiryDay) {
     });
 }
 
-export function formatLeg(leg) {
-    const side = leg.qty > 0 ? 'Long' : 'Short';
-    const typeStr = leg.type.toUpperCase();
-    if (leg.type === 'stock' || leg.type === 'bond' || leg.type === 'vixfuture') return side + ' ' + typeStr;
-    const offset = leg.strikeOffset || 0;
-    const strikeStr = offset === 0 ? 'ATM' : offset > 0 ? 'ATM+' + offset : 'ATM' + offset;
-    if (leg.dteOffset == null) return side + ' ' + typeStr + ' ' + strikeStr;
-    return side + ' ' + typeStr + ' ' + strikeStr + ' ' + leg.dteOffset + 'd';
-}
-
 // --- Net cost computation ---
 
 export function computeNetCost(legs, S, vol, r, day, q, expiries, overrideExpiryDay) {

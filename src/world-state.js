@@ -131,7 +131,7 @@ export function validatePnthBoard(world) {
 // Null/string fields (midtermResult, presidentialResult) are omitted —
 // the LLM cannot set them via structured effects.
 
-export const WORLD_STATE_RANGES = {
+const WORLD_STATE_RANGES = {
     // congress.senate
     'congress.senate.federalist':       { min: 0,   max: 100, type: 'number' },
     'congress.senate.farmerLabor':      { min: 0,   max: 100, type: 'number' },

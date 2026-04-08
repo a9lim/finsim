@@ -48,15 +48,6 @@ export function bondNotional() {
     return total;
 }
 
-export function strikeNotional(strike) {
-    let total = 0;
-    for (const p of portfolio.positions) {
-        if ((p.type === 'call' || p.type === 'put') && p.strike === strike) {
-            total += Math.abs(p.qty) * posPrice(p);
-        }
-    }
-    return total;
-}
 
 export function totalOptionsNotional() {
     let total = 0;

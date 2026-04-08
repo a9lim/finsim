@@ -6,9 +6,9 @@
    Pure functions -- no internal state.
    ===================================================== */
 
-import { fmtDollar, fmtNum, pnlClass, fmtDte, fmtRelDay, posTypeLabel } from './format-helpers.js';
+import { fmtNum, pnlClass, fmtDte, fmtRelDay, posTypeLabel } from './format-helpers.js';
 import { computeBidAsk } from './portfolio.js';
-import { renderChainInto, rebuildExpiryDropdown, buildStockBondTable, buildChainTable, bindChainTableClicks, posKey } from './chain-renderer.js';
+import { renderChainInto, rebuildExpiryDropdown, posKey } from './chain-renderer.js';
 import { vasicekBondPrice, computeVIXFuturePrice } from './pricing.js';
 import { BOND_FACE_VALUE, STRIKE_INTERVAL, STRIKE_RANGE } from './config.js';
 import { market } from './market.js';
@@ -24,8 +24,6 @@ window._shoalsSellMode = () => sellMode;
 // ---------------------------------------------------------------------------
 // Focus trap state (module-scoped for overlay open/close)
 // ---------------------------------------------------------------------------
-let _chainTrapCleanup = null;
-let _chainPrevFocus = null;
 let _tradeTrapCleanup = null;
 let _tradePrevFocus = null;
 let _popupTrapCleanup = null;
@@ -64,7 +62,6 @@ export function cacheDOMElements($) {
     $.closePanel = document.getElementById('close-panel');
     $.tradeExpiry    = document.getElementById('trade-expiry');
     $.chainTable    = document.getElementById('chain-table');
-    $.fullChainLink = document.getElementById('full-chain-link');
     $.stockPriceCell = document.getElementById('stock-price-cell');
     $.bondPriceCell  = document.getElementById('bond-price-cell');
     $.vixPriceCell   = document.getElementById('vix-price-cell');
@@ -78,7 +75,6 @@ export function cacheDOMElements($) {
     $.marginStatus      = document.getElementById('margin-status');
     $.borrowCostDisplay = document.getElementById('borrow-cost');
     $.dividendDisplay   = document.getElementById('dividend-income');
-    $.greeksAggregate = document.getElementById('greeks-aggregate');
     $.greekDelta      = document.getElementById('greek-delta');
     $.greekGamma      = document.getElementById('greek-gamma');
     $.greekTheta      = document.getElementById('greek-theta');
@@ -107,9 +103,6 @@ export function cacheDOMElements($) {
     $.timeSliderBar   = document.getElementById('time-slider-bar');
     $.timeSlider      = document.getElementById('time-slider');
     $.timeSliderLabel = document.getElementById('time-slider-label');
-    $.chainOverlay        = document.getElementById('chain-overlay');
-    $.chainOverlayClose   = document.getElementById('chain-overlay-close');
-    $.chainOverlayTable   = document.getElementById('chain-overlay-table');
     $.tradeDialog         = document.getElementById('trade-dialog');
     $.tradeDialogTitle    = document.getElementById('trade-dialog-title');
     $.tradeDialogBody     = document.getElementById('trade-dialog-body');
@@ -180,10 +173,10 @@ export function bindEvents($, handlers) {
         onTogglePlay, onStep, onSpeedUp, onSpeedDown, onToggleTheme,
         onPresetChange, onReset, onSliderChange, onTimeSlider,
         onBuyStock, onShortStock, onBuyBond, onShortBond, onBuyVix, onShortVix,
-        onChainCellClick, onFullChainOpen, onExpiryChange,
-        onTradeSubmit, onLiquidate,
+        onChainCellClick, onExpiryChange,
+        onTradeSubmit,
         onLLMKeyChange, onLLMModelChange,
-        onChainClose, onTradeClose, onMarginClose,
+        onTradeClose,
     } = handlers;
 
     $.playBtn.addEventListener('click', onTogglePlay);
@@ -285,16 +278,6 @@ export function bindEvents($, handlers) {
         const hint = document.getElementById('trade-hint');
         if (hint) hint.textContent = 'Tap to Trade \u00b7 Long-press for Bid/Ask \u00b7 Pinch to Zoom Chart';
     }
-    $.fullChainLink.addEventListener('click', onFullChainOpen);
-
-    const closeChain = () => {
-        $.chainOverlay.classList.add('hidden');
-        if (_chainTrapCleanup) { _chainTrapCleanup(); _chainTrapCleanup = null; }
-        if (_chainPrevFocus && _chainPrevFocus.focus) { _chainPrevFocus.focus(); _chainPrevFocus = null; }
-        if (typeof onChainClose === 'function') onChainClose();
-    };
-    initOverlayDismiss($.chainOverlay, $.chainOverlayClose, closeChain);
-
     const closeTrade = () => {
         $.tradeDialog.classList.add('hidden');
         if (_tradeTrapCleanup) { _tradeTrapCleanup(); _tradeTrapCleanup = null; }
@@ -404,7 +387,6 @@ export function bindEvents($, handlers) {
             });
         };
         _wireTooltipDelegation($.sidebar);
-        _wireTooltipDelegation($.chainOverlay);
     }
 }
 
@@ -589,77 +571,6 @@ export function syncSettingsUI($, sim) {
         _forms.updateSliderFill(slider);
     }
 
-}
-
-// ---------------------------------------------------------------------------
-// showChainOverlay
-// ---------------------------------------------------------------------------
-
-/**
- * @param {Array} skeleton - chain skeleton
- * @param {function} priceExpiry - (index) => priced expiry with greeks
- * @param {{ bid, ask }} stockBA
- * @param {{ bid, ask }} bondBA
- * @param {object} posMap
- */
-export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, vixBA, posMap, spot) {
-    $.chainOverlayTable.textContent = '';
-
-    if (!skeleton || skeleton.length === 0) {
-        const hint = document.createElement('p');
-        hint.className = 'panel-hint';
-        hint.textContent = 'No chain data available.';
-        $.chainOverlayTable.appendChild(hint);
-        $.chainOverlay.classList.remove('hidden');
-        return;
-    }
-
-    let selectedExpiry = 0;
-    let _sba = stockBA, _bba = bondBA, _vba = vixBA, _pm = posMap, _sp = spot;
-
-    function renderOverlay() {
-        $.chainOverlayTable.textContent = '';
-
-        const tabBar = document.createElement('div');
-        tabBar.className = 'chain-expiry-tabs';
-        skeleton.forEach((exp, i) => {
-            const btn = document.createElement('button');
-            btn.className = 'ghost-btn chain-expiry-tab' + (i === selectedExpiry ? ' active' : '');
-            btn.textContent = fmtDte(exp.dte);
-            btn.addEventListener('click', () => {
-                selectedExpiry = i;
-                if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
-                renderOverlay();
-            });
-            tabBar.appendChild(btn);
-        });
-        $.chainOverlayTable.appendChild(tabBar);
-
-        // Stock / Bond / VIX price table
-        $.chainOverlayTable.appendChild(
-            buildStockBondTable(_sba, _bba, _vba, $._onChainCellClick, _pm, true)
-        );
-
-        const expiry = priceExpiry(selectedExpiry);
-        $.chainOverlayTable.appendChild(buildChainTable(expiry, false, _pm, _sp));
-        if (!$.chainOverlayTable._chainClicksBound) {
-            bindChainTableClicks($.chainOverlayTable, $._onChainCellClick);
-            $.chainOverlayTable._chainClicksBound = true;
-        }
-    }
-
-    $._refreshChainOverlay = (newStockBA, newBondBA, newVixBA, newPosMap, newSpot) => {
-        _sba = newStockBA; _bba = newBondBA; _vba = newVixBA; _pm = newPosMap; _sp = newSpot;
-        renderOverlay();
-    };
-
-    renderOverlay();
-    _chainPrevFocus = document.activeElement;
-    $.chainOverlay.classList.remove('hidden');
-    if (typeof trapFocus === 'function') _chainTrapCleanup = trapFocus($.chainOverlay);
-    var firstFocusable = $.chainOverlay.querySelector('button, [tabindex="0"]');
-    if (firstFocusable) firstFocusable.focus();
-    if (typeof _haptics !== 'undefined') _haptics.trigger('light');
 }
 
 // ---------------------------------------------------------------------------
@@ -1291,7 +1202,7 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
     _popupPrevFocus = document.activeElement;
     $.popupOverlay.classList.remove('hidden');
     if (typeof trapFocus === 'function') _popupTrapCleanup = trapFocus($.popupOverlay);
-    var firstChoice = $.popupChoices.querySelector('button');
+    const firstChoice = $.popupChoices.querySelector('button');
     if (firstChoice) firstChoice.focus();
     if (typeof _haptics !== 'undefined') _haptics.trigger(magnitude === 'major' ? 'medium' : 'light');
 }
