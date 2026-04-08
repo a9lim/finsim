@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, BOND_FACE_VALUE, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ROGUE_TRADING_THRESHOLD } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ROGUE_TRADING_THRESHOLD } from './src/config.js';
 import { fmtDollar } from './src/format-helpers.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
@@ -14,7 +14,7 @@ import {
     chargeBorrowInterest, processDividends, checkMargin, aggregateGreeks,
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder,
-    computeBidAsk, computeNetDelta, computeGrossNotional, portfolioValue,
+    computeNetDelta, computeGrossNotional, portfolioValue,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -22,7 +22,7 @@ import {
     cacheDOMElements, bindEvents, updateChainDisplay,
     rebuildTradeDropdown, rebuildStrategyDropdown,
     updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateVixDisplay, updateStockBondPrices,
-    syncSettingsUI, toggleStrategyView, showChainOverlay,
+    syncSettingsUI, toggleStrategyView,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
     updateDynamicSections, updateEventLog, updateCongressDiagrams, updateStandings,
@@ -37,11 +37,11 @@ import { checkEndings, generateEnding } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
-import { computeVIXSpot, computeVIXFuturePrice } from './src/pricing.js';
+import { computeVIXSpot } from './src/pricing.js';
 import { syncMarket, market } from './src/market.js';
 import {
     resetImpactState, decayImpactVolumes,
-    getStockImpact, getBondImpact, getVixImpact, modeledStockADV, rehedgeMM,
+    modeledStockADV, rehedgeMM,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
     selectImpactToast,
@@ -50,14 +50,13 @@ import {
     listStrategies, getStrategy, saveStrategy, deleteStrategy,
     resolveLegs, computeNetCost, legsToRelative, nextAutoName,
 } from './src/strategy-store.js';
-import { applyStructuredEffects, congressHelpers } from './src/world-state.js';
+import { applyStructuredEffects } from './src/world-state.js';
 import { pickTip, resetUsedTips } from './src/events/tips.js';
 import { getEventById, ALL_EVENTS } from './src/events/index.js';
 import {
     factions, resetFactions, getFaction,
     onQuarterlyReview, applyComplianceChoice,
-    shiftFaction, firmTone,
-    getRegLevel, getFactionState, getFactionDescriptor,
+    shiftFaction, getFactionDescriptor,
     settleRegulatory, cooperateRegulatory,
 } from './src/faction-standing.js';
 import {
@@ -248,12 +247,6 @@ function _priceExpiry(idx) {
     return priceChainExpiry(sim.S, sim.v, sim.r, chainSkeleton[idx], false, sim.q);
 }
 
-/** Price one skeleton expiry with full greeks (for overlay). */
-function _priceExpiryGreeks(idx) {
-    if (idx < 0 || idx >= chainSkeleton.length) return null;
-    return priceChainExpiry(sim.S, sim.v, sim.r, chainSkeleton[idx], true, sim.q);
-}
-
 // ---------------------------------------------------------------------------
 // Bootstrap
 // ---------------------------------------------------------------------------
@@ -348,7 +341,6 @@ function init() {
         { key: 'b', label: 'Buy / sell stock',     group: 'Trade',      action: () => handleBuyStock() },
         { key: 'n', label: 'Buy / sell bond',      group: 'Trade',      action: () => handleBuyBond() },
         { key: 'x', label: 'Toggle buy / sell',    group: 'Trade',      action: () => document.getElementById('mode-btn').click() },
-        { key: 'o', label: 'Open options chain',   group: 'Trade',      action: () => openFullChain() },
         { key: 'Enter', label: 'Execute strategy', group: 'Trade',      action: () => handleTradeExecStrategy() },
         { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
         { key: '2', label: PRESETS[1].name,   group: 'Presets',    action: () => loadPreset(1) },
@@ -412,12 +404,8 @@ function init() {
             }
             dirty = true;
         },
-        onFullChainOpen:  () => openFullChain(),
         onTradeSubmit:    (data) => handleTradeSubmit(data),
-        onLiquidate:      () => handleLiquidate(),
-        onChainClose:     () => setTimeout(_processPopupQueue, 100),
         onTradeClose:     () => setTimeout(_processPopupQueue, 100),
-        onMarginClose:    () => setTimeout(_processPopupQueue, 100),
         onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
         onStrategyExpiryChange: (idx) => {
             const pe = _priceExpiry(idx);
@@ -920,7 +908,6 @@ function _updateLobbyPills() {
 function _processPopupQueue() {
     if (_popupQueue.length === 0) return;
     // Don't show if another overlay is open
-    if (!$.chainOverlay.classList.contains('hidden')) return;
     if (!$.tradeDialog.classList.contains('hidden')) return;
     if (!$.popupOverlay.classList.contains('hidden')) return;
 
@@ -1268,7 +1255,7 @@ function _onDayComplete() {
         _toast(text, rating === 'poor' ? 8000 : 5000);
     }
 
-    const { expired, unwound } = processExpiry(sim, sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
+    const { unwound } = processExpiry(sim, sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
     if (unwound.length > 0) {
         const names = [...new Set(unwound.map(p => p.strategyName))];
         for (const name of names) {
@@ -1747,7 +1734,6 @@ function _resetCore(index) {
     if (eventEngine) eventEngine.world.factions = factions;
     resetTraits();
     resetRegulations();
-    if (eventEngine) eventEngine.resetOneShot();
     resetLobbying();
     resetAudio();
     sim.reset(index);
@@ -1868,7 +1854,6 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
     chainDirty = true;
     updateUI();
     dirty = true;
-    _refreshChainOverlayIfOpen();
 }
 
 function handleBuyStock() {
@@ -1905,19 +1890,6 @@ function handleChainCellClick(info) {
     _executeOrPlace(info.type, info.side, _getTradeQty(), info.strike ?? undefined, expiryDay);
 }
 
-function openFullChain() {
-    if (playing) togglePlay();
-    const vol = market.sigma;
-    const displaySpot = sim.S + getStockImpact(market.sigma);
-    const bondDte = _getTradeExpiryDay() - sim.day;
-    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252) + getBondImpact(market.sigmaR);
-    const vixDte = bondDte;
-    const vixMid = computeVIXFuturePrice(market.v, market.kappa, market.theta, market.xi, vixDte / 252) + getVixImpact(market.xi);
-    const stockBA = computeBidAsk(displaySpot, vol);
-    const bondBA = computeBidAsk(bondMid, market.sigmaR);
-    const vixBA = computeBidAsk(vixMid, market.xi);
-    showChainOverlay($, chainSkeleton, _priceExpiryGreeks, stockBA, bondBA, vixBA, _buildPosMap(), displaySpot);
-}
 
 function handleTradeSubmit(data) {
     const vol = market.sigma;
@@ -1943,38 +1915,8 @@ function handleTradeSubmit(data) {
     chainDirty = true;
     updateUI();
     dirty = true;
-    _refreshChainOverlayIfOpen();
 }
 
-function _refreshChainOverlayIfOpen() {
-    if ($.chainOverlay.classList.contains('hidden') || !$._refreshChainOverlay) return;
-    const vol = market.sigma;
-    const displaySpot = sim.S + getStockImpact(market.sigma);
-    const bondDte = _getTradeExpiryDay() - sim.day;
-    const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252) + getBondImpact(market.sigmaR);
-    const vixMid = computeVIXFuturePrice(market.v, market.kappa, market.theta, market.xi, bondDte / 252) + getVixImpact(market.xi);
-    const stockBA = computeBidAsk(displaySpot, vol);
-    const bondBA = computeBidAsk(bondMid, market.sigmaR);
-    const vixBA = computeBidAsk(vixMid, market.xi);
-    $._refreshChainOverlay(stockBA, bondBA, vixBA, _buildPosMap(), displaySpot);
-}
-
-function handleLiquidate() {
-    const vol = market.sigma;
-    liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
-    chainDirty = true;
-    updateUI();
-    dirty = true;
-    _haptic('heavy');
-
-    if (portfolio.cash < sim.S) {
-        _showGameOver('Following the forced liquidation of all positions, your account remains in deficit by '
-            + fmtDollar(Math.abs(portfolio.cash))
-            + '. Regulators have flagged the account for review.');
-    } else {
-        _toast('All positions liquidated.');
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Strategy builder handlers
@@ -2258,8 +2200,8 @@ function _showEpilogue(pages) {
         }, 200);
     }
 
-    var _epiloguePrevFocus = document.activeElement;
-    var _epilogueTrapCleanup = null;
+    let _epiloguePrevFocus = document.activeElement;
+    let _epilogueTrapCleanup = null;
 
     function _cleanupEpilogue() {
         if (_epilogueTrapCleanup) { _epilogueTrapCleanup(); _epilogueTrapCleanup = null; }
@@ -2284,7 +2226,7 @@ function _showEpilogue(pages) {
     overlay.classList.remove('hidden');
     if (typeof trapFocus === 'function') _epilogueTrapCleanup = trapFocus(overlay);
     render();
-    var firstBtn = overlay.querySelector('button:not(.hidden)');
+    const firstBtn = overlay.querySelector('button:not(.hidden)');
     if (firstBtn) firstBtn.focus();
 }
 

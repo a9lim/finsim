@@ -222,7 +222,7 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q
             const isOption = pos.type === 'call' || pos.type === 'put';
             const strikeStr = isOption && pos.strike != null ? ' K' + pos.strike : '';
             const expiryStr = pos.expiryDay != null ? ' ' + fmtDte(pos.expiryDay - day) : '';
-            const labelStr = typeLabel + strikeStr + expiryStr + ' x' + absQty;
+            const labelStr = typeLabel + strikeStr + expiryStr + ' x' + fmtQty(absQty);
             const labelEl = existing.querySelector('.pos-label');
             if (labelEl) labelEl.textContent = labelStr;
         } else {

@@ -113,8 +113,6 @@ const LOBBY_ACTIONS = [
     },
 ];
 
-export { LOBBY_ACTIONS };
-
 export function getAvailableActions(day, cash) {
     const costMult = getTraitEffect('lobbyingCostMult', 1);
     return LOBBY_ACTIONS

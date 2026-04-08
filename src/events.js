@@ -186,11 +186,6 @@ export class EventEngine {
         if (params.rho !== undefined) sim._recomputeRhoDerived();
     }
 
-    /** True when the presidential term has ended and epilogue hasn't fired. */
-    isEpilogueReady(day) {
-        return day >= TERM_END_DAY && !this._epilogueFired;
-    }
-
     /** Compute the final election outcome. Sets _epilogueFired. */
     computeElectionOutcome(sim) {
         const w = this.world;
@@ -271,11 +266,6 @@ export class EventEngine {
     /** Clear fired one-shot tracking (call on reset). */
     resetOneShot() {
         this._firedOneShot.clear();
-    }
-
-    /** Return ids of all one-shot events that have fired this game. */
-    getFiredOneShotIds() {
-        return [...this._firedOneShot];
     }
 
     /** Evaluate portfolio-triggered events. Returns array of triggered event objects. */

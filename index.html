@@ -354,7 +354,6 @@
                         <div id="chain-table" class="chain-table">
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
-                        <button id="full-chain-link" class="ghost-btn chain-expand-btn">View Full Chain</button>
                         <div class="stat-group saved-strategies-section" id="saved-strategies-section">
                             <div class="group-label">Saved Strategies</div>
                             <select id="trade-strategy-select" class="sim-select" aria-label="Saved strategy">
@@ -664,18 +663,6 @@
         </div>
     </aside>
 
-    <!-- Chain Overlay (full option chain modal) -->
-    <div id="chain-overlay" class="sim-overlay hidden" role="dialog" aria-label="Options chain" aria-modal="true">
-        <div class="sim-overlay-panel glass chain-overlay-content">
-            <div class="stats-header">
-                <h2 class="stats-title">Options Chain</h2>
-                <button id="chain-overlay-close" class="tool-btn" aria-label="Close chain" data-icon="close" data-icon-size="16"></button>
-            </div>
-            <div class="sim-overlay-body scrollbar-thin">
-                <div id="chain-overlay-table" class="chain-table full-chain"></div>
-            </div>
-        </div>
-    </div>
 
     <!-- Trade Dialog (buy/sell confirmation) -->
     <div id="trade-dialog" class="sim-overlay hidden" role="dialog" aria-label="Trade confirmation" aria-modal="true">
