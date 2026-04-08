@@ -1913,9 +1913,9 @@ function openFullChain() {
     const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252) + getBondImpact(market.sigmaR);
     const vixDte = bondDte;
     const vixMid = computeVIXFuturePrice(market.v, market.kappa, market.theta, market.xi, vixDte / 252) + getVixImpact(market.xi);
-    const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
-    const bondBA = computeBidAsk(bondMid, displaySpot, vol);
-    const vixBA = computeBidAsk(vixMid, vixMid, market.xi);
+    const stockBA = computeBidAsk(displaySpot, vol);
+    const bondBA = computeBidAsk(bondMid, market.sigmaR);
+    const vixBA = computeBidAsk(vixMid, market.xi);
     showChainOverlay($, chainSkeleton, _priceExpiryGreeks, stockBA, bondBA, vixBA, _buildPosMap(), displaySpot);
 }
 
@@ -1953,9 +1953,9 @@ function _refreshChainOverlayIfOpen() {
     const bondDte = _getTradeExpiryDay() - sim.day;
     const bondMid = BOND_FACE_VALUE * Math.exp(-sim.r * bondDte / 252) + getBondImpact(market.sigmaR);
     const vixMid = computeVIXFuturePrice(market.v, market.kappa, market.theta, market.xi, bondDte / 252) + getVixImpact(market.xi);
-    const stockBA = computeBidAsk(displaySpot, displaySpot, vol);
-    const bondBA = computeBidAsk(bondMid, displaySpot, vol);
-    const vixBA = computeBidAsk(vixMid, vixMid, market.xi);
+    const stockBA = computeBidAsk(displaySpot, vol);
+    const bondBA = computeBidAsk(bondMid, market.sigmaR);
+    const vixBA = computeBidAsk(vixMid, market.xi);
     $._refreshChainOverlay(stockBA, bondBA, vixBA, _buildPosMap(), displaySpot);
 }
 

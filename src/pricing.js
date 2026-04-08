@@ -109,6 +109,10 @@ export function computeVIXSpot(v, kappa, theta, xi) {
  * the 30-day forward integrated vol from that point.
  * Natural contango when v < θ, backwardation when v > θ.
  *
+ * Jensen's inequality: E[√X] < √(E[X]), so the futures price
+ * (which is E[VIX_T] = E[√(fwdIntVar)]) is below √(E[fwdIntVar]).
+ * The ξ² correction approximates this concavity discount.
+ *
  * @param {number} v     - Current instantaneous variance
  * @param {number} kappa - Mean-reversion speed
  * @param {number} theta - Long-run variance
@@ -129,7 +133,7 @@ export function computeVIXFuturePrice(v, kappa, theta, xi, T) {
         const w = 2 / (kD * kD) * (kD - 1 + Math.exp(-kD));
         adj = xi * xi / (2 * kappa * kappa) * w;
     }
-    return 100 * Math.sqrt(Math.max(fwdIntVar + adj, 0));
+    return 100 * Math.sqrt(Math.max(fwdIntVar - adj, 0));
 }
 
 /**
