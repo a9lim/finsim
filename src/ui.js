@@ -9,10 +9,10 @@
 import { fmtDollar, fmtNum, pnlClass, fmtDte, fmtRelDay, posTypeLabel } from './format-helpers.js';
 import { computeBidAsk } from './portfolio.js';
 import { renderChainInto, rebuildExpiryDropdown, buildStockBondTable, buildChainTable, bindChainTableClicks, posKey } from './chain-renderer.js';
-import { vasicekBondPrice } from './pricing.js';
+import { vasicekBondPrice, computeVIXFuturePrice } from './pricing.js';
 import { BOND_FACE_VALUE, STRIKE_INTERVAL, STRIKE_RANGE } from './config.js';
 import { market } from './market.js';
-import { getStockImpact, getBondImpact } from './price-impact.js';
+import { getStockImpact, getBondImpact, getVixImpact } from './price-impact.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
 
 // ---------------------------------------------------------------------------
@@ -67,6 +67,7 @@ export function cacheDOMElements($) {
     $.fullChainLink = document.getElementById('full-chain-link');
     $.stockPriceCell = document.getElementById('stock-price-cell');
     $.bondPriceCell  = document.getElementById('bond-price-cell');
+    $.vixPriceCell   = document.getElementById('vix-price-cell');
     $.defaultPositions  = document.getElementById('default-positions');
     $.strategyPositions = document.getElementById('strategy-positions');
     $.pendingOrders     = document.getElementById('pending-orders');
@@ -87,6 +88,9 @@ export function cacheDOMElements($) {
     $.rateDisplay     = document.getElementById('rate-display');
     $.rateSparkCanvas = document.getElementById('rate-sparkline');
     $.rateSparkCtx    = $.rateSparkCanvas ? $.rateSparkCanvas.getContext('2d') : null;
+    $.vixDisplay      = document.getElementById('vix-display');
+    $.vixSparkCanvas  = document.getElementById('vix-sparkline');
+    $.vixSparkCtx     = $.vixSparkCanvas ? $.vixSparkCanvas.getContext('2d') : null;
     $.advancedToggle  = document.getElementById('advanced-toggle');
     $.advancedSection = document.getElementById('advanced-section');
     $.resetBtn        = document.getElementById('reset-btn');
@@ -139,6 +143,7 @@ export function cacheDOMElements($) {
     $.strategyChainTable = document.getElementById('strategy-chain-table');
     $.strategyStockCell  = document.getElementById('strategy-stock-cell');
     $.strategyBondCell   = document.getElementById('strategy-bond-cell');
+    $.strategyVixCell    = document.getElementById('strategy-vix-cell');
     $.tradeQty         = document.getElementById('trade-qty');
     $.tradeQtyVal      = document.getElementById('trade-qty-val');
     $.strategyQty      = document.getElementById('strategy-qty');
@@ -174,7 +179,7 @@ export function bindEvents($, handlers) {
     const {
         onTogglePlay, onStep, onSpeedUp, onSpeedDown, onToggleTheme,
         onPresetChange, onReset, onSliderChange, onTimeSlider,
-        onBuyStock, onShortStock, onBuyBond, onShortBond,
+        onBuyStock, onShortStock, onBuyBond, onShortBond, onBuyVix, onShortVix,
         onChainCellClick, onFullChainOpen, onExpiryChange,
         onTradeSubmit, onLiquidate,
         onLLMKeyChange, onLLMModelChange,
@@ -264,6 +269,16 @@ export function bindEvents($, handlers) {
         e.preventDefault();
         if (typeof onShortBond === 'function') onShortBond();
     });
+    // VIX futures price cell
+    if ($.vixPriceCell) {
+        $.vixPriceCell.addEventListener('click', () => {
+            if (sellMode) { if (typeof onShortVix === 'function') onShortVix(); } else if (typeof onBuyVix === 'function') onBuyVix();
+        });
+        $.vixPriceCell.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (typeof onShortVix === 'function') onShortVix();
+        });
+    }
 
     // Mobile hint text
     if (window.matchMedia('(pointer: coarse)').matches) {
@@ -339,6 +354,10 @@ export function bindEvents($, handlers) {
         $.strategyStockCell.addEventListener('contextmenu', (e) => { e.preventDefault(); if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('stock', 'short'); });
         $.strategyBondCell.addEventListener('click', () => { if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('bond', 'long'); });
         $.strategyBondCell.addEventListener('contextmenu', (e) => { e.preventDefault(); if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('bond', 'short'); });
+        if ($.strategyVixCell) {
+            $.strategyVixCell.addEventListener('click', () => { if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('vixfuture', 'long'); });
+            $.strategyVixCell.addEventListener('contextmenu', (e) => { e.preventDefault(); if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('vixfuture', 'short'); });
+        }
     }
     if ($.saveStrategyBtn && typeof handlers.onSaveStrategy === 'function') {
         $.saveStrategyBtn.addEventListener('click', handlers.onSaveStrategy);
@@ -444,6 +463,20 @@ export function updateRateDisplay($, rate, rateHistory) {
 }
 
 // ---------------------------------------------------------------------------
+// updateVixDisplay
+// ---------------------------------------------------------------------------
+
+export function updateVixDisplay($, vix, vixHistory) {
+    if ($.vixDisplay) $.vixDisplay.textContent = vix.toFixed(2);
+    if ($.vixSparkCtx && vixHistory && vixHistory.count >= 2
+        && typeof drawSparkline !== 'undefined') {
+        const c = $.vixSparkCanvas;
+        const color = getComputedStyle(document.documentElement).getPropertyValue('--vix').trim() || '#000000';
+        drawSparkline($.vixSparkCtx, vixHistory, c.width, c.height, color, color + '44');
+    }
+}
+
+// ---------------------------------------------------------------------------
 // updateStockBondPrices -- updates both trade-tab and strategy-tab cells
 // ---------------------------------------------------------------------------
 
@@ -483,12 +516,25 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
     const tradeBondDisplay = tradeBondMid != null ? tradeBondMid + getBondImpact(market.sigmaR) : null;
     const tradeBond = tradeBondDisplay != null ? tradeBondDisplay.toFixed(2) : dash;
 
+    // Trade tab VIX futures: from trade expiry dropdown
+    const tradeVixMid = tradeExp
+        ? computeVIXFuturePrice(market.v, market.kappa, market.theta, market.xi, tradeExp.dte / 252)
+        : null;
+    const tradeVixDisplay = tradeVixMid != null ? tradeVixMid + getVixImpact(market.xi) : null;
+    const tradeVix = tradeVixDisplay != null ? tradeVixDisplay.toFixed(2) : dash;
+
     if ($.stockPriceCell) _applyPill($.stockPriceCell, stockTxt, posMap && posMap['stock'], stockTip);
     if ($.bondPriceCell) {
         const bondQty = posMap && tradeExp
             ? posMap[posKey('bond', null, tradeExp.day)]
             : null;
         _applyPill($.bondPriceCell, tradeBond, bondQty, _bidAskTip(tradeBondMid, market.sigmaR));
+    }
+    if ($.vixPriceCell) {
+        const vixQty = posMap && tradeExp
+            ? posMap[posKey('vixfuture', null, tradeExp.day)]
+            : null;
+        _applyPill($.vixPriceCell, tradeVix, vixQty, _bidAskTip(tradeVixMid, market.xi));
     }
 
     // Strategy tab bond: from strategy expiry dropdown
@@ -504,6 +550,13 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
     const stratBondDisplay = stratBondMid != null ? stratBondMid + getBondImpact(market.sigmaR) : null;
     const stratBond = stratBondDisplay != null ? stratBondDisplay.toFixed(2) : dash;
 
+    // Strategy tab VIX futures: from strategy expiry dropdown
+    const stratVixMid = stratExp
+        ? computeVIXFuturePrice(market.v, market.kappa, market.theta, market.xi, stratExp.dte / 252)
+        : null;
+    const stratVixDisplay = stratVixMid != null ? stratVixMid + getVixImpact(market.xi) : null;
+    const stratVix = stratVixDisplay != null ? stratVixDisplay.toFixed(2) : dash;
+
     const sMap = stratPosMap || posMap;
     if ($.strategyStockCell) _applyPill($.strategyStockCell, stockTxt, sMap && sMap['stock'], stockTip);
     if ($.strategyBondCell) {
@@ -511,6 +564,12 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
             ? sMap[posKey('bond', null, stratExp.day)]
             : null;
         _applyPill($.strategyBondCell, stratBond, bondQty, _bidAskTip(stratBondMid, market.sigmaR));
+    }
+    if ($.strategyVixCell) {
+        const vixQty = sMap && stratExp
+            ? sMap[posKey('vixfuture', null, stratExp.day)]
+            : null;
+        _applyPill($.strategyVixCell, stratVix, vixQty, _bidAskTip(stratVixMid, market.xi));
     }
 }
 
@@ -543,7 +602,7 @@ export function syncSettingsUI($, sim) {
  * @param {{ bid, ask }} bondBA
  * @param {object} posMap
  */
-export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posMap, spot) {
+export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, vixBA, posMap, spot) {
     $.chainOverlayTable.textContent = '';
 
     if (!skeleton || skeleton.length === 0) {
@@ -556,7 +615,7 @@ export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posM
     }
 
     let selectedExpiry = 0;
-    let _sba = stockBA, _bba = bondBA, _pm = posMap, _sp = spot;
+    let _sba = stockBA, _bba = bondBA, _vba = vixBA, _pm = posMap, _sp = spot;
 
     function renderOverlay() {
         $.chainOverlayTable.textContent = '';
@@ -576,9 +635,9 @@ export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posM
         });
         $.chainOverlayTable.appendChild(tabBar);
 
-        // Stock / Bond price table
+        // Stock / Bond / VIX price table
         $.chainOverlayTable.appendChild(
-            buildStockBondTable(_sba, _bba, $._onChainCellClick, _pm, true)
+            buildStockBondTable(_sba, _bba, _vba, $._onChainCellClick, _pm, true)
         );
 
         const expiry = priceExpiry(selectedExpiry);
@@ -589,8 +648,8 @@ export function showChainOverlay($, skeleton, priceExpiry, stockBA, bondBA, posM
         }
     }
 
-    $._refreshChainOverlay = (newStockBA, newBondBA, newPosMap, newSpot) => {
-        _sba = newStockBA; _bba = newBondBA; _pm = newPosMap; _sp = newSpot;
+    $._refreshChainOverlay = (newStockBA, newBondBA, newVixBA, newPosMap, newSpot) => {
+        _sba = newStockBA; _bba = newBondBA; _vba = newVixBA; _pm = newPosMap; _sp = newSpot;
         renderOverlay();
     };
 

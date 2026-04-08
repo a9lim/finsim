@@ -1524,6 +1524,40 @@ $\\sigma_R$. A hawkish Fed raises $b$ (pulling rates up); a dovish Fed lowers it
 `,
     },
 
+    vix: {
+        title: 'VXPNT (Equity Volatility Index)',
+        body: `
+<p><strong>VXPNT</strong> is the 30-day equity volatility index for PNTH, analogous to
+the CBOE VIX but computed for this single stock. It measures the market&rsquo;s
+expectation of PNTH&rsquo;s volatility over the next 30 trading days.</p>
+
+<h3>How It&rsquo;s Computed</h3>
+<p>In the Heston stochastic volatility model, the expected integrated variance
+over period $\\Delta = 30/252$ is:</p>
+$$\\text{VXPNT}^2 = \\theta + (v - \\theta)\\frac{1 - e^{-\\kappa\\Delta}}{\\kappa\\Delta}$$
+<p>where $v$ is the current instantaneous variance, $\\theta$ is the long-run
+variance, and $\\kappa$ is the mean-reversion speed. VXPNT is expressed as
+an annualised percentage (e.g., 24.5).</p>
+
+<h3>VXPNT Futures</h3>
+<p>Tradeable VXPNT futures settle in cash at the VXPNT spot level on their
+expiry date. Futures pricing uses the <em>forward</em> variance curve:</p>
+$$E[v_T] = \\theta + (v - \\theta)e^{-\\kappa T}$$
+<p>This produces natural <strong>contango</strong> (futures above spot) when current
+volatility is below long-run levels ($v < \\theta$), and <strong>backwardation</strong>
+(futures below spot) when volatility is elevated ($v > \\theta$).</p>
+
+<h3>Trading Uses</h3>
+<ul>
+<li><strong>Hedging</strong>: Long VXPNT futures hedge a portfolio against volatility spikes.</li>
+<li><strong>Carry trade</strong>: Short VXPNT futures in contango to earn the roll-down, at
+the risk of a vol spike.</li>
+<li><strong>Event plays</strong>: Go long VXPNT before anticipated Fed decisions or
+political events to profit from vol expansion.</li>
+</ul>
+`,
+    },
+
     // -----------------------------------------------------------------------
     // Dynamic Regime Topics
     // -----------------------------------------------------------------------

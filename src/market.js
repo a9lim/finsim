@@ -13,6 +13,7 @@ export const market = {
     kappa: 0, theta: 0, xi: 0, rho: 0,
     a: 0, b: 0, sigmaR: 0,
     borrowSpread: 0,
+    vix: 0,
 };
 
 /** Sync market state from simulation. Call once per substep/reset. */

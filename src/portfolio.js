@@ -8,6 +8,7 @@
 import {
     INITIAL_CAPITAL,
     MAINTENANCE_MARGIN,
+    VIX_MAINTENANCE_MARGIN,
     REG_T_MARGIN,
     SHORT_OPTION_MARGIN_PCT,
     BOND_FACE_VALUE,
@@ -17,8 +18,8 @@ import {
     MONEYNESS_SPREAD_WEIGHT,
 } from './config.js';
 
-import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration } from './pricing.js';
-import { recordStockTrade, recordBondTrade, recordOptionTrade } from './price-impact.js';
+import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration, computeVIXSpot } from './pricing.js';
+import { recordStockTrade, recordBondTrade, recordVixTrade, recordOptionTrade } from './price-impact.js';
 import { getRegulationEffect } from './regulations.js';
 import { capitalMultiplier } from './faction-standing.js';
 
@@ -101,6 +102,9 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
 
     if (type === 'bond') {
         const fillCost = recordBondTrade(signedQty, currentVol);
+        return Math.max(0.01, spreadFill + fillCost);
+    } else if (type === 'vixfuture') {
+        const fillCost = recordVixTrade(signedQty, currentVol);
         return Math.max(0.01, spreadFill + fillCost);
     } else if (type === 'stock') {
         const fillCost = recordStockTrade(signedQty, currentVol);
@@ -215,6 +219,9 @@ function _marginForShort(type, qty, fillPrice, currentPrice, currentVol, current
             // Treat bonds like stock for margin purposes
             return REG_T_MARGIN * fillPrice * qty;
 
+        case 'vixfuture':
+            return REG_T_MARGIN * fillPrice * qty;
+
         case 'call':
         case 'put': {
             // Short option margin: max(SHORT_OPTION_MARGIN_PCT * underlying value, premium received)
@@ -236,6 +243,7 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
     if (type === 'call' || type === 'put') {
         return Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
     }
+    if (type === 'vixfuture') return VIX_MAINTENANCE_MARGIN * mid * absQty;
     return MAINTENANCE_MARGIN * mid * absQty;
 }
 
@@ -274,6 +282,8 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
             const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
             if (pos.type === 'call' || pos.type === 'put') {
                 required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
+            } else if (pos.type === 'vixfuture') {
+                required += VIX_MAINTENANCE_MARGIN * mid * absQty;
             } else {
                 required += MAINTENANCE_MARGIN * mid * absQty;
             }
@@ -326,7 +336,7 @@ export function executeMarketOrder(
     portfolio.totalTrades++;
 
     const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
-    const spreadVol = type === 'bond' ? market.sigmaR : currentVol;
+    const spreadVol = type === 'bond' ? market.sigmaR : type === 'vixfuture' ? market.xi : currentVol;
     const fill = _fillPrice(sim, type, side, qty, mid, currentPrice, strike, spreadVol, expiryDay || 0, currentDay);
 
     // Find existing position of same type+strike+expiry+strategy for netting
@@ -661,7 +671,7 @@ export function closePosition(sim, positionId, currentPrice, currentVol, current
     const pos = portfolio.positions[idx];
     const absQty = Math.abs(pos.qty);
     const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
-    const spreadVol = pos.type === 'bond' ? market.sigmaR : currentVol;
+    const spreadVol = pos.type === 'bond' ? market.sigmaR : pos.type === 'vixfuture' ? market.xi : currentVol;
 
     if (pos.qty > 0) {
         const fill = _fillPrice(sim, pos.type, 'short', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay);
@@ -912,6 +922,22 @@ export function processExpiry(sim, expiryDay, currentPrice, currentDay, currentV
             expired.push(pos);
             continue;
         }
+        if (pos.type === 'vixfuture') {
+            const settlementVIX = computeVIXSpot(market.v, market.kappa, market.theta, market.xi);
+            if (pos.qty > 0) {
+                portfolio.cash += settlementVIX * Math.abs(pos.qty);
+            } else {
+                const returnedMargin = pos._reservedMargin ?? _marginForShort(
+                    pos.type, Math.abs(pos.qty), pos.entryPrice, currentPrice, currentVol,
+                    currentRate, currentDay, pos.strike, pos.expiryDay
+                );
+                portfolio.cash += returnedMargin - settlementVIX * Math.abs(pos.qty);
+            }
+            if (pos.borrowCost) portfolio.closedBorrowCost += pos.borrowCost;
+            portfolio.positions.splice(i, 1);
+            expired.push(pos);
+            continue;
+        }
         if (pos.type !== 'call' && pos.type !== 'put') continue;
 
         // Close at market value (no auto-exercise)
@@ -974,6 +1000,8 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
         const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
         if (pos.type === 'call' || pos.type === 'put') {
             total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
+        } else if (pos.type === 'vixfuture') {
+            total += VIX_MAINTENANCE_MARGIN * mid * absQty;
         } else {
             total += MAINTENANCE_MARGIN * mid * absQty;
         }
@@ -1011,6 +1039,8 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
             const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
             if (pos.type === 'call' || pos.type === 'put') {
                 required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
+            } else if (pos.type === 'vixfuture') {
+                required += VIX_MAINTENANCE_MARGIN * mid * absQty;
             } else {
                 required += MAINTENANCE_MARGIN * mid * absQty;
             }
@@ -1082,6 +1112,29 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
                     theta += -bondP * dLnP / TRADING_DAYS_PER_YEAR * w;
                 } else {
                     theta += currentRate * bondP / TRADING_DAYS_PER_YEAR * w;
+                }
+            }
+            continue;
+        }
+
+        if (pos.type === 'vixfuture') {
+            const dte = pos.expiryDay != null
+                ? Math.max((pos.expiryDay - currentDay) / TRADING_DAYS_PER_YEAR, 0)
+                : 0;
+            if (dte > 0) {
+                const kappa = market.kappa;
+                const Delta = 30 / 252;
+                const kD = kappa * Delta;
+                const MR = kD < 1e-6 ? 1 : (1 - Math.exp(-kD)) / kD;
+                const expKT = Math.exp(-kappa * dte);
+                const sigma = Math.sqrt(Math.max(market.v, 1e-8));
+                const vixFut = unitPrice('vixfuture', currentPrice, currentVol, currentRate, currentDay, null, pos.expiryDay, q);
+                if (vixFut > 0.01) {
+                    vega += w * MR * expKT * 10000 * sigma / vixFut;
+                    // Theta: contango/backwardation decay per trading day
+                    // Positive when v > θ (backwardation decays → long gains),
+                    // negative when v < θ (contango decays → long bleeds)
+                    theta += w * 5000 * kappa * (market.v - market.theta) * expKT * MR / (vixFut * TRADING_DAYS_PER_YEAR);
                 }
             }
             continue;

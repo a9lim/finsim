@@ -7,7 +7,7 @@
    ===================================================== */
 
 import { fmtDte, fmtNum } from './format-helpers.js';
-import { modeledOI, modeledStockADV, modeledBondADV } from './price-impact.js';
+import { modeledOI, modeledStockADV, modeledBondADV, modeledVixADV } from './price-impact.js';
 import { market } from './market.js';
 import { computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 
@@ -18,6 +18,7 @@ import { computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 export function posKey(type, strike, expiryDay) {
     if (type === 'stock') return 'stock';
     if (type === 'bond') return 'bond:' + expiryDay;
+    if (type === 'vixfuture') return 'vixfuture:' + expiryDay;
     return type + ':' + strike + ':' + expiryDay;
 }
 
@@ -306,12 +307,14 @@ export function renderChainInto(container, pricedExpiry, onClick, posMap) {
 // Exported: build stock/bond price table (used by chain overlay)
 // ---------------------------------------------------------------------------
 
-export function buildStockBondTable(stockBA, bondBA, onChainCellClick, posMap, showADV) {
+export function buildStockBondTable(stockBA, bondBA, vixBA, onChainCellClick, posMap, showADV) {
     const table = document.createElement('table');
     table.className = 'chain-tbl overlay-stock-bond';
     const thead = document.createElement('thead');
     const hr = document.createElement('tr');
-    const headers = showADV ? ['Stock', 'Stock ADV', 'Bond ADV', 'Bond'] : ['Stock', 'Bond'];
+    const headers = showADV
+        ? ['Stock', 'Stock ADV', 'Bond ADV', 'Bond', 'VXPNT ADV', 'VXPNT']
+        : ['Stock', 'Bond', 'VXPNT'];
     for (const h of headers) {
         const th = document.createElement('th');
         th.className = 'chain-th';
@@ -355,6 +358,23 @@ export function buildStockBondTable(stockBA, bondBA, onChainCellClick, posMap, s
     bondTd.setAttribute('role', 'button');
     bindCellTrade(bondTd, 'bond', onChainCellClick);
     tr.appendChild(bondTd);
+
+    if (showADV) {
+        const vixAdvTd = document.createElement('td');
+        vixAdvTd.className = 'chain-cell chain-greek';
+        vixAdvTd.textContent = modeledVixADV(market.xi).toFixed(1) + 'k';
+        tr.appendChild(vixAdvTd);
+    }
+
+    const vixTd = document.createElement('td');
+    vixTd.className = 'chain-cell vix-overlay-cell';
+    vixTd.textContent = vixBA ? vixBA.bid.toFixed(2) + ' / ' + vixBA.ask.toFixed(2) : '\u2014';
+    const vixQty = posMap && Object.keys(posMap).filter(k => k.startsWith('vixfuture:')).reduce((acc, k) => acc + posMap[k], 0);
+    if (vixQty) vixTd.classList.add(vixQty > 0 ? 'pos-long' : 'pos-short');
+    vixTd.setAttribute('tabindex', '0');
+    vixTd.setAttribute('role', 'button');
+    bindCellTrade(vixTd, 'vixfuture', onChainCellClick);
+    tr.appendChild(vixTd);
 
     tbody.appendChild(tr);
     table.appendChild(tbody);

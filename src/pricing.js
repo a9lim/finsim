@@ -96,6 +96,43 @@ export function computeEffectiveSigma(v, T, kappa, theta, xi) {
 }
 
 /**
+ * VXPNT spot: 30-day equity volatility index for PNTH.
+ * In the Heston model this is the expected integrated vol over 30 trading days.
+ */
+export function computeVIXSpot(v, kappa, theta, xi) {
+    return computeEffectiveSigma(v, 30 / 252, kappa, theta, xi) * 100;
+}
+
+/**
+ * VXPNT futures fair value: expected VXPNT at expiry time T.
+ * Uses forward variance E[v_T] = θ + (v-θ)e^{-κT}, then computes
+ * the 30-day forward integrated vol from that point.
+ * Natural contango when v < θ, backwardation when v > θ.
+ *
+ * @param {number} v     - Current instantaneous variance
+ * @param {number} kappa - Mean-reversion speed
+ * @param {number} theta - Long-run variance
+ * @param {number} xi    - Vol-of-vol
+ * @param {number} T     - Time to futures expiry in years
+ * @returns {number} Fair VIX futures level (percentage, e.g. 24.5)
+ */
+export function computeVIXFuturePrice(v, kappa, theta, xi, T) {
+    const expNkT = Math.exp(-kappa * T);
+    const fwdVar = theta + (v - theta) * expNkT;
+    const Delta = 30 / 252;
+    const kD = kappa * Delta;
+    const fwdIntVar = kD < 1e-6
+        ? Math.max(fwdVar, 1e-8)
+        : theta + (fwdVar - theta) * (1 - Math.exp(-kD)) / kD;
+    let adj = 0;
+    if (xi > 0 && kD >= 1e-6) {
+        const w = 2 / (kD * kD) * (kD - 1 + Math.exp(-kD));
+        adj = xi * xi / (2 * kappa * kappa) * w;
+    }
+    return 100 * Math.sqrt(Math.max(fwdIntVar + adj, 0));
+}
+
+/**
  * Adjust volatility for moneyness using first-order Heston skew.
  *
  * ATM implied vol skew: dσ/d(log K) ≈ ρξ / (2σ), dampened at longer

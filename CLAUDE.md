@@ -18,13 +18,13 @@ Serve from the root — shared files load via absolute paths (`/shared-*.js`, `/
 
 ## Overview
 
-Interactive options trading simulator at **Meridian Capital**. Player is a senior derivatives trader during the Barron administration. GBM+Merton+Heston stock, Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), strategy builder, portfolio/margin system, Almgren-Chriss price impact, narrative event engine with popup decisions, political lore, chiptune jazz soundtrack, and 5-page adaptive epilogue with 6 ending types. Zero dependencies, vanilla ES6 modules, no build step.
+Interactive options trading simulator at **Meridian Capital**. Player is a senior derivatives trader during the Barron administration. GBM+Merton+Heston stock, Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), VXPNT equity volatility index + tradeable VXPNT futures, strategy builder, portfolio/margin system, Almgren-Chriss price impact, narrative event engine with popup decisions, political lore, chiptune jazz soundtrack, and 5-page adaptive epilogue with 6 ending types. Zero dependencies, vanilla ES6 modules, no build step.
 
 ## Architecture
 
-**Orchestrator**: `main.js` (~2300 lines) — DOM cache `$`, rAF loop, sub-step streaming, all system wiring. Shared micro-helpers at module top: `_toast()` / `_haptic()` (guarded global access), `_clampRate()` (regulation rate bounds), `_runSubstep()` (full substep pipeline), `_refreshStrategyView()` / `_populateStrategyLegs()` (strategy UI update sequence).
+**Orchestrator**: `main.js` (~2400 lines) — DOM cache `$`, rAF loop, sub-step streaming, all system wiring. Shared micro-helpers at module top: `_toast()` / `_haptic()` (guarded global access), `_syncAll()` (syncMarket + VIX computation), `_clampRate()` (regulation rate bounds), `_runSubstep()` (full substep pipeline), `_refreshStrategyView()` / `_populateStrategyLegs()` (strategy UI update sequence).
 
-**Module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator. `market.js` is shared mutable state (single-writer main.js via `syncMarket`, multiple readers).
+**Module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator. `market.js` is shared mutable state (single-writer main.js via `_syncAll`/`syncMarket`, multiple readers — includes `vix` field computed from Heston params).
 
 **Narrative systems** (Dynamic mode only): events.js (Poisson scheduler + followup chains + filibuster/media/interjection recurring pulses + trait-aware likelihood weighting + `evaluateTriggers` for portfolio-triggered events), `src/events/` directory (11 domain files: fed.js, macro.js, pnth.js, congress.js, investigation.js, media.js, market.js, firm.js, tips.js, interjections.js, traits.js — all events share a unified schema; index.js merges pools with by-id lookup and followup chain validation; `_helpers.js` provides portfolio calculation helpers for trigger functions; `param-ranges.js` exports canonical parameter clamping ranges), world-state.js (congress/PNTH/geopolitical/Fed/media), faction-standing.js (unified 6-faction standing system: firmStanding, regulatoryExposure, federalistSupport, farmerLaborSupport, mediaTrust, fedRelations + capitalMultiplier), traits.js (12 permanent convictions + 6 dynamic reputation tags), regulations.js (event-driven regulatory pipeline — legislative bills move through introduced→committee→floor→active/failed, executive orders auto-expire via daily tick; no condition-based activation), lobbying.js (6-action 3-tier targeted PAC funding system), endings.js (6 ending conditions + 5-page adaptive epilogue generation).
 
@@ -60,17 +60,19 @@ Internal values use original scale ($10,000 starting capital). `fmtDollar()` app
 - P&L: `pnl-down` (red) / no class (neutral) / `pnl-up` (green)
 - Portfolio value: colored vs buy-and-hold benchmark, not absolute
 - Greeks: per-Greek CSS vars (`--delta`/`--gamma`/`--theta`/`--vega`/`--rho`), NOT `pnl-up`/`pnl-down`
-- Sparklines: always `--text` CSS var color
+- VIX cells: `--vix` (purple) — `#vix-price-cell`, `#strategy-vix-cell`, `.vix-overlay-cell`
+- VXPNT sparkline: `--vix` CSS var color
+- Sparklines: rate/portfolio use `--text` CSS var color
 
 ### Pricing
 
-Always use `unitPrice()` (position-value.js) — includes vol surface + impact overlay. Only exception: strategy.js payoff curve sweeps via direct tree pricing.
+Always use `unitPrice()` (position-value.js) — includes vol surface + impact overlay. Handles 5 types: `stock`, `bond`, `vixfuture`, `call`, `put`. Only exception: strategy.js payoff curve sweeps via direct tree pricing.
 
-All pricing uses `prepareTree` + `priceWithTree`. No `priceAmerican` function exists. Each module owns reusable trees for zero-alloc pricing.
+All option pricing uses `prepareTree` + `priceWithTree`. No `priceAmerican` function exists. Each module owns reusable trees for zero-alloc pricing. VXPNT spot uses `computeVIXSpot()` (Heston 30-day expected integrated vol × 100). VXPNT futures use `computeVIXFuturePrice()` (forward variance curve → forward integrated vol). Both in `pricing.js`.
 
 ### Price Impact
 
-Impact is an **overlay** on `sim.S` — never mutates it. `getStockImpact(sigma)` and `getOptionImpact(...)` both require current `sigma` at read time. Only `resetImpactState()` clears cumulative volumes.
+Impact is an **overlay** on `sim.S` — never mutates it. `getStockImpact(sigma)`, `getBondImpact(sigmaR)`, `getVixImpact(xi)`, and `getOptionImpact(...)` each require their respective vol parameter at read time. VIX futures impact is keyed off `xi` (vol-of-vol) — higher xi deepens the VIX liquidity pool. Only `resetImpactState()` clears cumulative volumes.
 
 ### Popups vs Toasts
 
@@ -78,7 +80,7 @@ Events are unified under `src/events/`. Toast-only events have `headline` + `par
 
 ### Positions
 
-Signed qty: `qty > 0` = long, `qty < 0` = short. No `side` property. Netting key: `type + strike + expiryDay + strategyName`.
+Signed qty: `qty > 0` = long, `qty < 0` = short. No `side` property. Netting key: `type + strike + expiryDay + strategyName`. Five position types: `stock`, `bond`, `vixfuture`, `call`, `put`. VIX futures are cash-settled at VXPNT spot on expiry, use Reg-T margin for shorts, and contribute vega + theta to portfolio greeks.
 
 ### Strategies
 
@@ -118,6 +120,10 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - `trigger` (portfolio-triggered, daily eval) vs `when` (world-state eligibility guard) — events with `trigger` are never Poisson-drawn
 - `factionShifts` on choices are additive — conditional bonuses (`when.hasTrait`) add to the base `value`, not replace it
 - `superevent: true` on event objects is the sole source of truth — no hardcoded sets or heuristics
+- VIX futures `spreadVol` uses `market.xi` (vol-of-vol), not `market.sigma` — same pattern as bonds using `market.sigmaR`
+- `computeVIXSpot` and `computeVIXFuturePrice` take **variance** `v`, not vol — same convention as `computeEffectiveSigma`
+- VIX futures have no borrow cost — `chargeBorrowInterest` only processes `stock` and `bond`
+- VIX futures theta is positive in backwardation (v > θ), negative in contango (v < θ) — for long positions
 
 ### Do NOT Re-add
 
@@ -157,6 +163,7 @@ Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selecta
 - `Strait of Farsis` / `Beijing` / `Mar-a-Lago` / `Korindian` — use real geography (Strait of Hormuz, Nanjing, Little St. James, Meridine)
 - `$.volumeSlider` / `#volume-slider` in the Info tab — volume slider moved to the settings dropdown (`#settings-btn` toolbar gear icon); DOM cache is `$.settingsBtn`
 - `<h2 class="stats-title">Trading</h2>` in the main sidebar — replaced by `.sidebar-tabs` inside `.stats-header` with tab buttons directly in the header (matches scripture's pattern)
+- `syncMarket(sim)` calls in main.js — use `_syncAll()` which also computes `market.vix`
 
 ### Cross-Domain Event Wiring
 
