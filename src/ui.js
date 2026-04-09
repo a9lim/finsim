@@ -323,9 +323,10 @@ export function bindEvents($, handlers) {
 
     // Order type toggle (Market / Limit / Stop)
     if ($.orderTypeToggles) {
-        _forms.bindModeGroup($.orderTypeToggles, 'ordertype', v => {
-            $.triggerPriceGroup.classList.toggle('hidden', v === 'market');
-        });
+        const _updateOrderDeps = _forms.bindDeps([
+            { target: $.triggerPriceGroup, show: () => $.orderTypeToggles.querySelector('.mode-btn.active')?.dataset.ordertype !== 'market' }
+        ]);
+        _forms.bindModeGroup($.orderTypeToggles, 'ordertype', () => _updateOrderDeps());
     }
 
     // Trigger price slider
