@@ -391,7 +391,12 @@ export class EventEngine {
      * from pool -> substitute {version}/{prevVersion}/{tierLabel}/{tier} placeholders
      * -> apply major-release multiplier if applicable -> fire through _fireEvent.
      *
-     * Returns the result of _fireEvent (entry log + optional popup descriptor).
+     * Returns one of:
+     *   - mediocre-minor branch: a log entry from _logEvent (no event fired through _fireEvent)
+     *   - normal branch: a log entry from _fireEvent, or { queued: true, event } for popups
+     *   - missing-event branch: null (with console.warn)
+     * Caller can pass the result to _partition unchanged — log entries go to fired,
+     * { queued: true, event } objects go to popups, null is filtered.
      */
     _fireSilmarillionRelease(sim, day, netDelta) {
         const { isMajorBump, prevVersion, newVersion } =
