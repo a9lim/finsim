@@ -37,6 +37,9 @@ export function createWorldState() {
             crucibleLaunched:         false,
             companionScandal:        0,
             aegisControversy:        0,
+            silmarillionVersion:     '3.5',
+            lastReleaseTier:         null,
+            frontierLead:            0,
         },
         geopolitical: {
             tradeWarStage:       0,
@@ -161,6 +164,8 @@ const WORLD_STATE_RANGES = {
     'pnth.crucibleLaunched':             { type: 'boolean' },
     'pnth.companionScandal':            { min: 0,   max: 3,   type: 'number' },
     'pnth.aegisControversy':            { min: 0,   max: 3,   type: 'number' },
+    'pnth.lastReleaseTier':             { type: 'enum', values: ['breakthrough', 'strong', 'mediocre', 'disappointing', 'failure'] },
+    'pnth.frontierLead':                { min: -3,  max: 3,   type: 'number' },
     // geopolitical
     'geopolitical.tradeWarStage':       { min: 0,   max: 4,   type: 'number' },
     'geopolitical.mideastEscalation':   { min: 0,   max: 3,   type: 'number' },
@@ -231,6 +236,11 @@ export function applyStructuredEffects(world, effects) {
         if (range.type === 'boolean') {
             const boolVal = Boolean(value);
             obj[leafKey] = boolVal;
+        } else if (range.type === 'enum') {
+            // Enum: only accept values from the whitelist; 'set' op only
+            if (op !== 'set') continue;
+            if (!range.values.includes(value)) continue;
+            obj[leafKey] = value;
         } else {
             // numeric
             const current = typeof obj[leafKey] === 'number' ? obj[leafKey] : 0;
