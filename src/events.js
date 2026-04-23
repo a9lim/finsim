@@ -12,6 +12,7 @@ import {
     NON_FED_COOLDOWN_MIN, NON_FED_COOLDOWN_MAX, FED_MEETING_JITTER,
     BOREDOM_THRESHOLD, TERM_END_DAY,
     PNTH_EARNINGS_INTERVAL, PNTH_EARNINGS_JITTER,
+    MODEL_RELEASE_INTERVAL, MODEL_RELEASE_JITTER, MODEL_RELEASE_OFFSET,
     ADV, EVENT_COUPLING_CAP, HISTORY_CAPACITY,
 } from './config.js';
 
@@ -28,7 +29,7 @@ const MAX_LOG = MAX_EVENT_LOG;
 const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 
 // -- Pulse-excluded categories (not drawn by Poisson random) ------------
-const _PULSE_CATEGORIES = new Set(['fed', 'pnth_earnings', 'midterm', 'interjection']);
+const _PULSE_CATEGORIES = new Set(['fed', 'pnth_earnings', 'midterm', 'interjection', 'model_release']);
 
 // -- EventEngine --------------------------------------------------------
 export class EventEngine {
@@ -65,6 +66,7 @@ export class EventEngine {
         this._pools = {
             fed:            ALL_EVENTS.filter(e => e.category === 'fed' && !e.followupOnly),
             pnth_earnings:  ALL_EVENTS.filter(e => e.category === 'pnth_earnings' && !e.followupOnly),
+            model_release:  ALL_EVENTS.filter(e => e.category === 'model_release' && !e.followupOnly),
             random:         ALL_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category) && !e.followupOnly),
             filibuster:     ALL_EVENTS.filter(e => e.category === 'filibuster' && !e.followupOnly),
             media:          ALL_EVENTS.filter(e => e.category === 'media' && !e.followupOnly),
@@ -79,6 +81,7 @@ export class EventEngine {
         this._pulses = [
             { type: 'recurring', id: 'fomc',           interval: FED_MEETING_INTERVAL,    jitter: FED_MEETING_JITTER,    nextDay: -1, poolKey: 'fed' },
             { type: 'recurring', id: 'pnth_earnings',  interval: PNTH_EARNINGS_INTERVAL,  jitter: PNTH_EARNINGS_JITTER,  nextDay: -1, poolKey: 'pnth_earnings' },
+            { type: 'modelRelease', id: 'model_release', interval: MODEL_RELEASE_INTERVAL, jitter: MODEL_RELEASE_JITTER, offset: MODEL_RELEASE_OFFSET, nextDay: -1 },
             { type: 'recurring', id: 'filibuster_check', interval: 7,  jitter: 2, nextDay: -1, poolKey: 'filibuster' },
             { type: 'recurring', id: 'media_cycle',      interval: 21, jitter: 5, nextDay: -1, poolKey: 'media' },
             { type: 'recurring', id: 'interjection',     interval: 50, jitter: 15, nextDay: -1, poolKey: 'interjection' },
@@ -141,6 +144,16 @@ export class EventEngine {
                 if (day >= pulse.day && !pulse.fired) {
                     pulse.fired = true;
                     return _partition(this[pulse.handler](sim, day, netDelta));
+                }
+            } else if (pulse.type === 'modelRelease') {
+                // Initialize nextDay on first call -- use offset, not interval, for first fire
+                if (pulse.nextDay < 0) {
+                    pulse.nextDay = day + pulse.offset + this._jitterRoll(pulse.jitter);
+                }
+                if (day >= pulse.nextDay) {
+                    pulse.nextDay = day + pulse.interval + this._jitterRoll(pulse.jitter);
+                    const result = this._fireSilmarillionRelease(sim, day, netDelta);
+                    if (result) return _partition([result]);
                 }
             }
         }
@@ -255,12 +268,13 @@ export class EventEngine {
 
         // Reset all pulse states
         for (const pulse of this._pulses) {
-            if (pulse.type === 'recurring') {
+            if (pulse.type === 'recurring' || pulse.type === 'modelRelease') {
                 pulse.nextDay = -1;
             } else if (pulse.type === 'fixed') {
                 pulse.fired = false;
             }
         }
+        this._releasesThisYear = 0;
     }
 
     /** Update player context passed to event guards. */
