@@ -14,6 +14,7 @@ import { FIRM_EVENTS } from './firm.js';
 import { TIP_EVENTS } from './tips.js';
 import { INTERJECTION_EVENTS } from './interjections.js';
 import { TRAIT_EVENTS } from './traits.js';
+import { SILMARILLION_EVENTS } from './silmarillion.js';
 
 export const ALL_EVENTS = [
     ...FED_EVENTS,
@@ -27,6 +28,7 @@ export const ALL_EVENTS = [
     ...TIP_EVENTS,
     ...INTERJECTION_EVENTS,
     ...TRAIT_EVENTS,
+    ...SILMARILLION_EVENTS,
 ];
 
 // -- Event-by-id lookup --
