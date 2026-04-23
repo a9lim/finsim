@@ -188,4 +188,154 @@ export const SILMARILLION_EVENTS = [
             { faction: 'firmStanding', value: -1 },
         ],
     },
+
+    // =====================================================================
+    //  TIER HEADLINE: DISAPPOINTING
+    // =====================================================================
+    {
+        id: 'silmarillion_disappointing',
+        category: 'model_release',
+        magnitude: 'moderate',
+        headline: 'Silmarillion {version} ships and analysts immediately ask why. Capability gains marginal; safety regressions on multiple internal evals. Mira Kassis declines to comment. Stock -6%.',
+        params: { mu: -0.015, theta: 0.01, lambda: 0.3, muJ: -0.01 },
+        effects: [
+            { path: 'pnth.frontierLead', op: 'add', value: -1 },
+        ],
+        factionShifts: [
+            { faction: 'firmStanding', value: -1 },
+        ],
+        followups: [
+            { id: 'kassis_internal_doubt',   mtth: 12, weight: 0.7 },
+            { id: 'talent_drift_to_covenant', mtth: 25, weight: 0.6 },
+            { id: 'dirks_blames_gottlieb_loyalists', mtth: 18, weight: 0.6 },
+        ],
+    },
+
+    // -- Disappointing followup chain -------------------------------------
+    {
+        id: 'kassis_internal_doubt',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'A leaked Kassis memo to her staff appears on TechCrunch: "We cannot keep promising what we cannot deliver. The pretraining bet is not paying back." Dirks orders an internal leak investigation.',
+        magnitude: 'moderate',
+        when: (sim, world) => world.pnth.ctoIsMira,
+        params: { mu: -0.01, theta: 0.005 },
+        effects: [
+            { path: 'media.leakCount', op: 'add', value: 1 },
+        ],
+    },
+    {
+        id: 'talent_drift_to_covenant',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'A wave of mid-level Silmarillion researchers post arrival announcements at Covenant AI within the same week. "Aletheia is where the safety work happens now," one writes. PNTH HR scrambles.',
+        magnitude: 'moderate',
+        params: { mu: -0.01 },
+        effects: (world) => {
+            // If Gottlieb has resigned but not yet started the rival, this nudges
+            // it forward -- the talent flight makes the rival viable.
+            if (!world.pnth.ceoIsGottlieb && !world.pnth.gottliebStartedRival) {
+                world.pnth.gottliebStartedRival = true;
+            }
+        },
+    },
+    {
+        id: 'dirks_blames_gottlieb_loyalists',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Andrea Dirks calls out "a small minority of legacy engineers loyal to Eugene" in an all-hands. The room goes quiet. David Zhen requests a 1:1 with Dirks the same day.',
+        magnitude: 'moderate',
+        params: { mu: -0.005 },
+        effects: (world) => {
+            if (world.pnth.boardDirks < 12) world.pnth.boardDirks += 1;
+            if (world.pnth.boardGottlieb > 0) world.pnth.boardGottlieb -= 1;
+        },
+    },
+
+    // =====================================================================
+    //  TIER HEADLINE: FAILURE
+    // =====================================================================
+    {
+        id: 'silmarillion_failure',
+        category: 'model_release',
+        magnitude: 'major',
+        headline: 'Silmarillion {version} launch is a fiasco. Live demo crashes on stage; benchmark numbers retracted within 24 hours after Tianxia researchers identify training-set contamination. Activist investors smell blood. Stock -14%.',
+        params: { mu: -0.035, theta: 0.02, lambda: 0.6, muJ: -0.03 },
+        effects: [
+            { path: 'pnth.frontierLead', op: 'add', value: -2 },
+            { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+        ],
+        factionShifts: [
+            { faction: 'firmStanding', value: -2 },
+        ],
+        followups: [
+            { id: 'activist_stake_revealed',  mtth: 10, weight: 0.9 },
+            { id: 'sec_inquiry_opened',       mtth: 18, weight: 0.7 },
+            { id: 'kassis_resignation_threat', mtth: 14, weight: 0.6 },
+            { id: 'serica_overtakes_headline', mtth: 25, weight: 0.5 },
+            { id: 'ptonos_revises_pnth_bookings', mtth: 8, weight: 0.8 },
+        ],
+    },
+
+    // -- Failure followup chain ------------------------------------------
+    {
+        id: 'activist_stake_revealed',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Trian-equivalent activist fund Lockstep Capital reveals a 4.8% PNTH stake and a public letter demanding "fundamental governance review." Dirks chairmanship explicitly named.',
+        magnitude: 'major',
+        params: { mu: -0.02, theta: 0.015 },
+        effects: [
+            { path: 'pnth.activistStakeRevealed', op: 'set', value: true },
+        ],
+    },
+    {
+        id: 'sec_inquiry_opened',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'SEC opens informal inquiry into PNTH disclosures around Silmarillion {version} benchmark methodology. Subpoenas hinted at. Compliance counsel works through the weekend.',
+        magnitude: 'major',
+        params: { mu: -0.015, theta: 0.012 },
+        factionShifts: [
+            { faction: 'regulatoryExposure', value: 3 },
+        ],
+    },
+    {
+        id: 'kassis_resignation_threat',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Mira Kassis tells the board she\'ll step down as CTO unless the Silmarillion roadmap is restructured. Wired publishes the threat verbatim within hours. Dirks "evaluating options."',
+        magnitude: 'major',
+        when: (sim, world) => world.pnth.ctoIsMira,
+        params: { mu: -0.02, theta: 0.015 },
+    },
+    {
+        id: 'serica_overtakes_headline',
+        followupOnly: true,
+        category: 'pnth',
+        oneShot: true,
+        likelihood: 1.0,
+        headline: 'Tianxia 3.0 ships with capability evaluations exceeding Silmarillion across multiple benchmarks. Liang Wei: "The era of Western technological hegemony is over." Western press largely concedes the point.',
+        magnitude: 'major',
+        when: (sim, world) => world.pnth.frontierLead <= -2,
+        params: { mu: -0.015, theta: 0.01 },
+    },
+    {
+        id: 'ptonos_revises_pnth_bookings',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Ptonos earnings call mentions "softer demand from a key customer" -- Wall Street decodes it instantly. PNTH bookings revised down. Ptonos stock dips on the dependency reveal.',
+        magnitude: 'moderate',
+        params: { mu: -0.012, theta: 0.008 },
+        factionShifts: [
+            { faction: 'firmStanding', value: -1 },
+        ],
+    },
 ];
