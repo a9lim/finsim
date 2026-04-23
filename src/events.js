@@ -313,6 +313,43 @@ export class EventEngine {
         return entry;
     }
 
+    /**
+     * Roll a Silmarillion release tier using world-state-modulated distribution.
+     * Returns one of: 'breakthrough', 'strong', 'mediocre', 'disappointing', 'failure'.
+     *
+     * Algorithm:
+     *   1. Roll base tier from distribution {F:10, D:25, M:30, S:25, B:10} as index 0..4.
+     *   2. Compute net shift in [-2, +2] from world state (see modulation table).
+     *   3. Add shift to tier index, clamp to [0, 4], return label.
+     */
+    _rollSilmarillionTier(world) {
+        // 1. Base roll: cumulative distribution F=0.10, D=0.35, M=0.65, S=0.90, B=1.00
+        const r = Math.random();
+        let tierIdx;
+        if      (r < 0.10) tierIdx = 0; // failure
+        else if (r < 0.35) tierIdx = 1; // disappointing
+        else if (r < 0.65) tierIdx = 2; // mediocre
+        else if (r < 0.90) tierIdx = 3; // strong
+        else                tierIdx = 4; // breakthrough
+
+        // 2. World-state modulation (sum of conditions, clamped to [-2, +2])
+        let shift = 0;
+        if (world.geopolitical.tradeWarStage >= 2)        shift -= 1;
+        if (world.geopolitical.straitClosed)              shift -= 1;
+        if (world.pnth.aegisControversy >= 2)             shift -= 1;
+        if (world.pnth.commercialMomentum >= 1)           shift += 1;
+        if (world.pnth.commercialMomentum <= -1)          shift -= 1;
+        if (world.pnth.gottliebStartedRival &&
+            (world.pnth.lastReleaseTier === 'disappointing' ||
+             world.pnth.lastReleaseTier === 'failure'))   shift -= 1;
+        if (world.pnth.frontierLead >= 2)                 shift += 1;
+        shift = Math.max(-2, Math.min(2, shift));
+
+        // 3. Apply shift, clamp, map to label
+        tierIdx = Math.max(0, Math.min(4, tierIdx + shift));
+        return ['failure', 'disappointing', 'mediocre', 'strong', 'breakthrough'][tierIdx];
+    }
+
     _scheduleFollowups(event, day, depth, chainIdSuffix) {
         if (!event.followups || depth >= MAX_CHAIN_DEPTH) return;
         const chainId = event.id || ('chain_' + day + (chainIdSuffix || ''));
