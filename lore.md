@@ -160,18 +160,19 @@ Capital: Philadelphia. Presidential island resort: Little St. James.
 
 ## Industry & Suppliers
 
-The chip duopoly powers the AI race. Ptonos is the domestic anchor; Zhaowei is
-the contested foreign alternative. Foundation-model labs (PNTH, Covenant,
-Zhaowei) sit downstream of both.
+Two chip makers and three foundation-model labs define the AI race. Ptonos
+holds Columbian domestic supply; Zhaowei is Serica's vertically integrated
+answer. Atop them sit PNTH (with Silmarillion) and — once founded — Covenant
+(with Aletheia).
 
 - **Ptonos** — Columbia's primary domestic AI accelerator manufacturer.
-  Headquartered in Austin. Sole vendor of the high-end GPUs that train
+  Headquartered in Austin. Primary vendor of the high-end GPUs that train
   Silmarillion, Aletheia, and most Columbian AI workloads. Capacity-constrained —
   every quarter Ptonos chooses who gets allocation. PNTH has historically been
   the priority customer; that arrangement is fragile when Aletheia exists or
   when PNTH stumbles. Ptonos earnings calls are read closely by anyone trying
-  to forecast PNTH's next release. Greek-named after the family naming
-  convention common across the AI sector.
+  to forecast PNTH's next release. CEO Helena Karras (Greek-American;
+  semiconductor architect by training) refuses to do investor roadshows.
 
 - **Tianxia** (天下, "all under heaven") — Zhaowei Technologies' foundation
   model line. Serica's vertically-integrated answer to Silmarillion: Zhaowei
