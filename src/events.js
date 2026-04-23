@@ -52,6 +52,11 @@ export class EventEngine {
         // Epilogue
         this._epilogueFired = false;
 
+        // Silmarillion release counter -- 0..3 within each "year" of releases.
+        // Counter logic is purely modular (4 releases per year, 4th is major bump);
+        // does not depend on sim.day so it stays in sync if releases are missed.
+        this._releasesThisYear = 0;
+
         // Player context for enriched guard signatures
         this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [], traitIds: [], portfolio: {} };
         this._firedOneShot = new Set();
@@ -348,6 +353,36 @@ export class EventEngine {
         // 3. Apply shift, clamp, map to label
         tierIdx = Math.max(0, Math.min(4, tierIdx + shift));
         return ['failure', 'disappointing', 'mediocre', 'strong', 'breakthrough'][tierIdx];
+    }
+
+    /**
+     * Bump world.pnth.silmarillionVersion in place.
+     * 3 minor bumps (patch += 1) followed by 1 major bump (major += 1, patch = 0).
+     * Counter logic is modular on _releasesThisYear, not sim.day.
+     *
+     * Examples (counter -> resulting version starting from 3.5):
+     *   counter=0 -> 3.6 (minor), counter becomes 1
+     *   counter=1 -> 3.7 (minor), counter becomes 2
+     *   counter=2 -> 3.8 (minor), counter becomes 3
+     *   counter=3 -> 4.0 (major), counter becomes 0
+     */
+    _bumpSilmarillionVersion(world) {
+        const [majorStr, patchStr] = world.pnth.silmarillionVersion.split('.');
+        let major = parseInt(majorStr, 10);
+        let patch = parseInt(patchStr, 10);
+        const isMajorBump = (this._releasesThisYear === 3);
+
+        if (isMajorBump) {
+            major += 1;
+            patch = 0;
+            this._releasesThisYear = 0;
+        } else {
+            patch += 1;
+            this._releasesThisYear += 1;
+        }
+
+        world.pnth.silmarillionVersion = `${major}.${patch}`;
+        return { isMajorBump, prevVersion: `${majorStr}.${patchStr}`, newVersion: world.pnth.silmarillionVersion };
     }
 
     _scheduleFollowups(event, day, depth, chainIdSuffix) {
