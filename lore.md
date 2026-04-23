@@ -119,7 +119,15 @@ Capital: Philadelphia. Presidential island resort: Little St. James.
   Dirks/Gottlieb proxy fight. Elderly, enigmatic. His vote is the one that
   determines the company's direction. Both factions court him constantly.
 
-### Products
+### Models & Products
+
+- **Silmarillion** — PNTH's foundation model line. Every Atlas product (Sentinel,
+  Aegis, Companion, Crucible) runs on top of the latest Silmarillion generation.
+  Quarterly minor releases, annual major releases. The most-anticipated event in
+  tech — major-version keynotes are the closest thing the AI industry has to an
+  Apple keynote. Game starts at Silmarillion 3.5; the 1.x line was research,
+  2.x was first commercial, 3.x is current production. Internally referred to
+  as "Sil" or "the model"; press calls it Silmarillion.
 
 - **Atlas Sentinel** — Enterprise surveillance and analytics platform.
   Already launched at game start. Government contracts (DHS, FBI, local PDs)
@@ -147,6 +155,37 @@ Capital: Philadelphia. Presidential island resort: Little St. James.
 - **Covenant AI** — Gottlieb's rival startup after leaving PNTH. Competes on
   "ethical AI" positioning. Poaches some PNTH engineers. Stock market reads it
   as both a competitive threat and validation of the AI sector.
+
+---
+
+## Industry & Suppliers
+
+The chip duopoly powers the AI race. Ptonos is the domestic anchor; Zhaowei is
+the contested foreign alternative. Foundation-model labs (PNTH, Covenant,
+Zhaowei) sit downstream of both.
+
+- **Ptonos** — Columbia's primary domestic AI accelerator manufacturer.
+  Headquartered in Austin. Sole vendor of the high-end GPUs that train
+  Silmarillion, Aletheia, and most Columbian AI workloads. Capacity-constrained —
+  every quarter Ptonos chooses who gets allocation. PNTH has historically been
+  the priority customer; that arrangement is fragile when Aletheia exists or
+  when PNTH stumbles. Ptonos earnings calls are read closely by anyone trying
+  to forecast PNTH's next release. Greek-named after the family naming
+  convention common across the AI sector.
+
+- **Tianxia** (天下, "all under heaven") — Zhaowei Technologies' foundation
+  model line. Serica's vertically-integrated answer to Silmarillion: Zhaowei
+  makes the chips and trains the model on them. Tianxia 2.x is the current
+  generation. Lags Silmarillion by ~1 generation but closes the gap on every
+  PNTH stumble. State-aligned — Liang Wei treats Tianxia parity with
+  Silmarillion as a national-prestige issue.
+
+- **Aletheia** (Greek "truth, unconcealment") — Covenant AI's flagship model.
+  Only exists once Gottlieb has started Covenant (`pnth.gottliebStartedRival
+  = true`). Slower release cadence (~2/year), positioned on safety/transparency
+  rather than capability. Aletheia launches are events that can spike PNTH
+  talent flight if Silmarillion just disappointed. Depends on Ptonos for
+  compute — competes with PNTH for the same chip allocation.
 
 ---
 
