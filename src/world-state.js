@@ -37,8 +37,8 @@ export function createWorldState() {
             crucibleLaunched:         false,
             companionScandal:        0,
             aegisControversy:        0,
-            silmarillionVersion:     '3.5',
-            lastReleaseTier:         null,
+            silmarillionVersion:     '3.5', // not-yet-released sentinel; engine-bumped on quarterly pulse
+            lastReleaseTier:         null,  // null = not-yet-released; LLM cannot reset to null
             frontierLead:            0,
         },
         geopolitical: {
@@ -131,8 +131,11 @@ export function validatePnthBoard(world) {
 // -- LLM effect validation ranges (whitelist) ----------------------------
 // Numeric: { min, max, type: 'number' }
 // Boolean: { type: 'boolean' }
+// Enum:    { type: 'enum', values: [...] } — set-only, value must be in list
 // Null/string fields (midtermResult, presidentialResult) are omitted —
-// the LLM cannot set them via structured effects.
+// the LLM cannot set them via structured effects. silmarillionVersion is
+// also omitted — the engine bumps it on a quarterly schedule, the LLM is
+// not permitted to mutate it.
 
 const WORLD_STATE_RANGES = {
     // congress.senate
@@ -237,7 +240,8 @@ export function applyStructuredEffects(world, effects) {
             const boolVal = Boolean(value);
             obj[leafKey] = boolVal;
         } else if (range.type === 'enum') {
-            // Enum: only accept values from the whitelist; 'set' op only
+            // Enum: categorical state with no ordering, so 'add' is undefined.
+            // Only accept 'set' with a value from the whitelist.
             if (op !== 'set') continue;
             if (!range.values.includes(value)) continue;
             obj[leafKey] = value;
