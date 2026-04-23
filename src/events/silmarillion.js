@@ -101,4 +101,91 @@ export const SILMARILLION_EVENTS = [
         when: (sim, world) => world.pnth.gottliebStartedRival,
         params: { mu: -0.01, theta: 0.01 },
     },
+
+    // =====================================================================
+    //  TIER HEADLINE: STRONG
+    // =====================================================================
+    {
+        id: 'silmarillion_strong',
+        category: 'model_release',
+        magnitude: 'moderate',
+        headline: 'Silmarillion {version} ships with material gains across reasoning and code generation benchmarks. Wall Street takes the win; analysts revise targets up. Stock +5%.',
+        params: { mu: 0.02, theta: 0.005, lambda: 0.3 },
+        effects: [
+            { path: 'pnth.frontierLead', op: 'add', value: 1 },
+        ],
+        factionShifts: [
+            { faction: 'firmStanding', value: 1 },
+        ],
+        followups: [
+            { id: 'malhotra_victory_lap', mtth: 10, weight: 0.7 },
+            { id: 'serica_quiet_response', mtth: 18, weight: 0.5 },
+        ],
+    },
+
+    // -- Strong followup chain --------------------------------------------
+    {
+        id: 'malhotra_victory_lap',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Raj Malhotra books MarketWire and CNBC on the same morning. "Capital allocation discipline. Operational excellence. Adjusted EBITDA up sequentially. The Silmarillion line is the moat." Sharma asks one sharp question; he deflects.',
+        magnitude: 'minor',
+        params: { mu: 0.005 },
+    },
+    {
+        id: 'serica_quiet_response',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Serica\'s state-controlled tech press downplays Silmarillion {version} -- a brief paragraph buried under Tianxia coverage. Western Sericologists read this as nervousness, not confidence.',
+        magnitude: 'minor',
+    },
+
+    // =====================================================================
+    //  TIER HEADLINE: MEDIOCRE (MAJOR ONLY)
+    //  Mediocre minor releases fire as inline toasts from the pulse handler
+    //  and have no entry in this file.
+    // =====================================================================
+    {
+        id: 'silmarillion_major_meh',
+        category: 'model_release',
+        magnitude: 'moderate',
+        headline: 'Silmarillion {version} keynote underwhelms. Year-end major bump headlined the conference circuit but the demos felt rehearsed. The Continental: "Were they hiding something or do they have nothing?" Stock -3%.',
+        params: { mu: -0.012, theta: 0.008, lambda: 0.2 },
+        effects: [
+            { path: 'pnth.commercialMomentum', op: 'add', value: -1 },
+        ],
+        followups: [
+            { id: 'gottlieb_was_right_oped', mtth: 14, weight: 0.7 },
+            { id: 'analyst_downgrades',      mtth: 8,  weight: 0.8 },
+        ],
+    },
+
+    // -- Mediocre-major followup chain ------------------------------------
+    {
+        id: 'gottlieb_was_right_oped',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'The Continental publishes a 3,000-word Rachel Tan piece arguing PNTH lost its way when Dirks won the boardroom: "The military pivot starved the research bench. Silmarillion {version} is the bill arriving."',
+        magnitude: 'moderate',
+        params: { mu: -0.01 },
+        effects: (world) => {
+            if (world.pnth.boardGottlieb < 12) world.pnth.boardGottlieb += 1;
+            if (world.pnth.boardDirks > 0)     world.pnth.boardDirks -= 1;
+        },
+    },
+    {
+        id: 'analyst_downgrades',
+        followupOnly: true,
+        category: 'pnth',
+        likelihood: 1.0,
+        headline: 'Priya Sharma\'s MarketWire post-keynote piece: "The plateau thesis is no longer fringe." Three sell-side desks downgrade PNTH within 48 hours.',
+        magnitude: 'moderate',
+        params: { mu: -0.015, theta: 0.01 },
+        factionShifts: [
+            { faction: 'firmStanding', value: -1 },
+        ],
+    },
 ];
