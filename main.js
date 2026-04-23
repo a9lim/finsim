@@ -1728,6 +1728,17 @@ function _resetCore(index) {
     impactHistory.length = 0;
     quarterlyReviews.length = 0;
     if (eventEngine) eventEngine.resetTriggerCooldowns();
+    if (eventEngine) {
+        // Reset Silmarillion release state on game reset (preset re-load includes this path)
+        eventEngine._releasesThisYear = 0;
+        eventEngine.world.pnth.silmarillionVersion = '3.5';
+        eventEngine.world.pnth.lastReleaseTier = null;
+        eventEngine.world.pnth.frontierLead = 0;
+        // Reset the modelRelease pulse so initial offset reapplies
+        for (const pulse of eventEngine._pulses) {
+            if (pulse.type === 'modelRelease') pulse.nextDay = -1;
+        }
+    }
     resetUsedTips();
     resetFactions();
     // Re-attach faction reference after reset (faction-standing.js is the source of truth)
