@@ -138,7 +138,7 @@ export const SILMARILLION_EVENTS = [
         followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
-        headline: 'Serica\'s state-controlled tech press downplays Silmarillion {version} -- a brief paragraph buried under Tianxia coverage. Western Sericologists read this as nervousness, not confidence.',
+        headline: 'Serica\'s state-controlled tech press downplays the latest Silmarillion release -- a brief paragraph buried under Tianxia coverage. Western Sericologists read this as nervousness, not confidence.',
         magnitude: 'minor',
     },
 
@@ -168,7 +168,7 @@ export const SILMARILLION_EVENTS = [
         followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
-        headline: 'The Continental publishes a 3,000-word Rachel Tan piece arguing PNTH lost its way when Dirks won the boardroom: "The military pivot starved the research bench. Silmarillion {version} is the bill arriving."',
+        headline: 'The Continental publishes a 3,000-word Rachel Tan piece arguing PNTH lost its way when Dirks won the boardroom: "The military pivot starved the research bench. This release is the bill arriving."',
         magnitude: 'moderate',
         params: { mu: -0.01 },
         effects: (world) => {
@@ -298,7 +298,7 @@ export const SILMARILLION_EVENTS = [
         followupOnly: true,
         category: 'pnth',
         likelihood: 1.0,
-        headline: 'SEC opens informal inquiry into PNTH disclosures around Silmarillion {version} benchmark methodology. Subpoenas hinted at. Compliance counsel works through the weekend.',
+        headline: 'SEC opens informal inquiry into PNTH disclosures around the latest Silmarillion benchmark methodology. Subpoenas hinted at. Compliance counsel works through the weekend.',
         magnitude: 'major',
         params: { mu: -0.015, theta: 0.012 },
         factionShifts: [
