@@ -385,6 +385,86 @@ export class EventEngine {
         return { isMajorBump, prevVersion: `${majorStr}.${patchStr}`, newVersion: world.pnth.silmarillionVersion };
     }
 
+    /**
+     * Fire a Silmarillion release event.
+     * Sequence: bump version -> roll tier -> select tier-keyed headline
+     * from pool -> substitute {version}/{prevVersion}/{tierLabel}/{tier} placeholders
+     * -> apply major-release multiplier if applicable -> fire through _fireEvent.
+     *
+     * Returns the result of _fireEvent (entry log + optional popup descriptor).
+     */
+    _fireSilmarillionRelease(sim, day, netDelta) {
+        const { isMajorBump, prevVersion, newVersion } =
+            this._bumpSilmarillionVersion(this.world);
+
+        const tier = this._rollSilmarillionTier(this.world);
+        this.world.pnth.lastReleaseTier = tier;
+
+        // Mediocre-minor releases produce no chain headline event -- just log a
+        // toast directly and skip _fireEvent entirely.
+        if (tier === 'mediocre' && !isMajorBump) {
+            const headline = `Silmarillion ${newVersion} ships. Reviewers: incremental. Aggregate benchmarks roughly flat vs. ${prevVersion}.`;
+            return this._logEvent(day, { headline, category: 'model_release' }, {}, 'minor');
+        }
+
+        // Select the matching tier-keyed headline event from the pool.
+        // For major releases on Mediocre, use the dedicated major-meh event.
+        let eventId;
+        if (tier === 'mediocre' && isMajorBump) {
+            eventId = 'silmarillion_major_meh';
+        } else {
+            eventId = `silmarillion_${tier}`;
+        }
+        const baseEvent = getEventById(eventId);
+        if (!baseEvent) {
+            console.warn(`[events] _fireSilmarillionRelease: missing event '${eventId}'`);
+            return null;
+        }
+
+        // Clone and substitute placeholders in the headline.
+        const tierLabel = {
+            breakthrough: 'breakthrough',
+            strong: 'strong showing',
+            mediocre: 'middling result',
+            disappointing: 'underwhelming launch',
+            failure: 'fiasco',
+        }[tier];
+        const resolvedHeadline = baseEvent.headline
+            .replaceAll('{version}',     newVersion)
+            .replaceAll('{prevVersion}', prevVersion)
+            .replaceAll('{tierLabel}',   tierLabel)
+            .replaceAll('{tier}',        tier);
+
+        // Major release: multiply per-tier deltas (params and frontierLead-bearing
+        // effects). _fireEvent applies clamping after delta addition, so the
+        // multiplier is safe to apply here on the cloned params.
+        let resolvedParams = baseEvent.params;
+        let resolvedEffects = baseEvent.effects;
+        if (isMajorBump && resolvedParams) {
+            resolvedParams = {};
+            for (const [k, v] of Object.entries(baseEvent.params)) {
+                resolvedParams[k] = v * 1.5;
+            }
+        }
+        if (isMajorBump && Array.isArray(baseEvent.effects)) {
+            resolvedEffects = baseEvent.effects.map(eff => {
+                if (eff.path === 'pnth.frontierLead' && eff.op === 'add') {
+                    return { ...eff, value: eff.value * 2 };
+                }
+                return eff;
+            });
+        }
+
+        const cloned = {
+            ...baseEvent,
+            headline: resolvedHeadline,
+            params:   resolvedParams,
+            effects:  resolvedEffects,
+        };
+
+        return this._fireEvent(cloned, sim, day, 0, netDelta);
+    }
+
     _scheduleFollowups(event, day, depth, chainIdSuffix) {
         if (!event.followups || depth >= MAX_CHAIN_DEPTH) return;
         const chainId = event.id || ('chain_' + day + (chainIdSuffix || ''));
