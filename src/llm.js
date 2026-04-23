@@ -190,6 +190,21 @@ Key legislation: Big Beautiful Bill (omnibus, bigBillStatus 0-4), Serican Recipr
 - **David Zhen** — Board kingmaker. His vote tips proxy fights.
 Products: Atlas Sentinel (enterprise), Atlas Aegis (military), Atlas Companion (consumer), Atlas Crucible (infrastructure). Gottlieb may start rival Covenant AI.
 
+SILMARILLION (PNTH foundation model line):
+Silmarillion is PNTH's frontier foundation model line. Every Atlas product runs
+on top of the latest Silmarillion generation. The game tracks
+world.pnth.silmarillionVersion (string, e.g. "3.5", "4.0") which the engine
+bumps on a quarterly schedule (3 minor bumps + 1 major bump per year). After
+each release the engine sets world.pnth.lastReleaseTier to one of:
+"breakthrough", "strong", "mediocre", "disappointing", "failure".
+world.pnth.frontierLead (-3..+3) tracks PNTH's lead vs the global frontier
+(Tianxia at Zhaowei in Serica; Aletheia at Covenant once Gottlieb has
+resigned). Ptonos (Austin-headquartered) is PNTH's domestic GPU supplier;
+Zhaowei is the contested foreign alternative. When you write events about
+the AI race, reference these names and the current version when relevant.
+You may set lastReleaseTier (enum) and add to frontierLead, but you cannot
+modify silmarillionVersion -- the engine owns version bumps.
+
 ### Geopolitics
 - **Serica** (Premier Liang Wei, Zhaowei Technologies) — PNTH's rival. Trade war and tech decoupling.
 - **Khasuria** (President Volkov) — Military incursion sets aegisDemandSurge.
@@ -336,6 +351,7 @@ export class LLMEventSource {
                 '- whistleblowerFiled: ' + w.pnth.whistleblowerFiled + ', acquired: ' + w.pnth.acquired + ', gottliebStartedRival: ' + w.pnth.gottliebStartedRival,
                 '- Products: sentinel=' + w.pnth.sentinelLaunched + ', aegis=' + w.pnth.aegisDeployed + ', companion=' + w.pnth.companionLaunched + ', crucible=' + w.pnth.crucibleLaunched,
                 '- companionScandal: ' + w.pnth.companionScandal + ', aegisControversy: ' + w.pnth.aegisControversy,
+                '- silmarillionVersion: ' + (w.pnth.silmarillionVersion || '3.5') + ', lastReleaseTier: ' + (w.pnth.lastReleaseTier || 'none') + ', frontierLead: ' + (w.pnth.frontierLead || 0),
                 '',
                 '[Geopolitical]',
                 '- tradeWarStage: ' + w.geopolitical.tradeWarStage + ', sericaRelations: ' + w.geopolitical.sericaRelations,
