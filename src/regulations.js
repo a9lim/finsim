@@ -106,6 +106,14 @@ const REGULATIONS = [
         duration: null, // special: no auto-expiry, controlled by filibuster chain
         effects: { spreadMult: 1.25 },
     },
+    {
+        id: 'algorithmic_capability_disclosure_act',
+        name: 'Algorithmic Capability Disclosure Act',
+        description: 'Reyes\'s response to the Silmarillion capability surge — mandatory pre-release disclosure of foundation-model evaluations to the FTC. Compliance overhead increases borrowing costs across AI-exposed names.',
+        color: 'var(--ext-purple)',
+        type: 'legislative',
+        effects: { borrowSpreadAdd: 0.2 },
+    },
 ];
 
 // -- Lookup helper --------------------------------------------------------
