@@ -79,6 +79,9 @@ export const BOREDOM_THRESHOLD = 3;        // consecutive minor events before bo
 export const TERM_END_DAY = HISTORY_CAPACITY + 1008;          // 4 years into live trading
 export const PNTH_EARNINGS_INTERVAL = 63;  // quarterly earnings, aligned with QUARTERLY_CYCLE
 export const PNTH_EARNINGS_JITTER = 5;     // +/-5 day jitter on earnings schedule
+export const MODEL_RELEASE_INTERVAL = 63;  // quarterly model releases, same cadence as earnings
+export const MODEL_RELEASE_JITTER   = 5;   // +/-5 day jitter, matching earnings
+export const MODEL_RELEASE_OFFSET   = 32;  // initial offset so releases interleave with earnings (32 days after game start)
 
 // -- Chart rendering --
 export const CHART_Y_AXIS_W = 64;          // right-side Y-axis label area (CSS px)
