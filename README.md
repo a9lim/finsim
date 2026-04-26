@@ -16,7 +16,7 @@ An interactive options trading simulator that runs entirely in the browser. You 
 
 - **Price dynamics**: geometric Brownian motion, Merton jump diffusion, Heston stochastic volatility, Vasicek interest rates
 - **Option pricing**: Cox-Ross-Rubinstein binomial trees (128 steps) with discrete dividends and finite-difference Greeks (Delta, Gamma, Theta, Vega, Rho)
-- **Options chains**: 25 strikes across 8 rolling expiries with volatility-aware bid/ask spreads
+- **Options chains**: 21 strikes across 8 rolling expiries with volatility-aware bid/ask spreads
 - **Price impact**: Almgren-Chriss model with market-maker rehedging that creates realistic gamma squeeze and pin-to-strike dynamics
 - **Portfolio management**: margin requirements, position netting, risk exposure, and the cost of leverage
 
@@ -33,7 +33,7 @@ Then open `http://localhost:8000/shoals/`.
 
 ## Tech
 
-Vanilla HTML, CSS, and JavaScript with ES6 modules. There's no build step, bundler, or dependencies. Canvas 2D for charts. All the pricing, simulation, and portfolio logic is written from scratch. The chiptune jazz soundtrack is synthesized at runtime via the Web Audio API, so there are no external audio files.
+Vanilla HTML, CSS, and JavaScript with ES6 modules. There's no build step, bundler, or dependencies. Canvas 2D for charts. All the pricing, simulation, and portfolio logic is written from scratch. The lounge jazz soundtrack is synthesized at runtime via the Web Audio API, so there are no external audio files.
 
 ## License
 
